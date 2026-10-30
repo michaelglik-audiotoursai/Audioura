@@ -47,30 +47,91 @@ HOST_METER_DIR = os.path.join(os.path.expanduser("~"), "Audioura", "meterlogs")
 CONTAINER_METER_DIR = "/meterlogs"
 CANONICAL_LOG = CONTAINER_METER_DIR + "/paid_api_calls.jsonl"
 
+# [LOCAL-827] The WHOLE-TASK budget ledger dir (LOCAL-817). task_budget.py and
+# LiveRunMeter write ~/.audioura_task_budgets/<id>.json; the raw meter door and
+# task_budget_report.py read it. Before 827 this dir was NEVER mounted into the
+# isolated --rm containers, so every run's LiveRunMeter wrote its ledger INSIDE
+# the container, which --rm destroyed — so the whole-task cap (LOCAL-817) started
+# from $0 every run and never accumulated across runs (LOCAL-821B spent $0.81 vs
+# $0.40; LOCAL-823/824 reported "No ledger … No runs recorded yet"). Mounting the
+# host dir at the SAME path the container's _task_budget_dir() default resolves to
+# makes every isolated run of a task share ONE ledger.
+HOST_TASK_BUDGET_DIR = os.path.join(os.path.expanduser("~"), ".audioura_task_budgets")
+CONTAINER_TASK_BUDGET_DIR = "/task_budgets"
+
 
 def docker_meter_args(task_id, meter_dir, host_meter_dir=HOST_METER_DIR,
-                      key_suffix=None):
+                      key_suffix=None, host_task_budget_dir=HOST_TASK_BUDGET_DIR,
+                      task_budget_usd=None, env=None):
     """Return the ``docker run`` argv fragment that bind-mounts the shared
     meterlog dir, installs the meter (PYTHONPATH=/opt/meter), writes the canonical
-    log and tags every row ``service=<task_id>``.
+    log and tags every row ``service=<task_id>`` — AND [LOCAL-827] bind-mounts the
+    shared whole-task budget ledger dir so every isolated run of a task shares ONE
+    ledger, and arms the whole-task cap (TASK_BUDGET_ID / TASK_BUDGET_USD).
 
-    meter_dir       — the repo's ``_meter`` directory on the host (mounted read-only
-                      at /opt/meter so sitecustomize installs the meter).
-    host_meter_dir  — host dir to bind at /meterlogs (default ~/Audioura/meterlogs);
-                      created if missing so the mount never fails.
-    key_suffix      — optional last-few chars of the paid-API key (NOT the key).
+    meter_dir            — the repo's ``_meter`` directory on the host (mounted
+                           read-only at /opt/meter so sitecustomize installs the
+                           meter).
+    host_meter_dir       — host dir to bind at /meterlogs (default
+                           ~/Audioura/meterlogs); created if missing so the mount
+                           never fails.
+    key_suffix           — optional last-few chars of the paid-API key (NOT the key).
+    host_task_budget_dir — [LOCAL-827] host dir holding the per-task JSON ledgers
+                           (default ~/.audioura_task_budgets); created if missing
+                           and bind-mounted at /task_budgets, with
+                           AUDIOURA_TASK_BUDGET_DIR pointing the container there, so
+                           LiveRunMeter's ledger and the raw door's meter-log cap
+                           both persist to the host across --rm.
+    task_budget_usd      — [LOCAL-827] the whole-task budget in dollars. When None,
+                           falls back to the caller's TASK_BUDGET_USD env. When a
+                           value is resolved, TASK_BUDGET_ID is set to ``task_id``
+                           and TASK_BUDGET_USD to the budget, arming the LOCAL-817
+                           whole-task cap and the LOCAL-827 meter-log cap inside the
+                           container.
+    env                  — env mapping the budget vars are read from (defaults to
+                           os.environ); lets a caller/test pass an explicit env.
     """
     try:
         os.makedirs(host_meter_dir, exist_ok=True)
+    except Exception:
+        pass
+    # [LOCAL-827] Create the shared ledger dir so the bind-mount never fails
+    # (mirrors the meterlog dir handling above).
+    try:
+        os.makedirs(host_task_budget_dir, exist_ok=True)
     except Exception:
         pass
     args = [
         "-e", "PYTHONPATH=/opt/meter",
         "-e", "PAID_API_LOG=" + CANONICAL_LOG,
         "-e", "METER_SERVICE=" + str(task_id),
+        # [LOCAL-827] Point the container's task-budget code at the mounted dir.
+        "-e", "AUDIOURA_TASK_BUDGET_DIR=" + CONTAINER_TASK_BUDGET_DIR,
         "-v", "%s:/opt/meter:ro" % meter_dir,
         "-v", "%s:%s" % (host_meter_dir, CONTAINER_METER_DIR),
+        # [LOCAL-827] The shared whole-task budget ledger dir, so every isolated
+        # run of a task reads/writes the SAME ledger instead of a throwaway one
+        # inside the --rm container.
+        "-v", "%s:%s" % (host_task_budget_dir, CONTAINER_TASK_BUDGET_DIR),
     ]
+    # [LOCAL-827] Arm the whole-task cap: TASK_BUDGET_ID is the task id (so the
+    # meter-log cap keys on service==task_id); TASK_BUDGET_USD is the budget,
+    # resolved from the arg or the caller's env. Setting TASK_BUDGET_ID also keeps
+    # the LOCAL-822 mount guard armed, exactly as the .sh wrappers do by hand.
+    _env = os.environ if env is None else env
+    budget = task_budget_usd
+    if budget is None:
+        try:
+            raw = _env.get("TASK_BUDGET_USD")
+            if raw is not None and str(raw).strip() != "":
+                budget = str(raw).strip()
+        except Exception:
+            budget = None
+    else:
+        budget = str(budget)
+    if budget is not None:
+        args += ["-e", "TASK_BUDGET_ID=" + str(task_id),
+                 "-e", "TASK_BUDGET_USD=" + str(budget)]
     if key_suffix:
         args += ["-e", "METER_KEY_SUFFIX=" + str(key_suffix)[-8:]]
     return args

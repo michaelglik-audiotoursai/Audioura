@@ -800,6 +800,171 @@ def check_task_budget():
 
 
 # --------------------------------------------------------------------------- #
+# Meter-log whole-task cap  (LOCAL-827)
+#
+# THE GAP LEFT BY LOCAL-817. The cap above reads the JSON ledger
+# (~/.audioura_task_budgets/<id>.json), which only LiveRunMeter writes, and only
+# at the END of a run. So:
+#   * a container whose ledger dir was never bind-mounted wrote the ledger inside
+#     the --rm container, which is destroyed — every run started from $0 and the
+#     whole-task cap never accumulated across runs (LOCAL-821B spent $0.81 vs
+#     $0.40; LOCAL-823/824 reported "No ledger … No runs recorded yet"), and
+#   * even with the dir mounted (LOCAL-827 docker_meter_args), the ledger only
+#     catches up at run END, so a single long run could overspend before its one
+#     ledger row is written.
+#
+# This cap is INDEPENDENT of LiveRunMeter: it sums the `usd` of the task's OWN
+# rows in the CANONICAL METER LOG (PAID_API_LOG) — the append-only JSONL the
+# meter itself writes after every paid call, tagged service=<task id>. Because the
+# log dir is bind-mounted to the host (the LOCAL-819/820 contract) and shared by
+# every isolated run of a task, the sum is the task's TRUE spend across ALL its
+# containers, updated the instant each call is recorded. Once that sum reaches
+# TASK_BUDGET_USD the raw door refuses the next paid call. It is the mechanical
+# cap the ticket asks for: "budget from the meter itself".
+#
+# ARMING — identical gate to the mount guard (LOCAL-822B), so a cap meant for Kiro
+# task runs can NEVER refuse a production paid call:
+#   * OFF unless TASK_BUDGET_ID is set AND TASK_BUDGET_USD resolves (>= 0).
+#   * NEVER armed when K_SERVICE is set (Cloud Run) — belt and braces.
+#   * Only the task's OWN rows count: a row is summed iff service == TASK_BUDGET_ID
+#     (the same tag docker_meter_args / the .sh wrappers stamp), so the shared
+#     stack's rows in the same log never count toward a task's cap and vice-versa.
+#
+# CACHING — summing the log on every call would reread a growing file each time.
+# The sum is cached per (log path, task id) and re-read at most every 10 s, like
+# the daily limit's 60 s DB cache. A budget breach is therefore enforced within
+# ~10 s of the call that crossed it; for a $0.0002 live cap with calls seconds
+# apart that still stops the run within a call or two, which the live proof shows.
+#
+# FAIL-OPEN — any error reading the env or the log -> allow (a meter bug must
+# never block a tour), exactly like check_daily_limit and check_task_budget.
+# A budget of exactly $0 is a real cap ($0 >= $0 refuses the first paid call).
+# --------------------------------------------------------------------------- #
+_METER_LOG_CAP_TTL = 10.0  # seconds: re-read the log at most this often
+# Cache: {(log_path, task_id): (expiry_epoch, summed_usd)}. Guarded by _meterlog_lock.
+_meterlog_lock = threading.Lock()
+_meterlog_cap_cache = {}
+
+
+def _meter_log_path_for_cap():
+    """The canonical meter log this process writes/reads, matching LOG so the cap
+    sums the SAME file the meter appends to. Never raises."""
+    try:
+        return os.environ.get("PAID_API_LOG") or LOG
+    except Exception:
+        return LOG
+
+
+def _sum_meter_log_usd_for_service(task_id, log_path):
+    """Sum of billed (status 200) `usd` for rows whose service == task_id in the
+    canonical meter log at ``log_path``. A missing log reads as $0.0 (fail-open: a
+    task with no rows yet has spent nothing). Raises only on an unexpected read
+    error so the caller can fail open. Malformed lines and rows missing fields are
+    skipped. Rows with no explicit status are counted (the meter writes status on
+    every real row; a defensive default of 'billed' keeps the cap conservative)."""
+    total = 0.0
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="ignore") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(row, dict):
+                    continue
+                if str(row.get("service") or "") != str(task_id):
+                    continue
+                status = row.get("status")
+                # Only billed rows carry $ (a non-200 row's usd is 0 anyway, but
+                # skip it explicitly so a future non-zero error row never counts).
+                if status is not None and status != 200:
+                    continue
+                try:
+                    total += float(row.get("usd") or 0.0)
+                except (TypeError, ValueError):
+                    continue
+    except FileNotFoundError:
+        return 0.0
+    return total
+
+
+def _meter_log_spent(task_id, log_path=None, now=None):
+    """Cached sum of the task's own spend from the canonical meter log. Re-reads
+    the file at most every _METER_LOG_CAP_TTL seconds per (log, task). Never
+    raises -> on any error returns 0.0 (fail-open)."""
+    try:
+        path = log_path or _meter_log_path_for_cap()
+        now_ts = now if now is not None else time.time()
+        key = (path, str(task_id))
+        with _meterlog_lock:
+            cached = _meterlog_cap_cache.get(key)
+            if cached is not None and now_ts < cached[0]:
+                return cached[1]
+        total = _sum_meter_log_usd_for_service(task_id, path)
+        with _meterlog_lock:
+            _meterlog_cap_cache[key] = (now_ts + _METER_LOG_CAP_TTL, total)
+        return total
+    except Exception:
+        return 0.0
+
+
+def _meter_log_cap_armed():
+    """[LOCAL-827] True only for a Kiro task run with a budget: TASK_BUDGET_ID set
+    and TASK_BUDGET_USD resolved, and NEVER on Cloud Run (K_SERVICE set). Mirrors
+    the mount-guard arming so the cap can never stop production. Never raises ->
+    False."""
+    try:
+        if _is_cloud_run():
+            return False
+        if not _task_budget_id():
+            return False
+        if _task_budget_usd() is None:
+            return False
+        return True
+    except Exception:
+        return False
+
+
+def check_task_budget_meter_log():
+    """[LOCAL-827] Enforce TASK_BUDGET_USD from the METER LOG itself. Raises
+    TaskBudgetExceeded when the sum of the task's own billed `usd` rows in the
+    canonical meter log (service == TASK_BUDGET_ID) has reached TASK_BUDGET_USD;
+    returns None (allow) otherwise.
+
+    This is the mechanical cap that accumulates across isolated run containers
+    without depending on LiveRunMeter's end-of-run ledger: the meter writes a row
+    after every paid call, the log dir is bind-mounted to the host and shared by
+    every run of the task, so the sum is the task's true cross-run spend. The sum
+    is cached and re-read at most every 10 s.
+
+    Never armed without TASK_BUDGET_ID, and never on Cloud Run (K_SERVICE). Fails
+    OPEN on any error. Called immediately before sending any paid request,
+    alongside check_daily_limit, check_task_budget and check_meter_mount."""
+    try:
+        if not _meter_log_cap_armed():
+            return  # cap off / production
+        task_id = _task_budget_id()
+        budget = _task_budget_usd()
+        spent = _meter_log_spent(task_id)
+    except Exception as e:
+        # Fail-open: an env/log read error must never block a tour.
+        try:
+            sys.stderr.write("[paid_api_meter] meter-log task-budget check failed "
+                             "open: %s\n" % (str(e)[:200],))
+        except Exception:
+            pass
+        return
+    if spent >= budget:
+        raise TaskBudgetExceeded(
+            "TASK_BUDGET_USD reached (meter log): task %s metered paid-API spend "
+            "$%.4f >= budget $%g. Refusing paid request (whole-task cap across all "
+            "run containers, LOCAL-827)." % (task_id, spent, budget))
+
+
+# --------------------------------------------------------------------------- #
 # Container meter-mount contract  (LOCAL-822 / LOCAL-822B)
 #
 # LOCAL-820 wired the .sh wrappers and isolated_test.py so a container's meter
@@ -1038,6 +1203,7 @@ def install():
             if _host_kind(request.url):
                 check_daily_limit()
                 check_task_budget()
+                check_task_budget_meter_log()
                 check_meter_mount()
             resp = _orig(self, request, **kw)
             try:
@@ -1063,6 +1229,7 @@ def install():
             # Enforce the daily limit BEFORE sending the paid request.
             check_daily_limit()
             check_task_budget()
+            check_task_budget_meter_log()
             check_meter_mount()
             try:
                 resp = _orig_open(req, *a, **kw)
@@ -1128,6 +1295,7 @@ def install():
             if _host_kind(url):
                 check_daily_limit()
                 check_task_budget()
+                check_task_budget_meter_log()
                 check_meter_mount()
             resp = _orig_httpx_send(self, request, stream=stream, **kw)
             try:
@@ -1146,6 +1314,7 @@ def install():
             if _host_kind(url):
                 check_daily_limit()
                 check_task_budget()
+                check_task_budget_meter_log()
                 check_meter_mount()
             resp = await _orig_httpx_asend(self, request, stream=stream, **kw)
             try:
@@ -1175,6 +1344,7 @@ def install():
             if _host_kind(url):
                 check_daily_limit()
                 check_task_budget()
+                check_task_budget_meter_log()
                 check_meter_mount()
             resp = await _orig_aiohttp_request(self, method, str_or_url, **kw)
             try:
@@ -1258,6 +1428,7 @@ def install():
             if kind:
                 check_daily_limit()
                 check_task_budget()
+                check_task_budget_meter_log()
                 check_meter_mount()
             try:
                 response = _orig_make_api_call(self, operation_name, api_params)
