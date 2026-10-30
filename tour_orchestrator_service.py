@@ -149,6 +149,39 @@ WORKER_SERVICE_ACCOUNT = os.getenv('WORKER_SERVICE_ACCOUNT', '')
 # Job store mode: 'memory' for local Docker, 'database' for Cloud Run (multi-instance safe)
 JOB_STORE_MODE = os.getenv('JOB_STORE_MODE', 'memory')
 
+# [LOCAL-821] Durable record of every orchestrator job so a tour whose
+# generation outlived the instance (Cloud Run SIGTERM) is finished by the next
+# instance. Guarded import: a missing module must never break the service — the
+# resume/sweep simply no-ops and the live in-memory path still delivers the tour
+# on the instance that generated it.
+try:
+    from orchestrator_jobs import get_orchestrator_jobs_store
+except Exception as _orch_jobs_import_err:  # pragma: no cover - image without the module
+    get_orchestrator_jobs_store = None
+    print(f"[LOCAL-821] orchestrator_jobs store unavailable ({_orch_jobs_import_err}); "
+          f"resume-on-boot/sweep disabled, live path unchanged.")
+
+# Resume/sweep is opt-in via env so existing single-instance Docker deployments
+# are unaffected until explicitly enabled (Cloud Run sets it true). The sweep
+# interval and the "don't touch a job younger than this" guard are tunable.
+ORCH_RESUME_ENABLED = os.getenv('ORCH_RESUME_ENABLED', 'false').lower() == 'true'
+ORCH_SWEEP_INTERVAL_SECONDS = int(os.getenv('ORCH_SWEEP_INTERVAL_SECONDS', '120'))
+# A job must have been idle (no progress write) at least this long before a
+# sweep re-attaches, so a healthy in-flight job on another live instance is left
+# alone. Resume-on-boot uses 0 (anything non-terminal is fair game at startup).
+ORCH_SWEEP_MIN_IDLE_SECONDS = int(os.getenv('ORCH_SWEEP_MIN_IDLE_SECONDS', '300'))
+
+
+def _orch_jobs_store():
+    """Return the orchestrator_jobs store singleton, or None if unavailable."""
+    if get_orchestrator_jobs_store is None:
+        return None
+    try:
+        return get_orchestrator_jobs_store()
+    except Exception as _e:  # pragma: no cover - defensive
+        print(f"[LOCAL-821] could not get orchestrator_jobs store: {_e}")
+        return None
+
 
 def _get_auth_headers(target_url):
     """Get authorization headers for service-to-service calls on Cloud Run.
@@ -710,6 +743,72 @@ def _set_tour_request_status(job_id, status):
         print(f"[QUOTA] WARNING: could not set tour_requests status={status} for {job_id}: {_e}")
 
 
+def _generator_job_state(generator_job_id):
+    """[LOCAL-821] Return the generator job's current status as one of
+    'completed' | 'processing' | 'queued' | 'error' | 'missing'.
+
+    Reads the generator's /status/<id> endpoint, which is backed by the
+    generator_jobs table (LOCAL-775) and so answers from ANY instance — the
+    whole reason a resumed orchestration can re-attach. A 404 or any error maps
+    to 'missing' (treat as not-recoverable so a genuinely unknown job is not
+    retried forever). Best-effort; never raises."""
+    if not generator_job_id:
+        return 'missing'
+    try:
+        resp = _authenticated_request(
+            "GET", f"{TOUR_GENERATOR_URL}/status/{generator_job_id}", timeout=30)
+        if resp.status_code == 404:
+            return 'missing'
+        if resp.status_code != 200:
+            return 'missing'
+        data = resp.json()
+        status = (data.get('status') or '').strip().lower()
+        if status in ('completed', 'processing', 'queued', 'error'):
+            return status
+        # Unknown/blank status from a known job — treat as still processing so we
+        # do not throw away a job that may yet finish.
+        return 'processing'
+    except Exception as _e:
+        print(f"[LOCAL-821] _generator_job_state({generator_job_id}) failed: {_e}")
+        return 'missing'
+
+
+def _tour_already_stored_for_job(job_id):
+    """[LOCAL-821] Idempotency guard for resume/sweep: has this orchestrator job
+    already been delivered?
+
+    A delivered job flips its tour_requests row (keyed on tour_id = job_id,
+    source 'orchestrator') to 'completed' as the very last step. If that row is
+    already 'completed', the tour was stored and we must NOT deliver again on a
+    resume. Returns True only when the row is confirmed 'completed'; any DB error
+    or a missing row returns False, so a genuine un-finished job is still
+    resumed (the store_audio_tour cache-hit guard is the second line of defence
+    if it turns out a row was stored). Best-effort read."""
+    try:
+        import psycopg2 as _pg
+        _conn = _pg.connect(
+            host=os.getenv('DB_HOST', 'postgres-2'),
+            database=os.getenv('DB_NAME', 'audiotours'),
+            user=os.getenv('DB_USER', 'admin'),
+            password=os.getenv('DB_PASSWORD', 'password123'),
+            port=os.getenv('DB_PORT', '5432')
+        )
+        _cur = _conn.cursor()
+        _cur.execute(
+            "SELECT status FROM tour_requests "
+            "WHERE tour_id = %s AND source = 'orchestrator' "
+            "ORDER BY id DESC LIMIT 1",
+            (job_id,)
+        )
+        _row = _cur.fetchone()
+        _cur.close()
+        _conn.close()
+        return bool(_row and _row[0] == 'completed')
+    except Exception as _e:
+        print(f"[LOCAL-821] _tour_already_stored_for_job({job_id}) check skipped: {_e}")
+        return False
+
+
 def _release_generation_reservation(user_id, job_id, reason):
     """[LOCAL-595B defect 2/3] Give back the L3 fresh_used / L4 ops_used unit
     reserved at request time, because the reserved generation did not result in
@@ -727,8 +826,11 @@ def _release_generation_reservation(user_id, job_id, reason):
 # [LOCAL-606] The columns captured in a version snapshot. Centralised so the
 # ensure-table DDL, the snapshot INSERT in store_audio_tour and the restore
 # helper (restore_tour_version.py) all agree on the exact set.
+# [LOCAL-821B] zip_bytes added: when the ZIP lives in the DB column
+# audio_tours.audio_tour (GCloud), the OLD bytes are archived here so a restore
+# brings back audio, not just text — otherwise the replace is irreversible.
 AUDIO_TOUR_VERSION_COLUMNS = (
-    "tour_content", "zip_filename", "stops_count", "lat", "lng",
+    "tour_content", "zip_filename", "stops_count", "lat", "lng", "zip_bytes",
 )
 
 
@@ -777,11 +879,26 @@ def _ensure_versioning_objects(cur):
             stops_count INTEGER,
             lat DOUBLE PRECISION,
             lng DOUBLE PRECISION,
+            zip_bytes BYTEA,
             replaced_at TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
             replaced_by_job VARCHAR(128),
             CONSTRAINT uq_audio_tour_versions_tour_version UNIQUE (tour_id, version_no)
         )
     """)
+
+    # [LOCAL-821B] Additive zip_bytes column for tables created before 821B.
+    # On GCloud the ZIP lives in the DB column audio_tours.audio_tour, not a
+    # file on disk; archiving the old TEXT alone left the replace irreversible
+    # (the 465 defect). Keep the OLD bytes here so a restore brings back audio
+    # too. Nullable: rows archived before this column (or where the ZIP was a
+    # renamed file on disk) simply carry NULL and fall back to the disk file.
+    cur.execute("""
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'audio_tour_versions' AND column_name = 'zip_bytes'
+    """)
+    if cur.fetchone() is None:
+        print("[LOCAL-821B] Adding audio_tour_versions.zip_bytes column...")
+        cur.execute("ALTER TABLE audio_tour_versions ADD COLUMN zip_bytes BYTEA")
 
 
 def _rename_superseded_zip(old_zip_filename, version_no):
@@ -872,11 +989,22 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
     GCloud DB. When None it falls back to the ``TOUR_TRACK`` env var; any other
     value is normalised to 'beta' (LOCAL-737).
 
+    [LOCAL-606 / D622] When an existing tour with the SAME (name, creator, track)
+    is found and the new text DIFFERS from it, the stale content is REPLACED,
+    keeping a reversible version: the OLD content/zip/stops/lat/lng go to
+    audio_tour_versions FIRST, the old ZIP is renamed on disk (and, when the ZIP
+    lives in the DB column audio_tours.audio_tour, its OLD BYTES are archived in
+    the version row too — LOCAL-821B), then the row's content/zip/stops are
+    overwritten and its translations flagged stale (action 'replaced'). The tour
+    id and share codes are kept, so curator links keep pointing at the improved
+    tour. A byte-identical match is a cache hit (action 'already_exists',
+    number_requested incremented, no replacement).
+
     Returns:
         dict with keys:
             success (bool): True if stored or already existed.
             existing_tour_id (int|None): If the tour already exists, its ID.
-            action (str): 'inserted', 'updated', 'already_exists', or 'error'.
+            action (str): 'inserted', 'updated', 'already_exists', 'replaced', or 'error'.
             error (str|None): Error message on failure.
         Legacy callers can still treat the return value as truthy/falsy via __bool__
         but the richer dict carries the distinction between "stored OK" and
@@ -1121,7 +1249,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # identical requests (the versioning case) are then handled one at a time.
         print(f"Checking if tour already exists (case-insensitive, creator- and track-scoped, matching index)...")
         cur.execute(
-            "SELECT id, tour_content, zip_filename, stops_count, lat, lng "
+            "SELECT id, tour_content, zip_filename, stops_count, lat, lng, audio_tour "
             "FROM audio_tours "
             "WHERE lower(tour_name) = lower(%s) AND creator_user_id = %s "
             "AND track = %s AND original_tour_id IS NULL "
@@ -1158,7 +1286,7 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
         # links keep working and point at the improved tour.
         if existing_tour:
             (existing_id, old_content, old_zip, old_stops,
-             old_lat, old_lng) = existing_tour
+             old_lat, old_lng, old_zip_bytes) = existing_tour
 
             # Normalise for the byte-identical comparison. Treat NULL stored
             # content as "no content yet" → always a replacement so a row that
@@ -1191,136 +1319,153 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                                existing_tour_id=existing_id,
                                version_no=_current_version)
 
-            # --- Replacement path (text differs or stored content was NULL) ---
-            print(f"[LOCAL-606] Tour id={existing_id} regenerated with DIFFERENT text "
-                  f"(old_len={len(_old_text) if _old_text is not None else 'NULL'}, "
-                  f"new_len={len(_new_text)}). Replacing stored content; archiving old version.")
+            # [LOCAL-606 / D622] The text DIFFERS from the stored tour (not a
+            # cache hit). Replace-on-change is the default behaviour: the stale
+            # content is archived to audio_tour_versions FIRST (reversible), then
+            # the row's content/zip/stops are overwritten in place. The tour id
+            # and share codes are kept, so a curator's edit updates THEIR tour and
+            # listeners never see a duplicate.
+            if True:  # replacement path (text differs or stored content was NULL)
+                print(f"[LOCAL-606] Tour id={existing_id} regenerated with DIFFERENT text "
+                      f"(old_len={len(_old_text) if _old_text is not None else 'NULL'}, "
+                      f"new_len={len(_new_text)}). Replacing stored content; archiving old version.")
 
-            # Read the new ZIP as binary data for the row update.
-            print(f"Reading ZIP file: {zip_path}")
-            print(f"File exists: {os.path.exists(zip_path)}")
-            print(f"File size: {os.path.getsize(zip_path) if os.path.exists(zip_path) else 'N/A'}")
-            with open(zip_path, "rb") as f:
-                zip_data = f.read()
-            print(f"Read {len(zip_data)} bytes from ZIP file")
+                # Read the new ZIP as binary data for the row update.
+                print(f"Reading ZIP file: {zip_path}")
+                print(f"File exists: {os.path.exists(zip_path)}")
+                print(f"File size: {os.path.getsize(zip_path) if os.path.exists(zip_path) else 'N/A'}")
+                with open(zip_path, "rb") as f:
+                    zip_data = f.read()
+                print(f"Read {len(zip_data)} bytes from ZIP file")
 
-            _job_id = job_id or os.getenv('CURRENT_JOB_ID') or request_string
+                _job_id = job_id or os.getenv('CURRENT_JOB_ID') or request_string
 
-            try:
-                # Single transaction: version insert + row update + stale flag.
-                # Next version number for this tour.
-                cur.execute(
-                    "SELECT COALESCE(MAX(version_no), 0) + 1 "
-                    "FROM audio_tour_versions WHERE tour_id = %s",
-                    (existing_id,)
-                )
-                next_version = cur.fetchone()[0]
-
-                # Rename the superseded ZIP on disk to <name>.v<N>.zip and record
-                # the archived name in the version row (best-effort on disk; the
-                # DB row is authoritative).
-                archived_zip = _rename_superseded_zip(old_zip, next_version)
-
-                # Archive the OLD content first — reversibility invariant.
-                cur.execute(
-                    """
-                    INSERT INTO audio_tour_versions
-                        (tour_id, version_no, tour_content, zip_filename,
-                         stops_count, lat, lng, replaced_by_job)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    """,
-                    (existing_id, next_version, old_content, archived_zip,
-                     old_stops, old_lat, old_lng, str(_job_id)[:128])
-                )
-
-                # Replace the row's content/zip/stops_count; set lat/lng only if
-                # they were NULL (D622: "sets lat/lng if they are NULL"). Keep
-                # id, tour_name, share code, original_tour_id unchanged, and bump
-                # number_requested like any served delivery.
-                cur.execute(
-                    """
-                    UPDATE audio_tours
-                    SET tour_content = %s,
-                        audio_tour = %s,
-                        zip_filename = %s,
-                        stops_count = %s,
-                        lat = COALESCE(lat, %s),
-                        lng = COALESCE(lng, %s),
-                        number_requested = number_requested + 1
-                    WHERE id = %s
-                    """,
-                    (tour_content, psycopg2.Binary(zip_data), zip_filename,
-                     stops_count, lat, lng, existing_id)
-                )
-
-                # [LOCAL-685] New content → the evaluated score is stale; clear it so
-                # the background scorer (tour_editor_score.py --backfill) re-scores.
-                # SAVEPOINT: a schema without the column must not abort the replace.
-                cur.execute("SAVEPOINT clear_editor_score")
                 try:
-                    cur.execute("UPDATE audio_tours SET editor_score = NULL WHERE id = %s",
-                                (existing_id,))
-                    cur.execute("RELEASE SAVEPOINT clear_editor_score")
-                except Exception:
-                    cur.execute("ROLLBACK TO SAVEPOINT clear_editor_score")
+                    # Single transaction: version insert + row update + stale flag.
+                    # Next version number for this tour.
+                    cur.execute(
+                        "SELECT COALESCE(MAX(version_no), 0) + 1 "
+                        "FROM audio_tour_versions WHERE tour_id = %s",
+                        (existing_id,)
+                    )
+                    next_version = cur.fetchone()[0]
 
-                # [LOCAL-724 item 4] The tour's TEXT just changed, so its old
-                # content rating is stale. Re-rate it now, in this same
-                # transaction, before the replacement commits — so the edited
-                # tour is never listed under a rating earned by its previous
-                # text. rate_tour_row clears/overwrites content_rating,
-                # review_status, content_rated_at; it never raises and never
-                # commits. If it cannot rate (model error / old schema), the row
-                # keeps its prior rating and the launchd backfill re-rates later.
-                try:
-                    import tour_content_rating
-                    _redetail = tour_content_rating.rate_tour_row(
-                        cur, existing_id, tour_name, tour_content, stops_count)
-                    if _redetail is None:
-                        # Could not re-rate synchronously: do NOT keep showing the
-                        # tour under its stale rating. Hold it (clear + pending)
-                        # until the backfill re-rates it.
-                        tour_content_rating.clear_rating(cur, existing_id)
-                except Exception as _rerate_err:
-                    print(f"[LOCAL-724] re-rate skipped for tour {existing_id}: "
-                          f"{_rerate_err}")
+                    # Rename the superseded ZIP on disk to <name>.v<N>.zip and record
+                    # the archived name in the version row (best-effort on disk; the
+                    # DB row is authoritative).
+                    archived_zip = _rename_superseded_zip(old_zip, next_version)
 
-                # Flag translations (original_tour_id = this id) stale so the next
-                # translation request regenerates them. Never deleted.
-                cur.execute(
-                    "UPDATE audio_tours SET translation_stale = TRUE "
-                    "WHERE original_tour_id = %s",
-                    (existing_id,)
-                )
-                stale_count = cur.rowcount
+                    # Archive the OLD content first — reversibility invariant.
+                    # [LOCAL-821B] Also archive the OLD ZIP bytes when the ZIP
+                    # lived in the DB column audio_tours.audio_tour (GCloud). On
+                    # a filesystem deployment the old ZIP is the renamed file on
+                    # disk and old_zip_bytes is NULL; the restore then falls back
+                    # to the archived file. psycopg2.Binary(None) is not valid,
+                    # so pass NULL through unchanged when there are no bytes.
+                    _old_zip_bytes_param = (
+                        psycopg2.Binary(old_zip_bytes)
+                        if old_zip_bytes is not None else None
+                    )
+                    cur.execute(
+                        """
+                        INSERT INTO audio_tour_versions
+                            (tour_id, version_no, tour_content, zip_filename,
+                             stops_count, lat, lng, zip_bytes, replaced_by_job)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (existing_id, next_version, old_content, archived_zip,
+                         old_stops, old_lat, old_lng, _old_zip_bytes_param,
+                         str(_job_id)[:128])
+                    )
 
-                conn.commit()
-                print(f"[LOCAL-606] Replaced tour id={existing_id} content "
-                      f"(version {next_version} archived, old ZIP -> {archived_zip}, "
-                      f"{stale_count} translation(s) flagged stale).")
-                cur.close()
-                conn.close()
-                print(f"==== AUDIO TOUR CONTENT REPLACED — id={existing_id} ====")
-                # [LOCAL-766 / D713] Record which pooled stops this (replaced)
-                # tour delivered, so the delivery rule can protect them if this
-                # tour is community/priced. After the row is committed/closed;
-                # non-fatal.
-                _record_pool_provenance(existing_id, location, request_string,
-                                        tour_name, tour_type, tour_content, is_test)
-                # [LOCAL-717] live row is version next_version + 1; [LOCAL-718] the
-                # archived (old) content is version next_version.
-                return _result(success=True, action="replaced",
-                               existing_tour_id=existing_id,
-                               version_no=next_version + 1,
-                               replaced_version_no=next_version)
-            except Exception as _replace_err:
-                conn.rollback()
-                print(f"[LOCAL-606] ERROR during replacement of id={existing_id}: {_replace_err}")
-                print(f"Traceback: {traceback.format_exc()}")
-                cur.close()
-                conn.close()
-                return _result(success=False, action="error", existing_tour_id=existing_id,
-                               error=str(_replace_err))
+                    # Replace the row's content/zip/stops_count; set lat/lng only if
+                    # they were NULL (D622: "sets lat/lng if they are NULL"). Keep
+                    # id, tour_name, share code, original_tour_id unchanged, and bump
+                    # number_requested like any served delivery.
+                    cur.execute(
+                        """
+                        UPDATE audio_tours
+                        SET tour_content = %s,
+                            audio_tour = %s,
+                            zip_filename = %s,
+                            stops_count = %s,
+                            lat = COALESCE(lat, %s),
+                            lng = COALESCE(lng, %s),
+                            number_requested = number_requested + 1
+                        WHERE id = %s
+                        """,
+                        (tour_content, psycopg2.Binary(zip_data), zip_filename,
+                         stops_count, lat, lng, existing_id)
+                    )
+
+                    # [LOCAL-685] New content → the evaluated score is stale; clear it so
+                    # the background scorer (tour_editor_score.py --backfill) re-scores.
+                    # SAVEPOINT: a schema without the column must not abort the replace.
+                    cur.execute("SAVEPOINT clear_editor_score")
+                    try:
+                        cur.execute("UPDATE audio_tours SET editor_score = NULL WHERE id = %s",
+                                    (existing_id,))
+                        cur.execute("RELEASE SAVEPOINT clear_editor_score")
+                    except Exception:
+                        cur.execute("ROLLBACK TO SAVEPOINT clear_editor_score")
+
+                    # [LOCAL-724 item 4] The tour's TEXT just changed, so its old
+                    # content rating is stale. Re-rate it now, in this same
+                    # transaction, before the replacement commits — so the edited
+                    # tour is never listed under a rating earned by its previous
+                    # text. rate_tour_row clears/overwrites content_rating,
+                    # review_status, content_rated_at; it never raises and never
+                    # commits. If it cannot rate (model error / old schema), the row
+                    # keeps its prior rating and the launchd backfill re-rates later.
+                    try:
+                        import tour_content_rating
+                        _redetail = tour_content_rating.rate_tour_row(
+                            cur, existing_id, tour_name, tour_content, stops_count)
+                        if _redetail is None:
+                            # Could not re-rate synchronously: do NOT keep showing the
+                            # tour under its stale rating. Hold it (clear + pending)
+                            # until the backfill re-rates it.
+                            tour_content_rating.clear_rating(cur, existing_id)
+                    except Exception as _rerate_err:
+                        print(f"[LOCAL-724] re-rate skipped for tour {existing_id}: "
+                              f"{_rerate_err}")
+
+                    # Flag translations (original_tour_id = this id) stale so the next
+                    # translation request regenerates them. Never deleted.
+                    cur.execute(
+                        "UPDATE audio_tours SET translation_stale = TRUE "
+                        "WHERE original_tour_id = %s",
+                        (existing_id,)
+                    )
+                    stale_count = cur.rowcount
+
+                    conn.commit()
+                    print(f"[LOCAL-606] Replaced tour id={existing_id} content "
+                          f"(version {next_version} archived, old ZIP -> {archived_zip}, "
+                          f"{stale_count} translation(s) flagged stale).")
+                    cur.close()
+                    conn.close()
+                    print(f"==== AUDIO TOUR CONTENT REPLACED — id={existing_id} ====")
+                    # [LOCAL-766 / D713] Record which pooled stops this (replaced)
+                    # tour delivered, so the delivery rule can protect them if this
+                    # tour is community/priced. After the row is committed/closed;
+                    # non-fatal.
+                    _record_pool_provenance(existing_id, location, request_string,
+                                            tour_name, tour_type, tour_content, is_test)
+                    # [LOCAL-717] live row is version next_version + 1; [LOCAL-718] the
+                    # archived (old) content is version next_version.
+                    return _result(success=True, action="replaced",
+                                   existing_tour_id=existing_id,
+                                   version_no=next_version + 1,
+                                   replaced_version_no=next_version)
+                except Exception as _replace_err:
+                    conn.rollback()
+                    print(f"[LOCAL-606] ERROR during replacement of id={existing_id}: {_replace_err}")
+                    print(f"Traceback: {traceback.format_exc()}")
+                    cur.close()
+                    conn.close()
+                    return _result(success=False, action="error", existing_tour_id=existing_id,
+                                   error=str(_replace_err))
 
         # Read the ZIP file as binary data (new-insert path)
         print(f"Reading ZIP file: {zip_path}")
@@ -1511,8 +1656,18 @@ def link_stop_metrics_to_tour(tour_id, job_id):
         return -1
 
 
-def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None, mode=None):
-    """Orchestrate the complete tour generation pipeline asynchronously."""
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None, mode=None, resume_generator_job_id=None):
+    """Orchestrate the complete tour generation pipeline asynchronously.
+
+    [LOCAL-821] When resume_generator_job_id is set, this is a RESUME of a job
+    whose text generation already started on a previous instance (killed by
+    SIGTERM). We skip the /generate POST and re-poll that EXISTING generator job
+    instead — a completed generator job (its result is persisted in
+    generator_jobs, LOCAL-775) returns its tour_content, so delivery reuses the
+    normal poll path with no re-generation and no new spend. The resume holds a
+    lease on the orchestrator_jobs row (acquired by the caller) so two instances
+    cannot both finish the same job.
+    """
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
     print(f"Parameters:")
     print(f"  job_id: {job_id}")
@@ -1523,56 +1678,103 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
     print(f"  request_string: {request_string}")
     print(f"  language: {language}")
     print(f"  persona: {persona}")
+    print(f"  resume_generator_job_id: {resume_generator_job_id}")
+    _orch_store = _orch_jobs_store()
     # [LOCAL-595B defect 3] Set true if the tour is served from cache / stop pool.
     # Used at the completed transition to decide whether the reserved pack unit
     # stands (fresh delivery) or was already released (cache hit).
     _was_cache_hit = False
     try:
+        # A resumed job may not have an ACTIVE_JOBS entry on this fresh instance;
+        # rebuild the minimal in-memory tracking the pipeline reads/writes.
+        if job_id not in ACTIVE_JOBS:
+            ACTIVE_JOBS[job_id] = {
+                "status": "queued",
+                "progress": "",
+                "location": location,
+                "tour_type": tour_type,
+                "total_stops": total_stops,
+                "user_id": user_id,
+                "request_string": request_string,
+                "language": language,
+                "persona": persona,
+                "is_test": is_test,
+                "stops": stops,
+                "mode": mode,
+                "created_at": datetime.now().isoformat(),
+                "resumed": True,
+            }
         ACTIVE_JOBS[job_id]["status"] = "processing"
         ACTIVE_JOBS[job_id]["progress"] = "Starting complete tour generation pipeline..."
-        
-        # Step 1: Generate tour text first, then process with modernized service
-        log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 1/5: Generating tour text...")
-        generate_data = {
-            "location": location,
-            "tour_type": tour_type,
-            "total_stops": total_stops
-        }
-        # [S81] Forward user_id so downstream tour-generator can perform persona lookup
-        if user_id:
-            generate_data["user_id"] = user_id
-        # [S81] Forward persona for direct-pass cases (skips DB lookup in tour-generator)
-        if persona:
-            generate_data["persona"] = persona
-        # [LOCAL-525] Forward user-chosen stops (validated at the orchestrator
-        # boundary). The tour-generator re-validates and passes them to the engine
-        # as forced_stops. Absent → omitted → normal generation, unchanged.
-        if stops:
-            generate_data["stops"] = stops
-        # [LOCAL-597 / LOCAL-778] Forward the generation mode. 'by_reference' makes
-        # the generator reuse already-researched stops only (zero grounding, zero
-        # SERP). 'reuse_first' (D719 amended) reuses whatever matches and researches
-        # only the missing stops. Absent/None → normal fresh generation.
-        if mode:
-            generate_data["mode"] = mode
-        
-        print(f"Calling tour text generator API: {datetime.now().isoformat()}")
-        print(f"Request data: {generate_data}")
-        response = _authenticated_request("POST", f"{TOUR_GENERATOR_URL}/generate",
-            headers={"Content-Type": "application/json"},
-            json=generate_data,
-            timeout=60
-        )
-        
-        print(f"Tour generator API response: {response.status_code}")
-        print(f"Response content: {response.text[:1000]}")
-        if response.status_code != 200:
-            raise Exception(f"Error generating tour: {response.text}")
-        
-        job_data = response.json()
-        job_id_1 = job_data["job_id"]
-        ACTIVE_JOBS[job_id]["text_job_id"] = job_id_1
-        print(f"Tour text generator job ID: {job_id_1}")
+
+        # [LOCAL-821] Idempotency: if this job already produced an audio_tours
+        # row (a previous instance finished the store but died before flipping
+        # tour_requests, or a concurrent resume beat us), do NOT deliver again.
+        # Finish the bookkeeping and return.
+        if _tour_already_stored_for_job(job_id):
+            print(f"[LOCAL-821] job {job_id} already has a stored tour — finishing idempotently, no re-delivery.")
+            _set_tour_request_status(job_id, 'completed')
+            if _orch_store:
+                _orch_store.mark_completed(job_id)
+            ACTIVE_JOBS[job_id]["status"] = "completed"
+            ACTIVE_JOBS[job_id]["progress"] = "Tour already stored (resumed)."
+            return
+
+        if resume_generator_job_id:
+            # --- RESUME: attach to the already-started generator job ---
+            job_id_1 = resume_generator_job_id
+            ACTIVE_JOBS[job_id]["text_job_id"] = job_id_1
+            log_job_update(job_id, ACTIVE_JOBS[job_id]["status"],
+                           f"Resuming: re-attaching to generator job {job_id_1}...")
+            print(f"[LOCAL-821] RESUME — skipping /generate, re-polling generator job {job_id_1}")
+        else:
+            # Step 1: Generate tour text first, then process with modernized service
+            log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 1/5: Generating tour text...")
+            generate_data = {
+                "location": location,
+                "tour_type": tour_type,
+                "total_stops": total_stops
+            }
+            # [S81] Forward user_id so downstream tour-generator can perform persona lookup
+            if user_id:
+                generate_data["user_id"] = user_id
+            # [S81] Forward persona for direct-pass cases (skips DB lookup in tour-generator)
+            if persona:
+                generate_data["persona"] = persona
+            # [LOCAL-525] Forward user-chosen stops (validated at the orchestrator
+            # boundary). The tour-generator re-validates and passes them to the engine
+            # as forced_stops. Absent → omitted → normal generation, unchanged.
+            if stops:
+                generate_data["stops"] = stops
+            # [LOCAL-597 / LOCAL-778] Forward the generation mode. 'by_reference' makes
+            # the generator reuse already-researched stops only (zero grounding, zero
+            # SERP). 'reuse_first' (D719 amended) reuses whatever matches and researches
+            # only the missing stops. Absent/None → normal fresh generation.
+            if mode:
+                generate_data["mode"] = mode
+
+            print(f"Calling tour text generator API: {datetime.now().isoformat()}")
+            print(f"Request data: {generate_data}")
+            response = _authenticated_request("POST", f"{TOUR_GENERATOR_URL}/generate",
+                headers={"Content-Type": "application/json"},
+                json=generate_data,
+                timeout=60
+            )
+
+            print(f"Tour generator API response: {response.status_code}")
+            print(f"Response content: {response.text[:1000]}")
+            if response.status_code != 200:
+                raise Exception(f"Error generating tour: {response.text}")
+
+            job_data = response.json()
+            job_id_1 = job_data["job_id"]
+            ACTIVE_JOBS[job_id]["text_job_id"] = job_id_1
+            print(f"Tour text generator job ID: {job_id_1}")
+            # [LOCAL-821] Persist the generator job id NOW — this is what lets a
+            # fresh instance re-attach if we are killed before delivery. Written
+            # as soon as it is known, before the (possibly long) poll begins.
+            if _orch_store:
+                _orch_store.set_generator_job_id(job_id, job_id_1)
         
         # Wait for text generation to complete
         ACTIVE_JOBS[job_id]["progress"] = "Waiting for tour text generation..."
@@ -1946,6 +2148,9 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             # [LOCAL-595B defect 2] No tour was delivered — mark 'failed' and give
             # back the reserved pack unit so the listener's allowance is intact.
             _set_tour_request_status(job_id, 'failed')
+            # [LOCAL-821] Terminal failure on the durable record (clears lease).
+            if _orch_store:
+                _orch_store.mark_error(job_id, reason=error_msg)
             # [LOCAL-785] Record the no-audio-files failure (our pipeline produced
             # nothing) so it is counted, not silently swallowed.
             _record_failure(surface="generate", error_code="generation_failed",
@@ -2204,6 +2409,9 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             # (so it never counts toward L2/Tester caps) and release the reserved
             # L3/L4 pack unit. The listener keeps their allowance.
             _set_tour_request_status(job_id, 'failed')
+            # [LOCAL-821] Terminal failure on the durable record (clears lease).
+            if _orch_store:
+                _orch_store.mark_error(job_id, reason=f"store_failed: {store_error}")
             # [LOCAL-785] Record the store-failed failure (delivery produced a tour
             # but the DB write failed — our bug) so it is counted.
             _record_failure(surface="store", error_code="generation_failed",
@@ -2580,6 +2788,11 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         if _was_cache_hit:
             print(f"[QUOTA] job={job_id} delivered from cache/pool — pack unit already released, tour still counts for volume caps")
 
+        # [LOCAL-821] Terminal success on the durable record so the resume/sweep
+        # never picks this job up again (and the lease is cleared).
+        if _orch_store:
+            _orch_store.mark_completed(job_id)
+
         log_job_update(job_id, "completed", final_message)
         ACTIVE_JOBS[job_id]["netlify_ready"] = True
         ACTIVE_JOBS[job_id]["language"] = language
@@ -2627,6 +2840,167 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # same as the old rollback, and the pack unit is now correctly returned.
         _set_tour_request_status(job_id, 'failed')
         _release_generation_reservation(user_id, job_id, reason='exception')
+
+        # [LOCAL-821] Durable-record disposition. If the generator job is itself
+        # terminally failed (or we never got one), this is a real failure — mark
+        # the record 'error' so it is not resumed. But if the exception was a
+        # give-up on a generator job that is still running OR already completed
+        # (a poll timeout / transient error, or this very instance being torn
+        # down), DO NOT mark terminal: release the lease and leave the record
+        # non-terminal so the sweep re-attaches and finishes the tour. This is
+        # the heart of the fix — a tour the generator actually produced is never
+        # lost to an orchestrator-side give-up.
+        if _orch_store:
+            _gen_jid = ACTIVE_JOBS.get(job_id, {}).get("text_job_id") or resume_generator_job_id
+            _gen_state = _generator_job_state(_gen_jid) if _gen_jid else 'missing'
+            if _gen_state in ('completed', 'processing', 'queued'):
+                print(f"[LOCAL-821] exception for job {job_id} but generator job "
+                      f"{_gen_jid} is '{_gen_state}' — leaving record resumable.")
+                _orch_store.release_lease(job_id)
+            else:
+                _orch_store.mark_error(job_id, reason=str(e))
+
+def _resume_one_job(job):
+    """[LOCAL-821] Finish a single non-terminal orchestrator job on this instance.
+
+    `job` is a dict from orchestrator_jobs (list_resumable / get). The lease is
+    acquired HERE (not by the caller) so the acquire+run is atomic per job: only
+    the instance that wins the lease runs the delivery. Steps:
+      1. acquire_lease — bail if another instance holds it.
+      2. idempotency — if the tour was already stored, finish bookkeeping.
+      3. decide from the generator job state:
+           completed/processing/queued → re-run orchestrate_tour_async attached
+             to the existing generator job (skips /generate; the poll loop will
+             pick up a completed job immediately and deliver, or keep polling a
+             running one).
+           error/missing → terminal failure: mark the record + tour_requests
+             'failed' and release the device's reservation.
+    Best-effort; never raises to the sweep loop.
+    """
+    store = _orch_jobs_store()
+    if store is None:
+        return
+    job_id = job.get('job_id')
+    if not job_id:
+        return
+    leased = store.acquire_lease(job_id)
+    if leased is None:
+        # Another instance owns it, or it became terminal — skip.
+        return
+    try:
+        gen_jid = leased.get('generator_job_id')
+        params = leased.get('params') or {}
+        user_id = params.get('user_id')
+
+        # Idempotency first — a prior instance may have stored the tour but died
+        # before marking the record terminal.
+        if _tour_already_stored_for_job(job_id):
+            print(f"[LOCAL-821][sweep] job {job_id} already delivered — finishing record.")
+            _set_tour_request_status(job_id, 'completed')
+            store.mark_completed(job_id)
+            return
+
+        gen_state = _generator_job_state(gen_jid) if gen_jid else 'missing'
+        print(f"[LOCAL-821][sweep] resuming job {job_id}: generator={gen_jid} state={gen_state}")
+
+        if gen_state in ('completed', 'processing', 'queued'):
+            # Re-attach to the existing generator job and run the normal delivery
+            # path. A completed generator job delivers at once; a running one is
+            # polled to completion. orchestrate_tour_async marks the record
+            # terminal on its own success/failure branches.
+            orchestrate_tour_async(
+                job_id,
+                params.get('location'),
+                params.get('tour_type'),
+                params.get('total_stops'),
+                user_id=user_id,
+                request_string=params.get('request_string'),
+                language=params.get('language') or 'en',
+                persona=params.get('persona'),
+                is_test=params.get('is_test'),
+                stops=params.get('stops'),
+                mode=params.get('mode'),
+                resume_generator_job_id=gen_jid,
+            )
+        else:
+            # generator job failed or is unknown → this request cannot be
+            # delivered. Terminal failure with the reason; give back allowance.
+            reason = (f"generator job {gen_jid} is '{gen_state}'" if gen_jid
+                      else "no generator job id recorded (died before /generate returned)")
+            print(f"[LOCAL-821][sweep] job {job_id} unrecoverable — {reason}")
+            _set_tour_request_status(job_id, 'failed')
+            _release_generation_reservation(user_id, job_id, reason='resume_failed')
+            store.mark_error(job_id, reason=reason)
+    except Exception as _e:
+        print(f"[LOCAL-821][sweep] error resuming job {job_id}: {_e}")
+        print(traceback.format_exc())
+        # Leave the record non-terminal but release our lease so a later sweep
+        # (or another instance) can retry.
+        try:
+            store.release_lease(job_id)
+        except Exception:
+            pass
+
+
+def _sweep_resumable_jobs(min_idle_seconds):
+    """[LOCAL-821] One pass: find resumable jobs and finish each. Returns the
+    number of jobs attempted (for tests/logging)."""
+    store = _orch_jobs_store()
+    if store is None:
+        return 0
+    jobs = store.list_resumable(min_age_seconds=min_idle_seconds)
+    if not jobs:
+        return 0
+    print(f"[LOCAL-821][sweep] {len(jobs)} resumable job(s) found "
+          f"(min_idle={min_idle_seconds}s)")
+    for job in jobs:
+        if _SHUTTING_DOWN:
+            print("[LOCAL-821][sweep] shutting down — stopping sweep.")
+            break
+        _resume_one_job(job)
+    return len(jobs)
+
+
+def _resume_and_sweep_loop():
+    """[LOCAL-821] Daemon: resume-on-boot once (anything non-terminal is fair
+    game), then sweep periodically for jobs idle long enough to be orphaned.
+
+    Resume-on-boot uses min_idle=0 so a tour whose instance was just torn down is
+    picked up immediately on the replacement instance. The periodic sweep uses
+    ORCH_SWEEP_MIN_IDLE_SECONDS so a healthy in-flight job on another live
+    instance (writing progress) is left alone; only a job that has not advanced
+    for that long is treated as orphaned. The lease makes a double-pickup
+    harmless either way."""
+    print("[LOCAL-821] resume-on-boot: scanning for unfinished tours...")
+    try:
+        _sweep_resumable_jobs(min_idle_seconds=0)
+    except Exception as _e:
+        print(f"[LOCAL-821] resume-on-boot error: {_e}")
+    while not _SHUTTING_DOWN:
+        time.sleep(ORCH_SWEEP_INTERVAL_SECONDS)
+        if _SHUTTING_DOWN:
+            break
+        try:
+            _sweep_resumable_jobs(min_idle_seconds=ORCH_SWEEP_MIN_IDLE_SECONDS)
+        except Exception as _e:
+            print(f"[LOCAL-821] sweep error: {_e}")
+
+
+def _start_resume_sweep_thread():
+    """Start the resume/sweep daemon if enabled. Idempotent-ish: called once from
+    __main__. Returns the thread or None."""
+    if not ORCH_RESUME_ENABLED:
+        print("[LOCAL-821] resume/sweep disabled (set ORCH_RESUME_ENABLED=true to enable).")
+        return None
+    if get_orchestrator_jobs_store is None:
+        print("[LOCAL-821] resume/sweep requested but orchestrator_jobs store unavailable.")
+        return None
+    t = threading.Thread(target=_resume_and_sweep_loop, name='orch-resume-sweep', daemon=True)
+    t.start()
+    print(f"[LOCAL-821] resume/sweep thread started "
+          f"(interval={ORCH_SWEEP_INTERVAL_SECONDS}s, min_idle={ORCH_SWEEP_MIN_IDLE_SECONDS}s).")
+    return t
+
 
 def track_user_tour(user_id, tour_id, request_string):
     """Track a user's tour request in the user tracking service."""
@@ -2723,6 +3097,7 @@ def health_check():
         "service": "tour_orchestrator",
         "cost_ceiling": _ceiling_stats,
     })
+
 
 @app.route('/generate-complete-tour', methods=['POST'])
 def generate_complete_tour():
@@ -3017,7 +3392,23 @@ def generate_complete_tour():
         "community_visibility": _community_visibility,  # [LOCAL-701] 'members' | 'public'
         "created_at": datetime.now().isoformat()
     }
-    
+
+    # [LOCAL-821] Durable record of this job BEFORE generation starts, so a fresh
+    # instance can finish it if we are killed mid-generation (Cloud Run SIGTERM).
+    # The generator_job_id is filled in by orchestrate_tour_async as soon as the
+    # /generate call returns it. Best-effort; a DB problem here never blocks the
+    # request (the live in-memory path still delivers on this instance).
+    _orch_store_gen = _orch_jobs_store()
+    if _orch_store_gen is not None:
+        _orch_store_gen.create(
+            job_id,
+            location=location, tour_type=tour_type, total_stops=total_stops,
+            user_id=user_id, request_string=request_string, language=language,
+            persona=persona, is_test=is_test_override, stops=stops,
+            mode=generation_mode, community_id=_community_id,
+            community_visibility=_community_visibility,
+        )
+
     # Track user request immediately
     print(f"Checking user tracking condition - user_id: '{user_id}', request_string: '{request_string}'")
     if user_id and request_string:
@@ -3587,6 +3978,13 @@ if __name__ == '__main__':
     else:
         print("[LOCAL-596] L2 seat-maintenance job disabled "
               "(set L2_SEAT_JOB_ENABLED=true to enable)")
+
+    # [LOCAL-821] Resume-on-boot + periodic sweep: finish tours whose generation
+    # outlived their instance (Cloud Run SIGTERM). Guarded daemon thread, OFF by
+    # default (ORCH_RESUME_ENABLED), so single-instance Docker is unaffected until
+    # explicitly opted in. The lease on orchestrator_jobs makes a concurrent
+    # pickup by two instances harmless.
+    _start_resume_sweep_thread()
 
     # Run Flask app
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', '5002')), debug=False)

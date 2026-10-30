@@ -4,9 +4,11 @@
 When a regenerated tour whose text differs from the stored row replaces that
 row's content, ``tour_orchestrator_service.store_audio_tour`` first archives the
 OLD content/ZIP/stops_count/lat/lng into ``audio_tour_versions`` and renames the
-superseded ZIP to ``<name>.v<N>.zip`` (never deleted). This helper puts a chosen
-archived version back onto the live ``audio_tours`` row, so every replacement is
-reversible.
+superseded ZIP to ``<name>.v<N>.zip`` (never deleted). [LOCAL-821B] When the ZIP
+lives in the DB column ``audio_tours.audio_tour`` (GCloud) the OLD BYTES are
+archived in ``audio_tour_versions.zip_bytes`` too. This helper puts a chosen
+archived version — text, stops AND audio — back onto the live ``audio_tours``
+row, so every replacement is reversible.
 
 Usage
 =====
@@ -55,6 +57,20 @@ def _connect():
     )
 
 
+def _column_exists(cur, table, column):
+    """True if `column` exists on `table` in the current search_path. Lets the
+    tool run against a pre-062 schema (no zip_bytes) and the migrated schema."""
+    cur.execute(
+        """
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = %s AND column_name = %s
+        LIMIT 1
+        """,
+        (table, column),
+    )
+    return cur.fetchone() is not None
+
+
 def _restore_zip_name_on_disk(archived_zip, dry_run):
     """Best-effort: give the archived ``<name>.v<N>.zip`` back its live basename.
 
@@ -93,25 +109,49 @@ def restore(tour_id, version_no, apply_changes):
     cur = conn.cursor()
     try:
         # The archived version to restore.
-        cur.execute(
-            """
-            SELECT tour_content, zip_filename, stops_count, lat, lng, replaced_at
-            FROM audio_tour_versions
-            WHERE tour_id = %s AND version_no = %s
-            """,
-            (tour_id, version_no),
-        )
-        ver = cur.fetchone()
+        # [LOCAL-821B] zip_bytes is the OLD audio bytes archived when the ZIP
+        # lived in the DB column audio_tours.audio_tour (GCloud). Older rows and
+        # filesystem deployments carry NULL here (the restore then keeps the
+        # live audio bytes and relies on the renamed ZIP file on disk).
+        # Pulled via a LEFT-join-free SELECT guarded so a schema without the
+        # column (pre-062) still works.
+        _has_zip_bytes = _column_exists(cur, "audio_tour_versions", "zip_bytes")
+        if _has_zip_bytes:
+            cur.execute(
+                """
+                SELECT tour_content, zip_filename, stops_count, lat, lng,
+                       replaced_at, zip_bytes
+                FROM audio_tour_versions
+                WHERE tour_id = %s AND version_no = %s
+                """,
+                (tour_id, version_no),
+            )
+            ver = cur.fetchone()
+            if ver is not None:
+                (v_content, v_zip, v_stops, v_lat, v_lng, v_when, v_zip_bytes) = ver
+        else:
+            cur.execute(
+                """
+                SELECT tour_content, zip_filename, stops_count, lat, lng, replaced_at
+                FROM audio_tour_versions
+                WHERE tour_id = %s AND version_no = %s
+                """,
+                (tour_id, version_no),
+            )
+            ver = cur.fetchone()
+            if ver is not None:
+                (v_content, v_zip, v_stops, v_lat, v_lng, v_when) = ver
+                v_zip_bytes = None
         if ver is None:
             print(f"ERROR: no audio_tour_versions row for tour_id={tour_id} "
                   f"version_no={version_no}.")
             return 2
-        (v_content, v_zip, v_stops, v_lat, v_lng, v_when) = ver
 
         # The current live row.
         cur.execute(
             """
-            SELECT tour_content, zip_filename, stops_count, lat, lng, tour_name
+            SELECT tour_content, zip_filename, stops_count, lat, lng, tour_name,
+                   audio_tour
             FROM audio_tours WHERE id = %s
             """,
             (tour_id,),
@@ -120,7 +160,7 @@ def restore(tour_id, version_no, apply_changes):
         if live is None:
             print(f"ERROR: no audio_tours row with id={tour_id}.")
             return 2
-        (c_content, c_zip, c_stops, c_lat, c_lng, c_name) = live
+        (c_content, c_zip, c_stops, c_lat, c_lng, c_name, c_zip_bytes) = live
 
         print("=" * 70)
         print(f"RESTORE tour_id={tour_id}  version_no={version_no}  "
@@ -133,12 +173,30 @@ def restore(tour_id, version_no, apply_changes):
                 return f"<text len={len(x)}>"
             return repr(x)
 
+        def _fmt_bytes(b):
+            if b is None:
+                return "<none>"
+            import hashlib
+            return f"<{len(b)} bytes, md5={hashlib.md5(b).hexdigest()[:12]}>"
+
+        # [LOCAL-821B] Decide the audio to restore. If the archived version has
+        # zip_bytes (ZIP lived in the DB column), restore those OLD bytes. If it
+        # is NULL (filesystem deployment, or a pre-062 row), keep the live bytes
+        # unchanged — the renamed ZIP file on disk is the archive there.
+        _restore_audio = _has_zip_bytes and (v_zip_bytes is not None)
+
         print("Field changes (current -> restored):")
         print(f"  tour_content : {_fmt(c_content)} -> {_fmt(v_content)}")
         print(f"  zip_filename : {_fmt(c_zip)} -> (from v{version_no}) {_fmt(v_zip)}")
         print(f"  stops_count  : {_fmt(c_stops)} -> {_fmt(v_stops)}")
         print(f"  lat          : {_fmt(c_lat)} -> {_fmt(v_lat)}")
         print(f"  lng          : {_fmt(c_lng)} -> {_fmt(v_lng)}")
+        if _restore_audio:
+            print(f"  audio_tour   : {_fmt_bytes(c_zip_bytes)} -> "
+                  f"{_fmt_bytes(v_zip_bytes)}")
+        else:
+            print(f"  audio_tour   : {_fmt_bytes(c_zip_bytes)} -> UNCHANGED "
+                  f"(no zip_bytes archived; disk-renamed ZIP is the archive)")
         print(f"  id and share code: UNCHANGED")
 
         if not apply_changes:
@@ -154,35 +212,70 @@ def restore(tour_id, version_no, apply_changes):
             (tour_id,),
         )
         snapshot_version = cur.fetchone()[0]
-        cur.execute(
-            """
-            INSERT INTO audio_tour_versions
-                (tour_id, version_no, tour_content, zip_filename,
-                 stops_count, lat, lng, replaced_by_job)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            (tour_id, snapshot_version, c_content, c_zip, c_stops, c_lat, c_lng,
-             f"restore_to_v{version_no}"),
-        )
+        # [LOCAL-821B] Snapshot the current audio bytes too (into zip_bytes) when
+        # the column exists, so restoring away from this snapshot brings audio
+        # back as well. psycopg2.Binary(None) is invalid, so pass NULL through.
+        import psycopg2
+        if _has_zip_bytes:
+            _cur_zip_param = (psycopg2.Binary(c_zip_bytes)
+                              if c_zip_bytes is not None else None)
+            cur.execute(
+                """
+                INSERT INTO audio_tour_versions
+                    (tour_id, version_no, tour_content, zip_filename,
+                     stops_count, lat, lng, zip_bytes, replaced_by_job)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (tour_id, snapshot_version, c_content, c_zip, c_stops, c_lat,
+                 c_lng, _cur_zip_param, f"restore_to_v{version_no}"),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO audio_tour_versions
+                    (tour_id, version_no, tour_content, zip_filename,
+                     stops_count, lat, lng, replaced_by_job)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (tour_id, snapshot_version, c_content, c_zip, c_stops, c_lat,
+                 c_lng, f"restore_to_v{version_no}"),
+            )
 
         live_zip_name = _restore_zip_name_on_disk(v_zip, dry_run=False)
 
-        cur.execute(
-            """
-            UPDATE audio_tours
-            SET tour_content = %s,
-                zip_filename = %s,
-                stops_count  = %s,
-                lat          = %s,
-                lng          = %s
-            WHERE id = %s
-            """,
-            (v_content, live_zip_name, v_stops, v_lat, v_lng, tour_id),
-        )
+        if _restore_audio:
+            cur.execute(
+                """
+                UPDATE audio_tours
+                SET tour_content = %s,
+                    zip_filename = %s,
+                    stops_count  = %s,
+                    lat          = %s,
+                    lng          = %s,
+                    audio_tour   = %s
+                WHERE id = %s
+                """,
+                (v_content, live_zip_name, v_stops, v_lat, v_lng,
+                 psycopg2.Binary(v_zip_bytes), tour_id),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE audio_tours
+                SET tour_content = %s,
+                    zip_filename = %s,
+                    stops_count  = %s,
+                    lat          = %s,
+                    lng          = %s
+                WHERE id = %s
+                """,
+                (v_content, live_zip_name, v_stops, v_lat, v_lng, tour_id),
+            )
         conn.commit()
         print(f"\n[APPLIED] Restored tour_id={tour_id} to version {version_no}. "
               f"Current content snapshotted as version {snapshot_version} "
-              f"(this restore is itself reversible).")
+              f"(this restore is itself reversible)."
+              + (" Audio bytes restored." if _restore_audio else ""))
         return 0
     except Exception as e:
         conn.rollback()
