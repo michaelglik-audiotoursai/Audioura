@@ -13,6 +13,10 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 8 — 2026-10-30 02:25 EDT (wdvrdaz9xq): orchestrator ROLLED BACK
+- orchestrator traffic **100% on 00007-4zv** (caa87604). 00008-7c2 (50893631, ORCH_RESUME_ENABLED=true) is at 0%: its sweep re-ran a live job and **stored Van Gogh twice** (500/501, hidden). Migrations **061 + 062** applied (orchestrator_jobs, audio_tour_versions.zip_bytes). Backup 1793339771879.
+- 279/294 were resumed and stored once (498 Met, 499 Rijks, both hidden; 499 pin in Utrecht). Catalog 481 unchanged by md5. audio_tours 393. Generator still 00016-62s (cheap museum ON).
+
 # ▶️ WAVE 7 — 2026-10-30 01:55 EDT (wdvrdaz9xn; overrides waves 6/5 lists below)
 - generator **00016-62s** = `dad37e92` + **cheap museum arm ON** (CHEAP_ARM_CATEGORIES=museum, NARRATION_MODEL=gpt-4.1-mini, RESEARCH_BACKEND=serper) [00015-dvg = same image, wave-4 env; 00011-47m = wave 5]. Proofs: Orsay 497 4/5 full arm ($1.31); Rijksmuseum 5/5 cheap ($0.38), NOT stored (orchestrator SIGTERM again).
 - Open: orchestrator SIGTERM loses long tours (requests 279, 294; LOCAL-821); wrong-venue paragraph in cheap-arm research; false "N exhibitions on view" line (LOCAL-826). audio_tours 389.
