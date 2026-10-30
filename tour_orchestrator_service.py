@@ -1656,7 +1656,7 @@ def link_stop_metrics_to_tour(tour_id, job_id):
         return -1
 
 
-def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None, mode=None, resume_generator_job_id=None):
+def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None, mode=None, resume_generator_job_id=None, lease_owner=None):
     """Orchestrate the complete tour generation pipeline asynchronously.
 
     [LOCAL-821] When resume_generator_job_id is set, this is a RESUME of a job
@@ -1665,8 +1665,18 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
     instead — a completed generator job (its result is persisted in
     generator_jobs, LOCAL-775) returns its tour_content, so delivery reuses the
     normal poll path with no re-generation and no new spend. The resume holds a
-    lease on the orchestrator_jobs row (acquired by the caller) so two instances
-    cannot both finish the same job.
+    lease on the orchestrator_jobs row (acquired by the caller, passed in as
+    lease_owner) so two instances cannot both finish the same job.
+
+    [LOCAL-829] The LIVE path (fresh generation, resume_generator_job_id is None)
+    now also owns its row: it ACQUIRES the lease here under its own owner and
+    RENEWS it on every poll iteration and right before store. Without this a
+    periodic sweep on the SAME instance would find the live row 'resumable' once
+    it aged past min_idle (the live thread held no lease and never heartbeat) and
+    resume it in parallel — both paths would then store, and a tour longer than
+    the sweep's min_idle got stored twice (the defect this closes). The store
+    itself is additionally guarded by an atomic per-job claim (store.claim_store)
+    so even a lease race cannot produce two stores.
     """
     print(f"\n==== ORCHESTRATE_TOUR_ASYNC STARTED: {datetime.now().isoformat()} ====")
     print(f"Parameters:")
@@ -1680,11 +1690,59 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
     print(f"  persona: {persona}")
     print(f"  resume_generator_job_id: {resume_generator_job_id}")
     _orch_store = _orch_jobs_store()
+    # [LOCAL-829] Lease ownership for THIS run. On a resume the caller already
+    # acquired the lease and hands us its owner token; on the live path we mint a
+    # fresh owner and acquire the lease below. _lease_seconds / _renew_seconds
+    # keep lease length >= 3x the renew interval so a couple of missed renews do
+    # not drop the lease under a live thread.
+    try:
+        from orchestrator_jobs import make_owner as _make_owner, DEFAULT_LEASE_SECONDS as _LEASE_SECS
+    except Exception:
+        _make_owner = None
+        _LEASE_SECS = 900
+    _lease_owner = lease_owner or (_make_owner() if _make_owner else None)
+    _lease_seconds = _LEASE_SECS
+
+    def _renew_lease(context=""):
+        """[LOCAL-829] Heartbeat the lease so the sweep leaves this live row
+        alone. Best-effort: a failed renew is logged, not fatal — the store-claim
+        is the hard guard against a double store even if the lease lapses."""
+        if not (_orch_store and _lease_owner):
+            return
+        try:
+            ok = _orch_store.renew_lease(job_id, _lease_owner, lease_seconds=_lease_seconds)
+            if not ok:
+                print(f"[LOCAL-829] lease renew for {job_id} did not apply "
+                      f"(not owner/terminal) {context}")
+        except Exception as _re:
+            print(f"[LOCAL-829] lease renew error for {job_id} {context}: {_re}")
+
     # [LOCAL-595B defect 3] Set true if the tour is served from cache / stop pool.
     # Used at the completed transition to decide whether the reserved pack unit
     # stands (fresh delivery) or was already released (cache hit).
     _was_cache_hit = False
     try:
+        # [LOCAL-829] LIVE path owns its row: take the lease at the very start of
+        # a fresh generation (a resume arrives with the lease already held). If
+        # the acquire fails, only ABORT when we can confirm another holder has a
+        # LIVE lease (something else is finishing this job). A None from a missing
+        # row or a DB blip must fail OPEN — the in-memory path still delivers and
+        # the atomic store-claim is the hard guard against a double store.
+        if _orch_store and _lease_owner and not resume_generator_job_id:
+            _leased = _orch_store.acquire_lease(job_id, lease_seconds=_lease_seconds, owner=_lease_owner)
+            if _leased is None:
+                _other = None
+                try:
+                    _row = _orch_store.get(job_id)
+                    _other = _row.get('lease_owner') if _row else None
+                except Exception:
+                    _other = None
+                if _other and _other != _lease_owner:
+                    print(f"[LOCAL-829] job {job_id}: live lease held by {_other} — "
+                          f"not starting a duplicate live delivery.")
+                    return
+                print(f"[LOCAL-829] job {job_id}: lease not acquired (no row / DB blip) — "
+                      f"proceeding fail-open; store-claim still guards duplication.")
         # A resumed job may not have an ACTIVE_JOBS entry on this fresh instance;
         # rebuild the minimal in-memory tracking the pipeline reads/writes.
         if job_id not in ACTIVE_JOBS:
@@ -1827,6 +1885,10 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         _gen_404_start = None
         while True:
             poll_count += 1
+            # [LOCAL-829] Heartbeat the lease every poll iteration so a sweep on
+            # this (or any) instance never treats this live thread's row as
+            # orphaned while it is still polling the generator.
+            _renew_lease(context=f"(poll {poll_count})")
             _now = datetime.now()
             _stalled_for = _now - _last_progress_at
             _ran_for = _now - _poll_started_at
@@ -2328,6 +2390,31 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         # this is belt-and-braces; resolving it here keeps the two call paths in
         # lockstep and makes the chosen track visible at the call site.
         _store_track = normalize_track(os.getenv('TOUR_TRACK', 'beta'))
+
+        # [LOCAL-829] Idempotent store per orchestrator job. Immediately before
+        # store_audio_tour, atomically claim the right to store (status ->
+        # 'storing' only when not already 'storing'/'completed'). Exactly one
+        # path wins — whether a live thread and a sweep on the same instance, or
+        # two resumers racing on one row. The loser logs and STOPS without
+        # delivering; the winner alone calls store_audio_tour. A claim error (DB
+        # blip) fails OPEN and stores, so the only live delivery is never blocked
+        # by an unavailable store (single-instance behaviour as today). The
+        # winner renews its lease as part of the claim.
+        _store_claimed = True
+        if _orch_store and _lease_owner:
+            try:
+                _won = _orch_store.claim_store(job_id, _lease_owner, lease_seconds=_lease_seconds)
+            except Exception as _claim_err:
+                print(f"[LOCAL-829] store claim error for {job_id} (fail-open, storing): {_claim_err}")
+                _won = True
+            if not _won:
+                print(f"[LOCAL-829] store already claimed for {job_id} — this path stops, no re-store.")
+                ACTIVE_JOBS[job_id]["status"] = "processing"
+                ACTIVE_JOBS[job_id]["progress"] = "Store claimed by another path (LOCAL-829); not re-storing."
+                _store_claimed = False
+        if not _store_claimed:
+            return
+
         store_result = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=ACTIVE_JOBS[job_id].get("actual_stops"), is_test=is_test, tour_kind=ACTIVE_JOBS[job_id].get("tour_kind"), job_id=job_id, user_id=user_id, track=_store_track, tour_type=tour_type, location=location)
         
         # [LOCAL-156] store_audio_tour now returns a dict:
@@ -2345,8 +2432,36 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         store_replaced_version_no = store_result.get("replaced_version_no") if isinstance(store_result, dict) else None
         
         if not store_success:
-            # [LOCAL-156] FAIL CLOSED: storage failed — do NOT report completed.
-            # Issue a compensating credit if the user was already charged.
+            # [LOCAL-829] When the durable store + lease are active, a store
+            # failure is treated as RETRYABLE: the generator job already
+            # succeeded (its text is safe in generator_jobs), so only the final
+            # DB write failed — almost always a transient blip. Release the store
+            # claim back to 'processing' (lease released) and return WITHOUT the
+            # terminal fail-closed refund below, so a later sweep re-attaches to
+            # the same generator job and stores once. No double refund, no
+            # premature 'failed' row. A row left in 'storing' with an expired
+            # lease (a crash mid-store) is likewise picked up by the sweep.
+            if _orch_store and _lease_owner:
+                print(f"[LOCAL-829] store failed for {job_id}: {store_error} — "
+                      f"releasing claim to 'processing' for sweep retry (generator job intact).")
+                try:
+                    _orch_store.release_store_claim(job_id, owner=_lease_owner)
+                except Exception as _rel_err:
+                    print(f"[LOCAL-829] release_store_claim error for {job_id}: {_rel_err}")
+                ACTIVE_JOBS[job_id]["status"] = "processing"
+                ACTIVE_JOBS[job_id]["error"] = (
+                    f"Tour storage failed: {store_error}. Will retry on next sweep."
+                )
+                ACTIVE_JOBS[job_id]["error_type"] = "store_failed_retryable"
+                _record_failure(surface="store", error_code="generation_failed",
+                                message=f"Tour storage failed (retryable): {store_error}",
+                                exception_type="store_failed",
+                                job_id=job_id, tour_id=job_id, user_id=user_id)
+                print(f"Keeping extraction directory due to database storage failure: {extract_path}")
+                return  # Leave the job resumable; do NOT fall through to completed.
+
+            # [LOCAL-156] FAIL CLOSED (no durable store/resume): storage failed —
+            # do NOT report completed. Issue a compensating credit if charged.
             print(f"[LOCAL-156] STORAGE FAILED: {store_error}")
             print(f"[LOCAL-156] Job {job_id} will NOT report completed — billing must not diverge from delivery (D14).")
             
@@ -2856,7 +2971,10 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             if _gen_state in ('completed', 'processing', 'queued'):
                 print(f"[LOCAL-821] exception for job {job_id} but generator job "
                       f"{_gen_jid} is '{_gen_state}' — leaving record resumable.")
-                _orch_store.release_lease(job_id)
+                # [LOCAL-829] Release under the owner THIS run holds (live path
+                # minted its own owner; resume was handed one), so the release
+                # actually matches lease_owner and the row becomes resumable.
+                _orch_store.release_lease(job_id, owner=_lease_owner)
             else:
                 _orch_store.mark_error(job_id, reason=str(e))
 
@@ -2921,6 +3039,10 @@ def _resume_one_job(job):
                 stops=params.get('stops'),
                 mode=params.get('mode'),
                 resume_generator_job_id=gen_jid,
+                # [LOCAL-829] Hand the delivery the lease owner we already hold,
+                # so its poll-loop renewals and store-claim act under the SAME
+                # owner — the resume keeps its lease alive end to end.
+                lease_owner=leased.get('lease_owner'),
             )
         else:
             # generator job failed or is unknown → this request cannot be
