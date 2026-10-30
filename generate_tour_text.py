@@ -23056,10 +23056,38 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                     _sp_route_provider, _sp_route_model = narration_model_route()
                     _sp_model = (_sp_route_model if _sp_route_provider == "openai"
                                  else story_pass_model())
+                    # [LOCAL-837] STORY_PASS_MODEL override. The A/B (run_local837_ab)
+                    # measured the story pass ALONE on the SAME research: on the
+                    # cheap museum arm gpt-4.1 extracts a NAMED human agent and
+                    # clears Michael's bar on stops where gpt-4.1-mini defaults to
+                    # the artwork/"staff" and does not (e.g. the Night Watch —
+                    # mini: "the staff moved the painting into a cave"; gpt-4.1:
+                    # "Arie van Schendel, the curator, had the painting evacuated…
+                    # Because of this decision The Night Watch survived"). The pass
+                    # is ONE call per stop, so lifting only it to gpt-4.1 while the
+                    # big per-stop NARRATION stays on mini is the cheap-arm remedy
+                    # the ticket proposes. Opt-in and reversible: set
+                    # STORY_PASS_MODEL=gpt-4.1 to engage it; unset, the pass stays
+                    # on the cheap-arm model (mini) exactly as before.
+                    _sp_env_model = (os.environ.get('STORY_PASS_MODEL', '') or '').strip()
+                    if _sp_env_model:
+                        _sp_model = _sp_env_model
                     _story_pass_result = generate_story_for_stop(
                         _sp_matrix, _sp_material, max_sentences=_sp_max,
                         model=_sp_model,
-                        forbidden=poi.get('_local474_forbidden', '') or '')
+                        forbidden=poi.get('_local474_forbidden', '') or '',
+                        # [LOCAL-837] MUSEUM-WORKS PATH. This branch is reached
+                        # only inside `if _storied_mode and tour_category ==
+                        # 'museum'`, i.e. every stop here is a discrete artwork
+                        # that the downstream scanner reads as a `title` and
+                        # refuses to let carry a story (can_carry rejects
+                        # kind=='title', by design — not touched). So the story
+                        # must be about a PERSON connected to the work, and
+                        # provenance alone (gift/bequest/acquisition — no stake)
+                        # must be NO_STORY rather than a credits list. On the
+                        # cheap arm the default prompt wrote exactly that
+                        # provenance, and 0/5 stops cleared the bar (LOCAL-832B).
+                        works_mode=True)
                     poi['_story_pass'] = _story_pass_result
                     print(f"  [LOCAL-490] Stop {stop_num} story pass: "
                           f"ok={_story_pass_result['ok']} "
@@ -23067,6 +23095,27 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                           f"${_story_pass_result['cost']:.4f}")
                     if _story_pass_result['ok']:
                         print(f"    story: \"{_story_pass_result['story'][:150]}\"")
+                    # [LOCAL-837] A/B research capture. When LOCAL837_AB_DUMP names
+                    # a path, append this stop's {matrix, material} to it. This
+                    # piggybacks on the research the live run ALREADY paid for, so
+                    # the offline A/B (run_local837_ab.py) can run the story pass
+                    # on the SAME research for mini vs gpt-4.1 without paying for
+                    # research twice — the ticket's "same research per stop". Pure
+                    # append of already-held data; no network, no extra spend; off
+                    # unless the env var is set, so production is untouched.
+                    _ab_dump = os.environ.get('LOCAL837_AB_DUMP', '').strip()
+                    if _ab_dump:
+                        try:
+                            with open(_ab_dump, 'a', encoding='utf-8') as _abf:
+                                _abf.write(json.dumps({
+                                    'tour': location,
+                                    'stop': stop_num,
+                                    'name': poi.get('name', ''),
+                                    'matrix': _sp_matrix,
+                                    'material': _sp_material,
+                                }, ensure_ascii=False) + '\n')
+                        except Exception as _ab_err:
+                            print(f"  [LOCAL-837] A/B dump skipped (non-fatal): {_ab_err}")
             except ImportError as _sp_err:
                 print(f"  [LOCAL-490] story_pass not importable — falling back to "
                       f"the inline shape instructions ({_sp_err})")
@@ -23085,12 +23134,20 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
 ━━━ END STORY ━━━
 
 This story is REQUIRED and comes first in your description. Reproduce its facts
-exactly — every name, date and number. You may adjust wording to flow into the
-surrounding text; you may NOT add a fact to it, remove a named person from it,
-or replace it with a story of your own.
+exactly — every name, date and number.
 
-After the story, add physical description and context if there is room. Do not
-introduce any further named person who does not appear above.
+KEEP THESE SENTENCES TOGETHER AND IN ORDER, as one unbroken block at the very
+start of your description. Do NOT split the story across your description, do NOT
+interleave physical description or context between its sentences, and do NOT
+re-order them. The story is a single run about one person, and that run is the
+whole point — breaking it apart destroys it. You may adjust the joining words at
+the seams so the block reads smoothly, but every sentence of the story stays
+adjacent to the next, in the order given. You may NOT add a fact to it, remove a
+named person from it, or replace it with a story of your own.
+
+Only AFTER the complete story block may you add physical description and context,
+if there is room. Do not introduce any further named person who does not appear
+above.
 """
         elif _storied_mode and tour_category == 'museum':
             _story_reinforcement = """
