@@ -9862,6 +9862,24 @@ def _apply_delivery_hours_guard(result):
                       f"{_dup_t[:50]!r} (same work as {_first_t[:50]!r})", flush=True)
         except Exception as _d722e:  # pragma: no cover
             _import_logger.error(f"[LOCAL-722] delivery dedup skipped: {_d722e}")
+        # 3z-ii. [LOCAL-823] TITLE/BODY DUPLICATION. A stop title must never be a
+        #     prefix COPY of its own body. Belvedere cheap-arm proof tour 474
+        #     shipped Stop 1 with the opening run of its narration ON the title
+        #     line. This runs AFTER the LOCAL-722 dedup (so the deduped set is
+        #     final) and BEFORE the conclusion/header rebuild below (so a repaired
+        #     title flows into the rebuilt "first stop" orientation). Short
+        #     proper-name titles that the body merely opens by naming are never
+        #     touched; only a long, sentence-shaped title that IS the body's
+        #     opening is shortened to a clean banner. Deterministic, idempotent.
+        try:
+            import stop_title_body_dup_guard as _stbd
+            final, _tbd = _stbd.repair_tour_text_title_body_dup(final)
+            for _r in _tbd:
+                print(f"  [LOCAL-823] title/body dedup: Stop {_r['num']} title was "
+                      f"a prefix copy of its body — shortened "
+                      f"{_r['old_title'][:50]!r} → {_r['new_title'][:50]!r}", flush=True)
+        except Exception as _tbde:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-823] title/body dedup skipped: {_tbde}")
         # 4. [LOCAL-619] THE ONE CONCLUSION — built from the FINAL delivered text,
         #    as the LAST step on EVERY path (fresh, pool, cache, by_reference,
         #    overview), after every other gate above. This is the single choke
@@ -22724,8 +22742,20 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                     from story_pass import MAX_SENTENCES, MAX_SENTENCES_TOP
                     _sp_max = (MAX_SENTENCES_TOP
                                if poi.get('_is_top_value_stop') else MAX_SENTENCES)
+                    # [LOCAL-823] Route the story pass through the same cheap-arm
+                    # selector as the narration writer. generate_story_for_stop()
+                    # with no model= falls back to STORY_PASS_MODEL (default
+                    # gpt-4o), which ignored the cheap arm. narration_model_route()
+                    # yields the cheap-arm model (gpt-4.1-mini on the museum arm)
+                    # when it applies, or story_pass_model() (the production
+                    # default) otherwise; a non-openai bake-off route falls back to
+                    # story_pass_model() so this path keeps speaking OpenAI.
+                    _sp_route_provider, _sp_route_model = narration_model_route()
+                    _sp_model = (_sp_route_model if _sp_route_provider == "openai"
+                                 else story_pass_model())
                     _story_pass_result = generate_story_for_stop(
                         _sp_matrix, _sp_material, max_sentences=_sp_max,
+                        model=_sp_model,
                         forbidden=poi.get('_local474_forbidden', '') or '')
                     poi['_story_pass'] = _story_pass_result
                     print(f"  [LOCAL-490] Stop {stop_num} story pass: "
@@ -22798,8 +22828,24 @@ Write the story FIRST, then add physical description if space allows.
         if poi.get('_local474_forbidden'):
             description_prompt += poi['_local474_forbidden']
 
+        # [LOCAL-823] Route the per-stop narration writer through the cheap-arm
+        # selector. narration_model_route() returns (provider, model): when
+        # CHEAP_ARM_CATEGORIES includes this tour's category and NARRATION_MODEL is
+        # set (e.g. museum + gpt-4.1-mini), it yields that model; otherwise it
+        # yields ("openai", story_pass_model()) — the D370 default, byte-for-byte
+        # as before. Before this fix the writer read story_pass_model() directly
+        # (→ gpt-4o), so the big per-stop narration call ignored the cheap arm and
+        # ran on gpt-4o even with NARRATION_MODEL=gpt-4.1-mini (LOCAL-823: gpt-4o
+        # was $0.75 of a $1.03 museum tour). This POST speaks OpenAI chat-
+        # completions; the gemini/anthropic bake-off providers are only driven by
+        # the LOCAL-647 replay harness, never the production/cheap-arm path, so a
+        # non-openai route here falls back to the OpenAI story_pass_model() to keep
+        # the transport unchanged.
+        _nr_provider, _nr_model = narration_model_route()
+        _narration_model = _nr_model if _nr_provider == "openai" else story_pass_model()
+
         description_data = {
-            "model": story_pass_model(),  # D370 — story pass only, not the pipeline default
+            "model": _narration_model,  # [LOCAL-823] cheap-arm-aware; D370 default preserved when the arm is off
             "messages": [
                 {"role": "system", "content": "You are a knowledgeable museum guide with expertise in art, architecture, and history."},
                 {"role": "user", "content": description_prompt}

@@ -71,15 +71,41 @@ class TestStoryPassModel(unittest.TestCase):
 class TestCallSiteIsBound(unittest.TestCase):
     """Assertions against the production source, so a revert cannot stay green."""
 
-    def test_call_site_uses_story_pass_model(self):
+    def test_call_site_routes_through_narration_model_route(self):
+        """[LOCAL-823] The per-stop narration writer must take its model from the
+        cheap-arm-aware selector, not read story_pass_model() directly.
+
+        Before LOCAL-823, description_data['model'] called story_pass_model()
+        (→ gpt-4o), so the big per-stop narration call ignored the museum cheap
+        arm and ran on gpt-4o even with NARRATION_MODEL=gpt-4.1-mini. The writer
+        now binds its model from narration_model_route(), which still yields
+        ("openai", story_pass_model()) when the cheap arm is off — so the D370
+        default is preserved byte-for-byte (asserted in TestNarrationRouteDefault
+        below and TestStoryPassModel above) — but honours NARRATION_MODEL on a
+        museum tour when CHEAP_ARM_CATEGORIES includes it.
+        """
         model_node = _dict_value(_description_data_dict(), "model")
+        # The model is bound to a local resolved from narration_model_route()
+        # (an ast.Name '_narration_model'); the resolution itself must call
+        # narration_model_route() somewhere in the module.
         self.assertIsInstance(
-            model_node, ast.Call,
-            "description_data['model'] is no longer a call — story pass reverted to a literal/env read",
+            model_node, ast.Name,
+            "description_data['model'] should bind the cheap-arm-resolved narration model",
         )
         self.assertEqual(
-            getattr(model_node.func, "id", None), "story_pass_model",
-            "description_data['model'] does not call story_pass_model()",
+            model_node.id, "_narration_model",
+            "description_data['model'] is not the LOCAL-823 _narration_model binding",
+        )
+        with open(_SOURCE_PATH, "r", encoding="utf-8") as fh:
+            tree = ast.parse(fh.read())
+        routed = [
+            n for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and getattr(n.func, "id", None) == "narration_model_route"
+        ]
+        self.assertTrue(
+            routed,
+            "no narration_model_route() call — the narration writer is not cheap-arm-routed",
         )
 
     def test_call_site_costs_at_the_model_it_called(self):
@@ -96,6 +122,53 @@ class TestCallSiteIsBound(unittest.TestCase):
             priced_with_model,
             "no _tour_llm_cost call passes model= — the story pass would be mispriced",
         )
+
+
+class TestNarrationRouteDefault(unittest.TestCase):
+    """[LOCAL-823] The cheap-arm route must preserve the D370 default: with no
+    NARRATION_* / CHEAP_ARM_CATEGORIES env set, the narration writer still
+    resolves to ("openai", story_pass_model()) — byte-for-byte today's gpt-4o."""
+
+    def setUp(self):
+        self._saved = {k: os.environ.pop(k, None) for k in
+                       ("NARRATION_PROVIDER", "NARRATION_MODEL",
+                        "CHEAP_ARM_CATEGORIES", "TOUR_STORY_MODEL")}
+
+    def tearDown(self):
+        for k, v in self._saved.items():
+            os.environ.pop(k, None)
+            if v is not None:
+                os.environ[k] = v
+
+    def test_default_route_is_openai_story_pass_model(self):
+        provider, model = generate_tour_text.narration_model_route()
+        self.assertEqual(provider, "openai")
+        self.assertEqual(model, story_pass_model())
+        self.assertEqual(model, "gpt-4o")
+
+    def test_museum_cheap_arm_yields_narration_model(self):
+        import cheap_arm
+        os.environ["CHEAP_ARM_CATEGORIES"] = "museum"
+        os.environ["NARRATION_MODEL"] = "gpt-4.1-mini"
+        token = cheap_arm.set_tour_category("museum")
+        try:
+            provider, model = generate_tour_text.narration_model_route()
+            self.assertEqual(provider, "openai")
+            self.assertEqual(model, "gpt-4.1-mini")
+        finally:
+            cheap_arm.reset_tour_category(token)
+
+    def test_non_museum_category_keeps_production_default(self):
+        import cheap_arm
+        os.environ["CHEAP_ARM_CATEGORIES"] = "museum"
+        os.environ["NARRATION_MODEL"] = "gpt-4.1-mini"
+        token = cheap_arm.set_tour_category("walking")
+        try:
+            provider, model = generate_tour_text.narration_model_route()
+            self.assertEqual(provider, "openai")
+            self.assertEqual(model, story_pass_model())  # env ignored off-list
+        finally:
+            cheap_arm.reset_tour_category(token)
 
 
 class TestCostFollowsTheModel(unittest.TestCase):

@@ -78,6 +78,159 @@ _SECTION_LABELS = frozenset({
     "collection guide", "audio guide", "highlights", "collection highlights", "floor plan", "map", "museum map",
 })
 
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-823] MULTILINGUAL SITE-CHROME labels. The English nav/section set above
+# is useless on a non-English venue website: Belvedere (Vienna), a GERMAN site,
+# shipped a stop titled "Fußzeile" ("page footer") — pure page chrome scraped as
+# an artwork title that passed every English-only guard (791E etc.). A museum's
+# CMS furniture (footer, header, imprint, data-protection, navigation, search,
+# menu, legal notice, sitemap) is page chrome in EVERY language, never a work.
+#
+# These are matched EXACTLY as the whole title (after a leading article and the
+# same _norm() normalisation as _SECTION_LABELS), so a real work whose title
+# merely CONTAINS one of these common words is never caught — only a title that
+# IS the bare chrome label. Kept to words that are unambiguously website
+# furniture in each language (a footer/header/imprint/privacy/navigation/search/
+# menu/legal-notice/sitemap/cookie label), plus the obvious siblings, so the set
+# never collides with an artwork or exhibition name. Accents and the German ß
+# are \w in Unicode, so _norm() preserves them; the stored forms are lowercase.
+# ─────────────────────────────────────────────────────────────────────────────
+_SITE_CHROME_MULTILINGUAL = frozenset({
+    # ── German (de) — the Belvedere field defect and its CMS siblings ──────────
+    "fußzeile", "fusszeile",              # footer (ß and ss spellings)
+    "kopfzeile",                           # header
+    "impressum",                           # imprint / legal notice
+    "datenschutz", "datenschutzerklärung", "datenschutzerklaerung",  # data protection
+    "navigation", "hauptnavigation", "hauptmenü", "hauptmenu",       # navigation / main menu
+    "menü", "menu",                        # menu (menu also English, harmless)
+    "suche",                               # search
+    "startseite",                          # home page
+    "kontakt",                             # contact
+    "über uns", "uber uns",                # about us
+    "öffnungszeiten", "offnungszeiten",    # opening hours
+    "besuch", "besuch planen",             # visit / plan your visit
+    "tickets kaufen",                      # buy tickets
+    "aktuelles", "veranstaltungen",        # news / events
+    "sammlung", "ausstellungen", "ausstellung",  # collection / exhibitions
+    "anmelden", "newsletter abonnieren",   # log in / subscribe
+    "barrierefreiheit",                    # accessibility
+    "nutzungsbedingungen", "agb",          # terms of use
+    "cookie einstellungen", "cookies",     # cookie settings
+    "seitenübersicht", "seitenubersicht", "sitemap",  # sitemap
+    "zum inhalt springen",                 # skip to content
+    "rechtliches", "rechtliche hinweise",  # legal
+    # ── French (fr) — the Musée d'Orsay language and its CMS siblings ──────────
+    "pied de page",                        # footer
+    "en tête", "en-tête", "entête",        # header
+    "mentions légales", "mentions legales",  # legal notice
+    "politique de confidentialité", "politique de confidentialite",  # privacy policy
+    "confidentialité", "confidentialite",  # privacy
+    "navigation", "menu principal",        # navigation / main menu
+    "recherche", "rechercher",             # search
+    "accueil",                             # home
+    "contact", "nous contacter",           # contact
+    "à propos", "a propos",                # about
+    "horaires", "horaires d'ouverture",    # opening hours
+    "préparer sa visite", "preparer sa visite", "visiter",  # plan your visit
+    "billetterie", "billets",              # tickets
+    "actualités", "actualites", "agenda",  # news / events
+    "collections", "expositions", "exposition",  # collections / exhibitions
+    "se connecter", "s'abonner",           # log in / subscribe
+    "accessibilité", "accessibilite",      # accessibility
+    "conditions d'utilisation", "cgu",     # terms of use
+    "plan du site",                        # sitemap
+    "aller au contenu",                    # skip to content
+    # ── Italian (it) ───────────────────────────────────────────────────────────
+    "piè di pagina", "pie di pagina",      # footer
+    "intestazione",                        # header
+    "note legali",                         # legal notice
+    "informativa sulla privacy", "privacy",  # privacy policy
+    "navigazione", "menu principale",      # navigation / main menu
+    "cerca", "ricerca",                    # search
+    "home", "pagina iniziale",             # home
+    "contatti",                            # contact
+    "chi siamo",                           # about us
+    "orari", "orari di apertura",          # opening hours
+    "visita", "pianifica la visita",       # visit / plan your visit
+    "biglietti",                           # tickets
+    "notizie", "eventi",                   # news / events
+    "collezione", "collezioni", "mostre", "mostra",  # collection / exhibitions
+    "accedi", "iscriviti",                 # log in / subscribe
+    "accessibilità", "accessibilita",      # accessibility
+    "mappa del sito",                      # sitemap
+    # ── Spanish (es) ─────────────────────────────────────────────────────────────
+    "pie de página", "pie de pagina",      # footer
+    "encabezado",                          # header
+    "aviso legal",                         # legal notice
+    "política de privacidad", "politica de privacidad", "privacidad",  # privacy
+    "navegación", "navegacion", "menú principal", "menu principal",     # navigation / main menu
+    "buscar", "búsqueda", "busqueda",      # search
+    "inicio",                              # home
+    "contacto",                            # contact
+    "sobre nosotros", "acerca de",         # about us
+    "horario", "horarios",                 # opening hours
+    "visita", "planifica tu visita",       # visit / plan your visit
+    "entradas", "boletos",                 # tickets
+    "noticias", "eventos",                 # news / events
+    "colección", "coleccion", "colecciones", "exposiciones", "exposición", "exposicion",  # collection / exhibitions
+    "iniciar sesión", "iniciar sesion", "suscribirse",  # log in / subscribe
+    "accesibilidad",                       # accessibility
+    "mapa del sitio",                      # sitemap
+    # ── Dutch (nl) ────────────────────────────────────────────────────────────
+    "voettekst",                           # footer
+    "koptekst",                            # header
+    "colofon",                             # imprint / colophon
+    "privacyverklaring", "privacy",        # privacy statement
+    "navigatie", "hoofdmenu", "hoofdnavigatie",  # navigation / main menu
+    "zoeken",                              # search
+    "home", "startpagina",                 # home
+    "contact",                             # contact
+    "over ons",                            # about us
+    "openingstijden",                      # opening hours
+    "bezoek", "plan je bezoek",            # visit / plan your visit
+    "tickets", "kaarten",                  # tickets
+    "nieuws", "agenda",                    # news / events
+    "collectie", "tentoonstellingen", "tentoonstelling",  # collection / exhibitions
+    "inloggen", "aanmelden",               # log in / subscribe
+    "toegankelijkheid",                    # accessibility
+    "sitemap",                             # sitemap
+    # ── Portuguese (pt) ──────────────────────────────────────────────────────────
+    "rodapé", "rodape",                    # footer
+    "cabeçalho", "cabecalho",              # header
+    "aviso legal",                         # legal notice
+    "política de privacidade", "politica de privacidade", "privacidade",  # privacy
+    "navegação", "navegacao", "menu principal",  # navigation / main menu
+    "pesquisar", "buscar", "pesquisa",     # search
+    "início", "inicio", "página inicial", "pagina inicial",  # home
+    "contato", "contacto",                 # contact
+    "sobre nós", "sobre nos",              # about us
+    "horário", "horario", "horários", "horarios",  # opening hours
+    "visita", "planeie a sua visita",      # visit / plan your visit
+    "bilhetes", "ingressos",               # tickets
+    "notícias", "noticias", "eventos",     # news / events
+    "coleção", "colecao", "exposições", "exposicoes", "exposição", "exposicao",  # collection / exhibitions
+    "entrar", "inscrever-se",              # log in / subscribe
+    "acessibilidade",                      # accessibility
+    "mapa do site",                        # sitemap
+    # ── Vietnamese (vi) — the HCMC field language ─────────────────────────────
+    "chân trang",                          # footer
+    "đầu trang", "dau trang",              # header
+    "trang chủ", "trang chu",              # home page
+    "điều hướng", "dieu huong",            # navigation
+    "tìm kiếm", "tim kiem",                # search
+    "liên hệ", "lien he",                  # contact
+    "giới thiệu", "gioi thieu", "về chúng tôi", "ve chung toi",  # about / about us
+    "giờ mở cửa", "gio mo cua",            # opening hours
+    "tham quan",                           # visit
+    "vé", "mua vé", "mua ve",              # tickets / buy tickets
+    "tin tức", "tin tuc", "sự kiện", "su kien",  # news / events
+    "bộ sưu tập", "bo suu tap", "triển lãm", "trien lam",  # collection / exhibition
+    "đăng nhập", "dang nhap", "đăng ký", "dang ky",  # log in / register
+    "chính sách bảo mật", "chinh sach bao mat",  # privacy policy
+    "sơ đồ trang", "so do trang",          # sitemap
+    "menu", "trình đơn", "trinh don",      # menu
+})
+
 # Leading article across the live-venue languages (reuse the room-guard pattern).
 _LEAD_ARTICLE_RE = re.compile(
     r"(?i)^\s*(?:the|le|la|les|das|der|die|il|lo|el|los|las|l['’])\s+")
@@ -513,6 +666,15 @@ def is_junk_page_title(title: str, venue_name: str = "",
 
     # 2. the whole title is a bare section/navigation label.
     if _norm(t) in _SECTION_LABELS:
+        return True
+
+    # 2b. [LOCAL-823] the whole title is a bare MULTILINGUAL site-chrome label —
+    #     a footer/header/imprint/privacy/navigation/search/menu/legal/sitemap word
+    #     in German, French, Italian, Spanish, Dutch, Portuguese or Vietnamese.
+    #     This is what shipped the Belvedere (Vienna, German site) stop "Fußzeile"
+    #     past the English-only nav set. Matched EXACTLY as the normalised whole
+    #     title, so a real work that merely contains such a word is never caught.
+    if _norm(t) in _SITE_CHROME_MULTILINGUAL:
         return True
 
     # 3. a leading section word joined by a colon/dash.
