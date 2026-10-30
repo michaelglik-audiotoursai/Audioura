@@ -295,12 +295,68 @@ def _orphan_duplicates_following(orphan_tail: str,
     return False
 
 
-def _promote_orphan_to_stop(orphan_tail: str, handoff_title: str) -> str:
+# [LOCAL-826C] A stop title must never be the placeholder a lost hand-off left
+# behind. "This stop" / "Next stop" (and "the next stop") are the fallback cues a
+# Directions line degraded to when the real title had already been truncated into
+# a fragment upstream (Rijks 866) — they are NOT names.
+_PLACEHOLDER_TITLES = {"this stop", "next stop", "the next stop", "the stop"}
+
+# A sentence-ending mark (optionally followed by a closing quote/paren). Used to
+# count whole sentences in an orphan body and to tell a real narrated stop from a
+# bare title fragment that carries no sentence ending at all.
+_SENTENCE_END_826C = re.compile(r'[.!?][\'"\u2019\u201d)]*(?:\s|$)')
+
+
+def _is_placeholder_title(title: str) -> bool:
+    """True when ``title`` is a lost-hand-off placeholder, not a real name."""
+    t = re.sub(r'\s+', ' ', (title or "").strip()).strip().lower().rstrip('.')
+    return (not t) or t in _PLACEHOLDER_TITLES
+
+
+def _orphan_is_title_fragment(orphan_tail: str) -> bool:
+    """[LOCAL-826C] True when the orphan's narration is only a TITLE FRAGMENT — a
+    single run of words with NO sentence ending and under two sentences overall.
+
+    The Rijks 866 corruption word-truncated a 21-word bilingual title into
+    "A Militiaman Holding a Berkemeyer, Known as the 'Merry Drinker' (Een
+    schutter" and that fragment became the orphan's leading "body". A fragment is
+    not a narrated stop: it has no finished sentence. Promoting it manufactures a
+    bogus stop. Measured over the orphan's PROSE (field-label prefixes dropped,
+    their narration values kept — mirrors ``_orphan_body_text``)."""
+    prose = _orphan_body_text(orphan_tail)
+    if not prose:
+        return True
+    sentences = [s for s in _SENTENCE_END_826C.split(prose) if s.strip()]
+    # Count complete sentences = number of sentence-ending marks.
+    n_ends = len(_SENTENCE_END_826C.findall(prose))
+    # A real narrated body has at least TWO sentence endings. A title fragment
+    # (no end mark) or a single clipped clause does not qualify.
+    return n_ends < 2
+
+
+def _title_from_orphan_body(orphan_tail: str) -> str:
+    """[LOCAL-826C] Best-effort REAL title for an orphan whose hand-off cue was a
+    placeholder: the first complete, title-shaped sentence's subject is not
+    recoverable deterministically, so we DO NOT invent one — return '' so the
+    caller refuses to promote rather than shipping "This stop"."""
+    return ""
+
+
+def _promote_orphan_to_stop(orphan_tail: str, handoff_title: str) -> Optional[str]:
     """Build a self-contained "Stop:" block from an orphan body whose header was
     lost, titled by the Directions hand-off that announced it. The number is a
-    placeholder (0); the caller renumbers every survivor 1..k afterwards."""
+    placeholder (0); the caller renumbers every survivor 1..k afterwards.
+
+    [LOCAL-826C] Returns None (REFUSE to promote) when there is no REAL title:
+    a stop is never titled "This stop"/"Next stop". When the hand-off cue
+    degraded to a placeholder (the real title had been truncated upstream), the
+    orphan is left unpromoted rather than shipped under a placeholder header."""
+    title = (handoff_title or "").strip()
+    if _is_placeholder_title(title):
+        title = _title_from_orphan_body(orphan_tail)
+    if _is_placeholder_title(title):
+        return None
     body = orphan_tail.lstrip("\n")
-    title = (handoff_title or "").strip() or "This stop"
     return f"Stop 0: {title}\n\n" + body
 
 
@@ -313,7 +369,13 @@ def _orphan_has_narration_body(orphan_tail: str) -> bool:
     tour-716 case where only "Type/Specialty: …" / "Specific Examples: … — it is
     about a minute's walk away." follow a Directions line. Those carry no
     narration, only a distance preview of the NEXT stop, and must be dropped.
+
+    [LOCAL-826C] Also False when the prose is only a TITLE FRAGMENT (no sentence
+    ending, under two sentences) — the truncated-title artifact must never be
+    promoted into a bogus stop.
     """
+    if _orphan_is_title_fragment(orphan_tail):
+        return False
     for ln in (orphan_tail or "").splitlines():
         s = ln.strip()
         if not s:
@@ -403,11 +465,20 @@ def dedupe_and_fix_stop_count(text: str,
                 print(f"  [LOCAL-801] de-spliced duplicate body after Directions "
                       f"in stop {s['title_raw'][:40]!r}")
             elif _orphan_has_narration_body(orphan_tail):
-                _promoted_seg = _promote_orphan_to_stop(orphan_tail, _ht)
+                _promoted_candidate = _promote_orphan_to_stop(orphan_tail, _ht)
+                if _promoted_candidate is None:
+                    # [LOCAL-826C] No REAL title (hand-off degraded to a
+                    # placeholder because the title was truncated upstream) — do
+                    # not ship a "This stop" header. Drop the orphan artifact.
+                    print(f"  [LOCAL-826C] orphan body not promoted (no real "
+                          f"title; would be a placeholder) in "
+                          f"{s['title_raw'][:30]!r}")
+                    break
+                _promoted_seg = _promoted_candidate
                 promoted += 1
                 print(f"  [LOCAL-801] promoted lost-header stop from spliced body "
                       f"after Directions in {s['title_raw'][:30]!r}: "
-                      f"{(_ht or 'This stop')[:40]!r}")
+                      f"{_ht[:40]!r}")
                 break  # one orphan promoted per splice; it becomes its own seg
 
         # (3) Duplicate of an already-kept stop?
