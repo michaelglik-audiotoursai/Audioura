@@ -13,7 +13,7 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-# ▶️ WAVE 12 — 2026-10-30 08:35 EDT (wdvrdaz9z9) — CURRENT generator: **00018-8vt** = `18e07ff7` (places path no longer calls Gemini; kite proof 507 $0.32, Gemini $0.05, but only 1/5 kite schools for 'Kiteboarding lessons'). Rollback 00017-869. orchestrator_jobs 03ec8b1a set to error by hand (backup AudiouraBackups\orch_job_03ec8b1a_20261030).
+# ▶️ WAVE 12 — 2026-10-30 08:28 EDT (wdvrdaz9z9) — CURRENT generator: **00018-8vt** = `18e07ff7` (places path no longer calls Gemini; kite proof 507 $0.32, Gemini $0.05, but only 1/5 kite schools for 'Kiteboarding lessons'). Rollback 00017-869. orchestrator_jobs 03ec8b1a set to error by hand (backup AudiouraBackups\orch_job_03ec8b1a_20261030).
 
 # ▶️ WAVE 11 — 2026-10-30 07:25 EDT (wdvrdaz9xz)
 - generator **00017-869** = `4a954c70`, cheap arm ON for museum,walking,restaurant,facility,specialized (Michael typed "All five" 06:4x) [00016-62s museum-only]. orchestrator **00010-v5c** = 4a954c70, ORCH_RESUME_ENABLED=true [00009-7ht; 00007-4zv pre-resume]. Wave 10 skipped (superseded).
