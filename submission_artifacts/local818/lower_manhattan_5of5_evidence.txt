@@ -1,0 +1,11 @@
+=== lower_manhattan: STOPS + verdict ===
+1020:Total API cost: $0.2777 (40664 tokens)
+1022:Tour total:     $0.2777
+1062:  STOP 1: Wall Street
+1063:  STOP 2: Federal Hall National Memorial
+1064:  STOP 3: Trinity Church
+1065:  STOP 4: The Charging Bull
+1066:  STOP 5: Battery Park
+1067:  shortfall-apology present: False
+1068:  stored is_test row id=2; delivered 5/5 stop(s) in 425s
+1082:  [lower-manhattan-NEWYORK] 5/5 stops cat=walking  -> PASS
