@@ -1,0 +1,31 @@
+meter_report — since 2026-10-30T05:26:35Z  (kinds=all)
+logs: /Users/micha/Audioura/meterlogs/p1_paid_api_calls.jsonl, /Users/micha/Audioura/meterlogs/paid_api_calls.jsonl, /Users/micha/Audioura/meterlogs/paid_api_calls_local799.jsonl, /Users/micha/Audioura/meterlogs/paid_api_calls_local801.jsonl
+rows scanned=39530  kept=461  (billed only)
+
+BY DAY (UTC)
+                               requests          usd      tokens_in     tokens_out
+----------------------------------------------------------------------------------
+2026-10-30                          461       0.5771         667315          66470
+
+BY SERVICE
+                               requests          usd      tokens_in     tokens_out
+----------------------------------------------------------------------------------
+LOCAL-826                           461       0.5771         667315          66470
+
+BY MODEL
+                               requests          usd      tokens_in     tokens_out
+----------------------------------------------------------------------------------
+gemini-flash-latest                  60       0.2113          57055          16668
+gpt-4.1-mini                         94       0.1521         509613          30997
+(none)                              119       0.1290              0              0
+gpt-4o                                5       0.0382           6801           2115
+gpt-4.1                               5       0.0245           4844           1853
+gpt-4o-mini                         176       0.0220          87065          14837
+text-embedding-3-small                2       0.0000           1937              0
+
+BY KEY-SUFFIX
+                               requests          usd      tokens_in     tokens_out
+----------------------------------------------------------------------------------
+(none)                              461       0.5771         667315          66470
+
+TOTAL   requests=461  usd=$0.5771  tokens_in=667315  tokens_out=66470

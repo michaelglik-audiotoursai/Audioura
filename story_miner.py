@@ -2617,6 +2617,36 @@ CANONICAL_ALIASES: Dict[str, str] = {}
 _ROMAN_NUMERALS = {'i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x'}
 
 
+def _alias_target_present_in_set(resolved_title: str,
+                                 canon_norm_map: Dict[str, str]) -> Optional[str]:
+    """[LOCAL-826 Bug 1] An alias resolves to ``resolved_title`` (a work's English
+    label), but cross-language dedup may have folded that label out of the
+    matchable set, keeping only the local-language label of the SAME work. Return
+    a surviving title for the same work: any OTHER normalized variant that
+    CANONICAL_ALIASES maps to the same ``resolved_title`` and that is present in
+    ``canon_norm_map`` (the normalized → display map of the matchable set).
+
+    Deterministic: when several co-labels survive, the shortest normalized key is
+    chosen (stable, and it is the plainest label form). Returns None when no
+    co-label of the same work is in the set, so the caller falls through to the
+    normal fuzzy path and may still DROP — never a false match.
+    """
+    _resolved_norm = _normalize(resolved_title)
+    # The resolved target itself, under its own normalized form.
+    if _resolved_norm in canon_norm_map:
+        return canon_norm_map[_resolved_norm]
+    _candidates = []
+    for _variant_norm, _target in CANONICAL_ALIASES.items():
+        if _normalize(_target) != _resolved_norm:
+            continue
+        if _variant_norm in canon_norm_map:
+            _candidates.append(_variant_norm)
+    if not _candidates:
+        return None
+    _best = sorted(_candidates, key=lambda k: (len(k), k))[0]
+    return canon_norm_map[_best]
+
+
 # --- T0a: Match candidate to canonical title ---
 
 def match_candidate_to_canonical(
@@ -2633,16 +2663,37 @@ def match_candidate_to_canonical(
     Returns (matched_canonical_title, evidence_snippet) or None if no match.
     """
     _norm_candidate = _normalize(candidate_name)
-    
+
+    # Normalized map from every canonical title to its display form. Built once.
+    _canon_norm_map = {_normalize(c): c for c in canonical_titles}
+
     # Step 1: Exact alias lookup (deterministic, no hash-order ties)
+    #
+    # [LOCAL-826 Bug 1] An alias resolves every language/variant of a work to its
+    # English label (build_dynamic_aliases uses label_en as the canonical value).
+    # But filter_corpus_titles' cross-language dedup KEEPS ONLY ONE label per work
+    # (the preferred language, e.g. French for the Musée d'Orsay) and folds the
+    # English label OUT of canonical_titles. So for a work whose EN and local
+    # labels share no content words — "Starry Night Over the Rhône" / "La Nuit
+    # étoilée", "The Birth of Venus" / "La Naissance de Vénus" — the alias target
+    # (the EN label) is NOT in the matchable set, the `_resolved in canonical_titles`
+    # guard fails, and the famous work is DROPPED even though it is fully present
+    # in SPARQL. Fix: when the alias target is absent, FOLLOW it to any co-label of
+    # the SAME work (another normalized key that aliases to the same EN label) that
+    # IS in the matchable set, and return that surviving title. A candidate in
+    # EITHER language then matches the one surviving label.
     if _norm_candidate in CANONICAL_ALIASES:
         _resolved = CANONICAL_ALIASES[_norm_candidate]
         if _resolved in canonical_titles:
             snippet = _find_snippet(_resolved, corpus)
             return (_resolved, snippet)
-    
+        # Alias target folded out of the set — follow it to a surviving co-label.
+        _present = _alias_target_present_in_set(_resolved, _canon_norm_map)
+        if _present is not None:
+            snippet = _find_snippet(_present, corpus)
+            return (_present, snippet)
+
     # Also try exact match against canonical titles (normalized)
-    _canon_norm_map = {_normalize(c): c for c in canonical_titles}
     if _norm_candidate in _canon_norm_map:
         _exact = _canon_norm_map[_norm_candidate]
         snippet = _find_snippet(_exact, corpus)
@@ -2673,7 +2724,39 @@ def match_candidate_to_canonical(
     _candidate_words = _content_words(_norm_candidate)
     if not _candidate_words:
         return None
-    
+
+    # [LOCAL-826 Bug 2] Distinctive-subject gate data. A shared PLACE word
+    # ("Auvers-sur-Oise" across five Van Gogh titles) must never carry a fuzzy
+    # match on its own: "L'Église d'Auvers-sur-Oise" and "Chaumes de Cordeville à
+    # Auvers-sur-Oise" are DIFFERENT works that share only the toponym. Compute the
+    # document frequency of each content word across the whole canonical set; a
+    # word in many titles (place names, series words, generic nouns) is COMMON and
+    # cannot, by itself, justify a match. A match must share at least one
+    # DISTINCTIVE word — one that is rare across the set — or be an exact/alias
+    # hit (handled above, before this loop).
+    _canon_content = {}        # canonical title → its content-word list (memoized)
+    _df = {}                   # content word → number of titles it appears in
+    for _c in canonical_titles:
+        _cw = _content_words(_normalize(_c))
+        _canon_content[_c] = _cw
+        for _w in set(_cw):
+            _df[_w] = _df.get(_w, 0) + 1
+    _n_titles = max(1, len(canonical_titles))
+    # A word is "common" (cannot, alone, justify a match) when it appears in 3 or
+    # more titles — an ABSOLUTE threshold, not a fraction of the set. A genuine
+    # distinctive SUBJECT noun ("église", "chaumes", "olympia") almost never
+    # recurs across three different artwork titles, whereas a place name
+    # ("Auvers-sur-Oise" across a Van Gogh series) or a series word does. A
+    # fraction-of-N threshold fails here: on a 464-title venue a toponym in 5
+    # titles stays well under 2%·N and would read as distinctive, re-opening the
+    # very false accept (Église ↔ Chaumes on "Auvers") this gate must stop. A word
+    # in one or two titles is DISTINCTIVE, so a bare famous title ("Olympia",
+    # df 2) still matches.
+    _common_cutoff = 3
+
+    def _distinctive(word: str) -> bool:
+        return _df.get(word, 0) < _common_cutoff
+
     # Extract candidate's numeral (if any)
     _cand_numeral = None
     for w in _candidate_words:
@@ -2686,7 +2769,7 @@ def match_candidate_to_canonical(
 
     for canonical in canonical_titles:
         _norm_canon = _normalize(canonical)
-        _canon_words = _content_words(_norm_canon)
+        _canon_words = _canon_content[canonical]
         if not _canon_words:
             continue
         
@@ -2732,6 +2815,80 @@ def match_candidate_to_canonical(
             if len(_candidate_words) == 1 and len(_canon_words) >= 3:
                 if rev_score < 0.34:
                     continue  # Single word covers too little of the canonical title
+
+            # [LOCAL-826 Bug 2] DISTINCTIVE-SUBJECT GATE. The overlap that scored
+            # this pair must include at least one DISTINCTIVE word shared DIRECTLY
+            # between candidate and canonical — a shared place name / series word /
+            # generic noun (COMMON across the set) is never enough. Without this,
+            # "L'Église d'Auvers-sur-Oise" matched "Chaumes de Cordeville à
+            # Auvers-sur-Oise" on the toponym alone, narrating one painting under
+            # another's title.
+            #
+            # DIRECT means the same token, or a ≥5-char prefix (inflections) — NOT
+            # a bilingual-expanded equivalent. The per-venue bilingual map is built
+            # by POSITIONAL alignment of EN/local labels
+            # (build_bilingual_map_from_sparql), which on non-parallel titles emits
+            # spurious pairs (e.g. "auvers"↔"cordeville" from aligning "The Church
+            # at Auvers" with "L'église d'Auvers-sur-Oise"); trusting those for the
+            # distinctive-subject decision reintroduces the very false accept this
+            # gate exists to stop. Genuine cross-language matches (The Railway →
+            # Le Chemin de fer) resolve through the ALIAS path above, not here, so
+            # the fuzzy gate can safely demand same-language distinctive evidence.
+            def _shares_distinctively() -> bool:
+                _cand_set = set(_candidate_words)
+                _canon_set = set(_canon_words)
+                for _w in (_cand_set & _canon_set):
+                    if _distinctive(_w):
+                        return True
+                # 5-char prefix for inflected forms, both sides ≥5 chars.
+                for _cw in _candidate_words:
+                    if len(_cw) < 5:
+                        continue
+                    for _kw in _canon_words:
+                        if (len(_kw) >= 5 and _cw[:5] == _kw[:5]
+                                and (_distinctive(_cw) or _distinctive(_kw))):
+                            return True
+                return False
+
+            if not _shares_distinctively():
+                continue  # Only common/place words overlap — different work.
+
+            # [LOCAL-826 Bug 2] SPECIFICITY GATE. A candidate that is a strict
+            # subset of a LONGER canonical carrying extra DISTINCTIVE SUBJECT words
+            # is a DIFFERENT, more-specific work: "Olympia" ≠ "Une moderne Olympia"
+            # (Cézanne). Reject when every candidate content word appears in the
+            # canonical but the canonical adds ≥1 distinctive SUBJECT word the
+            # candidate lacks.
+            #
+            # A medium/material/format/period qualifier does NOT make a different
+            # work: the LOCAL-34 bare-title enrichment appends exactly these to a
+            # bare SPARQL title ("Olympia" → "Olympia (toile)"), and the stored
+            # canonical then carries "toile". Treating that as a distinguishing
+            # subject would DROP the famous bare title against its own enriched
+            # form. So descriptor words are excluded from the "extra distinctive"
+            # test; only a real subject word differentiates.
+            _DESCRIPTOR_WORDS = {
+                # media / materials (fr + en)
+                'toile', 'huile', 'peinture', 'sculpture', 'bronze', 'marbre',
+                'bois', 'panneau', 'cuivre', 'ivoire', 'cuir', 'dore', 'doree',
+                'pastel', 'aquarelle', 'gouache', 'fusain', 'crayon', 'gravure',
+                'estampe', 'dessin', 'photographie', 'tirage', 'plaster', 'platre',
+                'oil', 'canvas', 'panel', 'paper', 'bronze', 'marble', 'wood',
+                'leather', 'gilded', 'painted', 'drawing', 'print', 'photograph',
+            }
+
+            def _is_descriptor(_w: str) -> bool:
+                # Medium/material word, or a bare year (e.g. "1863").
+                return _w in _DESCRIPTOR_WORDS or _w.isdigit()
+
+            _cand_set = set(_candidate_words)
+            _canon_set = set(_canon_words)
+            if _cand_set and _cand_set < _canon_set:
+                _extra = _canon_set - _cand_set
+                if any(_distinctive(_w) and not _is_descriptor(_w)
+                       for _w in _extra):
+                    continue  # canonical is a distinct, more-specific work
+
             best_score = score
             best_match = canonical
 

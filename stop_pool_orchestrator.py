@@ -911,14 +911,28 @@ def maybe_generate_with_pool(
         pooled_units = _regroup_pooled_units(
             [_pooled_unit_from_row(r) for r in pooled_rows])
         sources_block = _sources_from_rows(pooled_rows)
-        _on_view_shows = sum(1 for u in pooled_units
-                             if ':' not in (u.get('title') or ''))
+        # [LOCAL-826 Bug 3] Prefer the venue's own on-view exhibition count (the
+        # site-first harvest). Only that count licenses the "N exhibitions on view"
+        # phrasing; counting pooled units is OUR delivered number, not the venue's,
+        # so when that is all we have the builder must use the neutral honest line.
+        _sf_counts = {}
+        try:
+            from generate_tour_text import _LAST_SITE_FIRST_COUNTS as _sfc
+            _sf_counts = _sfc or {}
+        except Exception:
+            _sf_counts = {}
+        _on_view_shows = _sf_counts.get('exhibitions_on_view')
+        _count_sourced = bool(_on_view_shows)
+        if not _on_view_shows:
+            _on_view_shows = sum(1 for u in pooled_units
+                                 if ':' not in (u.get('title') or ''))
         try:
             from about_museum_stop import build_shortfall_sentence
             _shortfall_sentence = build_shortfall_sentence(
                 venue_name=_venue_name(location),
                 exhibitions_on_view=_on_view_shows,
-                delivered_stops=len(pooled_units), requested_stops=N)
+                delivered_stops=len(pooled_units), requested_stops=N,
+                count_is_sourced=_count_sourced)
         except Exception:
             _shortfall_sentence = ""
         opening_section = _build_opening_section(
@@ -1013,6 +1027,13 @@ def maybe_generate_with_pool(
             except Exception:
                 _sf_counts = {}
             _on_view_shows = _sf_counts.get('exhibitions_on_view')
+            # [LOCAL-826 Bug 3] The "N exhibitions on view" phrasing may be used
+            # ONLY when the count came from the venue's own on-view exhibition list
+            # (the site-first harvest recorded in _LAST_SITE_FIRST_COUNTS). When it
+            # did not, the shortfall is ours (dedupe/filters/verification), not the
+            # venue's — so fall back to counting delivered shows but tell the
+            # builder the count is UNSOURCED, which yields the neutral honest line.
+            _count_sourced = bool(_on_view_shows)
             if not _on_view_shows:
                 # A show's title has no "Artist: Work" separator; a work does.
                 _on_view_shows = sum(
@@ -1024,7 +1045,8 @@ def maybe_generate_with_pool(
                     venue_name=_venue_name(location),
                     exhibitions_on_view=_on_view_shows,
                     delivered_stops=_delivered_total,
-                    requested_stops=N)
+                    requested_stops=N,
+                    count_is_sourced=_count_sourced)
             except Exception as _sf_e:
                 logger.info(f"[LOCAL-600] N>K shortfall sentence skipped ({_sf_e})")
         opening_section = _build_opening_section(
