@@ -2810,7 +2810,19 @@ def _serper_search(query: str, api_key: str = "", num: int = 10) -> List[Dict]:
         if status != 200 or not raw:
             return []
         body = _json.loads(raw.decode())
-        return body.get("organic", []) or []
+        organic = body.get("organic", []) or []
+        # [LOCAL-849] Resolve google.com/goto links before the caller scores any
+        # host. An unresolved goto reads as host 'google.com' to _registrable_host
+        # and would win/pollute homepage scoring; resolve_links keeps the top 3,
+        # decodes locally, batches one free /resolve for the rest, and anything
+        # still unresolved is dropped here (unknown host). Fail-open.
+        try:
+            from serper_links import resolve_links, is_resolved
+            resolved = resolve_links({"organic": organic}, query=query)
+            organic = [h for h in resolved.get("organic", []) if is_resolved(h)]
+        except Exception:
+            pass
+        return organic
     except Exception as e:
         print(f"  [LOCAL-599] Serper search failed: {type(e).__name__}: {e}")
         return []

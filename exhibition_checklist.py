@@ -348,8 +348,16 @@ def _search_exhibition_url(exhibition_name: str, venue_base_url: str) -> str:
             print(f"  [LOCAL-425] No on-domain results from search")
             return ''
         body = _json.loads(raw.decode())
+        try:  # [LOCAL-849] resolve google.com/goto links before domain compare
+            from serper_links import resolve_links, is_resolved
+            body = resolve_links(body, query=query)
+        except Exception:
+            def is_resolved(_r):
+                return True
         organic = body.get("organic", [])
         for hit in organic:
+            if not is_resolved(hit):
+                continue  # unresolved goto = unknown host
             url = hit.get('link', '')
             if not url:
                 continue
@@ -523,6 +531,13 @@ def _search_exhibition_works_from_web(
 
     if not organic:
         return [], ''
+
+    try:  # [LOCAL-849] resolve google.com/goto links before fetch/domain use
+        from serper_links import resolve_links, is_resolved as _is_resolved849
+        _resolved = resolve_links({"organic": organic}, query=query)
+        organic = [h for h in _resolved.get("organic", []) if _is_resolved849(h)]
+    except Exception:
+        pass
 
     # Skip the venue's own domain (likely 429) and shopping/store pages
     parsed_venue = urlparse(venue_base_url) if venue_base_url else None

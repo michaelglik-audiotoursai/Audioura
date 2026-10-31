@@ -1,0 +1,51 @@
+{
+  "searchParameters": {"q": "\"The Night Watch\" Rembrandt", "type": "search", "num": 8},
+  "organic": [
+    {
+      "title": "The Night Watch - Rijksmuseum",
+      "link": "https://www.rijksmuseum.nl/en/collection/SK-C-5",
+      "snippet": "The Night Watch by Rembrandt van Rijn, 1642. On display in the Gallery of Honour.",
+      "position": 1
+    },
+    {
+      "title": "The Night Watch - Wikipedia",
+      "link": "https://en.wikipedia.org/wiki/The_Night_Watch",
+      "snippet": "The Night Watch is a 1642 painting by Rembrandt.",
+      "position": 2
+    },
+    {
+      "title": "Rembrandt's Night Watch - Britannica",
+      "link": "https://www.britannica.com/topic/The-Night-Watch",
+      "snippet": "Militia Company of District II under the command of Captain Frans Banninck Cocq.",
+      "position": 3
+    },
+    {
+      "title": "The Night Watch restoration - Smithsonian Magazine",
+      "link": "https://www.google.com/goto?url=CAESxQFBVTExQ29UWVZ3bnRfbmlnaHR3YXRjaA",
+      "snippet": "Operation Night Watch is the largest research project ever on Rembrandt's masterpiece.",
+      "position": 4
+    },
+    {
+      "title": "Night Watch analysis - The Guardian",
+      "link": "https://www.google.com/goto?url=CAESyQFBVTExQ29rbmd1YXJkaWFuX253",
+      "snippet": "Why Rembrandt's Night Watch is a revolutionary group portrait.",
+      "position": 5
+    },
+    {
+      "title": "Night Watch facts - example history site",
+      "link": "https://www.google.com/url?q=https%3A%2F%2Fwww.dutchmasters.example%2Fnight-watch&sa=U",
+      "snippet": "A plain url= target variant that can be decoded locally.",
+      "position": 6
+    }
+  ],
+  "news": [
+    {
+      "title": "Rijksmuseum unveils Night Watch findings",
+      "link": "https://www.google.com/goto?url=CAESzAFBVTExQ29uZXdzX255",
+      "snippet": "New scan reveals under-drawing.",
+      "date": "2 days ago",
+      "source": "ANP"
+    }
+  ],
+  "credits": 1
+}

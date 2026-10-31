@@ -351,8 +351,16 @@ def _serper_news(query: str) -> List[Dict]:
         if status != 200 or not raw:
             return []
         body = json.loads(raw.decode())
+        try:  # [LOCAL-849] resolve google.com/goto links in news results
+            from serper_links import resolve_links, is_resolved
+            body = resolve_links(body, query=query)
+        except Exception:
+            def is_resolved(_r):
+                return True
         out = []
         for r in body.get('news', []) or []:
+            if not is_resolved(r):
+                continue
             out.append({'title': r.get('title', '') or '',
                         'url': r.get('link', '') or '',
                         'snippet': r.get('snippet', '') or '',

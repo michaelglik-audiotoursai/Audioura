@@ -922,9 +922,44 @@ def _serp_search(query: str) -> Tuple[List[Dict], float]:
             print(f"  [SQ-S2]   response body:   {response_body[:500]}")
             return [], latency
         body = json.loads(raw.decode())
+        # [LOCAL-849] Resolve Google /goto redirect links BEFORE reading any
+        # organic link. Since Oct 30 Serper returns the real URL only for the top
+        # 3 organic results; the rest come back as opaque google.com/goto links.
+        # Left unresolved they would be judged as the host 'google.com' by
+        # normalize_domain/classify_domain below (wrong source-tier verdict) and
+        # fetched as the Google redirect.
+        #
+        # This is the HOT judge path — a museum tour issues ~40+ of these — and a
+        # /resolve round-trip is ~25-30 s (vendor's "about 30 seconds"). Blocking
+        # every search on it would add ~15 min to a tour. So this chokepoint uses
+        # the NO-WAIT fast path (need_beyond_top3=False): the top 3 real links are
+        # kept, any goto that carries a plain url= target is decoded for FREE, and
+        # the opaque post-top-3 goto links are DROPPED as unknown host (never
+        # judged as google.com, never fetched). The tour's story research fetches
+        # only a handful of pages — the top 3 + Wikipedia are ample (the live
+        # proof delivered 5/5 and 4/4 stops this way). Callers that genuinely need
+        # resolved links beyond the top 3 can call resolve_links(need_beyond_top3
+        # =True) directly, where the one bounded /resolve per search is paid for.
+        try:
+            from serper_links import resolve_links, is_goto_link
+            body = resolve_links(body, query=query, need_beyond_top3=False)
+        except Exception:
+            def is_goto_link(_u):  # fail-open: without the helper, drop goto hosts
+                return '/goto' in (_u or '') and 'google.' in (_u or '')
         organic = body.get("organic", [])
-        results = [{'title': r.get('title', ''), 'url': r.get('link', ''), 'snippet': r.get('snippet', '')}
-                  for r in organic]
+        results = []
+        _dropped_goto = 0
+        for r in organic:
+            link = r.get('link', '')
+            # Drop an unresolved goto link: it is an UNKNOWN host, not google.com.
+            if r.get('_unresolved_goto') or is_goto_link(link):
+                _dropped_goto += 1
+                continue
+            results.append({'title': r.get('title', ''), 'url': link,
+                            'snippet': r.get('snippet', '')})
+        if _dropped_goto:
+            print(f"  [LOCAL-849] dropped {_dropped_goto} unresolved goto link(s) "
+                  f"(unknown host, not judged/fetched)")
         return results, latency
     except Exception as e:
         latency = (time.time() - start) * 1000
