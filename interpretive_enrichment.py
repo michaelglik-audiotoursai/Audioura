@@ -316,9 +316,17 @@ def _verify_attribution(
             api_key=serp_key, timeout=12)
         if status == 200 and raw:
             data = _json707.loads(raw.decode("utf-8", "ignore"))
+            try:  # [LOCAL-849] resolve google.com/goto links before judging
+                from serper_links import resolve_links, is_resolved
+                data = resolve_links(data, query=payload.get("q", ""))
+            except Exception:
+                def is_resolved(_r):
+                    return True
             organic = data.get("organic", [])
             # Check if any result is from a primary/authoritative source
             for result in organic[:5]:
+                if not is_resolved(result):
+                    continue  # unresolved goto = unknown host, skip
                 url = result.get("link", "")
                 snippet = result.get("snippet", "")
                 domain = urlparse(url).netloc.lower()
@@ -369,8 +377,16 @@ def _search_interpretive(query: str) -> List[Dict]:
             api_key=serp_key, timeout=12)
         if status == 200 and raw:
             data = _json707.loads(raw.decode("utf-8", "ignore"))
+            try:  # [LOCAL-849] resolve google.com/goto links before use
+                from serper_links import resolve_links, is_resolved
+                data = resolve_links(data, query=payload.get("q", ""))
+            except Exception:
+                def is_resolved(_r):
+                    return True
             results = []
             for r in data.get("organic", [])[:10]:
+                if not is_resolved(r):
+                    continue  # unresolved goto = unknown host, skip
                 results.append({
                     'title': r.get("title", ""),
                     'url': r.get("link", ""),

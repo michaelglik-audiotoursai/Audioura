@@ -380,7 +380,14 @@ def _web_search_restaurant(
                                       api_key=serp_key, timeout=12)
             if status == 200 and raw:
                 data = _json707.loads(raw.decode("utf-8", "ignore"))
-                organic = data.get("organic", [])[:8]
+                try:  # [LOCAL-849] resolve google.com/goto links before classify
+                    from serper_links import resolve_links, is_resolved
+                    data = resolve_links(data, query=payload.get("q", ""))
+                except Exception:
+                    def is_resolved(_r):
+                        return True
+                organic = [r for r in data.get("organic", [])[:8]
+                           if is_resolved(r)]  # drop unresolved goto (unknown host)
 
                 # Sort: preferred sources first, review sites last
                 preferred = [r for r in organic if _is_from_preferred_source(r.get("link", ""))]

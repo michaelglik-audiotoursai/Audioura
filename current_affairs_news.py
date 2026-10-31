@@ -335,8 +335,19 @@ def _serp_news(query: str, tbs: str = 'qdr:m',
     except Exception as e:
         print(f"  [LOCAL-655] NEWS query failed: {type(e).__name__}: {e}")
         return []
+    # [LOCAL-849] Resolve any google.com/goto redirect links in the news results
+    # before they are fetched or cited; drop any that stay unresolved (unknown
+    # host). Fail-open: a resolve failure leaves the links as-is.
+    try:
+        from serper_links import resolve_links, is_resolved
+        body = resolve_links(body, query=query)
+    except Exception:
+        def is_resolved(_r):
+            return True
     out = []
     for r in body.get("news", []) or []:
+        if not is_resolved(r):
+            continue
         out.append({
             'title': (r.get('title') or '').strip(),
             'source': (r.get('source') or '').strip(),

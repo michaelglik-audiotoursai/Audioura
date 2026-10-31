@@ -451,10 +451,22 @@ def _record(url, status, body, req_body=None):
             rec.update(model=url.split("/models/")[-1].split(":")[0] if "/models/" in url else "",
                        tokens_in=pin, tokens_out=pout, search_queries=q, usd=usd if status == 200 else 0.0)
         elif kind == "serper":
+            # [LOCAL-849] The /resolve endpoint (google.com/goto link resolution)
+            # is FREE — 0 credits per the vendor (Serper support, 2026-10-30:
+            # "It's free (0 credits)"). It must be logged (a row IS written so the
+            # calls are visible, kind=serper) but priced $0, even on a 200 —
+            # otherwise every goto-resolve would be mis-billed $0.001/query and
+            # the ledger would over-count against the Serper prepaid balance.
             # [LOCAL-783] The Places endpoint bills 2 credits ($0.002); every other
             # Serper endpoint (search, news, scholar) bills 1 credit ($0.001).
+            _is_resolve = "/resolve" in (url or "")
             _is_places = "/places" in (url or "")
-            _rate = SERPER_PLACES_PER_QUERY if _is_places else SERPER_PER_QUERY
+            if _is_resolve:
+                _rate = 0.0
+            elif _is_places:
+                _rate = SERPER_PLACES_PER_QUERY
+            else:
+                _rate = SERPER_PER_QUERY
             rec.update(usd=_rate if status == 200 else 0.0)
     except Exception as e:
         rec["meter_error"] = str(e)[:120]
