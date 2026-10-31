@@ -662,6 +662,7 @@ def store_delivered_tour(
     research_cost_usd_per_stop: float = 0.0,
     records_by_title: Optional[Dict[str, dict]] = None,
     fresh_days: Optional[int] = None,
+    venue_unresolved: bool = False,
 ) -> int:
     """Parse a delivered tour and UPSERT each stop into the pool.
 
@@ -694,7 +695,24 @@ def store_delivered_tour(
     nears expiry. When `fresh_days` is None (every ordinary delivered-tour write)
     `fresh_until` is left NULL and the row is never aged out by the library
     clause — behaviour is byte-for-byte unchanged for ordinary deliveries.
+
+    [LOCAL-850] `venue_unresolved` — when True, pooling is SKIPPED entirely (0
+    stops written). The caller sets this for a museum/facility tour whose venue
+    could NOT be identified (no Wikidata QID and no accepted official site). Such
+    a tour must never seed the pool: "Rijks Museum Amsterdam" did not resolve and
+    its tour drifted to the Kröller-Müller museum's works, which were then pooled
+    under `loc:rijks museum amsterdam netherlands` and reused. A `loc:` identity
+    is still legitimate for a RESOLVED site-first venue (MassArt → maamboston.org,
+    qid='' but resolved) and for walking tours — those pass venue_unresolved=False
+    and pool as before. Only a genuinely unidentified venue is blocked.
     """
+    if venue_unresolved:
+        logger.info(
+            f"[LOCAL-850] pool store SKIPPED for '{location}' / {tour_type}: "
+            f"venue unresolved (no QID, no accepted site) — a tour whose venue "
+            f"could not be identified must never seed the pool")
+        return 0
+
     identity = venue_identity(location, qid)
     pool_key = _pool_key(identity, tour_type)
     units = parse_delivered_stops(tour_content)

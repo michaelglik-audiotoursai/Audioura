@@ -1,0 +1,149 @@
+{
+  "cap": 0.6,
+  "per_tour_cap": 0.4,
+  "metered_total": 0.2369717500000001,
+  "results": [
+    {
+      "location": "Rijks Museum Amsterdam, Netherlands",
+      "n_requested": 5,
+      "n_stops": 0,
+      "resolved": [
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ],
+        [
+          "Q190804",
+          "Rijksmuseum"
+        ]
+      ],
+      "pool_skipped": false,
+      "pool_stored": 0,
+      "drift_rejected": false,
+      "glued_city_recovered": true,
+      "kroller_hits": [],
+      "honfleur_pin": false,
+      "tour_usd": 0.003,
+      "stop_titles": []
+    },
+    {
+      "location": "Musee d Orsay Paris",
+      "n_requested": 5,
+      "n_stops": 0,
+      "resolved": [
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ],
+        [
+          "Q23402",
+          "Musée d'Orsay"
+        ]
+      ],
+      "pool_skipped": false,
+      "pool_stored": 0,
+      "drift_rejected": false,
+      "glued_city_recovered": true,
+      "kroller_hits": [],
+      "honfleur_pin": false,
+      "tour_usd": 0.002,
+      "stop_titles": []
+    }
+  ]
+}
