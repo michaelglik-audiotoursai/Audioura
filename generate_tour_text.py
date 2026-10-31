@@ -12373,6 +12373,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 if "," in location:
                     parts = [p.strip() for p in location.split(",")]
                     _city_hint = parts[1] if len(parts) >= 2 else ""
+                # [LOCAL-850] Never feed a COUNTRY as the city — "…, Netherlands"
+                # made resolve_venue geo-disambiguate against the country centroid
+                # and drift to the wrong museum. Recover the real city.
+                try:
+                    from venue_resolver import city_hint_from_location as _ch850
+                    _city_hint = _ch850(location) or _city_hint
+                except Exception:
+                    pass
                 _pre_entity = resolve_venue(_museum_venue_name, _city_hint)
                 if _pre_entity and _pre_entity.qid:
                     _pre_works = fetch_venue_works(_pre_entity.qid, _pre_entity.language, venue_name=_pre_entity.name)
@@ -12515,6 +12523,12 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             if "," in location:
                 parts = [p.strip() for p in location.split(",")]
                 _det_city_hint = parts[1] if len(parts) >= 2 else ""
+            # [LOCAL-850] Never feed a COUNTRY as the city (see city_hint_from_location).
+            try:
+                from venue_resolver import city_hint_from_location as _ch850
+                _det_city_hint = _ch850(location) or _det_city_hint
+            except Exception:
+                pass
             _det_entity = resolve_venue(_museum_venue_name, _det_city_hint)
             
             if _det_entity and _det_entity.qid:
@@ -13777,6 +13791,12 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             if "," in location:
                 parts = [p.strip() for p in location.split(",")]
                 _det_city_hint = parts[1] if len(parts) >= 2 else ""
+            # [LOCAL-850] Never feed a COUNTRY as the city (see city_hint_from_location).
+            try:
+                from venue_resolver import city_hint_from_location as _ch850
+                _det_city_hint = _ch850(location) or _det_city_hint
+            except Exception:
+                pass
             _det_entity = resolve_venue(_museum_venue_name, _det_city_hint)
             
             if _det_entity and _det_entity.qid:
@@ -31862,11 +31882,31 @@ RULES:
                         _lib_fresh_days = _fd_i if _fd_i > 0 else None
                 except (TypeError, ValueError):
                     _lib_fresh_days = None
+                # [LOCAL-850] A museum/facility tour whose venue was NOT identified
+                # (no Wikidata QID AND no accepted official site) must never seed
+                # the pool. "Rijks Museum Amsterdam" did not resolve, its tour
+                # drifted to the Kröller-Müller museum's works, and those were
+                # pooled under loc:rijks museum amsterdam netherlands and reused.
+                # A RESOLVED site-first venue (MassArt → maamboston.org; qid='' but
+                # _museum_site_url set) still pools. Walking / non-museum tours are
+                # unaffected (venue_unresolved stays False).
+                _venue_unresolved = False
+                try:
+                    if tour_category == 'museum' and _museum_venue_name:
+                        _has_site = bool(_museum_site_first_eligible or _museum_site_url)
+                        if not _pool_qid and not _has_site:
+                            _venue_unresolved = True
+                            print(f"  [LOCAL-850] museum venue '{_museum_venue_name}' "
+                                  f"UNRESOLVED (no QID, no accepted site) — this "
+                                  f"tour will NOT be pooled")
+                except Exception:
+                    _venue_unresolved = False
                 _pool_written = _pool.store_delivered_tour(
                     location, tour_type, complete_tour, _db_url,
                     qid=_pool_qid, sources=_pool_sources,
                     research_cost_usd_per_stop=_research_per_stop,
                     fresh_days=_lib_fresh_days,
+                    venue_unresolved=_venue_unresolved,
                 )
                 print(f"  [LOCAL-590] POOL STORE: {_pool_written} stop(s) pooled for {location} / {tour_type}"
                       f" (research ${_research_per_stop:.4f}/stop"

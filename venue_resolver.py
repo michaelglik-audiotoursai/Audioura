@@ -411,6 +411,148 @@ _BUILDING_WING_TYPES = {
 }
 
 
+# ─── [LOCAL-850] Robust city / name parsing for drift-prone venue strings ─────
+# "Rijks Museum Amsterdam, Netherlands" did not resolve and the tour drifted to
+# the Kröller-Müller museum (whose Dutch name is literally "Rijksmuseum
+# Kröller-Müller", site krollermuller.nl). Two parsing failures caused it:
+#   1. The city ("Amsterdam") was GLUED into the name segment, not comma-split,
+#      so the country-word skip left city="" and the search name carried the
+#      city — "Rijks Museum Amsterdam" matches no Wikidata item.
+#   2. "Rijks Museum" (spaced) never matched the compact label "Rijksmuseum".
+# The sets and helpers below recover the city and generate compact-spacing /
+# accent-folded name variants so the real museum is found, deterministically.
+
+# Country words that are NEVER a city. Seen as a trailing comma segment or glued
+# to the end of a name. Lowercased; matched case-insensitively.
+_COUNTRY_WORDS_850 = frozenset({
+    'france', 'italy', 'italia', 'usa', 'u.s.a.', 'us', 'uk', 'u.k.',
+    'spain', 'españa', 'espana', 'germany', 'deutschland', 'netherlands',
+    'the netherlands', 'holland', 'belgium', 'belgië', 'belgique',
+    'switzerland', 'suisse', 'schweiz', 'japan', 'china', 'austria',
+    'österreich', 'portugal', 'greece', 'ireland', 'scotland', 'wales',
+    'england', 'britain', 'great britain', 'united kingdom',
+    'united states', 'united states of america', 'canada', 'mexico',
+    'brazil', 'argentina', 'russia', 'poland', 'czech republic', 'czechia',
+    'hungary', 'denmark', 'sweden', 'norway', 'finland', 'iceland',
+    'turkey', 'türkiye', 'israel', 'egypt', 'india', 'australia',
+    'new zealand', 'south korea', 'korea',
+})
+
+# A curated set of major museum-city names, used ONLY to recover a city that was
+# GLUED to the end of a venue name with no comma ("… Amsterdam, Netherlands" →
+# city "Amsterdam"). This is a recognition aid, not an allow-list: an unknown
+# city simply isn't pulled off the glued tail (the resolver still tries the full
+# name). Lowercased. Multi-word cities are matched greedily (longest first).
+_GLUED_CITY_NAMES_850 = frozenset({
+    'amsterdam', 'rotterdam', 'the hague', 'den haag', 'utrecht', 'haarlem',
+    'paris', 'lyon', 'marseille', 'nice', 'bordeaux', 'strasbourg',
+    'london', 'oxford', 'cambridge', 'edinburgh', 'glasgow', 'liverpool',
+    'manchester', 'madrid', 'barcelona', 'bilbao', 'seville', 'valencia',
+    'rome', 'roma', 'florence', 'firenze', 'venice', 'venezia', 'milan',
+    'milano', 'naples', 'napoli', 'turin', 'torino', 'berlin', 'munich',
+    'münchen', 'munchen', 'cologne', 'köln', 'koln', 'frankfurt', 'hamburg',
+    'dresden', 'vienna', 'wien', 'brussels', 'bruxelles', 'brussel',
+    'antwerp', 'antwerpen', 'bruges', 'brugge', 'ghent', 'gent', 'zurich',
+    'zürich', 'geneva', 'genève', 'basel', 'bern', 'lisbon', 'lisboa',
+    'porto', 'athens', 'copenhagen', 'københavn', 'stockholm', 'oslo',
+    'helsinki', 'dublin', 'prague', 'praha', 'budapest', 'warsaw',
+    'warszawa', 'kraków', 'krakow', 'moscow', 'moskva',
+    'st petersburg', 'saint petersburg', 'istanbul', 'new york',
+    'new york city', 'washington', 'washington dc', 'boston', 'chicago',
+    'los angeles', 'san francisco', 'philadelphia', 'tokyo', 'kyoto',
+    'osaka', 'beijing', 'shanghai', 'toronto', 'montreal', 'ottawa',
+    'mexico city', 'são paulo', 'sao paulo', 'buenos aires',
+})
+
+
+def _split_glued_city(name: str) -> Tuple[str, str]:
+    """[LOCAL-850] Pull a known city that is GLUED to the end of a venue name.
+
+    "Rijks Museum Amsterdam" → ("Rijks Museum", "Amsterdam"). Only a city from
+    _GLUED_CITY_NAMES_850 is removed, longest-match first, so an ordinary name
+    word is never mistaken for a city. Returns (name_without_city, city). When no
+    known city is glued, returns (name, "").
+    """
+    _n = (name or "").strip()
+    if not _n:
+        return _n, ""
+    _low = _n.lower()
+    # Longest city names first so "new york city" wins over "new york".
+    for _city in sorted(_GLUED_CITY_NAMES_850, key=len, reverse=True):
+        # Word-boundary suffix match: "…<sep>city" at the very end.
+        _pat = r'[\s,]+' + re.escape(_city) + r'\s*$'
+        _m = re.search(_pat, _low)
+        if _m:
+            _head = _n[:_m.start()].strip().rstrip(',').strip()
+            if _head:   # never strip the city if it IS the whole name
+                return _head, _n[_m.start():].strip(' ,')
+    return _n, ""
+
+
+def city_hint_from_location(location: str) -> str:
+    """[LOCAL-850] Best city hint for a request string, never a country.
+
+    Callers used to take ``parts[1]`` of "Name City, Country" as the city — for
+    "Rijks Museum Amsterdam, Netherlands" that is "Netherlands", a COUNTRY. Geo-
+    disambiguating a bare "Rijksmuseum" against the Netherlands centroid picked
+    the wrong museum (Kröller-Müller in Otterlo; later the Catharijneconvent in
+    Utrecht — both nearer the country centre than the Rijksmuseum in Amsterdam).
+    This returns a real city: the first non-country comma segment, else a known
+    city glued to the name head, else "". Deterministic, no network.
+    """
+    _loc = (location or "").strip()
+    if not _loc:
+        return ""
+    if "," in _loc:
+        for _seg in [p.strip() for p in _loc.split(",")][1:]:
+            if _seg and _seg.lower() not in _COUNTRY_WORDS_850 and len(_seg) > 1:
+                return _seg
+    # No usable comma city — try a city glued to the (comma-stripped) name head.
+    _head = re.sub(r',\s*[^,()]+$', '', _loc).strip()
+    if _head != _loc:
+        _head = re.sub(r',\s*[^,()]+$', '', _head).strip()
+    _, _glued = _split_glued_city(_head)
+    return _glued or ""
+
+
+# Common misspacings of compact museum names ("Rijks Museum" → "Rijksmuseum").
+# Only the distinctive compacting that Wikidata labels actually use; the generic
+# collapse (join ALL words) below covers the long tail.
+_COMPACT_NAME_FIXES_850 = (
+    (re.compile(r'(?i)\brijks\s+museum\b'), 'Rijksmuseum'),
+    (re.compile(r'(?i)\bstedelijk\s+museum\b'), 'Stedelijk Museum'),
+    (re.compile(r'(?i)\bvan\s+gogh\s+museum\b'), 'Van Gogh Museum'),
+)
+
+
+def _compact_spacing_variants(name: str) -> List[str]:
+    """[LOCAL-850] Spelling/spacing variants for a venue name.
+
+    Returns extra search strings (never the input itself) covering:
+      • known compactions ("Rijks Museum" → "Rijksmuseum");
+      • a generic "glue the leading words" variant for a two-word head followed
+        by "Museum"/"Gallery" ("Boijmans Van Beuningen" is left alone, but
+        "Rijks Museum" also yields "Rijksmuseum").
+    Deterministic and side-effect free.
+    """
+    _n = (name or "").strip()
+    out: List[str] = []
+    if not _n:
+        return out
+    for _rx, _repl in _COMPACT_NAME_FIXES_850:
+        _v = _rx.sub(_repl, _n).strip()
+        if _v and _v.lower() != _n.lower() and _v not in out:
+            out.append(_v)
+    # Generic: "<Word> Museum" / "<Word> Gallery" → "<Word>museum"/"<Word>gallery"
+    # (Dutch/German museum labels are frequently one closed compound word).
+    _m = re.match(r'(?i)^([a-zà-ÿ]+)\s+(museum|museo|museu|gallery|galerie)\s*$', _n)
+    if _m:
+        _v = f"{_m.group(1)}{_m.group(2)}".lower().capitalize()
+        if _v and _v.lower() != _n.lower() and _v not in out:
+            out.append(_v)
+    return out
+
+
 @dataclass
 class VenueEntity:
     """Resolved venue from Wikidata."""
@@ -447,6 +589,14 @@ def _normalise_venue_name(venue_string: str) -> List[str]:
     if _stripped != venue_string:
         _stripped = re.sub(r',\s*[^,()]+$', '', _stripped).strip()
 
+    # [LOCAL-850] Pull a GLUED city off the (already comma-stripped) name so the
+    # search key is the bare museum name. "Rijks Museum Amsterdam, Netherlands"
+    # arrives here as "Rijks Museum Amsterdam" (the comma strip removed only
+    # ", Netherlands"); the city "Amsterdam" is still glued. Searching with it
+    # attached matches no Wikidata item and leaves the resolver to drift to a
+    # web-search of another museum. Strip it; the de-glued head is tried first.
+    _deglued, _glued_city = _split_glued_city(_stripped)
+
     variants = []
 
     # Check for parenthetical content
@@ -465,6 +615,10 @@ def _normalise_venue_name(venue_string: str) -> List[str]:
     else:
         variants.append(_stripped)
 
+    # [LOCAL-850] De-glued name (city removed) tried right after the full form.
+    if _glued_city and _deglued and _deglued != _stripped:
+        variants.append(_deglued)
+
     # [LOCAL-637] Add a leading-article-stripped variant. "The Wallace Collection"
     # must also be searched as "Wallace Collection": the museum's Wikidata label is
     # "Wallace Collection" (no "The"), so wbsearchentities for "The Wallace
@@ -475,6 +629,15 @@ def _normalise_venue_name(venue_string: str) -> List[str]:
                                '', _stripped).strip()
     if _article_stripped and _article_stripped != _stripped:
         variants.append(_article_stripped)
+
+    # [LOCAL-850] Spelling/spacing variants. Wikidata labels Dutch/German museums
+    # as one compound word ("Rijksmuseum", not "Rijks Museum"). Generate the
+    # compacted forms for BOTH the full form and the de-glued name so "Rijks
+    # Museum Amsterdam" surfaces Q190804 ("Rijksmuseum"). Appended last so an
+    # exact as-typed match still wins when one exists.
+    for _base in (_deglued or _stripped, _stripped):
+        for _cv in _compact_spacing_variants(_base):
+            variants.append(_cv)
 
     # Deduplicate while preserving order
     seen = set()
@@ -765,16 +928,43 @@ def _resolve_venue_impl(venue_string: str, city: str = "") -> Optional[VenueEnti
     """
     # LOCAL-258: Extract city from trailing comma-separated segments if not provided.
     # E.g. "Musee des Arts Asiatiques (Asian Art Museum), Nice, France" → city="Nice"
+    # [LOCAL-850] Three fixes over the original:
+    #   0. A COUNTRY passed as the city is discarded. Callers in generate_tour_text
+    #      parse city as parts[1] of "Name City, Country" — for "Rijks Museum
+    #      Amsterdam, Netherlands" that is "Netherlands". Geo-disambiguating against
+    #      a country centroid picked the Kröller-Müller museum (rural Otterlo,
+    #      nearer the Netherlands centroid than the Rijksmuseum in Amsterdam) — the
+    #      exact wave-19 drift. Treat a country-as-city as "no city" so the glued
+    #      real city ("Amsterdam") is recovered instead.
+    #   1. The country-word skip now uses the full _COUNTRY_WORDS_850 set (the old
+    #      inline set was tiny and let, e.g., "Deutschland" through as a city).
+    #   2. When NO comma segment yields a city (the common "Name City, Country"
+    #      shape where the city is glued to the name — "Rijks Museum Amsterdam,
+    #      Netherlands"), recover a known glued city off the name head so geo-
+    #      disambiguation and city validation have something to work with.
+    if city and city.strip().lower() in _COUNTRY_WORDS_850:
+        print(f"  [LOCAL-850] '{city}' is a COUNTRY, not a city — discarding as a "
+              f"geo-disambiguation hint for '{venue_string}'")
+        city = ""
     if not city and "," in venue_string:
         _parts = [p.strip() for p in venue_string.split(",")]
         if len(_parts) >= 2:
-            # Heuristic: second segment is likely the city; skip country-looking words
-            _COUNTRY_WORDS = {'france', 'italy', 'usa', 'uk', 'spain', 'germany',
-                              'netherlands', 'belgium', 'switzerland', 'japan', 'china'}
+            # Heuristic: a trailing segment that is not a country is the city.
             for _seg in _parts[1:]:
-                if _seg.lower() not in _COUNTRY_WORDS and len(_seg) > 1:
+                if _seg.lower() not in _COUNTRY_WORDS_850 and len(_seg) > 1:
                     city = _seg
                     break
+    if not city:
+        # Glued-city recovery: strip the trailing comma segments, then look for a
+        # known city glued to the end of the remaining name.
+        _name_head = re.sub(r',\s*[^,()]+$', '', venue_string).strip()
+        if _name_head != venue_string:
+            _name_head = re.sub(r',\s*[^,()]+$', '', _name_head).strip()
+        _, _glued = _split_glued_city(_name_head)
+        if _glued:
+            city = _glued
+            print(f"  [LOCAL-850] Recovered glued city '{city}' from "
+                  f"'{venue_string}'")
 
     # LOCAL-258: Normalise venue name — strip parentheticals and trailing qualifiers,
     # then try each variant in order until we get candidates.
@@ -864,6 +1054,15 @@ def _resolve_venue_impl(venue_string: str, city: str = "") -> Optional[VenueEnti
                     break
     
     if not candidates:
+        # [LOCAL-850] Last resort before giving up: a Serper knowledge-graph
+        # lookup can bridge a spelling/spacing variant Wikidata's search missed
+        # ("Rijks Museum Amsterdam" → the "Rijksmuseum" panel → Q190804). The
+        # bridge only ACCEPTS a museum-type entity confirmed in the requested
+        # city, so it never drifts to another museum. Skipped silently when no
+        # SERP key is configured.
+        _kg_entity = _resolve_via_knowledge_graph(venue_string, city)
+        if _kg_entity is not None:
+            return _kg_entity
         print(f"  [venue_resolver] No Wikidata candidates for '{venue_string}'")
         return None
     
@@ -2828,6 +3027,133 @@ def _serper_search(query: str, api_key: str = "", num: int = 10) -> List[Dict]:
         return []
 
 
+def _serper_knowledge_graph(query: str, api_key: str = "") -> Dict:
+    """[LOCAL-850] Return Serper's knowledgeGraph block for a query (or {}).
+
+    Serper attaches a Google knowledge-graph panel to many venue queries with a
+    canonical title, type, and sometimes a Wikidata/Wikipedia link. We use it
+    ONLY as a bridge to a Wikidata QID: the title and any Wikidata id are fed
+    back through the normal museum-type + city validation, so the knowledge
+    graph never bypasses the "right museum, right city" contract — it only helps
+    find the candidate when a spelling/spacing variant missed it.
+
+    Metered like any Serper query ($0.001). Returns {} on any error or no key.
+    """
+    import json as _json
+    key = api_key or os.environ.get('SERP_API_KEY', '')
+    if not key:
+        return {}
+    try:
+        import cost_accumulator as _ca
+        _ca.add_search_queries(1)
+    except Exception:
+        pass
+    try:
+        from serper_meter import serper_post
+        status, raw = serper_post(
+            "https://google.serper.dev/search", {"q": query, "num": 5},
+            api_key=key, timeout=15)
+        if status != 200 or not raw:
+            return {}
+        body = _json.loads(raw.decode())
+        return body.get("knowledgeGraph", {}) or {}
+    except Exception as e:
+        print(f"  [LOCAL-850] Serper knowledge-graph lookup failed: "
+              f"{type(e).__name__}: {e}")
+        return {}
+
+
+_WIKIDATA_QID_RE_850 = re.compile(r'(Q\d+)')
+
+
+def _knowledge_graph_qid(kg: Dict) -> str:
+    """[LOCAL-850] Extract a Wikidata QID from a Serper knowledgeGraph block.
+
+    Looks in the common places Serper surfaces one: an explicit ``kgmid``/``fid``
+    is NOT a Wikidata id, so we only trust a wikidata.org link found in the
+    knowledge-graph attributes or website/description links. Returns '' when no
+    Wikidata QID is present (the caller then falls back to a title search).
+    """
+    if not isinstance(kg, dict):
+        return ""
+    _blobs: List[str] = []
+    for _k in ('descriptionLink', 'website', 'url'):
+        _v = kg.get(_k)
+        if isinstance(_v, str):
+            _blobs.append(_v)
+    _attrs = kg.get('attributes')
+    if isinstance(_attrs, dict):
+        for _v in _attrs.values():
+            if isinstance(_v, str):
+                _blobs.append(_v)
+    for _b in _blobs:
+        if 'wikidata.org' in _b:
+            _m = _WIKIDATA_QID_RE_850.search(_b)
+            if _m:
+                return _m.group(1)
+    return ""
+
+
+def _resolve_via_knowledge_graph(
+    venue_string: str, city: str,
+    *, kg_fetcher=None,
+) -> Optional[VenueEntity]:
+    """[LOCAL-850] Last-resort resolver: use a Serper knowledge-graph lookup to
+    find the venue's Wikidata entity when every wbsearchentities variant missed.
+
+    Deterministic contract — this NEVER relaxes identity:
+      • The knowledge-graph title is searched on Wikidata (or a Wikidata QID in
+        the panel is used directly);
+      • the candidate must be a MUSEUM-type entity (``_MUSEUM_TYPES``);
+      • when a city is known the candidate must pass city validation
+        (``_validate_city_match`` is True — a stall/None does NOT pass here,
+        because this is a brand-new candidate, not an already-trusted one).
+    Returns the resolved VenueEntity or None. ``kg_fetcher`` is injectable for
+    offline tests: ``kg_fetcher(query) -> knowledgeGraph dict``.
+    """
+    _fetch = kg_fetcher or (lambda q: _serper_knowledge_graph(q))
+    _name = re.sub(r',\s*[^,()]+(?:,\s*[^,()]+)?$', '', venue_string).strip() or venue_string
+    _deglued, _glued = _split_glued_city(_name)
+    _city = city or _glued
+    _q = f"{_deglued or _name} {_city} museum".strip()
+    try:
+        kg = _fetch(_q)
+    except Exception as e:
+        print(f"  [LOCAL-850] knowledge-graph resolve error: {type(e).__name__}: {e}")
+        return None
+    if not kg:
+        return None
+
+    _candidates: List[Tuple[str, str]] = []
+    _kg_qid = _knowledge_graph_qid(kg)
+    _kg_title = (kg.get('title') or '').strip()
+    if _kg_qid:
+        _candidates.append((_kg_qid, _kg_title or _kg_qid))
+    # Also search the KG title on Wikidata (the panel title is the canonical name).
+    if _kg_title:
+        _hits = _search_entities(_kg_title) or []
+        for _q2, _l2 in _hits[:5]:
+            if _q2 not in {c for c, _ in _candidates}:
+                _candidates.append((_q2, _l2))
+    if not _candidates:
+        return None
+
+    for _qid, _label in _candidates[:6]:
+        _type = _get_instance_of(_qid)
+        if not (_type and _type in _MUSEUM_TYPES):
+            continue
+        if _city and _validate_city_match(_qid, _city) is not True:
+            print(f"  [LOCAL-850] KG candidate {_qid} ({_label}) not confirmed in "
+                  f"'{_city}' — rejected (no drift)")
+            continue
+        _ent = _fetch_entity_properties(_qid, _label)
+        if _ent and getattr(_ent, 'qid', ''):
+            print(f"  [LOCAL-850] Resolved via knowledge graph: '{venue_string}' → "
+                  f"{_ent.qid} ({_ent.name})")
+            return _ent
+    return None
+
+
 def _fetch_homepage_meta(url: str, timeout: int = 10) -> Dict:
     """Fetch a homepage and extract (title, og:site_name, visible text).
 
@@ -2941,6 +3267,104 @@ def _parent_org_route(venue_string: str, searcher=None) -> Tuple[str, str, Dict]
     return '', '', diag
 
 
+def _site_pick_is_other_venue(
+    venue_name: str, city: str, site_title: str, site_url: str, site_host: str,
+) -> bool:
+    """[LOCAL-850] True when a discovered official-site pick actually belongs to a
+    DIFFERENT venue than the one requested.
+
+    The requested venue did NOT resolve to a Wikidata entity, so we have only its
+    request string to go on. Two independent checks, EITHER of which rejects:
+
+      1. Curated/famous gate — ask venue_identity_gate whether the homepage title
+         or host is a known OTHER venue (catches "Kröller-Müller Museum", the Met,
+         etc. when they are in the curated table).
+
+      2. Token-superset gate (table-free) — the exact Kröller-Müller drift. Its
+         homepage title is "Rijksmuseum Kröller-Müller": it CONTAINS our token
+         "rijksmuseum" but ADDS the distinctive proper tokens "kröller"/"müller".
+         A site whose name adds distinctive proper words we never asked for is a
+         different (or more specific) institution — reject it. A site that only
+         repeats our tokens plus generic words (museum/gallery/official/the city)
+         is accepted.
+
+    Conservative on uncertainty: when the title carries NO distinctive token at
+    all (we cannot judge), this returns False and the existing score/name-signal
+    gate still applies. Deterministic, no network.
+    """
+    # 1. Curated/famous identity gate.
+    try:
+        from venue_identity_gate import build_identity, passage_is_other_venue
+        identity = build_identity(venue_name=venue_name or "", city=city or "")
+        is_other, reason, detail = passage_is_other_venue(
+            (site_title or "").strip(), identity,
+            url=site_url or f"https://{site_host}/")
+        if is_other:
+            print(f"  [LOCAL-850] identity gate: pick is other venue "
+                  f"(reason={reason}, detail={detail!r})")
+            return True
+    except Exception as _e:
+        print(f"  [LOCAL-850] identity-gate check skipped: "
+              f"{type(_e).__name__}: {_e}")
+
+    # 2. Token-superset gate (no curated table needed).
+    try:
+        _generic = _STOPWORDS_NAME | {
+            'official', 'site', 'website', 'home', 'homepage', 'welcome',
+            'visit', 'tickets', 'exhibitions', 'exhibition', 'collection',
+            'collections', 'national', 'royal', 'city', 'town', 'the',
+        }
+        # City words are expected on the page and never a drift signal.
+        for _w in re.findall(r"[a-z0-9]+", (city or "").lower()):
+            _generic.add(_w)
+
+        def _distinct(s: str) -> Set[str]:
+            import unicodedata as _ud
+            _folded = ''.join(
+                c for c in _ud.normalize('NFKD', (s or '').lower())
+                if not _ud.combining(c))
+            return {w for w in re.findall(r"[a-z0-9]+", _folded)
+                    if len(w) >= 3 and w not in _generic}
+
+        _req = _distinct(venue_name)
+        # Fold the requested compact-spacing variants in too, so "Rijks Museum"
+        # counts "rijksmuseum" as a requested token (not a drift signal).
+        for _v in _compact_spacing_variants(venue_name):
+            _req |= _distinct(_v)
+        _req |= _distinct(_split_glued_city(venue_name)[0])
+
+        _title_tokens = _distinct(site_title)
+        if not _req or not _title_tokens:
+            return False  # nothing to compare — defer to the score gate
+
+        # The title must share at least one requested distinctive token (else the
+        # score gate already made a weak decision — don't double-judge here).
+        if not (_req & _title_tokens):
+            return False
+
+        # Distinctive proper tokens the title ADDS beyond what we asked for.
+        _extra = _title_tokens - _req
+        # A PARENTHETICAL gloss in the title is an alias/acronym, not a different
+        # venue: "MassArt Art Museum (MAAM)" → "(MAAM)" is MassArt's own acronym.
+        # Drop any extra token that appears only inside parentheses in the title.
+        _paren_blob = ' '.join(re.findall(r'\(([^()]*)\)', site_title or ''))
+        if _extra and _paren_blob:
+            import unicodedata as _ud2
+            _pf = ''.join(c for c in _ud2.normalize('NFKD', _paren_blob.lower())
+                          if not _ud2.combining(c))
+            _paren_tokens = set(re.findall(r"[a-z0-9]+", _pf))
+            _extra = {t for t in _extra if t not in _paren_tokens}
+        if _extra:
+            print(f"  [LOCAL-850] token-superset gate: title adds distinctive "
+                  f"tokens {sorted(_extra)} not in requested {sorted(_req)} — "
+                  f"treating as a DIFFERENT venue")
+            return True
+    except Exception as _e:
+        print(f"  [LOCAL-850] token-superset check skipped: "
+              f"{type(_e).__name__}: {_e}")
+    return False
+
+
 @_sub_timed('discover_official_site')
 def discover_official_site(
     venue_string: str,
@@ -2982,6 +3406,7 @@ def discover_official_site(
 
     # Score each distinct non-aggregator host's homepage.
     best_url, best_score, best_reasons = '', 0, []
+    best_title, best_host = '', ''
     seen_hosts: Set[str] = set()
     for hit in organic[:10]:
         link = (hit.get('link') or hit.get('url') or '').strip()
@@ -3004,18 +3429,37 @@ def discover_official_site(
               f"title={meta.get('title', '')[:80]!r}")
         if score > best_score:
             best_url, best_score, best_reasons = home, score, reasons
+            best_title, best_host = meta.get('title', '') or '', host
 
     # A pick needs a positive score AND at least one NAME signal (title or host)
     # so a page that only mentions the city can't win on its own.
     _name_signal = any(r.startswith('title_match') or r.startswith('host_name')
                        for r in best_reasons)
     if best_url and best_score >= 3 and _name_signal:
-        diag['route'] = 'web_search'
-        diag['pick'] = best_url
-        diag['pick_score'] = best_score
-        print(f"  [LOCAL-599] PICK (web_search): {best_url} score={best_score} {best_reasons}")
-        return SiteDiscovery(official_url=best_url, source='web_search',
-                             diagnostics=diag)
+        # [LOCAL-850] HARD anti-drift guard. The reason this ticket exists: for
+        # "Rijks Museum Amsterdam" (which did not resolve to a Wikidata entity),
+        # web search returned krollermuller.nl — the Kröller-Müller museum, whose
+        # Dutch name is literally "Rijksmuseum Kröller-Müller". Its homepage title
+        # token-overlaps "rijks", so _score_candidate gave it a name_signal and it
+        # won. Before accepting ANY web-search pick, confirm the discovered site
+        # does NOT belong to a DIFFERENT known venue. We build an identity for the
+        # REQUESTED venue and ask the venue-identity gate whether the candidate's
+        # homepage title / host is about another venue. If it is, the pick is
+        # refused — a tour for one museum must never be built from another's site.
+        if _site_pick_is_other_venue(_name, _city, best_title, best_url, best_host):
+            diag['route'] = ''
+            diag['drift_rejected'] = {'host': best_host, 'title': best_title[:120]}
+            print(f"  [LOCAL-850] REJECT web-search pick (is a DIFFERENT "
+                  f"venue): host={best_host} title={best_title[:80]!r} — "
+                  f"refusing to build '{venue_string}' from another venue's site")
+            # Fall through to the parent-org route; do NOT return the drifted site.
+        else:
+            diag['route'] = 'web_search'
+            diag['pick'] = best_url
+            diag['pick_score'] = best_score
+            print(f"  [LOCAL-599] PICK (web_search): {best_url} score={best_score} {best_reasons}")
+            return SiteDiscovery(official_url=best_url, source='web_search',
+                                 diagnostics=diag)
 
     # Parent-org route.
     print(f"  [LOCAL-599] Web search inconclusive (best score={best_score}) — "
