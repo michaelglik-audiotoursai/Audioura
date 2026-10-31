@@ -13,6 +13,11 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 19 — 2026-10-31 01:00 EDT (wdvrdazabx) — CURRENT: gen **00025-nxb** (8e5db189, 1Gi) + orch **00013-lc6** (8e5db189). Rollback 00024-nmp / 00012-bxs.
+- **Proofs:** 514 Rijks completed with no OOM (peak RSS 167.7 MiB), BUT the content is Kröller-Müller works and the pin is in Honfleur: 'Rijks Museum Amsterdam' has no Wikidata match. The 5 bad stops are pooled under `v41|loc:rijks museum amsterdam netherlands|museum`; moving them to rejected **waits for LEAD's OK**. 515 kite 5/5 providers, Gemini $0. Both hidden; audio_tours 407.
+- **LOCAL-846:** tracking started 4 → 0. The 23 old orchestrator 'started' rows are listed for LEAD (scratchpad stale_orch_23_v2.txt); **don't change them until LEAD decides**.
+- **Play Console account = michael.glik@audioura.com.** The Pixel can't find Internal-testing apps by search; use the tester opt-in link.
+
 # ▶️▶️ RESUME HERE — NEXT SESSION (written 2026-10-30 16:3x EDT, laptop going offline ~6 h)
 
 Do these in order:
