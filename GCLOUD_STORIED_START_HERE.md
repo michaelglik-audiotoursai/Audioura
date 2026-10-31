@@ -13,7 +13,9 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-# ▶️ WAVE 19 — 2026-10-31 01:00 EDT (wdvrdazabx) — CURRENT: gen **00025-nxb** (8e5db189, 1Gi) + orch **00013-lc6** (8e5db189). Rollback 00024-nmp / 00012-bxs.
+# ▶️ WAVE 20 — 2026-10-31 03:18 EDT (wdvrdazag4) — CURRENT gen **00026-cnb** (957be93f, 1Gi; LOCAL-850 venue resolution + LOCAL-849). Rollback 00025-nxb. Proofs 516 Rijks → Q190804 5/5 (pin 52.36, 4.885), 517 Orsay → Q23402 5/5; both pool reuses, $0.12; hidden. audio_tours 409. Orch still 00013-lc6.
+
+# ▶️ WAVE 19 — 2026-10-31 01:00 EDT (wdvrdazabx): gen **00025-nxb** (8e5db189, 1Gi) + orch **00013-lc6** (8e5db189). Rollback 00024-nmp / 00012-bxs.
 - **Proofs:** 514 Rijks completed with no OOM (peak RSS 167.7 MiB), BUT the content is Kröller-Müller works and the pin is in Honfleur: 'Rijks Museum Amsterdam' has no Wikidata match. The 5 bad stops are pooled under `v41|loc:rijks museum amsterdam netherlands|museum`; moved to rejected 10-31 with LEAD's OK (backup rijks_pool_reject_20261031; pool 147, rejected 9). 515 kite 5/5 providers, Gemini $0. Both hidden; audio_tours 407.
 - **LOCAL-846:** tracking started 4 → 0. The 23 old orchestrator 'started' rows are listed for LEAD (scratchpad stale_orch_23_v2.txt); closed as failed 10-31 with LEAD's OK (backup stale_orch_rows_20261031); tour_requests has 0 'started'. Rijks venue drift = LOCAL-850.
 - **Play Console account = michael.glik@audioura.com.** The Pixel can't find Internal-testing apps by search; use the tester opt-in link.
