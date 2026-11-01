@@ -22,27 +22,34 @@ has lapsed twice and Michael has had to ask twice.
 - **LOCAL-846:** tracking started 4 → 0. The 23 old orchestrator 'started' rows are listed for LEAD (scratchpad stale_orch_23_v2.txt); closed as failed 10-31 with LEAD's OK (backup stale_orch_rows_20261031); tour_requests has 0 'started'. Rijks venue drift = LOCAL-850.
 - **Play Console account = michael.glik@audioura.com.** The Pixel can't find Internal-testing apps by search; use the tester opt-in link.
 
-# ▶️▶️ RESUME HERE — NEXT SESSION (written 2026-10-30 16:3x EDT, laptop going offline ~6 h)
+# ▶️▶️ RESUME HERE — NEXT SESSION (written 2026-11-01 00:5x EDT, laptop shut down)
 
 Do these in order:
-1. Run `date`, and prefix every reply. Michael renamed this session `GCloud_Storied_1`; it is still GCloud_Storied.
-2. **Ask Michael to type `/remote-control`.** It dropped once today after network blips; the peer message result says "Remote Control is not connected" when it is down. LEAD = `Storied_Tours` (bridge:session_0162Qu7k54NgjdiBu8pVkpwb).
-3. Check ClickUp list `1000410000000733` for waves newer than 18 (wdvrdaza7f). Re-arm the 3-hour CronCreate watch. Tell LEAD you're back.
-4. **Pending from LEAD (D755):** deploy wave 18 (`2532fc1c960137cced1a3a6d496da02e7a19935e`, image `subscribed-generator:2532fc1c` already built, rev 00023-9zz at 0%) **with `--memory 1Gi`**, env unchanged. Proofs, cap $0.80, fresh strings:
-   - "Rijks Museum Amsterdam, Netherlands" (5): must complete with no OOM.
-   - "Kitesurf lessons near Mui Ne beach, Vietnam" (5): pass = ≥ 3 kite providers, Gemini $0, no "Restaurant" in the title.
-   - Pass → keep. Fail → traffic back to **00024-nmp**.
-   - First check that LEAD hasn't superseded this with a newer wave.
-5. Ask Michael whether Android 89 reached the Pixel 7, and whether the LOCAL-841 resume test passed (start a tour, background the app for 5+ min, reopen; the tour should be in Listening).
+1. Run `date` and prefix every reply; the session may show as `GCloud_Storied_1`, which is the same session.
+2. Ask Michael to type `/remote-control`. LEAD = `Storied_Tours` (bridge:session_0162Qu7k54NgjdiBu8pVkpwb).
+3. Restart the Cloud SQL proxy, which needs a fresh token. Check ClickUp list `1000410000000733` for waves newer than **21** (wdvrdazanw). Re-arm the 3-hour CronCreate watch. Tell LEAD you're back.
+4. Deploy any new wave under the STANDING OK.
+   - Generator **always `--image` + `--memory 1Gi`**.
+   - Check that proof strings haven't been used by USER-1073427300 (D622 overwrite).
+   - Run the proofs with `scratchpad/runproof_r.py`.
+5. Ask Michael whether Android 89 reached the Pixel and whether the LOCAL-841 resume test passed. The Pixel needs the **tester opt-in link**: Internal-testing apps don't show in Play Store search.
+   - **Play Console:** https://play.google.com/console, account **michael.glik@audioura.com**.
+   - Rule: when asking Michael to open anything, give the full URL and the account.
 
-**Live now:** generator **00024-nmp** (wave 16 image 2478ad45, 1Gi); orch **00012-bxs**; modernized **00006-9hq** (layered, max 3); map 00005-smt; user-api 00003-hvw; gateway 00003-x4s. audio_tours 405; proofs 509–513 hidden.
+**Live now:**
+- Generator **00027-6sb** (wave 21, 9ead5b87, 1Gi); rollback 00026-cnb.
+- Orchestrator **00013-lc6** (8e5db189); rollback 00012-bxs.
+- Modernized 00006-9hq (layered, max 3); map 00005-smt; user-api 00003-hvw; gateway 00003-x4s.
+- audio_tours 411; proofs up to 519 hidden (restore SQL in AudiouraBackups\wave6_proofs_hide_20261030\latlng.json).
+- tour_requests has 0 stale 'started' rows.
 
-**Laptop gotchas found today:**
-- The Cloud SQL proxy drops connections often. Use `scratchpad/runproof_r.py` (60 s connect timeout, retries, restarts the proxy only on the 6th failure).
-- If the runner dies, the server job still runs: watch `tour_requests` directly.
-- `quiet.py` needs `PGPW` exported.
-- **Proof strings:** reusing one this user (USER-1073427300) already used **replaces** that tour (D622). Check `audio_tours.request_string` first.
-- `gcloud run services update --memory` builds from the *latest template* image, not the serving one. Pass `--image` explicitly.
+**Nothing is pending from LEAD.** Open items are LEAD's: LOCAL-830/841 app builds, iOS 88 on TestFlight.
+
+**Laptop gotchas:**
+- The Cloud SQL proxy drops connections; the runner retries, and the server jobs carry on regardless.
+- `quiet.py` needs `PGPW`.
+- `gcloud run services update --memory` uses the *latest template* image, so always pass `--image`.
+- `python -I` loses the user-site psycopg2.
 
 # ▶️ 2026-10-30 16:19 EDT: CURRENT = generator **00024-nmp**: wave 16 image 2478ad45 + **1Gi memory** (D755); rollback 00022-kbx (512Mi). TODO: wave 18 (2532fc1c) + 1Gi, then the Rijks and kite proofs.
 - **Wave 18** (wdvrdaza7f, 2532fc1c, gen 00023-9zz at 0%) FAILED. The kite proof was a clean refusal ("Mui Ne beach area" scope + Surf Bar drop → LOCAL-847). The Rijks proof hit a **generator OOM, 512 MiB** (also seen at 08:02Z on 00016-62s); memory decision is LEAD's.
