@@ -800,6 +800,66 @@ def research_with_sources(prompt: str, model: str = None, resolve: bool = True,
         prompt, model=model, resolve=resolve, timeout=timeout, grounded=grounded))
 
 
+def ungrounded_ask(prompt: str, timeout: int = 60) -> str:
+    """Answer an UNGROUNDED class-knowledge question, honouring the backend
+    selector. Returns the answer text ('' on any failure).
+
+    [LOCAL-851] An ungrounded ask is class knowledge — "what parts does a church
+    have", or "turn this grounded prose into strict JSON". It needs no web
+    retrieval, so it must NOT go to the Serper object backend (that does real
+    fetching). But on the CHEAP ARM (RESEARCH_BACKEND=serper, gated to this tour's
+    category by CHEAP_ARM_CATEGORIES) the point is to spend $0 on Gemini: an
+    ungrounded Gemini call is still billed per token, and on the museum path the
+    venue preflight (STEP 2 JSON reshape) and venue_parts.default_ask (Q1/Q2 class
+    knowledge) together account for ~30% of a museum tour's cost (D-note: wave 20
+    Prado proof, Gemini $0.116 of $0.378). So:
+
+      * RESEARCH_BACKEND=serper  → answer with the cheap OpenAI model (the same
+        gpt-4.1-mini the cheap arm already narrates with), through the project's
+        network meter. No Gemini key needed.
+      * default (gemini)         → _gemini(grounded=False), byte-for-byte the
+        previous behaviour.
+
+    The model name on the cheap arm is the effective NARRATION_MODEL for this tour
+    (cheap_arm.effective_env), defaulting to gpt-4.1-mini; this keeps the
+    ungrounded cheap answer on the same cheap model the arm is defined by, and
+    stays correct if LEAD ever changes the cheap model."""
+    backend = 'gemini'
+    try:
+        backend = research_backend()
+    except Exception:  # pragma: no cover - selector must never break the ask
+        backend = 'gemini'
+
+    if backend == 'serper':
+        # Cheap OpenAI model — no Gemini, no retrieval. Metered at the network
+        # layer like every other OpenAI call. Fail SAFE to ungrounded Gemini only
+        # if the cheap call errors AND a Gemini key is present, so a Serper-arm
+        # run with no Gemini key stays $0 on Gemini (returns '' instead).
+        cheap_model = 'gpt-4.1-mini'
+        try:
+            import cheap_arm as _cheap_arm
+            cheap_model = (_cheap_arm.effective_env('NARRATION_MODEL', '')
+                           or 'gpt-4.1-mini').strip() or 'gpt-4.1-mini'
+        except Exception:  # pragma: no cover
+            cheap_model = 'gpt-4.1-mini'
+        try:
+            text = _openai(prompt, model=cheap_model) or ''
+            if text.strip():
+                return text
+        except Exception:
+            text = ''
+        # Cheap call returned nothing. Do NOT silently fall to Gemini on the
+        # serper arm — that would reintroduce the spend this routing removes. The
+        # caller's own fallbacks (preflight re-parses the grounded prose; the
+        # chain degrades gracefully) handle an empty ungrounded answer.
+        return text
+
+    # Default backend: ungrounded Gemini, unchanged.
+    try:
+        return _gemini(prompt, grounded=False) or ''
+    except Exception:
+        return ''
+
 
 # COST PROTOTYPE 1 (ticket LOCAL-645). Gemini grounding is ~55% of a fresh tour's
 # cost: a 3-stop tour issues N+1 search-enabled requests (1 venue preflight + one

@@ -569,15 +569,26 @@ def preflight(venue: str, city: str = '', db_url: Optional[str] = None,
         if hit is not None:
             return hit
 
-    from story_leads import gemini_with_sources, _gemini
+    # [LOCAL-851] Route both model calls through the backend selector. On the
+    # cheap arm (RESEARCH_BACKEND=serper, gated to this tour's category by
+    # CHEAP_ARM_CATEGORIES) the museum preflight spends $0 on Gemini: STEP 1's
+    # grounded venue question is answered by Serper + a cheap model via
+    # research_with_sources, and STEP 2's ungrounded JSON reshape by the cheap
+    # OpenAI model via ungrounded_ask. With the default backend (gemini),
+    # research_with_sources == gemini_with_sources and ungrounded_ask ==
+    # _gemini(grounded=False), so this is byte-for-byte the previous behaviour.
+    from story_leads import research_with_sources, ungrounded_ask
 
     # STEP 1 — the ONE grounded call: a natural-language question that reliably
     # triggers Google Search (JSON-demand prompts do not). GroundingForbiddenError
-    # (L2 guard) propagates by design. This is the billable call the LOCAL-594
-    # meter counts.
+    # (L2 guard) propagates by design — on the default/gemini arm research_with_sources
+    # reaches gemini_with_sources, which raises it; on the serper arm nothing is
+    # billed for grounding, so an L2 by-reference build is satisfied without a
+    # forbidden request. This is the billable call the LOCAL-594 meter counts on
+    # the default arm.
     question = _GROUNDED_QUESTION.format(venue=venue or '(unspecified)',
                                          city=city or '(unspecified)')
-    call = gemini_with_sources(question, grounded=True)
+    call = research_with_sources(question, grounded=True)
 
     if call.get('error'):
         res = _blank_result()
@@ -588,15 +599,16 @@ def preflight(venue: str, city: str = '', db_url: Optional[str] = None,
     report_text = call.get('text', '') or ''
     call_sources = call.get('sources', []) or []
 
-    # STEP 2 — turn the grounded prose into strict JSON. This is UNGROUNDED
-    # (grounded=False): it costs only Flash tokens, nothing on the Google-Search
-    # channel, and the LOCAL-594 grounding meter does not count it. It never
-    # introduces new facts — it only reshapes STEP 1's grounded answer.
+    # STEP 2 — turn the grounded prose into strict JSON. This is UNGROUNDED: it
+    # costs only cheap tokens, nothing on the Google-Search channel, and the
+    # LOCAL-594 grounding meter does not count it. It never introduces new facts —
+    # it only reshapes STEP 1's grounded answer. On the cheap arm ungrounded_ask
+    # uses the cheap OpenAI model ($0 on Gemini); on the default arm it is
+    # _gemini(grounded=False), unchanged.
     parsed = None
     if report_text.strip():
         try:
-            extract = _gemini(_EXTRACT_PROMPT.format(report=report_text[:6000]),
-                              grounded=False)
+            extract = ungrounded_ask(_EXTRACT_PROMPT.format(report=report_text[:6000]))
             parsed = _extract_json(extract)
         except Exception:
             parsed = None
