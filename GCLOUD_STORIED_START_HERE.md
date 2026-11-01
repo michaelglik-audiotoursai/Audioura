@@ -13,7 +13,9 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-# ▶️ WAVE 20 — 2026-10-31 03:18 EDT (wdvrdazag4) — CURRENT gen **00026-cnb** (957be93f, 1Gi; LOCAL-850 venue resolution + LOCAL-849). Rollback 00025-nxb. Proofs 516 Rijks → Q190804 5/5 (pin 52.36, 4.885), 517 Orsay → Q23402 5/5; both pool reuses, $0.12; hidden. audio_tours 409. Orch still 00013-lc6.
+# ▶️ WAVE 21 — 2026-10-31 22:08 EDT (wdvrdazanw) — CURRENT gen **00027-6sb** (9ead5b87, 1Gi; LOCAL-851 museums $0 Gemini). Rollback 00026-cnb. Proof 519 Reina Sofía 5/5 fresh, $0.338, Gemini $0, peak RSS 221.5 MiB; hidden. audio_tours 411.
+
+# ▶️ WAVE 20 — 2026-10-31 03:18 EDT (wdvrdazag4): gen **00026-cnb** (957be93f, 1Gi; LOCAL-850 venue resolution + LOCAL-849). Rollback 00025-nxb. Proofs 516 Rijks → Q190804 5/5 (pin 52.36, 4.885), 517 Orsay → Q23402 5/5; both pool reuses, $0.12; hidden. audio_tours 409. Orch still 00013-lc6.
 
 # ▶️ WAVE 19 — 2026-10-31 01:00 EDT (wdvrdazabx): gen **00025-nxb** (8e5db189, 1Gi) + orch **00013-lc6** (8e5db189). Rollback 00024-nmp / 00012-bxs.
 - **Proofs:** 514 Rijks completed with no OOM (peak RSS 167.7 MiB), BUT the content is Kröller-Müller works and the pin is in Honfleur: 'Rijks Museum Amsterdam' has no Wikidata match. The 5 bad stops are pooled under `v41|loc:rijks museum amsterdam netherlands|museum`; moved to rejected 10-31 with LEAD's OK (backup rijks_pool_reject_20261031; pool 147, rejected 9). 515 kite 5/5 providers, Gemini $0. Both hidden; audio_tours 407.
