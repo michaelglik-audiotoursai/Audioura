@@ -10884,6 +10884,36 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _pf_single_venue = (tour_type == 'museum') or bool(_pf_named_venue)
     if (_pf_single_venue and not exclude_titles and not harness
             and os.environ.get('LOCAL603_PREFLIGHT', '1') != '0'):
+        # [LOCAL-851] Bind the cheap-arm category BEFORE the preflight runs. The
+        # authoritative binding happens later, inside _generate_tour_text_impl
+        # (cheap_arm.set_tour_category at the "CHEAP ARM BY CATEGORY" block), but
+        # the preflight runs HERE in the wrapper — earlier — so at preflight time
+        # the category contextvar is still unset (''). With CHEAP_ARM_CATEGORIES
+        # active, an unset category falls to the production default, so the
+        # preflight's research backend would be Gemini even on the cheap arm, and a
+        # museum tour would keep paying Gemini for the preflight (LOCAL-851). Bind
+        # a best-effort category now so story_leads.research_backend() sees the
+        # cheap arm during the preflight. The impl's later set_tour_category
+        # overwrites this with the FINAL category for the rest of the tour; this
+        # early value only governs the preflight call. Non-fatal: a failure here
+        # leaves the pre-LOCAL-851 behaviour (preflight on the default backend).
+        try:
+            import cheap_arm as _ca851
+            _pf_category = _classify_tour_category(location, tour_type)
+            # Mirror the impl's CLASSIFY-FIX: a named venue word promotes a
+            # 'walking' classification to 'museum'. The preflight only fires for a
+            # single named venue, so this matches what the impl will finalise.
+            if _pf_category == 'walking':
+                _pf_vwords = {'museum', 'musée', 'musee', 'gallery', 'galleria',
+                              'palais', 'palazzo', 'palace', 'castle', 'château',
+                              'house', 'mansion', 'library', 'institute', 'villa'}
+                if set(location.lower().split()) & _pf_vwords:
+                    _pf_category = 'museum'
+            _ca851.set_tour_category(_pf_category)
+            _ca851.log_decision(_pf_category)
+        except Exception as _ca851_err:  # pragma: no cover - gate must never block
+            print(f"  [LOCAL-851] early cheap-arm bind for preflight skipped "
+                  f"(non-fatal): {_ca851_err}")
         try:
             import venue_preflight as _vpf
             # [LEAD 2026-10-08] tour_type is already 'museum' here, so the request names a

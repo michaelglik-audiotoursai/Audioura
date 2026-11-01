@@ -400,7 +400,35 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
                     _ground_r1 = n_gem_grounded < MAX_GROUNDED_PER_STOP
             else:
                 _ground_r1 = n_gem_grounded < MAX_GROUNDED_PER_STOP
-            r1 = _research_with_sources(_seed_prompt, grounded=_ground_r1)
+            # [LOCAL-851] When r1 is GROUNDED, research_with_sources routes it to
+            # Serper + a cheap model on the cheap arm (LOCAL-648). But when the
+            # per-stop grounded budget is spent, r1 is called UNGROUNDED, and
+            # research_with_sources sends an ungrounded call straight to
+            # gemini_with_sources — so on the museum path, after the first grounded
+            # pass, every retry was still a billed ungrounded Gemini call
+            # (~$0.009/tour of gemini_tokens, D-note: LOCAL-851 trace). On the CHEAP
+            # ARM (RESEARCH_BACKEND=serper) route the ungrounded r1 through
+            # ungrounded_ask so it is answered by the cheap OpenAI model ($0 on
+            # Gemini). On the DEFAULT backend r1 is left EXACTLY as before
+            # (_research_with_sources == gemini_with_sources, same {text,sources,..}
+            # shape) — byte-for-byte unchanged.
+            _r1_serper = False
+            if not _ground_r1:
+                try:
+                    from story_leads import research_backend as _rb851
+                    _r1_serper = (_rb851() == 'serper')
+                except Exception:
+                    _r1_serper = False
+            if _r1_serper:
+                try:
+                    from story_leads import ungrounded_ask as _ungrounded_ask_r1
+                    r1 = {'text': _ungrounded_ask_r1(_seed_prompt) or '',
+                          'sources': [], 'supports': [], 'queries': [],
+                          'error': ''}
+                except Exception:
+                    r1 = _research_with_sources(_seed_prompt, grounded=False)
+            else:
+                r1 = _research_with_sources(_seed_prompt, grounded=_ground_r1)
             n_gem += 1
             if _ground_r1:
                 n_gem_grounded += 1
@@ -465,12 +493,41 @@ def run_for_stop(matrix: Dict, stop_text: str, exhibition: str = '',
             # for nothing. STORY_LOOP_R2_GROUNDED=1 restores the old behaviour for
             # BEFORE-baseline measurement only.
             _ground_r2 = R2_GROUNDED and (n_gem_grounded < MAX_GROUNDED_PER_STOP)
-            r2 = gemini_with_sources(ADJUDICATION_PROMPT.format(
+            _adj_prompt = ADJUDICATION_PROMPT.format(
                 work=work, exhibition=exhibition, answer=r1['text'],
-                evidence=ev_block), grounded=_ground_r2)
-            n_gem += 1
+                evidence=ev_block)
+            # [LOCAL-851] Route the adjudication through the backend selector, like
+            # r1 above. It is UNGROUNDED by default (judges only against the
+            # retrieved evidence block — "do not rely on memory"), so on the cheap
+            # arm (RESEARCH_BACKEND=serper, gated to this tour's category) it is
+            # answered by the cheap OpenAI model via story_leads.ungrounded_ask
+            # instead of a billed ungrounded Gemini call — this is the last
+            # museum-path Gemini caller, ~$0.04/tour of gemini_tokens, now $0.
+            # When STORY_LOOP_R2_GROUNDED=1 forces a grounded adjudication, it goes
+            # through research_with_sources (Serper+cheap on the cheap arm, Gemini
+            # grounded on the default arm) exactly as r1 does. On the DEFAULT
+            # backend the ungrounded adjudication is left EXACTLY as before
+            # (gemini_with_sources(grounded=False)); only the cheap (serper) arm
+            # diverts to the cheap OpenAI model via ungrounded_ask.
+            _r2_serper = False
+            if not _ground_r2:
+                try:
+                    from story_leads import research_backend as _rb851b
+                    _r2_serper = (_rb851b() == 'serper')
+                except Exception:
+                    _r2_serper = False
             if _ground_r2:
+                r2 = _research_with_sources(_adj_prompt, grounded=True)
                 n_gem_grounded += 1
+            elif _r2_serper:
+                try:
+                    from story_leads import ungrounded_ask as _ungrounded_ask
+                    r2 = {'text': _ungrounded_ask(_adj_prompt) or ''}
+                except Exception:
+                    r2 = gemini_with_sources(_adj_prompt, grounded=False)
+            else:
+                r2 = gemini_with_sources(_adj_prompt, grounded=False)
+            n_gem += 1
             text2 = r2.get('text') or ''
             m = re.search(r'PART\s*2.*?$', text2, re.S | re.I)
             story = (re.sub(r'^PART\s*2[^\n]*\n', '', m.group(0)).strip()

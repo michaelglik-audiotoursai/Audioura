@@ -358,17 +358,30 @@ def part_story_prompt(part, venue_name, location=''):
 # two callables production passes in.
 
 def default_ask(prompt, timeout=60):
-    """Ungrounded asker for Q1/Q2 — class knowledge, no sources needed."""
+    """Ungrounded asker for Q1/Q2 — class knowledge, no sources needed.
+
+    [LOCAL-851] Routed through story_leads.ungrounded_ask so that, under
+    RESEARCH_BACKEND=serper (the cheap arm, gated to this tour's category by
+    CHEAP_ARM_CATEGORIES), these class-knowledge questions are answered by the
+    cheap OpenAI model (gpt-4.1-mini) instead of a billed ungrounded Gemini call —
+    the museum path spends $0 on Gemini. With the default backend (gemini),
+    ungrounded_ask == the previous _gemini(grounded=False) via gemini_with_sources,
+    so behaviour is byte-for-byte unchanged. Q1/Q2 are CLASS knowledge (what a
+    church consists of); a web search cannot answer them better than the model
+    already does, so this is NOT routed to the Serper object backend — only the
+    cheap ungrounded model swaps in."""
     try:
-        from story_leads import gemini_with_sources
+        from story_leads import ungrounded_ask
     except Exception:
-        return ''
-    # grounded=False: Q1/Q2 are CLASS knowledge. A web search cannot tell you what
-    # a church consists of any better than the model already does, and grounding is
-    # billed per request whether it helps or not.
-    out = gemini_with_sources(prompt, resolve=False, timeout=timeout,
-                              grounded=False) or {}
-    return out.get('text', '') or ''
+        # Fail SAFE to the previous direct ungrounded Gemini asker.
+        try:
+            from story_leads import gemini_with_sources
+        except Exception:
+            return ''
+        out = gemini_with_sources(prompt, resolve=False, timeout=timeout,
+                                  grounded=False) or {}
+        return out.get('text', '') or ''
+    return ungrounded_ask(prompt, timeout=timeout) or ''
 
 
 def default_ask_grounded(prompt, timeout=90):
