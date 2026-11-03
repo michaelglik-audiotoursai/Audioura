@@ -379,6 +379,73 @@ _SEEN_CALLBACK_RE = re.compile(
     r"you\s+(?:have\s+)?(?:just\s+)?(?:seen|viewed)\s+(?:works?\s+)?by"
     r")\b")
 
+# ─── [LOCAL-855 defect 2] "you saw … at <external place>" cross-tour callback ──
+#
+# The field-test Sophia tour (HCMC) shipped, inside the Crazy-street stop:
+#
+#   "Like the intersecting streets in Gustave Caillebotte's 1877 painting 'Paris
+#    Street; Rainy Day,' which you saw at the Art Institute of Chicago, …"
+#
+# No Chicago / Art Institute stop exists in this tour (nor in any tour this user
+# took). This is a callback that tells the listener they saw something AT a named
+# external place — a museum / gallery / institution — that is not in the tour.
+# The LOCAL-634/635 recall guards missed it because the recall ("you saw") carries
+# no "earlier/already/previously" tail, and the token-overlap anchoring falsely
+# anchored it on the generic word "street" (shared with "The Crazy street"). A
+# callback may name only a place IN THIS TOUR or a tour the SAME user actually
+# took; neither held here. This detector fires on "(you) saw/viewed/encountered/
+# admired/glimpsed … at THE <Proper Place>" when that place is not a delivered
+# stop, regardless of a trailing time word.
+_SAW_AT_PLACE_RE = re.compile(
+    r"(?i)\byou\s+(?:have\s+)?(?:already\s+|once\s+|previously\s+)?"
+    r"(?:saw|viewed|encountered|admired|glimpsed|visited|observed|"
+    r"stood\s+before|came\s+across)\b[^.?!]{0,90}?\bat\s+"
+    r"(?:the\s+)?([A-Z\u00C0-\u017F][\w'\u00C0-\u017F.\-]*"
+    r"(?:\s+(?:of|the|de|du|des|la|le|les|and|von|van|di)?\s*"
+    r"[A-Z\u00C0-\u017F][\w'\u00C0-\u017F.\-]*){1,6})")
+
+
+def _saw_at_unseen_place(sentence: str, delivered_norms) -> Optional[str]:
+    """When ``sentence`` says the listener saw/viewed something AT a named place
+    that is NOT among the delivered stop titles, return that place; else None.
+
+    "which you saw at the Art Institute of Chicago" → "Art Institute of Chicago"
+    (no delivered stop matches it). A "saw … at <delivered stop>" is kept."""
+    m = _SAW_AT_PLACE_RE.search(sentence or "")
+    if not m:
+        return None
+    place = (m.group(1) or "").strip().strip(",.;:!?").strip()
+    # Trim trailing lowercase words the proper-run may have swept in
+    # ("Acoustic Bar carries here" → "Acoustic Bar"): a named place is a run of
+    # Capitalised words (connectors aside).
+    _words = place.split()
+    while _words and _words[-1][:1].islower() and _words[-1].lower() not in (
+            "of", "the", "de", "du", "des", "la", "le", "les", "and",
+            "von", "van", "di"):
+        _words.pop()
+    while _words and _words[-1].lower() in (
+            "of", "the", "de", "du", "des", "la", "le", "les", "and",
+            "von", "van", "di"):
+        _words.pop()
+    place = " ".join(_words).strip()
+    if not place:
+        return None
+    if _is_delivered(place, delivered_norms):
+        return None
+    # A distinctive token shared with a delivered title means it names a stop in
+    # this tour (e.g. "the Acoustic Bar" ⊂ "Acoustic Bar - Ngô Thời Nhiệm"): keep.
+    _generic = {"the", "bar", "street", "spa", "cafe", "club", "museum",
+                "gallery", "center", "centre", "house", "market", "tour"}
+    place_toks = {w for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", _norm(place))
+                  if w not in _generic}
+    for dn in delivered_norms or []:
+        dn_toks = {w for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", dn)
+                   if w not in _generic}
+        if place_toks and place_toks <= dn_toks:
+            return None
+    return place
+
+
 # ─── [LOCAL-635] Generalised recall phrase ───────────────────────────────────
 #
 # LOCAL-634 (_SEEN_CALLBACK_RE above) only caught "whose works you have already
@@ -549,6 +616,13 @@ def _callback_names_unseen(sentence: str, delivered_tokens: set,
                 continue  # every token of this name was delivered → a real callback
             # At least one word of this named entity was never delivered.
             return ent
+    # [LOCAL-855 defect 2] "you saw … at <external place>" — a callback to a named
+    # place (museum/gallery/institution) that is not a delivered stop. Checked
+    # before the generic recall-anchor test, whose generic-token overlap
+    # ("street"/"bar") falsely anchored the Art-Institute-of-Chicago leak.
+    _saw_at = _saw_at_unseen_place(sentence, delivered_norms or [])
+    if _saw_at is not None:
+        return f"saw at a place not in this tour: '{_saw_at}'"
     # [LOCAL-635] generalised unanchored recall phrase.
     if delivered_norms is not None and _RECALL_PHRASE_RE.search(sentence or ""):
         if not _recall_is_anchored(sentence, delivered_tokens, delivered_norms):

@@ -382,6 +382,154 @@ def generate_real_directions(
         return ""
 
 
+# ─── [LOCAL-855 defect 5] Invented street names in directions ─────────────────
+# The field-test Sophia tour put "the intersection with Le Van Sy Street" between
+# two stops ~150 m apart (Lê Văn Sỹ is km away). The street was invented: neither
+# stop carried an address, so there was no route data and no street to name. Rule:
+# when neither stop has an address, the directions reference NO street name — only
+# a distance and a compass direction. These helpers detect a street mention and
+# compute the distance + compass bearing from the stops' coordinates.
+
+# A "<Proper Name> Street/Road/Avenue/…" street reference in prose.
+_STREET_MENTION_RE = re.compile(
+    r"\b([A-Z\u00C0-\u017F][\w'\u00C0-\u017F.\-]*"
+    r"(?:\s+[A-Z\u00C0-\u017F][\w'\u00C0-\u017F.\-]*){0,4})\s+"
+    r"(Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Boulevard|Blvd\.?|Lane|Ln\.?|"
+    r"Drive|Dr\.?|Way|Alley|Quay|Highway|Đường|Rue|Calle|Strasse|Straße|Via)\b")
+
+
+def _addr_text(poi) -> str:
+    return (poi.get("address", "") or "") if isinstance(poi, dict) else ""
+
+
+def _street_tokens_from_addresses(*addrs) -> set:
+    """Folded word tokens of every street name named in the given addresses, so a
+    directions street mention can be checked against the real route data."""
+    toks = set()
+    for a in addrs:
+        for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", (a or "")):
+            toks.add(w.lower())
+    return toks
+
+
+def _poi_latlng(poi):
+    """Best (lat, lng) for a stop, from a 'coordinates' string or lat/lng keys."""
+    if not isinstance(poi, dict):
+        return None
+    coords = poi.get("coordinates")
+    if isinstance(coords, str) and "," in coords:
+        try:
+            a, b = coords.split(",", 1)
+            lat, lng = float(a.strip()), float(b.strip())
+            if not (lat == 0.0 and lng == 0.0):
+                return (lat, lng)
+        except (ValueError, TypeError):
+            pass
+    for lat_k, lng_k in (("latitude", "longitude"), ("lat", "lng"), ("lat", "lon")):
+        lat, lng = poi.get(lat_k), poi.get(lng_k)
+        if lat is None or lng is None:
+            continue
+        try:
+            flat, flng = float(lat), float(lng)
+        except (TypeError, ValueError):
+            continue
+        if not (flat == 0.0 and flng == 0.0):
+            return (flat, flng)
+    return None
+
+
+def distance_and_compass(from_poi, to_poi):
+    """Return ``(metres, compass)`` between two stops from their coordinates, or
+    ``(None, None)`` when either coordinate is missing. ``compass`` is one of the
+    eight points (north, northeast, …). Deterministic; no network."""
+    import math
+    a = _poi_latlng(from_poi)
+    b = _poi_latlng(to_poi)
+    if not a or not b:
+        return None, None
+    lat1, lng1 = math.radians(a[0]), math.radians(a[1])
+    lat2, lng2 = math.radians(b[0]), math.radians(b[1])
+    dlng = lng2 - lng1
+    R = 6371000.0
+    dphi = lat2 - lat1
+    h = (math.sin(dphi / 2) ** 2
+         + math.cos(lat1) * math.cos(lat2) * math.sin(dlng / 2) ** 2)
+    metres = 2 * R * math.asin(min(1.0, math.sqrt(h)))
+    y = math.sin(dlng) * math.cos(lat2)
+    x = (math.cos(lat1) * math.sin(lat2)
+         - math.sin(lat1) * math.cos(lat2) * math.cos(dlng))
+    brng = (math.degrees(math.atan2(y, x)) + 360.0) % 360.0
+    points = ["north", "northeast", "east", "southeast",
+              "south", "southwest", "west", "northwest"]
+    compass = points[int((brng + 22.5) // 45) % 8]
+    return metres, compass
+
+
+def _distance_phrase(metres):
+    """A short spoken distance phrase from a metre value, or '' when unknown."""
+    if metres is None:
+        return ""
+    if metres < 120:
+        return "about a one- or two-minute walk"
+    if metres < 400:
+        return f"roughly {int(round(metres / 50.0) * 50)} meters"
+    if metres < 1200:
+        return f"roughly {int(round(metres / 100.0) * 100)} meters"
+    return f"roughly {metres / 1000.0:.1f} kilometers"
+
+
+def names_invented_street(text: str, *addrs) -> str:
+    """When ``text`` names a '<Proper> Street/Road/…' whose words appear in NONE
+    of the given addresses, return that street phrase; else "". Used to reject a
+    directions leg that invents a street when there is no route data."""
+    addr_toks = _street_tokens_from_addresses(*addrs)
+    for m in _STREET_MENTION_RE.finditer(text or ""):
+        name = m.group(1).strip()
+        words = [w.lower() for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", name)]
+        if not words:
+            continue
+        if any(w in addr_toks for w in words):
+            continue  # the street is in the route data — a real reference
+        return f"{name} {m.group(2)}".strip()
+    return ""
+
+
+# A navigation preposition followed by a Proper-noun run — catches a bare
+# (suffixless) street or landmark name the no-route prompt must not produce
+# ("turn onto Võ Văn Tần", "cycle down Nguyễn Thị Diệu", "head toward Bến Nghé").
+_NAV_LANDMARK_RE = re.compile(
+    r"(?i)\b(?:onto|along|down|up|toward|towards|via|on\s+to|turn\s+(?:left|right)?\s*onto|"
+    r"head(?:ing)?\s+(?:to|toward|towards)|cross|reach\s+the\s+intersection\s+with)\s+"
+    r"([A-ZÀ-Ỹ][\wÀ-ỹ'.\-]*(?:\s+[A-ZÀ-Ỹ][\wÀ-ỹ'.\-]*){0,4})")
+
+
+def names_navigation_landmark(text: str, keep_names=()):
+    """When there is NO route data, the directions must name no street or
+    landmark between the stops. Return the first proper-noun named after a
+    navigation preposition (onto/along/down/toward/turn onto/…) that is NOT one
+    of ``keep_names`` (the from/to stop names), else "". Catches bare,
+    suffixless street names like 'Võ Văn Tần' that names_invented_street
+    (suffix-based) cannot."""
+    keep_folded = set()
+    for nm in keep_names or ():
+        for w in re.findall(r"[A-Za-zÀ-ỹ]{3,}", (nm or "")):
+            keep_folded.add(w.lower())
+    for m in _NAV_LANDMARK_RE.finditer(text or ""):
+        cand = m.group(1).strip().strip(".,;:!?").strip()
+        words = [w.lower() for w in re.findall(r"[A-Za-zÀ-ỹ]{3,}", cand)]
+        if not words:
+            continue
+        # Skip when the named thing is the destination/origin stop itself.
+        if all(w in keep_folded for w in words):
+            continue
+        # Skip pure direction words captured by accident.
+        if set(words) <= {"the", "left", "right", "heart", "city", "area",
+                          "intersection", "bustling", "local"}:
+            continue
+        return cand
+    return ""
+
+
 def generate_walking_directions(
     from_poi,
     to_poi,
@@ -471,26 +619,61 @@ def generate_walking_directions(
 
     mode_info = _MODE_PROMPTS.get(transport_mode, _MODE_PROMPTS['on_foot'])
 
-    system_prompt = (
-        f"You write short, natural {mode_info['verb']} directions for an audio tour. "
-        "RULES: "
-        "1. Do NOT fabricate precise distances ('walk 50 meters', '200 feet'). "
-        "2. Do NOT invent turn-by-turn GPS-style directions you can't verify. "
-        "3. DO reference visible landmarks, street names, storefronts, or building features "
-        "derivable from the addresses. "
-        "4. Keep it to 2–4 sentences. "
-        "5. Make it feel like a friend giving directions, not a GPS robot. "
-        f"6. {mode_info['constraint']}"
-    )
-    user_prompt = (
-        f"Area: {location}\n"
-        f"Transport mode: {mode_info['verb']} (the listener is a {mode_info['traveler']})\n"
-        f"From: {from_name}" + (f" ({from_addr})" if from_addr else "") + "\n"
-        f"To: {to_name}" + (f" ({to_addr})" if to_addr else "") + "\n\n"
-        f"Write 2–4 sentences of {mode_info['verb']} directions from '{from_name}' to '{to_name}'. "
-        f"Use {mode_info['verb']} language throughout. "
-        f"Reference at least one landmark or street name derivable from the addresses."
-    )
+    # [LOCAL-855 defect 5] No route data → no invented street names. When NEITHER
+    # stop carries an address, there is nothing to derive a street name from; the
+    # directions must give a distance and a compass direction only. The field-test
+    # Sophia tour invented "the intersection with Le Van Sy Street" between two
+    # pinned-only user stops. Compute the real distance + compass from coordinates.
+    _have_route_data = bool(from_addr) or bool(to_addr)
+    _dist_m, _compass = distance_and_compass(from_poi, to_poi)
+
+    if not _have_route_data:
+        _dist_phrase = _distance_phrase(_dist_m)
+        _compass_clause = (f"head {_compass}" if _compass else "continue")
+        system_prompt = (
+            f"You write short, natural {mode_info['verb']} directions for an audio tour. "
+            "RULES: "
+            "1. There is NO route or address data for these two stops. Do NOT name "
+            "any street, road, avenue, intersection, or named landmark between them "
+            "— you cannot know them and must not invent them. "
+            "2. Give only a general direction (a compass point) and an approximate "
+            "distance, then name the destination stop. "
+            "3. Keep it to 1–2 short sentences. "
+            "4. Make it feel like a friend giving directions, not a GPS robot. "
+            f"5. {mode_info['constraint']}"
+        )
+        user_prompt = (
+            f"Area: {location}\n"
+            f"Transport mode: {mode_info['verb']} (the listener is a {mode_info['traveler']})\n"
+            f"From: {from_name}\nTo: {to_name}\n"
+            f"Direction to travel: {_compass_clause}\n"
+            + (f"Approximate distance: {_dist_phrase}\n" if _dist_phrase else "")
+            + f"\nWrite 1–2 sentences of {mode_info['verb']} directions from "
+            f"'{from_name}' to '{to_name}'. State the compass direction "
+            f"({_compass_clause}) and the approximate distance if given, then name "
+            f"'{to_name}'. Do NOT name any street or landmark between the stops."
+        )
+    else:
+        system_prompt = (
+            f"You write short, natural {mode_info['verb']} directions for an audio tour. "
+            "RULES: "
+            "1. Do NOT fabricate precise distances ('walk 50 meters', '200 feet'). "
+            "2. Do NOT invent turn-by-turn GPS-style directions you can't verify. "
+            "3. DO reference visible landmarks, street names, storefronts, or building features "
+            "derivable from the addresses. Do NOT name a street that is NOT in the addresses given. "
+            "4. Keep it to 2–4 sentences. "
+            "5. Make it feel like a friend giving directions, not a GPS robot. "
+            f"6. {mode_info['constraint']}"
+        )
+        user_prompt = (
+            f"Area: {location}\n"
+            f"Transport mode: {mode_info['verb']} (the listener is a {mode_info['traveler']})\n"
+            f"From: {from_name}" + (f" ({from_addr})" if from_addr else "") + "\n"
+            f"To: {to_name}" + (f" ({to_addr})" if to_addr else "") + "\n\n"
+            f"Write 2–4 sentences of {mode_info['verb']} directions from '{from_name}' to '{to_name}'. "
+            f"Use {mode_info['verb']} language throughout. "
+            f"Reference at least one landmark or street name derivable from the addresses."
+        )
 
     try:
         response = requests.post(
@@ -530,6 +713,35 @@ def generate_walking_directions(
                 print(f"  ❌ [LOCAL-253] DIRECTIONS REJECTED: {v}")
             print(f"  ❌ [LOCAL-253] Rejected directions text: {text[:200]}")
             return ""  # Empty triggers the fallback "Continue to {next_stop}."
+
+        # [LOCAL-855 defect 5] Invented-street guard. When there is no route data
+        # (neither stop has an address), the directions must name NO street — a
+        # named street between the stops was invented. Reject it so the
+        # deterministic distance+compass fallback (built by the caller) is used.
+        _invented = names_invented_street(text, from_addr, to_addr)
+        if _invented:
+            logger.error(
+                f"[LOCAL-855] DIRECTIONS INVENTED-STREET GUARD REJECTED: "
+                f"{_invented!r} is not in the route data: {text[:160]}")
+            print(f"  ❌ [LOCAL-855] directions name an invented street "
+                  f"'{_invented}' (no route data) — using distance+compass fallback")
+            return ""
+
+        # [LOCAL-855 defect 5] No-route navigation-landmark guard. With no route
+        # data the no-route prompt forbids naming any street/landmark; a bare
+        # (suffixless) street name the model slips in — "turn onto Võ Văn Tần",
+        # "cycle down Nguyễn Thị Diệu" — is still an invention. Reject it so the
+        # deterministic distance+compass fallback is used instead.
+        if not _have_route_data:
+            _nav = names_navigation_landmark(text, keep_names=(from_name, to_name))
+            if _nav:
+                logger.error(
+                    f"[LOCAL-855] DIRECTIONS NAV-LANDMARK GUARD REJECTED: "
+                    f"{_nav!r} named with no route data: {text[:160]}")
+                print(f"  ❌ [LOCAL-855] directions name an unverifiable "
+                      f"street/landmark '{_nav}' (no route data) — using "
+                      f"distance+compass fallback")
+                return ""
 
         # [LOCAL-650 fix 2] Target guard — the directions MUST lead to the next
         # stop. On tour 557 the model wrote Stop 4's directions as "… until you

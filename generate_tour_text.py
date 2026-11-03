@@ -979,6 +979,27 @@ def _detect_transport_mode(location):
     return 'on_foot'
 
 
+def _directions_fallback_855(from_poi, next_poi):
+    """[LOCAL-855 defect 5] Deterministic directions when no valid LLM directions
+    survived: a compass direction + approximate distance from the two stops'
+    coordinates, then the destination. Never names a street (there is no route
+    data). Falls back to the plain "Continue to X." when coordinates are missing.
+    """
+    _next_name = (next_poi.get("name") if isinstance(next_poi, dict)
+                  else str(next_poi))
+    try:
+        from directions_generator import distance_and_compass, _distance_phrase
+        metres, compass = distance_and_compass(from_poi, next_poi)
+        if compass:
+            dist = _distance_phrase(metres)
+            if dist:
+                return f"Head {compass} to {_next_name} — it is {dist} away."
+            return f"Head {compass} to {_next_name}."
+    except Exception:
+        pass
+    return f"Continue to {_next_name}."
+
+
 def _stop_in_country_scope(stop_address, country_scope):
     """Check if a stop's address is within the given country or its enclaves."""
     if not country_scope or not stop_address:
@@ -9763,6 +9784,46 @@ def _recover_tour_venue(tour_text):
 import threading as _ca_threading
 _CA_CTX = _ca_threading.local()
 
+# [LOCAL-855] The clean display names of the stops the listener chose by hand,
+# recorded once at generation start. The narration subject-binding block and the
+# off-venue body scrub consult this as a fallback so they still fire for a user
+# stop even if a poi_list rebuild dropped the stop's `user_explicit` flag (the
+# D571 rebuild hazard). A folded-name set. NOT thread-local: the narration runs
+# in a worker ThreadPool, which must read what the main generation thread set.
+_USER_STOP_TITLES = {"names": set()}
+
+
+def _set_user_stop_titles(names):
+    import unicodedata as _ud
+    folded = set()
+    for n in (names or []):
+        if not n:
+            continue
+        s = _ud.normalize("NFKD", str(n))
+        s = "".join(c for c in s if not _ud.combining(c))
+        s = re.sub(r"[^\w\s]", " ", s.lower())
+        s = " ".join(s.split())
+        if s:
+            folded.add(s)
+    _USER_STOP_TITLES["names"] = folded
+
+
+def _is_user_stop_title(name) -> bool:
+    import unicodedata as _ud
+    folded = _USER_STOP_TITLES.get("names")
+    if not folded or not name:
+        return False
+    s = _ud.normalize("NFKD", str(name))
+    s = "".join(c for c in s if not _ud.combining(c))
+    s = re.sub(r"[^\w\s]", " ", s.lower())
+    s = " ".join(s.split())
+    if not s:
+        return False
+    for t in folded:
+        if s == t or s in t or t in s:
+            return True
+    return False
+
 
 def _set_current_affairs_context(*, wanted: bool, request: str, tour_category: str):
     """Record whether the in-flight tour wants dated news (LOCAL-655)."""
@@ -11736,7 +11797,18 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         _import_logger.error(f"[LOCAL-744] screen-work disclosure skipped: {_swt_err}")
 
     # Transport mode detection (Layer 1: keyword, Layer 2: intent field)
+    # [LOCAL-855 defect 6] A transport word (biking/cycling/bike/driving/…) can
+    # live in the TOUR_TYPE rather than the location — the user-stops path is
+    # invoked as generate_tour_text(location, "Sophia's biking tour", …), so the
+    # request's mode is in tour_type, not location. The field-test Sophia tour
+    # shipped "is a walking tour" because Layer-1 keyword detection read only the
+    # location. Detect the keyword from the location AND the tour_type so a
+    # transport word in either sets the mode (keyword still beats intent).
     _transport_keyword = _detect_transport_mode(location)
+    if _transport_keyword == 'on_foot' and tour_type:
+        _tt_keyword = _detect_transport_mode(str(tour_type))
+        if _tt_keyword != 'on_foot':
+            _transport_keyword = _tt_keyword
     _transport_from_intent = (intent.get('transport_mode', 'on_foot') if intent else 'on_foot')
     # Keyword match takes priority; fall back to intent's answer
     transport_mode = _transport_keyword if _transport_keyword != 'on_foot' else _transport_from_intent
@@ -13111,6 +13183,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         for _orig, _pretty in zip(forced_stops, _forced_titles):
             if _orig != _pretty:
                 print(f"  [LOCAL-554] stop title '{_orig}' -> '{_pretty}'")
+        # [LOCAL-855] Record the clean user-stop titles so the narration
+        # subject-binding block and the off-venue body scrub still fire for these
+        # stops even if a later poi_list rebuild drops their `user_explicit` flag.
+        try:
+            _set_user_stop_titles(_forced_titles)
+        except Exception:
+            pass
         poi_list = [_new_poi(name) for name in _forced_titles]
         # [LOCAL-852] Stamp every user stop user_explicit/_anchor (so it is exempt
         # from the provider/category guards, existence/closure drops, and from
@@ -22225,6 +22304,25 @@ NO CONDESCENSION:
 - NEVER write "To truly appreciate/understand [X], one must..." — just state the context.
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
 """
+            # [LOCAL-855 defects 1/3/4] A user-CHOSEN venue is narrated as the
+            # venue its Type/Specialty names, never the literal meaning of the
+            # name (fruit/street/legend), never padded with regional/national
+            # history, never given a dated claim that no source about the venue
+            # supports. When no material is sourced, the stop stays short.
+            try:
+                import user_stop_narration as _usn855
+                # Resilient detection: honour the stop's own flag, OR the
+                # generation-scoped user-stop title list (survives poi_list
+                # rebuilds that drop the flag — the D571 hazard).
+                if (not _usn855.is_user_stop(poi)) and _is_user_stop_title(poi_name):
+                    poi["user_explicit"] = True
+                _usn855_block = _usn855.user_stop_subject_block(
+                    poi, location, _outdoor_facts)
+                if _usn855_block:
+                    description_prompt += _usn855_block
+            except Exception as _usn855_err:
+                _import_logger.error(
+                    f"[LOCAL-855] user-stop subject block skipped: {_usn855_err}")
             # [LOCAL-186] Venue disambiguation — prevent entity conflation (D62).
             # When a stop name is ambiguous (e.g., "Musée Picasso" exists in Paris AND
             # Antibes), tell the model WHICH entity this stop refers to by using the
@@ -24000,6 +24098,26 @@ Write the story FIRST, then add physical description if space allows.
                         description = re.sub(r'^Description:\s*\n?', '', description, count=1, flags=re.IGNORECASE).strip()
                     if orientation:
                         orientation = re.sub(r'^Description:\s*\n?', '', orientation, count=1, flags=re.IGNORECASE).strip()
+
+                    # [LOCAL-855 defects 3/4] For a user-CHOSEN stop, apply the
+                    # LOCAL-802 relevance gate to the delivered body: drop
+                    # off-venue / unsourced-dated digressions the story research
+                    # fed in (the airport project, the Cần Thơ merger, the 1975
+                    # offensive). On-topic venue sentences are kept; never empties.
+                    try:
+                        import user_stop_narration as _usn855b
+                        if _usn855b.is_user_stop(poi):
+                            _d_scrub, _d_dropped = _usn855b.scrub_user_stop_body(
+                                description, poi, location, log=print)
+                            if _d_dropped:
+                                description = _d_scrub
+                            _o_scrub, _o_dropped = _usn855b.scrub_user_stop_body(
+                                orientation, poi, location, log=print)
+                            if _o_dropped:
+                                orientation = _o_scrub
+                    except Exception as _usn855b_err:
+                        print(f"  [LOCAL-855] user-stop body scrub skipped: "
+                              f"{_usn855b_err}")
 
                     # [LOCAL-569] Per-attempt instrumentation (always on, logging only).
                     # LOCAL-568 found the LOCAL-432 story retry ships the LAST attempt and
@@ -30292,7 +30410,11 @@ RULES:
                 if _storied_mode:
                     try:
                         from directions_generator import generate_walking_directions
-                        _storied_directions = generate_walking_directions(poi_name, next_poi['name'], location, api_key, transport_mode=transport_mode)
+                        # [LOCAL-855 defect 5] Pass the POI DICTS (not bare names)
+                        # so the generator can read coordinates/addresses: with no
+                        # route data it gives distance+compass only and its
+                        # invented-street guard can fire.
+                        _storied_directions = generate_walking_directions(poi, next_poi, location, api_key, transport_mode=transport_mode)
                         if _storied_directions:
                             directions = _storied_directions
                     except ImportError as _dir_imp_err:
@@ -30306,11 +30428,11 @@ RULES:
                     if _dir_violations:
                         for _dv in _dir_violations:
                             print(f"  ❌ [LOCAL-253] PRE-EXISTING DIRECTIONS REJECTED: {_dv}")
-                        _transition = f"Continue to {next_poi['name']}."
+                        _transition = _directions_fallback_855(poi, next_poi)
                     else:
                         _transition = directions.strip()
                 else:
-                    _transition = f"Continue to {next_poi['name']}."
+                    _transition = _directions_fallback_855(poi, next_poi)
             
             # [LOCAL-660 defect 4] A directions line may announce the end of the
             # walk ONLY on the leg into the LAST stop, and must never echo the
