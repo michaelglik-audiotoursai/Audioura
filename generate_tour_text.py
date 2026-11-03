@@ -2980,6 +2980,10 @@ def replenish_to_count(poi_list, want, scope, headers, propose, make_poi,
                 if _act835rc and not _act835rc.get("is_food"):
                     _kept_rc, _drop_rc = [], 0
                     for _c835rc in fresh:
+                        # [LOCAL-852] a user's own stop is never dropped by the guard.
+                        if _c835rc.get("user_explicit") or _c835rc.get("_anchor"):
+                            _kept_rc.append(_c835rc)
+                            continue
                         _v835rc = _cap835rc(_c835rc, _act835rc)
                         if _v835rc is True:
                             _kept_rc.append(_c835rc)
@@ -12175,7 +12179,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                     candidate_is_activity_provider as _cap835b)
                                 _req835b = (user_request if 'user_request' in dir()
                                             else location)
-                                _act835b = _ra835b(_req835b) or _ra835b(location)
+                                _act835b = _ra835b(_req835b, tour_type=tour_type) or _ra835b(location, tour_type=tour_type)
                                 if _act835b and not _act835b.get("is_food"):
                                     _v835b = _cap835b(poi, _act835b)
                                     if _v835b is False:
@@ -13079,13 +13083,52 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     _forced_stops_active = False
     if forced_stops is not None and len(forced_stops) > 0:
         _forced_stops_active = True
+        # [LOCAL-852] A listener pastes stops as "Name + URL" (a Google share link
+        # or a plain website). Parse each raw item: strip the URL (incl. the
+        # "https___" underscore-mangled form) from the display NAME, resolve a
+        # Google-Maps share link to its place name + @lat,lng via the redirect (no
+        # paid API), and keep a plain website's name to geocode by name. This runs
+        # BEFORE _presentable_stop_title so the title-case pass sees a clean name,
+        # and it stamps a resolved coordinate onto the stop so four share-link
+        # stops never fall to the same city centroid and collapse.
+        _us_parsed = None
+        try:
+            import user_stop_input as _usi
+            _us_parsed = _usi.parse_user_stops(forced_stops, log=print)
+        except Exception as _usi_err:
+            print(f"  [LOCAL-852] user-stop parse skipped (non-fatal): {_usi_err}")
+            _us_parsed = None
+
+        if _us_parsed:
+            _clean_names = [(p.get("name") or raw).strip()
+                            for p, raw in zip(_us_parsed, forced_stops)]
+        else:
+            _clean_names = list(forced_stops)
+
         # [LOCAL-554] Present the listener's own words properly. Matching and
         # protection still key on what they typed; only the DISPLAY title changes.
-        _forced_titles = [_presentable_stop_title(n) for n in forced_stops]
+        _forced_titles = [_presentable_stop_title(n) for n in _clean_names]
         for _orig, _pretty in zip(forced_stops, _forced_titles):
             if _orig != _pretty:
                 print(f"  [LOCAL-554] stop title '{_orig}' -> '{_pretty}'")
         poi_list = [_new_poi(name) for name in _forced_titles]
+        # [LOCAL-852] Stamp every user stop user_explicit/_anchor (so it is exempt
+        # from the provider/category guards, existence/closure drops, and from
+        # dedupe unless textually the same place), and stamp a resolved coordinate
+        # where the share link gave one — else mark the stop so a later centroid
+        # fallback is recognised as "coordinate unknown", not "same building".
+        for _i_poi, _poi in enumerate(poi_list):
+            _poi["user_explicit"] = True
+            _poi["_anchor"] = True
+            if _us_parsed and _i_poi < len(_us_parsed):
+                _ps = _us_parsed[_i_poi]
+                if _ps.get("lat") is not None and _ps.get("lng") is not None:
+                    _poi["coordinates"] = f"{_ps['lat']:.6f}, {_ps['lng']:.6f}"
+                    _poi["coord_source"] = "user_share_link"
+                    _poi["coord_confidence"] = "resolved"
+                    print(f"  [LOCAL-852] user stop {_poi['name']!r} pinned from "
+                          f"share link at {_poi['coordinates']} "
+                          f"(via {_ps.get('how')})")
         # Override total_stops to match the forced list length
         total_stops = len(forced_stops)
         print(f"\n{'=' * 70}")
@@ -16074,7 +16117,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         try:
             from category_match_guard import (requested_activity as _ra835,
                                                filter_off_category_activity as _foca835)
-            _act835 = _ra835(user_request) or _ra835(location)
+            _act835 = _ra835(user_request, tour_type=tour_type) or _ra835(location, tour_type=tour_type)
             if _act835 and not _act835.get("is_food"):
                 _anchors_835 = list(intent.get('named_places') or []) if intent else []
                 try:
@@ -16464,7 +16507,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # keeps only providers. No-op for a food/non-provider request.
                     try:
                         from category_match_guard import requested_activity as _ra835k
-                        _act835k = _ra835k(user_request) or _ra835k(location)
+                        _act835k = _ra835k(user_request, tour_type=tour_type) or _ra835k(location, tour_type=tour_type)
                         if (_act835k and not _act835k.get("is_food")
                                 and _p3c_kind not in ('business', 'dining')):
                             print(f"   [LOCAL-835B] provider request "
@@ -17208,12 +17251,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # restaurant that has no Wikipedia article (the whole point of
                     # sourcing it from the map).
                     _seg_exempt_pois = [p for p in poi_list
-                                        if p.get('page_sourced') or p.get('_maps_verified')]
+                                        if p.get('page_sourced') or p.get('_maps_verified')
+                                        or p.get('user_explicit') or p.get('_anchor')]
                     _seg_checked_pois = [p for p in poi_list
-                                         if not (p.get('page_sourced') or p.get('_maps_verified'))]
+                                         if not (p.get('page_sourced') or p.get('_maps_verified')
+                                                 or p.get('user_explicit') or p.get('_anchor'))]
                     if _seg_exempt_pois:
-                        print(f"  [D532] EXISTENCE-GATE: {len(_seg_exempt_pois)} page-sourced/maps-verified "
-                              f"stop(s) exempt, {len(_seg_checked_pois)} checked")
+                        print(f"  [D532/LOCAL-852] EXISTENCE-GATE: {len(_seg_exempt_pois)} page-sourced/maps-verified"
+                              f"/user-chosen stop(s) exempt, {len(_seg_checked_pois)} checked")
                     _seg_stop_names = [p['name'] for p in _seg_checked_pois]
                     # LOCAL-313: pass tour_category so dining tours use the correct
                     # verification path (Nominatim/OSM) instead of museum-shaped checks
@@ -20561,7 +20606,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
     try:
         from category_match_guard import (requested_activity as _ra835f,
                                            filter_off_category_activity as _foca835f)
-        _act835f = _ra835f(user_request) or _ra835f(location)
+        _act835f = _ra835f(user_request, tour_type=tour_type) or _ra835f(location, tour_type=tour_type)
         if _act835f and not _act835f.get("is_food") and poi_list:
             _anchors_835f = list(intent.get('named_places') or []) if intent else []
             try:

@@ -1,0 +1,11 @@
+{
+  "budget_usd": 0.6,
+  "runs": [
+    {
+      "note": "TEST-LOCAL-852",
+      "ts": "2026-11-03T05:21:19Z",
+      "usd": 0.16429
+    }
+  ],
+  "task_id": "LOCAL-852"
+}
