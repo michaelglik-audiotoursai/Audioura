@@ -146,7 +146,9 @@ def grounded_user_stop_body(poi: Dict, location: str = "") -> str:
     district = ""
     addr = (poi.get("address") or "").strip()
     if addr:
-        parts = [p.strip() for p in addr.split(",") if p.strip()]
+        # [LEAD 855D review] never take a "Label: value" line or a bare number as a district.
+        parts = [p.strip() for p in addr.split(",")
+                 if p.strip() and ":" not in p and not re.fullmatch(r"[\d.\s/-]+", p.strip())]
         # Prefer a "District N" / "Quận N" fragment, else the second-to-last part.
         for p in parts:
             if re.search(r"(?i)\b(?:district|qu[ậa]n)\b", p):
@@ -974,7 +976,7 @@ def scrub_tour_text_user_stops(tour_text, user_titles, location="", log=None,
         # [LOCAL-855B bounce] Carry Address + Specific Examples so the grounded
         # body replacement (used when a thin stop is fabrication end-to-end) can
         # state the real district and what the venue offers.
-        am = re.search(r"(?mi)^Address:\s*(.+?)\s*$", block_text)
+        am = re.search(r"(?mi)^Address:[ \t]*(\S[^\n]*?)[ \t]*$", block_text)
         if am:
             poi["address"] = am.group(1).strip()
         xm = re.search(r"(?mi)^Specific Examples:\s*(.+?)\s*$", block_text)

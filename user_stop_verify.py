@@ -58,7 +58,7 @@ _FIELD_LINE_RE = re.compile(
     r"Tour-Category|Address):")
 _TYPE_LINE_RE = re.compile(r"(?mi)^Type/Specialty:\s*(.+?)\s*$")
 _EXAMPLES_LINE_RE = re.compile(r"(?mi)^Specific Examples:\s*(.+?)\s*$")
-_ADDRESS_LINE_RE = re.compile(r"(?mi)^Address:\s*(.+?)\s*$")
+_ADDRESS_LINE_RE = re.compile(r"(?mi)^Address:[ \t]*(\S[^\n]*?)[ \t]*$")
 _COORD_LINE_RE = re.compile(
     r"(?mi)^Coordinates:\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)")
 
@@ -174,7 +174,10 @@ _SYSTEM = (
     "down' or 'among regulars', a tie to a company/artwork/figure, regional or "
     "national history, or a significance/role claim ('played a critical role', "
     "'opened doors', 'set a precedent'). If a sentence mixes a sensory clause "
-    "with an unsupported claim, label it UNSUPPORTED.\n\n"
+    "with an unsupported claim, label it UNSUPPORTED. A sentence that refers "
+    "back to a person, group, event or past that no SUPPORTED or SENSORY "
+    "sentence of the same stop introduces ('His playing…', 'those earlier "
+    "networks', 'that mythic past') is UNSUPPORTED.\n\n"
     "Judge meaning, not wording. Return ONLY JSON of the exact shape:\n"
     '{"stops":[{"id":<int>,"labels":[{"i":<int>,"label":"SUPPORTED|SENSORY|'
     'UNSUPPORTED"}]}]}'

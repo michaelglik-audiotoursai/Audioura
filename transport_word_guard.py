@@ -31,50 +31,64 @@ bare "walk".
 import re
 from typing import Tuple
 
-# Pedestrian movement words -> cycling / driving equivalents (whole-word).
+# [LEAD review of 855D] Bike mode ONLY, and only where "walk" describes the
+# LISTENER MOVING BETWEEN PLACES. A blanket \bwalk\b swap broke real phrases:
+# "Bùi Viện Walking Street" (a proper name), "walk inside the cathedral" (you do
+# dismount), and on driving tours "walk the trail to the falls" -> "drive the
+# trail". Driving tours legitimately include walks, so vehicle mode is a no-op.
 _BIKE_MAP = {
     "walk": "ride", "walking": "riding", "walks": "rides", "walked": "rode",
     "stroll": "ride", "strolling": "riding", "strolls": "rides",
     "on foot": "by bike",
 }
-_VEHICLE_MAP = {
-    "walk": "drive", "walking": "driving", "walks": "drives", "walked": "drove",
-    "stroll": "drive", "strolling": "driving", "strolls": "drives",
-    "on foot": "by car",
-}
-_MODE_MAPS = {"bike": _BIKE_MAP, "vehicle": _VEHICLE_MAP}
+_MODE_MAPS = {"bike": _BIKE_MAP}
 
-# One alternation per map covers all its keys; whole-word, case-insensitive.
-def _compile(mapping):
-    keys = sorted(mapping.keys(), key=len, reverse=True)
-    return re.compile(r"(?i)\b(" + "|".join(re.escape(k) for k in keys) + r")\b")
-
-_PATTERNS = {m: _compile(mp) for m, mp in _MODE_MAPS.items()}
+_MOVE_AFTER = (r"(?:to|towards?|along|down|up|past|over|back|on|onward|"
+               r"north|south|east|west|ahead|straight|away)")
+# Contexts where the word is the listener's movement (group 'w' is replaced).
+_BIKE_PATTERNS = [
+    re.compile(r"(?i)\b(?:as|while|when|once) you (?P<w>walk|stroll)\b"),
+    re.compile(r"(?i)\byour (?P<w>walk|stroll)\b"),
+    re.compile(r"(?i)\b(?:a|short|brief|quick|easy|minute's|-minute) (?P<w>walk|stroll)\b"),
+    re.compile(r"(?i)-minute (?P<w>walk|stroll)\b"),
+    re.compile(r"(?i)\b(?P<w>walk|walking|strolling|stroll)\s+" + _MOVE_AFTER + r"\b"),
+    re.compile(r"(?i)\b(?P<w>on foot)\b"),
+    re.compile(r"(?i)\b(?P<w>stroll|strolling|strolls)\b"),
+]
+_PROPER_NAME_RE = re.compile(r"\bWalking Street\b|\bWalk of\b")
+_PATTERNS = {"bike": _BIKE_PATTERNS}
 
 
 def correct_transport_words(text: str, mode: str) -> Tuple[str, int]:
-    """Rewrite pedestrian movement words to the tour's wheeled mode.
+    """Rewrite the listener's pedestrian movement words to cycling words.
 
-    Returns ``(new_text, n_changes)``. A no-op (0 changes) for ``on_foot`` or an
-    unknown mode, so it is always safe to call. Case of the first letter is
-    preserved ("Walk" -> "Ride").
+    Returns ``(new_text, n_changes)``. A no-op for every mode except ``bike``
+    (walking tours keep "walk"; driving tours legitimately include walks).
+    Proper names ("… Walking Street", "Walk of …") are never touched.
     """
     mapping = _MODE_MAPS.get(mode)
-    pattern = _PATTERNS.get(mode)
-    if not mapping or not text:
+    patterns = _PATTERNS.get(mode)
+    if not mapping or not patterns or not text:
         return text, 0
     changes = 0
 
-    def repl(m):
+    def fix(m):
         nonlocal changes
-        tok = m.group(0)
+        whole = m.group(0)
+        tok = m.group("w")
+        if _PROPER_NAME_RE.search(text[max(0, m.start() - 1):m.end() + 8]) and tok[:1].isupper():
+            return whole
         rep = mapping.get(tok.lower())
         if rep is None:
-            return tok
+            return whole
+        rep = rep[:1].upper() + rep[1:] if tok[:1].isupper() else rep
         changes += 1
-        return rep[:1].upper() + rep[1:] if tok[:1].isupper() else rep
+        a, b = m.span("w")
+        return whole[:a - m.start()] + rep + whole[b - m.start():]
 
-    return pattern.sub(repl, text), changes
+    for pat in patterns:
+        text = pat.sub(fix, text)
+    return text, changes
 
 
 if __name__ == "__main__":  # pragma: no cover
