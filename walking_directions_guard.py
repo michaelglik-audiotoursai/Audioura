@@ -76,11 +76,41 @@ def _haversine_km(a, b):
     return 2 * 6371.0 * asin(sqrt(h))
 
 
-def _approx_distance_phrase(km: Optional[float]) -> str:
-    """A natural, approximate distance phrase, or '' when unknown/zero."""
+def _approx_distance_phrase(km: Optional[float], mode: str = "on_foot") -> str:
+    """A natural, approximate distance phrase, or '' when unknown/zero.
+
+    [LOCAL-855D item 2] ``mode`` makes the phrase match the tour's transport. On a
+    WALKING tour it reads "a minute's walk" / "N-minute walk" as before. On a
+    CYCLING tour (mode 'bike') it NEVER says "walk": a short hop is given as a
+    distance only and a longer leg as a ride time at ~15 km/h, because Michael's
+    delivered cycling tour wrongly read "about a 19-minute walk" and "about a
+    minute's walk" between bike stops. Other wheeled modes ('vehicle', 'animal')
+    also drop the walk wording and give distance only (a drive/ride minute figure
+    would be guesswork at those speeds over these short city legs).
+    """
     if km is None or km <= 0:
         return ""
     meters = km * 1000.0
+    is_bike = (mode == "bike")
+    is_other_wheeled = mode in ("vehicle", "animal")
+    if is_bike:
+        # Cycling: distance only under ~400 m; ride time (≈15 km/h → 4 min/km)
+        # beyond that. No "walk" wording ever.
+        if meters < 400:
+            rounded = max(50, int(round(meters / 50.0) * 50))
+            return f"roughly {rounded} meters away"
+        minutes = max(1, int(round(km / 0.25)))  # 0.25 km/min ≈ 15 km/h
+        if km < 1.0:
+            rounded = int(round(meters / 50.0) * 50)
+            return f"roughly {rounded} meters (about a {minutes}-minute ride) away"
+        return f"roughly {km:.1f} km (about a {minutes}-minute ride) away"
+    if is_other_wheeled:
+        # Distance only — no walk/ride-time claim.
+        if meters < 1000:
+            rounded = int(round(meters / 50.0) * 50)
+            return f"roughly {rounded} meters away"
+        return f"roughly {km:.1f} km away"
+    # Default: walking (historical behaviour, unchanged).
     if meters < 120:
         return "about a minute's walk away"
     if meters < 1000:
@@ -90,6 +120,25 @@ def _approx_distance_phrase(km: Optional[float]) -> str:
     if miles < 1.3:
         return f"roughly {km:.1f} km (about a {max(1, int(round(km / 0.08)))}-minute walk) away"
     return f"roughly {km:.1f} km away"
+
+
+# [LOCAL-855D] Detect the tour's wheeled transport mode from its header/category
+# so a cycling tour never gets walk wording — robust across every call path
+# (the container runner passes no explicit mode). Reads the title line
+# ("… - Cycling Tour") and any "Tour-Category:" line.
+_BIKE_RE = re.compile(r'(?i)\b(cycl\w*|bik\w*|bicycle)\b')
+_VEHICLE_RE = re.compile(r'(?i)\b(driving|car|jeep|motorcycle|scooter|bus)\s+tour\b')
+
+
+def _mode_from_text(text: str) -> str:
+    head = "\n".join((text or "").splitlines()[:3])
+    cat = _tour_category(text)
+    probe = head + "\n" + cat
+    if _BIKE_RE.search(probe):
+        return "bike"
+    if _VEHICLE_RE.search(probe):
+        return "vehicle"
+    return "on_foot"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -208,7 +257,8 @@ def _correct_handoff(next_name: str, dist_phrase: str) -> str:
 
 
 def ensure_walking_directions_lead_to_next(text: str,
-                                          verified_stop_coords: dict = None
+                                          verified_stop_coords: dict = None,
+                                          transport_mode: str = None
                                           ) -> Tuple[str, dict]:
     """Make every non-last WALKING stop's Directions lead to the NEXT stop, with
     an approximate distance. Returns ``(new_text, report)`` where report is
@@ -238,6 +288,11 @@ def ensure_walking_directions_lead_to_next(text: str,
     distance_added = 0
     details = []
 
+    # [LOCAL-855D] Resolve the transport mode once: an explicit arg wins, else
+    # detect it from the tour header/category so a cycling tour never gets walk
+    # wording even on the container path that passes no mode.
+    _mode = transport_mode or _mode_from_text(text)
+
     # Rebuild back-to-front so offsets stay valid.
     pieces: List[str] = [text[blocks[-1]['end']:]]
     for i in range(len(blocks) - 1, -1, -1):
@@ -258,7 +313,7 @@ def ensure_walking_directions_lead_to_next(text: str,
                     km = _haversine_km(vc_a, vc_b)
             elif b['coord'] and nxt['coord']:
                 km = _haversine_km(b['coord'], nxt['coord'])
-            dist_phrase = _approx_distance_phrase(km)
+            dist_phrase = _approx_distance_phrase(km, _mode)
 
             dm = _DIRECTIONS_LINE_RE.search(seg)
             if dm:

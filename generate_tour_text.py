@@ -10524,6 +10524,24 @@ def _apply_delivery_hours_guard(result):
                       f"— each hand-off now names the correct next stop", flush=True)
         except Exception as _wdge:  # pragma: no cover
             _import_logger.error(f"[LOCAL-650] walking-directions guard skipped: {_wdge}")
+        # 3a-walk. [LOCAL-855D item 2] A cycling (or other wheeled) tour must not
+        #     describe the listener walking. The deterministic distance phrases are
+        #     already fixed in walking_directions_guard (mode-aware), but the LLM
+        #     body prose can still slip "as you walk" / "your walk". This every-path
+        #     pass rewrites a generic pedestrian movement word to the tour's mode
+        #     ("walk" -> "ride" on a bike tour); it is a no-op on a walking tour and
+        #     never invents facts. Mode is detected from the tour header.
+        try:
+            import transport_word_guard as _twg
+            from walking_directions_guard import _mode_from_text as _twg_mode
+            _twg_m = _twg_mode(final)
+            if _twg_m in ("bike", "vehicle"):
+                final, _twg_n = _twg.correct_transport_words(final, _twg_m)
+                if _twg_n:
+                    print(f"  [LOCAL-855D] transport words: rewrote {_twg_n} "
+                          f"pedestrian word(s) to '{_twg_m}' mode", flush=True)
+        except Exception as _twge:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-855D] transport-word guard skipped: {_twge}")
         # 3b. [LOCAL-638 Note 4] Every stop except the last must end with directions
         #     to the next stop, on EVERY path. Michael, Frick 523 (D640): "The story
         #     stops abruptly and has no directions to the next exhibit" — Stop 2 had
