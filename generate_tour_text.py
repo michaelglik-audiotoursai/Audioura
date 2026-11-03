@@ -9973,6 +9973,101 @@ def _is_user_stop_title(name) -> bool:
     return False
 
 
+# [LOCAL-855E item 2] Vietnamese address-component abbreviations whose presence
+# alone does NOT make an address: Đ.=Đường (street), P.=Phường (ward),
+# Q.=Quận (district), TP.=Thành phố (city), KP.=Khu phố (quarter).
+_VN_ADDR_ABBREV = {"đ", "d", "p", "q", "tp", "kp"}
+
+
+def _clean_user_stop_address(address: str) -> str:
+    """[LOCAL-855E item 2] Return a trustworthy address for a USER stop, or "".
+
+    The listener gave a PIN, not an address; any address on a user stop is only
+    kept when it names a real street (not just a road/ward/district abbreviation).
+    A stub the PHASE-3B model invented — "15 Đ." (a bare *Đường* with no road
+    name), "Đ.", "3/2, …, District 10," (a trailing-comma fragment) — is dropped,
+    so no "Address: 15 Đ." can ship. Deterministic; never raises.
+
+    Rules:
+      * strip surrounding whitespace and any trailing commas/semicolons;
+      * drop it entirely when, after removing the Đ./P./Q./TP./KP. abbreviations
+        and bare house numbers, no alphabetic street/place word of length >= 2
+        survives (i.e. the address is only abbreviations + numbers).
+    """
+    if not address:
+        return ""
+    import unicodedata as _ud
+    s = str(address).strip().strip(",;").strip()
+    if not s:
+        return ""
+    # Fold accents for the abbreviation test (Đ -> d), keep the original to return.
+    toks = re.split(r"[\s,]+", s)
+    meaningful = []
+    for tok in toks:
+        t = tok.strip(".,;:")
+        if not t:
+            continue
+        folded = "".join(c for c in _ud.normalize("NFKD", t.lower())
+                         if not _ud.combining(c))
+        # A pure abbreviation (đ/p/q/tp/kp), a bare number, or a number+slash
+        # house tag ("3/2") carries no street NAME.
+        if folded in _VN_ADDR_ABBREV:
+            continue
+        if re.fullmatch(r"[\d]+([/\-][\d]+)*", folded):
+            continue
+        # A real word: at least two letters.
+        if re.search(r"[a-zà-ỹ]{2,}", folded):
+            meaningful.append(t)
+    if not meaningful:
+        return ""
+    return s
+
+
+def _user_pin_merge_fields(entry, orig):
+    """[LOCAL-855E items 1+2] Decide a user stop's authoritative coordinate and
+    address for the PHASE-3B merge, keeping the LISTENER'S own pin and discarding
+    the model's inventions.
+
+    ``entry`` is the PHASE-3B model's JSON object for the stop (it may carry an
+    invented ``coordinates`` / ``address``); ``orig`` is the canonical poi before
+    the merge (a user stop carries ``coord_source='user_share_link'`` and the
+    resolved ``@lat,lng`` from the listener's link). Returns a dict::
+
+        {"is_user_pin": bool, "coordinates": str, "address": str,
+         "coord_kept": bool}
+
+    Rules:
+      * a user stop is detected by its ``user_explicit`` / ``_anchor`` flag, a
+        ``coord_source`` of ``user_share_link``, or the job's user-stop title set
+        (``_is_user_stop_title`` — survives a poi_list rebuild that drops flags);
+      * when it is a user stop WITH a coordinate, that coordinate is kept verbatim
+        and the model's is discarded (``coord_kept=True``);
+      * a user stop's address is taken ONLY from a real source (``orig``), never
+        from the model, and an abbreviation-only stub ("15 Đ.") is dropped;
+      * a non-user stop keeps the existing precedence (model value, else orig).
+    Deterministic; never raises.
+    """
+    entry = entry or {}
+    orig = orig or {}
+    orig_coords = (orig.get('coordinates', '') or '').strip()
+    name = entry.get('name') or orig.get('name') or ''
+    is_user_pin = bool(
+        orig.get('user_explicit') or orig.get('_anchor')
+        or orig.get('coord_source') == 'user_share_link'
+        or _is_user_stop_title(name))
+    coord_kept = bool(is_user_pin and orig_coords)
+    if coord_kept:
+        coordinates = orig_coords
+    else:
+        coordinates = (entry.get('coordinates') or orig_coords or '').strip()
+    if is_user_pin:
+        address = _clean_user_stop_address((orig.get('address') or ''))
+    else:
+        address = entry.get('address') or orig.get('address') or ''
+    return {"is_user_pin": is_user_pin, "coordinates": coordinates,
+            "address": address, "coord_kept": coord_kept}
+
+
 def _set_current_affairs_context(*, wanted: bool, request: str, tour_category: str):
     """Record whether the in-flight tour wants dated news (LOCAL-655)."""
     _CA_CTX.wanted = bool(wanted)
@@ -18338,10 +18433,31 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 for idx, entry in enumerate(parsed_normalized):
                     norm = _normalize_name(entry['name'])
                     orig = canonical_by_norm.get(norm)
-                    merged = _new_poi(entry['name'], entry.get('address') or (orig.get('address') if orig else ''))
+                    # [LOCAL-855E items 1+2] A user stop's coordinate and address
+                    # are the LISTENER'S own — the PHASE-3B model must never move
+                    # the pin or supply the address. The prior bug took the model's
+                    # invented `coordinates` FIRST (five District-1 venues collapsed
+                    # ~50 m apart) and its invented `address` FIRST ("Address: 15
+                    # Đ."). _user_pin_merge_fields keeps the listener's pin verbatim
+                    # and drops a model/stub address. Single-sourced with the test.
+                    _upm = _user_pin_merge_fields(entry, orig)
+                    _is_user_pin = _upm["is_user_pin"]
+                    _user_pin_kept = _upm["coord_kept"]
+                    merged = _new_poi(entry['name'], _upm["address"])
                     merged['stop_number'] = idx + 1
                     merged['directions'] = (entry.get('directions_from_previous') or '').strip()
-                    merged['coordinates'] = (entry.get('coordinates') or (orig.get('coordinates', '') if orig else '')).strip()
+                    merged['coordinates'] = _upm["coordinates"]
+                    # [LOCAL-855E item 1] Carry the user-pin provenance across the
+                    # fresh _new_poi() so NO later step (geocode sweep, pin-snap,
+                    # places attach, landmark reference) treats the pin as movable.
+                    if _is_user_pin:
+                        merged['user_explicit'] = True
+                        merged['_anchor'] = True
+                        if _user_pin_kept:
+                            merged['coord_source'] = 'user_share_link'
+                            merged['coord_confidence'] = 'resolved'
+                            print(f"  [LOCAL-855E] user pin kept {entry['name']!r} "
+                                  f"{merged['coordinates']}")
                     # [LOCAL-27] For museum tours: never populate type_specialty,
                     # specific_examples, or operational_details from GPT output.
                     # These will be sourced from corpus data downstream or omitted.
@@ -18881,6 +18997,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 clustered = [p for p in poi_list if p.get('coordinates') == top_coord]
                 print(f"   Coords cluster detected: {top_count} stops share '{top_coord}', refetching...")
                 for p in clustered:
+                    # [LOCAL-855E item 1] Never clear a user pin — the listener's
+                    # own @lat,lng is authoritative even if it happens to coincide
+                    # with another stop's coordinate; a real cluster of model
+                    # guesses is the only thing this refetch exists to fix.
+                    if (p.get('coord_source') == 'user_share_link'
+                            or ((p.get('user_explicit') or p.get('_anchor'))
+                                and _is_user_stop_title(p.get('name')))):
+                        print(f"  [LOCAL-855E] user pin kept {p.get('name')!r} "
+                              f"{p.get('coordinates')} (not cleared by cluster refetch)")
+                        continue
                     p['coordinates'] = ''
                 missing_coords2 = [p for p in poi_list if not p.get('coordinates')]
                 if missing_coords2:
@@ -19924,7 +20050,23 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     except Exception:
                         pass
                     _gp_hi = 0
+                    # [LOCAL-855E item 1] A user stop's coordinate is the
+                    # listener's own @lat,lng — authoritative. resolve_poi may
+                    # 'replace' it with an independent geocode of the NAME, which
+                    # for a small private venue lands on a different point and is
+                    # exactly the override LEAD caught (five District-1 venues
+                    # scattered/collapsed). Skip user pins entirely in the D559
+                    # pass; they are already placed by the listener.
+                    def _gp_is_user_pin(_p):
+                        return bool(
+                            _p.get('coord_source') == 'user_share_link'
+                            or ((_p.get('user_explicit') or _p.get('_anchor'))
+                                and _is_user_stop_title(_p.get('name'))))
                     for _p in poi_list:
+                        if _gp_is_user_pin(_p) and _p.get('coordinates'):
+                            print(f"  [LOCAL-855E] user pin kept {_p.get('name')!r} "
+                                  f"{_p.get('coordinates')} (D559 resolve skipped)")
+                            continue
                         _rec = resolve_poi(_p, location, _gp_anchor)
                         if _rec.get('confidence') == 'high':
                             _gp_hi += 1
@@ -19949,6 +20091,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # the near-identical inherited point. Runs AFTER resolve_poi so
                     # a coordinate the agreement rule already corrected is tested in
                     # its corrected position.
+                    # [LOCAL-855E item 1] The inherited-pin and centroid-collapse
+                    # repairs mutate poi coordinates in place and may move a user
+                    # pin (five District-1 venues really do sit ~50 m apart, which
+                    # these repairs read as "clustered / collapsed" and scatter).
+                    # The listener's own pins are authoritative, so snapshot them
+                    # now and restore them after both repairs run.
+                    _gp_user_pin_coords = {
+                        id(_p): _p.get('coordinates')
+                        for _p in poi_list
+                        if _gp_is_user_pin(_p) and _p.get('coordinates')}
                     try:
                         from geocode_stops import repair_inherited_coordinates
                         _inh = repair_inherited_coordinates(
@@ -20043,6 +20195,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     except Exception as _cc_err:
                         print(f"  [LOCAL-481] centroid-collapse repair error "
                               f"(non-fatal): {_cc_err}")
+                    # [LOCAL-855E item 1] Restore any user pin the repairs moved.
+                    for _p in poi_list:
+                        _orig_pin = _gp_user_pin_coords.get(id(_p))
+                        if _orig_pin and _p.get('coordinates') != _orig_pin:
+                            print(f"  [LOCAL-855E] user pin kept {_p.get('name')!r} "
+                                  f"{_orig_pin} (restored after geo repair that moved "
+                                  f"it to {_p.get('coordinates')})")
+                            _p['coordinates'] = _orig_pin
+                        elif _orig_pin:
+                            print(f"  [LOCAL-855E] user pin kept {_p.get('name')!r} "
+                                  f"{_orig_pin}")
                 except ImportError as _gc_err:
                     _import_logger.error(f"[D559] MISSING: geocode_stops — stops will be "
                                          f"ordered on unverified coordinates: {_gc_err}")
