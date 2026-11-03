@@ -76,6 +76,49 @@ def _haversine_m(a, b) -> float:
         return 2 * R * math.asin(math.sqrt(h))
 
 
+# [LOCAL-858] Two pins this close are treated as THE SAME point for the
+# shared-fallback test — a city-centroid guess the LLM stamped on several stops
+# lands them within a few metres of one another (tour 527's three stops were all
+# 10.776,106.695). 30 m is far tighter than the 150 m snap threshold, so two
+# genuinely distinct stops that merely sit near each other are never mistaken
+# for a shared centroid.
+_SHARED_FALLBACK_M = 30.0
+
+
+def _coord_is_marked_fallback(poi: Dict) -> bool:
+    """[LOCAL-858] True when the pipeline already STAMPED this coordinate as a
+    fallback / centroid (not an independently resolved point). Mirrors
+    identity_dedup._is_fallback_coord_stop so the two agree on what 'unknown
+    coordinate' means. Deterministic, offline, never raises."""
+    if not isinstance(poi, dict):
+        return False
+    for k in ("_coord_fallback", "coord_is_fallback", "_centroid_fallback",
+              "centroid_fallback", "is_fallback_coord", "coord_fallback"):
+        if poi.get(k):
+            return True
+    src = str(poi.get("coord_source") or poi.get("_coord_source")
+              or poi.get("coordinate_source") or "").strip().lower()
+    if src in ("fallback", "centroid", "city_centroid", "area_centroid",
+               "scope_centroid", "scope_center", "unknown"):
+        return True
+    conf = str(poi.get("coord_confidence") or poi.get("_coord_confidence")
+               or "").strip().lower()
+    if conf in ("fallback", "centroid", "none", "unknown"):
+        return True
+    return False
+
+
+def _is_user_pin(poi: Dict) -> bool:
+    """[LEAD 858 review] True for a stop the listener placed themselves
+    (LOCAL-855E marks it user_explicit + coord_source='user_share_link')."""
+    if not isinstance(poi, dict):
+        return False
+    src = str(poi.get("coord_source") or "").strip().lower()
+    return src == "user_share_link" or (
+        bool(poi.get("user_explicit")) and _parse_coord(poi.get("coordinates")) is not None
+        and src not in ("fallback", "centroid", "city_centroid"))
+
+
 def _poi_coord(poi: Dict) -> Optional[Tuple[float, float]]:
     """A poi's current coordinate, from the 'coordinates' string or lat/lng."""
     c = _parse_coord(poi.get("coordinates"))
@@ -329,6 +372,32 @@ def snap_pin(title: str,
         out["reason"] = "no in-scope reference — left unsnapped"
         return out
 
+    # [LOCAL-858] AUTHORITY OFF-SCOPE GUARD. A Wikidata P625 reference is the
+    # place's own identity and is otherwise exempt from the scope bounds — but a
+    # BARE-NAME wbsearchentities hit can still resolve a SAME-NAME place in another
+    # country when the lookup had no scope centre to filter by. The live Hanoi run
+    # snapped "St. Joseph's Cathedral" to the cathedral in BAGHDAD (6,144 km away),
+    # shipped as an authority pin. When a scope centre IS known here, no real stop
+    # on a city walking tour is hundreds of km from it: refuse a reference beyond
+    # ``max_authority_km`` (a generous cross-region bound) even when it is an
+    # authority, keeping the shipped pin rather than teleporting the stop.
+    _MAX_AUTHORITY_KM = 150.0
+    if authority and scope_center and ref_pt:
+        _auth_km = _haversine_m(ref_pt, scope_center) / 1000.0
+        if _auth_km > _MAX_AUTHORITY_KM:
+            vf_out = _apply_venue_fallback(
+                f"authority reference {_auth_km:.0f} km from centre — off-scope "
+                f"same-name place")
+            if vf_out is not None:
+                return vf_out
+            out["reference"] = ref_pt
+            out["source"] = source
+            out["reason"] = (
+                f"authority reference {_auth_km:.0f} km from centre "
+                f"> {_MAX_AUTHORITY_KM:.0f} km — refused (same-name place in "
+                f"another region)")
+            return out
+
     # [LOCAL-791E item 1] NAME-MATCH REQUIREMENT for a GENERIC geocoder reference.
     # A bare-name geocode ("City Hall") can land on a DIFFERENT same-class building
     # anywhere in the city — a wrong snap is worse than none. When the generic
@@ -444,6 +513,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          tour_language: str = "en",
                          landmark_fn: Optional[Callable] = None,
                          venue_fallback_coordinate: Optional[Tuple[float, float]] = None,
+                         city_centroid: Optional[Tuple[float, float]] = None,
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -460,7 +530,15 @@ def snap_poi_coordinates(poi_list: List[Dict],
 
     Logs ``[LOCAL-791C] pin snap <title> <m>`` for each snapped stop, a
     ``[LOCAL-791E] snap refused …`` line for a reference rejected by the name /
-    centroid guards, and a ``left unsnapped`` line for a stop with no reference."""
+    centroid guards, and a ``left unsnapped`` line for a stop with no reference.
+
+    [LOCAL-858] A stop that is NOT snapped and whose shipped pin is a city-centroid
+    guess (marked a fallback upstream, OR shared within ~30 m with another
+    un-snapped stop, OR equal to the optional ``city_centroid``) has that pin
+    CLEARED (``coordinates`` → ''), is marked ``_no_coordinate``, and is announced
+    ``[LOCAL-858] no coordinate <title>``. A centroid is 'coordinates unknown', not
+    a place, so it must never ship as a real pin (HCMC tour 527). The stop itself
+    is kept — only the fake pin is dropped."""
     emit = log or (lambda _m: None)
     rows: List[Dict] = []
 
@@ -503,6 +581,16 @@ def snap_poi_coordinates(poi_list: List[Dict],
     for i, poi in enumerate(poi_list):
         title = poi.get("name", "")
         coord = coords_all[i]
+        if _is_user_pin(poi):
+            # [LEAD 858 review] A listener's own pin (LOCAL-855E) is authoritative:
+            # never snapped, never cleared. Recorded as snapped-in-place so the
+            # centroid pass below skips it too.
+            rows.append({"title": title, "snapped": True,
+                         "new_coordinate": coord, "reference": coord,
+                         "source": "user_share_link", "distance_m": 0.0,
+                         "reason": "user pin kept"})
+            emit(f"[LOCAL-855E] user pin kept {title!r} (pin snap skipped)")
+            continue
         wd = _wikidata_coord(poi)
         _centroid_i = None if _injected else _centroid_excluding(i)
         _bound_i = 0.0 if _injected else _adaptive_bound(i, _centroid_i)
@@ -539,4 +627,76 @@ def snap_poi_coordinates(poi_list: List[Dict],
             d = row["distance_m"]
             emit(f"[LOCAL-791C] pin ok {title} "
                  f"{('%.0f' % d) if d is not None else '?'}m within threshold")
+
+    # ── [LOCAL-858] NEVER SHIP A CITY-CENTROID AS A REAL PIN ──────────────────
+    # A stop that was NOT snapped keeps whatever coordinate it shipped with. When
+    # that shipped coordinate is the LLM's city-centroid guess — the HCMC-tour-527
+    # failure: three stops all stamped 10.776,106.695 because the model could not
+    # place them and returned the city centre — keeping it ships the centroid as
+    # if it were a real pin, indistinguishable downstream (the app plots whatever
+    # number it is given). The ticket: log '[LOCAL-858] no coordinate <name>' and
+    # NEVER silently keep the centroid. A stop is centroid-collapsed when its pin
+    # is EITHER (a) already marked a fallback/centroid by an upstream phase, OR
+    # (b) the SAME point (within _SHARED_FALLBACK_M) as ≥1 OTHER un-snapped stop
+    # whose pin is equally uncorroborated — two stops cannot share one coordinate
+    # and both be real places — OR (c) equal to the supplied ``city_centroid``.
+    #
+    # Snapped stops are authoritative (Wikidata P625 / a name-matched geocode) and
+    # are never touched here. We CLEAR the collapsed coordinate (set it to '' so
+    # route-order and the map treat the stop as unplaced), mark it, and announce
+    # it — dropping the fake pin, not the stop.
+    def _row_for(idx: int) -> Dict:
+        return rows[idx] if idx < len(rows) else {}
+
+    # Indices of stops that did NOT get an authoritative snap this pass.
+    _unsnapped = [i for i, p in enumerate(poi_list)
+                  if not (_row_for(i).get("snapped") and _row_for(i).get("new_coordinate"))]
+
+    # The SHARED-point test uses the ORIGINAL shipped coordinates (``coords_all``,
+    # snapshotted at entry), NOT the post-snap positions: the collapse signal is
+    # that the model stamped the SAME point on several stops, and that is true of
+    # the SHIPPED pins even when some of those stops later snapped away to their
+    # real place. A stop whose shipped pin coincided with ANY other stop's shipped
+    # pin is a centroid guess.
+    def _shipped_shared(idx: int) -> bool:
+        a = coords_all[idx]
+        if not a:
+            return False
+        for j in range(len(coords_all)):
+            if j == idx:
+                continue
+            b = coords_all[j]
+            if b and _haversine_m(a, b) <= _SHARED_FALLBACK_M:
+                return True
+        return False
+
+    for i in _unsnapped:
+        poi = poi_list[i]
+        title = poi.get("name", "")
+        pt = coords_all[i]
+        if pt is None:
+            # No coordinate at all — already unplaced; announce it once (route
+            # order / the map already treat it as having no marker).
+            poi["_no_coordinate"] = True
+            emit(f"[LOCAL-858] no coordinate {title}")
+            continue
+        _collapsed = (
+            _coord_is_marked_fallback(poi)
+            or _shipped_shared(i)
+            or (city_centroid is not None
+                and _haversine_m(pt, city_centroid) <= _SHARED_FALLBACK_M))
+        if _collapsed:
+            # Drop the fake pin — a centroid is 'coordinates unknown', not a place.
+            poi["coordinates"] = ""
+            for _k in ("latitude", "longitude", "lat", "lng", "lon",
+                       "wikidata_lat", "wikidata_lng"):
+                if _k in poi:
+                    poi[_k] = None
+            poi["_no_coordinate"] = True
+            poi["_coord_fallback"] = True
+            _r = _row_for(i)
+            if isinstance(_r, dict):
+                _r["centroid_cleared"] = True
+            emit(f"[LOCAL-858] no coordinate {title}")
+
     return poi_list, rows
