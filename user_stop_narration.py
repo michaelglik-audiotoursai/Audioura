@@ -161,18 +161,34 @@ def grounded_user_stop_body(poi: Dict, location: str = "") -> str:
         return ""
 
     sentences = []
-    # (1) What it is + where.
-    kind = type_specialty if type_specialty else "the place the listener chose"
-    if district:
-        sentences.append(
-            f"{name} is {_article(kind)} {kind.lower()} here in {district}.")
-    else:
-        where = location.split(",")[0].strip() if location else ""
-        if where:
+    # (1) What it is + where. When the Type/Specialty is known, name the kind
+    # ("Longan is a bar in District 1"); when it is not, do NOT fabricate a kind —
+    # say it is the place the listener chose, with correct grammar (the earlier
+    # "is a the place the listener chose" glitch came from prefixing an article to
+    # a phrase that already carries one).
+    if type_specialty:
+        kind = type_specialty
+        if district:
             sentences.append(
-                f"{name} is {_article(kind)} {kind.lower()} in {where}.")
+                f"{name} is {_article(kind)} {kind.lower()} here in {district}.")
         else:
-            sentences.append(f"{name} is {_article(kind)} {kind.lower()}.")
+            where = location.split(",")[0].strip() if location else ""
+            if where:
+                sentences.append(
+                    f"{name} is {_article(kind)} {kind.lower()} in {where}.")
+            else:
+                sentences.append(f"{name} is {_article(kind)} {kind.lower()}.")
+    else:
+        if district:
+            sentences.append(
+                f"{name} is the place the listener chose, here in {district}.")
+        else:
+            where = location.split(",")[0].strip() if location else ""
+            if where:
+                sentences.append(
+                    f"{name} is the place the listener chose, here in {where}.")
+            else:
+                sentences.append(f"{name} is the place the listener chose.")
     # (2) What it offers — the listener's own examples, when present.
     if examples:
         ex = examples.rstrip(".")

@@ -81,8 +81,11 @@ _DOCUMENTED_KINDS = {
 # the final stop's block (it has no "Stop N" header). It is NOT the stop's own
 # narration, so the verifier must not treat its sentences as the stop's body.
 _CONCLUSION_LEAD_RE = re.compile(
-    r"(?i)^(across these stops|that'?s \d+ stops|if you would like to eat|"
-    r"we hope you|as (?:you|this tour) )")
+    r"(?i)^(across these stops|across all these stops|across your stops|"
+    r"that'?s \d+ stops? in all|if you would like to eat|"
+    r"we hope you(?:'ve| have)? enjoyed|thanks for (?:riding|walking|touring)|"
+    r"as (?:you|this tour) (?:conclude|wrap|finish|end|come to (?:a |an )?(?:close|end))|"
+    r"as this tour (?:draws|comes))")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -694,6 +697,24 @@ def verify_user_stops_in_text(
 
         # Rewrite each body paragraph keeping only its non-UNSUPPORTED sentences.
         _apply_drops(lines, meta, keep_flags)
+        # [LOCAL-855E item 3] Every user stop must NAME its venue. If dropping the
+        # orientation left the surviving text without the venue name (it can read
+        # as "This place…" / "this venue…"), prepend the deterministic
+        # orientation ("Look for <name> at <where>") so the stop is unambiguously
+        # about the venue the listener chose.
+        _folded_name = _fold(name)
+        _name_toks = [w for w in _folded_name.split() if len(w) >= 3]
+        _surviving = _fold(" ".join(
+            lines[abs_idx] for abs_idx in sorted(meta["para_sent_counts"].keys())))
+        _names_venue = bool(_folded_name and _folded_name in _surviving) or (
+            bool(_name_toks) and all(t in _surviving for t in _name_toks))
+        if not _names_venue:
+            orientation = _deterministic_orientation(meta["poi"], location)
+            if orientation:
+                _prepend_orientation(lines, meta, orientation)
+                if log:
+                    log(f"[LOCAL-855E] verify {name}: surviving text did not name "
+                        f"the venue — prepended deterministic orientation")
         report["stops"].append({"stop": name, "kept": kept_n,
                                 "dropped": dropped_n, "grounded": False,
                                 "snippets": 1})
@@ -702,6 +723,27 @@ def verify_user_stops_in_text(
             log(f"[LOCAL-855D] verify {name} kept {kept_n} dropped {dropped_n}")
 
     return "\n".join(lines), report
+
+
+def _prepend_orientation(lines: List[str], meta: dict, orientation: str):
+    """Put the deterministic orientation on the stop's Orientation line (or the
+    first body paragraph), keeping whatever text already survives there."""
+    for abs_idx in sorted(meta["para_sent_counts"].keys()):
+        is_or, _ss = meta["para_sent_counts"][abs_idx]
+        cur = lines[abs_idx]
+        if is_or:
+            label, _, val = cur.partition(":")
+            val = val.strip()
+            lines[abs_idx] = f"{label}: {orientation}" + (f" {val}" if val else "")
+            return
+    # No Orientation line: prepend to the first body paragraph.
+    for abs_idx in sorted(meta["para_sent_counts"].keys()):
+        cur = lines[abs_idx].strip()
+        if cur:
+            lines[abs_idx] = f"{orientation} {cur}".strip()
+            return
+        lines[abs_idx] = orientation
+        return
 
 
 def _deterministic_orientation(poi: Dict, location: str = "") -> str:
