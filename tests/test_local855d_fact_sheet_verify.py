@@ -166,5 +166,58 @@ class TestVerifyDrops(unittest.TestCase):
         self.assertIn("Directions: Head east.", out)
 
 
+class TestModeDetectionNotApplicable(unittest.TestCase):
+    pass
+
+
+class TestDocumentedKindAndConclusion(unittest.TestCase):
+    def setUp(self):
+        self._orig = usv._call_openai
+
+    def tearDown(self):
+        usv._call_openai = self._orig
+
+    def test_documented_monument_is_skipped_dates_kept(self):
+        # A cathedral stop must be skipped so a dated sentence survives even if
+        # the model would (wrongly) call it UNSUPPORTED.
+        tour = (
+            "Audio Guided Tour: Saigon - Walking Tour\n\n"
+            "Stop 1: Notre-Dame Cathedral Basilica of Saigon\n\n"
+            "Coordinates: 10.7797, 106.6992\n\n"
+            "Type/Specialty: Cathedral\n\n"
+            "Orientation: The red-brick towers rise above the square. "
+            "The cathedral was built between 1863 and 1880.\n\n")
+        # Model would label everything UNSUPPORTED — but the stop is skipped.
+        usv._call_openai = _fake_labels({0: {0: "UNSUPPORTED", 1: "UNSUPPORTED"}})
+        logs = []
+        out, rep = usv.verify_user_stops_in_text(
+            tour, ["Notre-Dame Cathedral Basilica of Saigon"], "Saigon",
+            api_key="x", log=logs.append)
+        self.assertIn("1863 and 1880", out, "monument date was over-scrubbed")
+        self.assertTrue(any("skipped (documented monument" in m for m in logs), logs)
+
+    def test_conclusion_paragraph_not_counted_as_body(self):
+        # The trailing tour-conclusion absorbed into the last stop block must not
+        # be verified; a thin stop with 1 real sentence -> grounded body.
+        tour = (
+            "Audio Guided Tour: HCMC - Cycling Tour\n\n"
+            "Stop 1: Acoustic Bar\n\n"
+            "Coordinates: 10.7705, 106.6890\n\n"
+            "Type/Specialty: Live music bar\n\n"
+            "Specific Examples: Acoustic sets, open mic nights\n\n"
+            "Orientation: Approach the narrow doorway marked by wooden panels.\n\n"
+            "Across these stops, one thread runs through: the places you chose. "
+            "That's 1 stop in all.\n\n")
+        usv._call_openai = _fake_labels({0: {0: "SENSORY"}})
+        out, rep = usv.verify_user_stops_in_text(
+            tour, ["Acoustic Bar"], "Ho Chi Minh City", api_key="x")
+        ab = next(s for s in rep["stops"] if s["stop"] == "Acoustic Bar")
+        # Only 1 body sentence (conclusion excluded) -> grounded body.
+        self.assertTrue(ab["grounded"], rep["stops"])
+        self.assertIn("Acoustic Bar is", out)
+        # Conclusion text is left in place (not treated as stop narration).
+        self.assertIn("Across these stops", out)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

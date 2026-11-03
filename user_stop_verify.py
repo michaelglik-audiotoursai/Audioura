@@ -64,6 +64,26 @@ _COORD_LINE_RE = re.compile(
 
 _MODEL_DEFAULT = os.environ.get("USER_STOP_VERIFY_MODEL", "gpt-4.1-mini")
 
+# [LOCAL-855D] Documented monumental/institutional kinds whose dated facts ARE
+# sourced (a cathedral, basilica, palace, museum, temple, …). Mirrors
+# user_stop_narration._DOCUMENTED_KINDS. The verifier SKIPS a stop of such a kind
+# so a famous monument keeps its sourced dates — Notre-Dame Cathedral Basilica of
+# Saigon must keep "built 1863–1880" (the ticket's run-B requirement). A small
+# private venue (bar/café/spa/shop/street/market) is NOT documented and is
+# verified normally.
+_DOCUMENTED_KINDS = {
+    "cathedral", "basilica", "church", "temple", "pagoda", "palace",
+    "museum", "memorial", "monument", "opera", "landmark", "shrine",
+    "mausoleum", "fort", "citadel",
+}
+
+# A trailing TOUR CONCLUSION / cross-stop recap paragraph that is absorbed into
+# the final stop's block (it has no "Stop N" header). It is NOT the stop's own
+# narration, so the verifier must not treat its sentences as the stop's body.
+_CONCLUSION_LEAD_RE = re.compile(
+    r"(?i)^(across these stops|that'?s \d+ stops|if you would like to eat|"
+    r"we hope you|as (?:you|this tour) )")
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # FACT SHEET
@@ -239,6 +259,10 @@ def _collect_body_paragraphs(block_lines: List[str]):
             if val.strip():
                 yield idx, True, val.strip()
         else:
+            if _CONCLUSION_LEAD_RE.match(stripped):
+                # A trailing tour-conclusion / recap paragraph absorbed into the
+                # final stop block — not the stop's narration. Skip it.
+                continue
             yield idx, False, ln
 
 
@@ -313,6 +337,18 @@ def verify_user_stops_in_text(
                     odf = v
                     break
         facts = build_fact_sheet(poi, location, odf)
+
+        # [LOCAL-855D] A documented monument/institution (cathedral, basilica,
+        # palace, museum, …) is SOURCED — skip it so its dates survive
+        # (Notre-Dame "built 1863–1880"). The 855B scrub already does not
+        # date-gate these kinds; the verifier must match that, or it would
+        # over-scrub the exact case the ticket's run B protects.
+        _kind_fold = _fold(poi.get("type_specialty") or "")
+        if set(_kind_fold.split()) & _DOCUMENTED_KINDS:
+            if log:
+                log(f"[LOCAL-855D] verify {title} skipped (documented monument "
+                    f"kind — sourced dates kept)")
+            continue
 
         # Number sentences across all body paragraphs of the stop, keeping a map
         # back to (block-line-index, is_orientation, sentence-within-paragraph).
