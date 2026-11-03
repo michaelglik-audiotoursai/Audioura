@@ -24,12 +24,26 @@ The same defect hit LEAD's own `geo_refutation` module hours earlier, where
 import re
 
 # Titles, honorifics and common abbreviations whose dot is NOT a sentence end.
+# [LOCAL-855D] Vietnamese address abbreviations are included so an address such
+# as "15 Đ. Nguyễn Văn Tráng, Phường Bến Thành, Quận 1" is never cut at the first
+# dot into the stub "15 Đ." (Michael's field report: "Address: 15 Đ.").
+#   đ   = Đường (Street)      — the one in the report
+#   p   = Phường (Ward)       — "P. Bến Thành"
+#   q   = Quận (District)     — "Q. 1"
+#   tp  = Thành phố (City)    — "TP. Hồ Chí Minh"
+#   kp  = Khu phố (Quarter)   — "KP. 3"
+# `_ends_on_abbreviation` lowercases the trailing token before the lookup, and
+# "Đ".lower() == "đ", so the lowercased Vietnamese forms match here. The trailing
+# token must also be *extracted* by `_TRAILING_TOKEN`, whose character class is
+# widened below to include the Vietnamese "Đ/đ".
 _ABBREV = {
     'st', 'ss', 'mr', 'mrs', 'ms', 'dr', 'prof', 'fr', 'rev', 'msgr', 'sr', 'jr',
     'hon', 'gen', 'col', 'capt', 'lt', 'sgt', 'gov', 'sen', 'rep', 'pres',
     'no', 'vs', 'etc', 'al', 'inc', 'ltd', 'co', 'corp', 'dept', 'est',
     'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct',
     'nov', 'dec', 'approx', 'ca', 'cf', 'ed', 'eds', 'vol', 'pp', 'fig',
+    # Vietnamese address abbreviations (LOCAL-855D).
+    'đ', 'p', 'q', 'tp', 'kp', 'ave', 'blvd', 'rd', 'hwy',
 }
 _BOUNDARY = re.compile(r'(?<=[.!?])\s+')
 # [LOCAL-654] The gpt-4.1-mini narrator routinely drops the space after a
@@ -55,7 +69,7 @@ _NOSPACE_BOUNDARY = re.compile(
 # right after the dot being a lowercase letter or a digit means it is not a
 # sentence end, which the capital-letter lookahead above already excludes. The
 # remaining risk is "No.3" style — handled by the abbreviation guard on the left.
-_TRAILING_TOKEN = re.compile(r'([A-Za-z][A-Za-z\'’]*)\.$')
+_TRAILING_TOKEN = re.compile(r'([A-Za-zĐđ][A-Za-zĐđ\'’]*)\.$')
 
 
 def _ends_on_abbreviation(chunk):

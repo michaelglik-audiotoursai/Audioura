@@ -39,7 +39,11 @@ __all__ = ["lookup", "LANDMARKS"]
 
 
 def _fold(text: str) -> str:
-    nfkd = unicodedata.normalize("NFKD", str(text or "").lower())
+    # Vietnamese đ/Đ (U+0111/U+0110) does NOT decompose under NFKD, so normalise
+    # it to "d" first — otherwise "Đồng Khởi" folds to "đong khoi" and never
+    # matches an ASCII "dong" token. [LOCAL-855B]
+    raw = str(text or "").lower().replace("đ", "d").replace("\u0110".lower(), "d")
+    nfkd = unicodedata.normalize("NFKD", raw)
     s = "".join(c for c in nfkd if not unicodedata.combining(c))
     s = re.sub(r"[^\w\s]", " ", s)
     return " ".join(s.split())
@@ -101,6 +105,33 @@ LANDMARKS: List[_Landmark] = [
     _Landmark("Q1949129", 10.77639, 106.70278,
               "Saigon Opera House", "Nhà hát Thành phố Hồ Chí Minh",
               {"opera", "house"}),
+    # [LOCAL-855B] District-1 anchors the An Spa narration wrongly placed itself
+    # at (its own pin is District 3, ~1.5 km away). Coordinates are the
+    # well-known Wikidata/OSM P625 points; match_tokens are the distinctive
+    # proper-noun tokens (class words like "theatre"/"square"/"street" are not
+    # required, so "Saigon Municipal Theatre", "Đồng Khởi Street", "Lam Sơn
+    # Square" all resolve). "saigon" is a dropped qualifier token.
+    _Landmark("Q1949129", 10.77639, 106.70278,
+              "Saigon Municipal Theatre", "Nhà hát Thành phố Hồ Chí Minh",
+              {"municipal", "theatre"}),
+    _Landmark("Q5291520", 10.77806, 106.70333,
+              "Đồng Khởi Street", "Đường Đồng Khởi",
+              {"dong", "khoi"}),
+    _Landmark("Q116096550", 10.77667, 106.70306,
+              "Lam Sơn Square", "Công trường Lam Sơn",
+              {"lam", "son"}),
+    # [LOCAL-855B defect 7] "The Crazy Street" is Bùi Viện Walking Street in
+    # District 1 (~10.7672, 106.6930). With no share link it geocoded by name and
+    # the resolver fell back, pinning it at 10.7752,106.6955 next to Rambutan
+    # (~900 m off). Give pin_snap an authoritative coordinate so it snaps the
+    # stop onto the real walking street. match_tokens: the user's own name
+    # ("Crazy") and the street's real name ("Bùi Viện").
+    _Landmark("Q106712663", 10.76720, 106.69300,
+              "Bùi Viện Walking Street", "Phố đi bộ Bùi Viện",
+              {"crazy", "street"}),
+    _Landmark("Q106712663", 10.76720, 106.69300,
+              "Bùi Viện Walking Street", "Phố đi bộ Bùi Viện",
+              {"bui", "vien"}),
     # Pagodas & temples tour anchors
     _Landmark("Q1063916", 10.75291, 106.66117,
               "Thien Hau Temple", "Chùa Bà Thiên Hậu",

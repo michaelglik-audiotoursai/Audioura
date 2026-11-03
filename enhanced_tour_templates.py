@@ -176,7 +176,7 @@ Example Format:
    Type: Historic university campus
    Significance: Founded 1636, oldest higher education institution in US
    Year: 1636
-   Directions: From Harvard Square T station, walk north on Massachusetts Avenue
+   Directions: From the main entrance on Massachusetts Avenue, walk north into the Yard
    Coordinates: 42.3744, -71.1169
 
 2. Widener Library
@@ -212,7 +212,7 @@ Example Format:
    Type: Historic university campus
    Significance: Founded 1636, oldest higher education institution in US
    Year: 1636
-   Directions: From Harvard Square T station, walk north on Massachusetts Avenue
+   Directions: From the main entrance on Massachusetts Avenue, walk north into the Yard
    Coordinates: 42.3744, -71.1169
 
 2. Widener Library

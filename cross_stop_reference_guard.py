@@ -351,7 +351,89 @@ def limit_thematic_bridges_in_text(tour_text: str,
     return out, dropped
 
 
-# ─── [LOCAL-634] Callback to an UNSEEN work/artist ────────────────────────────
+# ─── [LOCAL-855B bounce] user-stops tour: strip EVERY cross-stop callback ──────
+#
+# A user-stops tour is a list of UNRELATED venues the listener chose (a bar, a
+# spa, a karaoke room) — there is no shared subject, period or collection, so a
+# "you paused beside X earlier" / "a launching point not unlike the sackbut you
+# stopped at a moment ago" callback is ALWAYS a fabrication: the model invents a
+# recurring motif (a "sackbut") and threads it across stops. The D636 budget
+# ("a couple of callbacks for continuity") is right for a museum tour but wrong
+# here. For a user-stops tour the budget is ZERO: every previous-stop recap,
+# thematic bridge, seen-callback and the broadened "paused beside / referred to …
+# earlier" shape is dropped. The delivered Stop-5 leak — "a launching point not
+# unlike the sackbut you paused beside earlier" — slipped the D636 pass because
+# "paused beside" was not in the recap verb list and the budget had room; this
+# detector closes both gaps for the user-stops path.
+_USER_STOP_CALLBACK_RE = re.compile(
+    r"(?i)\b("
+    # any "you <perception-verb> … earlier/before/previously/a moment ago"
+    r"you\s+(?:have\s+)?(?:already\s+|just\s+|once\s+|previously\s+)?"
+    r"(?:paused|stopped|stood|lingered|passed|were|came)\s+"
+    r"(?:beside|by|at|near|before|past|through|in\s+front\s+of)\b[^.?!]*?"
+    r"\b(?:earlier|before|previously|a\s+moment\s+ago|moments?\s+ago|"
+    r"just\s+now|a\s+few\s+stops?\s+ago)\b|"
+    # "not unlike / like the X you … earlier"
+    r"(?:not\s+unlike|like|as\s+with|just\s+as)\s+the\s+[^.?!]*?\byou\s+"
+    r"(?:saw|paused|stopped|stood|passed|visited|encountered)\b[^.?!]*?"
+    r"\b(?:earlier|before|a\s+moment\s+ago)\b"
+    r")")
+
+
+def strip_all_cross_stop_callbacks_in_text(tour_text: str) -> Tuple[str, int]:
+    """[LOCAL-855B bounce] For a USER-STOPS tour, drop EVERY cross-stop callback
+    sentence — budget zero. A user's chosen venues share no thread, so any "you
+    paused beside … earlier" / "not unlike the sackbut you stopped at a moment
+    ago" is a fabricated motif. Reuses the existing recap / thematic-bridge /
+    stock-recency / seen-callback detectors AND a broadened "paused beside …
+    earlier" pattern. Field/header lines preserved; never empties a stop's whole
+    body (if dropping would leave a paragraph empty, the paragraph is kept — the
+    other scrubs own emptied bodies). Returns (cleaned_text, n_dropped).
+    """
+    if not tour_text:
+        return tour_text or "", 0
+    titles = [m.group(1) for m in re.finditer(
+        r'(?mi)^Stop\s+\d+:\s*(.+?)\s*$', tour_text)]
+    delivered_tokens = _delivered_name_tokens(titles)
+    delivered_norms = _delivered_title_norms(titles)
+    dropped = 0
+    out_lines: List[str] = []
+    for raw in tour_text.split("\n"):
+        stripped = raw.strip()
+        if (not stripped or _TEXT_STOP_HEADER_RE.match(stripped)
+                or _TEXT_FIELD_LINE_RE.match(stripped)):
+            out_lines.append(raw)
+            continue
+        lead = ""
+        body = raw
+        om = re.match(r'(?i)^(\s*orientation:\s*)', raw)
+        if om:
+            lead = raw[:om.end()]
+            body = raw[om.end():]
+        sents = _split_sentences(body)
+        kept_sents: List[str] = []
+        for sent in sents:
+            is_callback = bool(
+                _STOCK_RECENCY_RE.search(sent)
+                or _PREV_STOP_RECAP_RE.search(sent)
+                or _THEMATIC_BRIDGE_RE.search(sent)
+                or _USER_STOP_CALLBACK_RE.search(sent)
+                or _callback_names_unseen(sent, delivered_tokens, delivered_norms))
+            if is_callback:
+                dropped += 1
+                continue
+            kept_sents.append(sent)
+        new_body = " ".join(kept_sents).strip()
+        # Never empty a paragraph that had real prose: if every sentence was a
+        # callback (rare), keep the original so the stop is not left blank.
+        if not new_body and body.strip():
+            new_body = body.strip()
+            dropped -= len([s for s in sents])  # undo the count for this para
+        if lead or new_body:
+            out_lines.append((lead + new_body).rstrip())
+    out = "\n".join(out_lines)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, max(0, dropped)
 #
 # D636 keeps real callbacks ("a couple per tour, for continuity"). But a callback
 # may name ONLY artists and works the listener actually SAW — i.e. ones delivered
@@ -378,6 +460,73 @@ _SEEN_CALLBACK_RE = re.compile(
     r"(?:which|whom|whose\s+works?)\s+you\s+(?:have\s+)?already\s+(?:seen|met)|"
     r"you\s+(?:have\s+)?(?:just\s+)?(?:seen|viewed)\s+(?:works?\s+)?by"
     r")\b")
+
+# ─── [LOCAL-855 defect 2] "you saw … at <external place>" cross-tour callback ──
+#
+# The field-test Sophia tour (HCMC) shipped, inside the Crazy-street stop:
+#
+#   "Like the intersecting streets in Gustave Caillebotte's 1877 painting 'Paris
+#    Street; Rainy Day,' which you saw at the Art Institute of Chicago, …"
+#
+# No Chicago / Art Institute stop exists in this tour (nor in any tour this user
+# took). This is a callback that tells the listener they saw something AT a named
+# external place — a museum / gallery / institution — that is not in the tour.
+# The LOCAL-634/635 recall guards missed it because the recall ("you saw") carries
+# no "earlier/already/previously" tail, and the token-overlap anchoring falsely
+# anchored it on the generic word "street" (shared with "The Crazy street"). A
+# callback may name only a place IN THIS TOUR or a tour the SAME user actually
+# took; neither held here. This detector fires on "(you) saw/viewed/encountered/
+# admired/glimpsed … at THE <Proper Place>" when that place is not a delivered
+# stop, regardless of a trailing time word.
+_SAW_AT_PLACE_RE = re.compile(
+    r"(?i)\byou\s+(?:have\s+)?(?:already\s+|once\s+|previously\s+)?"
+    r"(?:saw|viewed|encountered|admired|glimpsed|visited|observed|"
+    r"stood\s+before|came\s+across)\b[^.?!]{0,90}?\bat\s+"
+    r"(?:the\s+)?([A-Z\u00C0-\u017F][\w'\u00C0-\u017F.\-]*"
+    r"(?:\s+(?:of|the|de|du|des|la|le|les|and|von|van|di)?\s*"
+    r"[A-Z\u00C0-\u017F][\w'\u00C0-\u017F.\-]*){1,6})")
+
+
+def _saw_at_unseen_place(sentence: str, delivered_norms) -> Optional[str]:
+    """When ``sentence`` says the listener saw/viewed something AT a named place
+    that is NOT among the delivered stop titles, return that place; else None.
+
+    "which you saw at the Art Institute of Chicago" → "Art Institute of Chicago"
+    (no delivered stop matches it). A "saw … at <delivered stop>" is kept."""
+    m = _SAW_AT_PLACE_RE.search(sentence or "")
+    if not m:
+        return None
+    place = (m.group(1) or "").strip().strip(",.;:!?").strip()
+    # Trim trailing lowercase words the proper-run may have swept in
+    # ("Acoustic Bar carries here" → "Acoustic Bar"): a named place is a run of
+    # Capitalised words (connectors aside).
+    _words = place.split()
+    while _words and _words[-1][:1].islower() and _words[-1].lower() not in (
+            "of", "the", "de", "du", "des", "la", "le", "les", "and",
+            "von", "van", "di"):
+        _words.pop()
+    while _words and _words[-1].lower() in (
+            "of", "the", "de", "du", "des", "la", "le", "les", "and",
+            "von", "van", "di"):
+        _words.pop()
+    place = " ".join(_words).strip()
+    if not place:
+        return None
+    if _is_delivered(place, delivered_norms):
+        return None
+    # A distinctive token shared with a delivered title means it names a stop in
+    # this tour (e.g. "the Acoustic Bar" ⊂ "Acoustic Bar - Ngô Thời Nhiệm"): keep.
+    _generic = {"the", "bar", "street", "spa", "cafe", "club", "museum",
+                "gallery", "center", "centre", "house", "market", "tour"}
+    place_toks = {w for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", _norm(place))
+                  if w not in _generic}
+    for dn in delivered_norms or []:
+        dn_toks = {w for w in re.findall(r"[A-Za-z\u00C0-\u017F]{3,}", dn)
+                   if w not in _generic}
+        if place_toks and place_toks <= dn_toks:
+            return None
+    return place
+
 
 # ─── [LOCAL-635] Generalised recall phrase ───────────────────────────────────
 #
@@ -549,6 +698,13 @@ def _callback_names_unseen(sentence: str, delivered_tokens: set,
                 continue  # every token of this name was delivered → a real callback
             # At least one word of this named entity was never delivered.
             return ent
+    # [LOCAL-855 defect 2] "you saw … at <external place>" — a callback to a named
+    # place (museum/gallery/institution) that is not a delivered stop. Checked
+    # before the generic recall-anchor test, whose generic-token overlap
+    # ("street"/"bar") falsely anchored the Art-Institute-of-Chicago leak.
+    _saw_at = _saw_at_unseen_place(sentence, delivered_norms or [])
+    if _saw_at is not None:
+        return f"saw at a place not in this tour: '{_saw_at}'"
     # [LOCAL-635] generalised unanchored recall phrase.
     if delivered_norms is not None and _RECALL_PHRASE_RE.search(sentence or ""):
         if not _recall_is_anchored(sentence, delivered_tokens, delivered_norms):

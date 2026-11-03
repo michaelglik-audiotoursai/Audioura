@@ -47,6 +47,23 @@ _REWRITTEN_RE = re.compile(
     r"(?P<venue>.+?)\s+in\s+(?P<place>.+?)\s*(?:,\s*"
     r"is\s+a[n]?\s+(?P<category>[a-z\u00C0-\u017F]+)\s+tour)?\.?\s*$")  # LEAD 2026-10-09: R11 Bern/Bordeaux had no "is a … tour" tail
 
+# [LOCAL-855B defect 1] The spoken title the model wrote for the user-stops
+# biking tour was "…of Ho Chi Minh City, Vietnam, featuring a cycling tour in the
+# biking category." — no "is a {category} tour" tail, so detect_rewritten_title
+# defaulted the category to "museum" and the restored header read "… - Museum
+# Tour". Two secondary category shapes the model uses, read BEFORE defaulting:
+#   "featuring a {category} tour"   /   "the {category} category"
+# and if NONE is found the restored header carries NO category suffix (never the
+# "museum" guess — a user-stops movement tour is not a museum).
+_CATEGORY_HINT_RES = (
+    re.compile(r"(?i)\bis\s+a[n]?\s+([a-z\u00C0-\u017F]+)\s+tour\b"),
+    re.compile(r"(?i)\bfeaturing\s+a[n]?\s+([a-z\u00C0-\u017F]+)\s+tour\b"),
+    re.compile(r"(?i)\bthe\s+([a-z\u00C0-\u017F]+)\s+category\b"),
+)
+# Category words we display verbatim; "cycling" is spoken but biking is the label.
+_CATEGORY_DISPLAY = {"cycling": "Cycling", "biking": "Cycling", "walking": "Walking",
+                     "driving": "Driving", "restaurant": "Restaurant"}
+
 
 def is_canonical_header(line: str) -> bool:
     """True when ``line`` is already the canonical ``Step-by-Step Audio Guided
@@ -56,13 +73,28 @@ def is_canonical_header(line: str) -> bool:
 
 def detect_rewritten_title(line: str):
     """Return (venue, place, category) when ``line`` is the spoken-rewritten title
-    shape, else None. Deterministic."""
+    shape, else None. ``category`` is "" when none can be read — the restored
+    header then carries no category suffix (never a "museum" guess). Deterministic."""
     m = _REWRITTEN_RE.match(line or "")
     if not m:
         return None
     venue = m.group("venue").strip().strip(",").strip()
     place = m.group("place").strip().strip(",").strip()
-    category = (m.group("category") or "museum").strip().lower()
+    category = (m.group("category") or "").strip().lower()
+    if not category:
+        # Read a secondary shape from the WHOLE line: "featuring a {cat} tour",
+        # "the {cat} category". Never fall back to "museum".
+        for _hint in _CATEGORY_HINT_RES:
+            _hm = _hint.search(line or "")
+            if _hm:
+                category = _hm.group(1).strip().lower()
+                break
+    # Do not let a locality run swept into {place}/{venue} ("Vietnam, featuring a
+    # cycling tour in the biking category") pollute the subject — trim each at a
+    # category hint word so the header subject is the real place.
+    _trim = re.compile(r"(?i)\s*\b(?:featuring|is\s+a[n]?|the\s+\w+\s+category)\b.*$")
+    place = _trim.sub("", place).strip().strip(",").strip()
+    venue = _trim.sub("", venue).strip().strip(",").strip()
     if not venue:
         return None
     return (venue, place, category)
@@ -73,9 +105,10 @@ def _rebuild_header(venue: str, place: str, category: str) -> str:
     subject = venue
     if place:
         subject = f"{venue}, {place}"
-    cat = (category or "").strip()
+    cat = (category or "").strip().lower()
     if cat:
-        suffix = f" - {cat[:1].upper() + cat[1:]} Tour"
+        label = _CATEGORY_DISPLAY.get(cat, cat[:1].upper() + cat[1:])
+        suffix = f" - {label} Tour"
     else:
         suffix = ""
     return f"{CANONICAL_PREFIX} {subject}{suffix}"
