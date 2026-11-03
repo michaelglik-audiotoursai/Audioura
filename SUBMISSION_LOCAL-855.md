@@ -311,3 +311,144 @@ suites): **207 passed, 3 skipped (network)**.
   semantic defect scan.
 - `tests/test_local855b_fixes.py` (new) — 37 tests.
 - `submission_artifacts/local855b/` — both delivered texts + meter ledger.
+
+
+---
+
+# 855D — the second bounce: stop adding regexes; check sentences against a fact sheet, and fix the "Đ." address cut
+
+LEAD read `submission_artifacts/local855b/live_tour_7stops.txt` and found three
+defect classes still shipping. The headline is item 3: the fabrication was back
+in NEW wording ("a quiet homage to that mythic past", "those tumultuous weeks
+when the city's fate was being decided", "opened doors for acceptance",
+"The story passed down through the neighborhood", "played a critical role for
+many local artists"), which proves **regexes cannot win** — every phrasing the
+scrub learns, the narrator re-invents. Base: `subscribed` (70737c2a);
+`git merge-base --is-ancestor 70737c2a HEAD` exits 0 (the branch carried an older
+subscribed, so 70737c2a was merged in first).
+
+## 1 — Addresses cut at the abbreviation dot ("Address: 15 Đ.")
+
+"Đ." is Vietnamese for *Đường* (Street); "P." = Phường (Ward), "Q." = Quận
+(District), "TP." = Thành phố (City). The ONE shared splitter the whole pipeline
+uses, `sentence_split.split_sentences`, cut "15 Đ. Nguyễn Văn Tráng, …" into the
+stub "15 Đ." + "Nguyễn Văn Tráng, …": its abbreviation guard knew only English
+titles, and its single-initial rule matched only ASCII `[A-Z]`, never the
+Vietnamese "Đ". A later gate then kept/dropped one fragment and the stub shipped
+(the directions line "Start by cycling along Đ." is the same cut, echoed).
+
+- **Fixed at the splitter root** (`sentence_split.py`), so every one of the ~20
+  gates that calls it is fixed at once — NOT a new regex in a scrub. Added
+  `đ, p, q, tp, kp` (and `ave, blvd, rd, hwy`) to `_ABBREV`, and widened
+  `_TRAILING_TOKEN` to recognise the Vietnamese "Đ/đ" so the abbreviation lookup
+  can see it. Real sentence boundaries, English initials ("Isabella V."), and US
+  acronyms ("U.S. Army") are unaffected.
+- `tests/test_local855d_address_abbrev_dot.py` — 9 tests, incl. the ticket's
+  `"15 Đ. Nguyễn Văn Tráng, Phường Bến Thành, Quận 1"`. Commit `d64fb550`.
+
+## 2 — Walking words in a cycling tour
+
+The delivered cycling tour read "about a 19-minute walk", "about a minute's walk"
+and "the vibrant street life as you walk". The two distance phrases came from
+`walking_directions_guard._approx_distance_phrase`, which was transport-mode
+blind; the prose "walk" came from the narrator.
+
+- `_approx_distance_phrase(km, mode)` is now **mode-aware**: on a bike tour it
+  gives a distance (under ~400 m) or a **ride time** (~15 km/h), and NEVER says
+  "walk"; walking behaviour is unchanged. Mode is an explicit arg or detected
+  from the tour header ("… - Cycling Tour"), covering the container path.
+- **`transport_word_guard.py`** (new) — a deterministic every-path pass that
+  rewrites a pedestrian movement word in LLM prose ("walk"→"ride", "stroll"→
+  "ride", "on foot"→"by bike") on a wheeled tour; no-op on a walking tour; matches
+  whole words only, so "walkway/boardwalk/crosswalk" are untouched. Wired into
+  the finalize block right after the directions guard.
+- `tests/test_local855d_transport_words.py` — 14 tests. Commit `91cb90e2`.
+
+## 3 — Fabrication (the approach change): fact sheet + ONE cheap verification call
+
+The ticket's prescription, implemented in **`user_stop_verify.py`** (new):
+
+- **`build_fact_sheet(poi, location, outdoor_facts)`** — the KNOWN facts only:
+  resolved name, kind (Places type), address, district, the listener's examples,
+  the city, and any retrieved source that names the venue.
+- **`verify_user_stops_in_text(...)`** — ONE cheap **gpt-4.1-mini** call per tour,
+  ALL user stops **batched in a single JSON request** (temperature 0, seed 7,
+  `response_format=json_object`). It labels each body sentence **SUPPORTED** (by
+  the fact sheet), **SENSORY** (what to notice, no claim of fact), or
+  **UNSUPPORTED**. **UNSUPPORTED sentences are dropped**; if **fewer than 2**
+  survive, the body is replaced with the deterministic **`grounded_user_stop_body()`**.
+  Logs **`[LOCAL-855D] verify <stop> kept K dropped D`** per stop.
+- The existing regex scrub (`scrub_tour_text_user_stops`) stays as the cheap
+  **first pass**; **NO new fabrication regex is added** — the only regexes in the
+  new module are the structural "Stop N:" block parsers (the same grammar the
+  scrub already uses). A documented-monument kind (cathedral/basilica/palace/
+  museum/landmark/…) is skipped so its sourced dates survive; the trailing tour
+  conclusion absorbed into the last block is excluded from a stop's body.
+- **Added cost: ~$0.001 per tour** (live run: in=1433 out=273 tok → $0.00101),
+  well under the $0.005 budget.
+- Wired into `generate_tour_text` immediately after the 855B scrub, before return.
+- `tests/test_local855d_fact_sheet_verify.py` — 10 offline tests (the single call
+  mocked): fact sheet, UNSUPPORTED drop, <2→grounded, log format, cost<$0.005,
+  no-key no-op, structure preserved, documented-kind skip, conclusion exclusion.
+  Commit `0a88a445` (+ refinements in `c53202cd`).
+
+## 4 — Real inputs
+
+The exact cloud share links (orch `ef0cee57` / tour 525/523) are not reachable
+from this Mac-local worktree, and the task forbids reading/writing the live DB.
+Per the ticket's stated alternative, the live run uses **REAL Google Maps place
+URLs** for the District-1/3 venues, resolved through the **LOCAL-852 resolver**
+(`user_stop_input`). Each URL carries `/maps/place/<Name>/@<lat>,<lng>` and
+resolves **offline** (no paid API) to a real name + coordinate — which fixes the
+prior run's munged placeholder links (`https___share.google_z20B`) that geocoded
+"Longan" to a Fruit Cafe and "Rambutan" to a Boutique Hotel. Commit `4433674f`.
+
+## Live — budget enforced, PASS
+
+`run_local855d_live.py`: `TASK_BUDGET_ID=LOCAL-855D TASK_BUDGET_USD=0.40`, meter
+contract, OWN meter dir `_local855d_meterlogs` (D753 Mac-local no-mount escape
+hatch — never writes the shared/live DB, never touches the `audioura-*`
+containers), cheap env + `STORY_PASS_MODEL=gpt-4.1`, pool OFF.
+
+**RUN A — Sophia's 7-stop cycling tour** — `submission_artifacts/local855d/live_tour_7stops.txt`
+- 7/7 delivered (The Crazy street, Thi Bar Saigon, Rambutan, A Star is Born,
+  Longan, An Spa, Acoustic Bar);
+- title "Ho Chi Minh City, Vietnam - Cycling Tour";
+- **none of the eight quoted fabrications, or a paraphrase, appears** (checked
+  literally AND by re-running the scrub as a semantic class scan — clean);
+- **no "Đ." address stub**; **no walking words anywhere**; **each stop is about
+  its venue**.
+
+**RUN B — 3-stop with Notre-Dame** — `submission_artifacts/local855d/live_tour_notredame_3stops.txt`
+- Notre-Dame Cathedral Basilica of Saigon **keeps its sourced dates 1877 & 1880**
+  (1863–1880; the verifier skips a documented monument so it is not over-scrubbed).
+
+Metered **$0.041 / $0.40** (`submission_artifacts/local855d/meter_ledger.json`).
+The fact-sheet verification call added **$0.00101** on run B and a similar amount
+on run A — comfortably under the $0.005-per-tour target.
+
+## Tests
+
+```
+python3 -m pytest tests/test_local855d_address_abbrev_dot.py \
+  tests/test_local855d_transport_words.py \
+  tests/test_local855d_fact_sheet_verify.py -q          # 33 passed
+```
+Full related regression (855D + 855B + 855 + walking + splitter):
+**150 passed, 3 skipped (network)**.
+
+## Files changed (855D)
+- `sentence_split.py` — Vietnamese address abbreviations; Đ/đ trailing-token.
+- `walking_directions_guard.py` — mode-aware distance phrase; `_mode_from_text`.
+- `transport_word_guard.py` (new) — pedestrian-word rewrite on a wheeled tour.
+- `user_stop_verify.py` (new) — fact sheet + ONE batched gpt-4.1-mini verification
+  call; UNSUPPORTED drop; <2→grounded; documented-kind skip; cost report.
+- `generate_tour_text.py` — wired the transport-word guard and the fact-sheet
+  verify pass (after the 855B scrub).
+- `run_local855d_live.py` (new) — budget-enforced live proof + PASS checks.
+- `tests/test_local855d_{address_abbrev_dot,transport_words,fact_sheet_verify}.py`
+  (new) — 33 tests.
+- `submission_artifacts/local855d/` — both delivered texts + meter ledger.
+
+Commits: `d64fb550` (1), `91cb90e2` (2), `0a88a445` (3), `4433674f` (4),
+`c53202cd` (5).
