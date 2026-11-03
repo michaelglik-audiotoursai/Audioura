@@ -7,6 +7,7 @@ import 'dart:async';
 import '../screens/debug_log_viewer_screen.dart';
 import '../config/map_tiles.dart';
 import '../services/resilient_tile_provider.dart';
+import '../widgets/osm_attribution.dart';
 
 class TourPoi {
   final int index;
@@ -376,6 +377,8 @@ class _TourMapScreenState extends State<TourMapScreen> {
               ),
           ],
         ),
+        // [LOCAL-854] OSM attribution stays visible (tiles are OSM data).
+        const OsmAttribution(),
       ],
     );
   }
