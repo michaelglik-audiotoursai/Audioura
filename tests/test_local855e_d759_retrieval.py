@@ -177,7 +177,7 @@ class TestOrientation(unittest.TestCase):
     def test_orientation_city_fallback(self):
         o = usv._deterministic_orientation({"name": "An Spa"},
                                            "Ho Chi Minh City, Vietnam")
-        self.assertEqual(o, "Look for An Spa at Ho Chi Minh City.")
+        self.assertEqual(o, "Look for An Spa in Ho Chi Minh City.")
 
 
 if __name__ == "__main__":

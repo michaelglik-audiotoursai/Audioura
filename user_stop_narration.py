@@ -181,14 +181,14 @@ def grounded_user_stop_body(poi: Dict, location: str = "") -> str:
     else:
         if district:
             sentences.append(
-                f"{name} is the place the listener chose, here in {district}.")
+                f"{name} is one of the places you chose, here in {district}.")
         else:
             where = location.split(",")[0].strip() if location else ""
             if where:
                 sentences.append(
-                    f"{name} is the place the listener chose, here in {where}.")
+                    f"{name} is one of the places you chose, here in {where}.")
             else:
-                sentences.append(f"{name} is the place the listener chose.")
+                sentences.append(f"{name} is one of the places you chose.")
     # (2) What it offers — the listener's own examples, when present.
     if examples:
         ex = examples.rstrip(".")

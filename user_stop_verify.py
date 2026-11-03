@@ -754,14 +754,13 @@ def _deterministic_orientation(poi: Dict, location: str = "") -> str:
     name = (poi.get("name") or poi.get("title") or "").strip()
     if not name:
         return ""
-    where = ""
-    addr = (poi.get("address") or "").strip()
+    addr = (poi.get("address") or "").strip().rstrip(",").strip()
     if addr:
-        where = addr.rstrip(",").strip()
-    if not where:
-        where = (location or "").split(",")[0].strip()
-    if where:
-        return f"Look for {name} at {where}."
+        return f"Look for {name} at {addr}."
+    # [LEAD 855E review] a city is a place you are IN, not AT.
+    city = (location or "").split(",")[0].strip()
+    if city:
+        return f"Look for {name} in {city}."
     return f"Look for {name}."
 
 
