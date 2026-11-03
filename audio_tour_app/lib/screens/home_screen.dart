@@ -54,6 +54,7 @@ import '../widgets/reviews_section.dart';
 import '../widgets/price_badge.dart';
 import '../widgets/community_tour_chip.dart';
 import '../widgets/first_layout_tile_layer.dart';
+import '../widgets/osm_attribution.dart';
 import '../widgets/tour_buy_sheet.dart';
 import '../widgets/download_action_plan.dart';
 import '../services/tour_preview_player.dart';
@@ -4893,6 +4894,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
+                // [LOCAL-854] OSM attribution stays visible (tiles are OSM data).
+                const OsmAttribution(),
               ],
                 );
               },
