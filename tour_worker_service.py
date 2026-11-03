@@ -213,11 +213,18 @@ def get_coordinates_direct(location):
 
 # === Tour storage ===
 
-def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None):
+def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content=None, stops_count=None,
+                     is_test=None):
     """Store the audio tour ZIP in the database.
 
     LOCAL-50: Also persists zip_filename for deterministic resolution.
     LOCAL-190: Persist stops_count (was missing — root cause of zero-stop tours).
+    [LOCAL-856] ``is_test`` from the request takes precedence; the TOUR_TEST_MODE
+    env is only the fallback — the SAME precedence the orchestrator's
+    store_audio_tour uses (LOCAL-103). Before this the worker ignored the request
+    flag entirely and read only the env, so a Background/Cloud-Tasks tour
+    requested with is_test=true was stored is_test=false in production (where the
+    env is unset). None means "use the env default".
     """
     try:
         import psycopg2
@@ -248,6 +255,9 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
             print(f"[STORE] Updated existing tour: {tour_name} (id={existing[0]}, zip={zip_filename}, stops_count={stops_count})")
         else:
             _is_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
+            # [LOCAL-856] Request flag wins; env is only the fallback (LOCAL-103).
+            if is_test is not None:
+                _is_test_mode = bool(is_test)
             cur.execute("""
                 INSERT INTO audio_tours (tour_name, request_string, audio_tour, number_requested,
                     lat, lng, tour_content, content_language, zip_filename, is_test, stops_count)
@@ -300,7 +310,7 @@ def _read_job_status(job_id):
 
 
 def run_generation(job_id, location, tour_type, total_stops, user_id=None, request_string=None,
-                   language='en', stops=None):
+                   language='en', stops=None, is_test=None):
     """
     Execute the full tour generation pipeline synchronously.
     Updates job_status table with progress throughout.
@@ -476,7 +486,7 @@ def run_generation(job_id, location, tour_type, total_stops, user_id=None, reque
             except Exception:
                 pass
 
-        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=actual_stops)
+        store_success = store_audio_tour(tour_name, request_string or location, zip_path, lat, lng, tour_content, stops_count=actual_stops, is_test=is_test)
         if not store_success:
             raise Exception("Failed to store tour in database")
 
@@ -594,6 +604,10 @@ def run_job():
     user_id = data.get('user_id')
     request_string = data.get('request_string')
     language = data.get('language', 'en')
+    # [LOCAL-856] The orchestrator only puts is_test in the payload when it
+    # resolved to True under the LOCAL-103 trust boundary, so a truthy value here
+    # is already authorised. Absent → None → the worker's env default applies.
+    is_test = True if data.get('is_test') else None
 
     if not job_id or not location or not tour_type:
         return jsonify({"error": "job_id, location, and tour_type required"}), 400
@@ -611,7 +625,7 @@ def run_job():
         _job_stops = _neutralize_user_stops(
             data.get('stops'), request_id=job_id, field='stops')
         success = run_generation(job_id, location, tour_type, total_stops, user_id,
-                                 request_string, language, _job_stops)
+                                 request_string, language, _job_stops, is_test=is_test)
         if success:
             return jsonify({"status": "completed", "job_id": job_id}), 200
         else:
