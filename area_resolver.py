@@ -238,6 +238,32 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
         city_lat, city_lng = city_coords
     
     print(f"  [area_resolver] City resolved: {city} → {city_qid} ({city_lat:.4f}, {city_lng:.4f})")
+
+    # [LOCAL-852] CITY-PART fallback. When the whole request string did not resolve
+    # to a city and we are left with a COUNTRY ("Ho Chi Minh City, Vietnam" could
+    # reduce to city='Vietnam' when the leading segment is a tour name/phrase that
+    # does not geocode), the scope centre must be the CITY, never the country
+    # centroid (which lands a user's name-only stop ~hundreds of km off). Scan the
+    # ORIGINAL string's comma segments for the most specific segment that resolves
+    # to a non-country place and adopt it as the city.
+    if _is_country_type(city_qid):
+        _orig_parts = [p.strip() for p in (location_string or "").split(",")
+                       if p.strip()]
+        for _seg in _orig_parts:
+            if _seg.lower() == city.lower():
+                continue
+            try:
+                _seg_qid, _seg_coords = _resolve_city(_seg)
+            except Exception:
+                _seg_qid, _seg_coords = "", (0.0, 0.0)
+            if _seg_qid and not _is_country_type(_seg_qid):
+                print(f"  [LOCAL-852] scope was a country ({city!r}); using the "
+                      f"city part {_seg!r} → {_seg_qid} instead of the country "
+                      f"centroid")
+                city, city_qid, city_coords = _seg, _seg_qid, _seg_coords
+                city_lat, city_lng = city_coords
+                neighborhood = ""
+                break
     
     # Resolve neighborhood if present
     neighborhood_qid = ""

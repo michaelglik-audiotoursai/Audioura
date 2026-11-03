@@ -201,6 +201,16 @@ def _candidate_title(cand: Dict) -> str:
     return ""
 
 
+def _is_user_explicit_cand(cand: Dict) -> bool:
+    """[LOCAL-852] True when a candidate is a stop the listener chose by hand
+    (``user_explicit`` / ``_anchor``). A user's OWN stop is exempt from EVERY
+    category/provider guard — it may be a private place (a named bar, a spa) that
+    no classifier will recognise as on-category, and the listener asked for it by
+    name. Never dropped by a guard."""
+    return bool(isinstance(cand, dict)
+                and (cand.get("user_explicit") or cand.get("_anchor")))
+
+
 def candidate_matches_category(cand: Dict,
                                requested: Set[str]) -> Optional[bool]:
     """Does ``cand`` match the requested category set?
@@ -240,6 +250,10 @@ def filter_off_category(cands: List[Dict],
     kept: List[Dict] = []
     for cand in cands:
         title = _candidate_title(cand)
+        # [LOCAL-852] A user's own named stop is never dropped by a category guard.
+        if _is_user_explicit_cand(cand):
+            kept.append(cand)
+            continue
         # User's own named place is never dropped by the category guard.
         if anchor_keys and _fold(re.sub(r"\s*\([^)]*\)\s*", " ", title)) in anchor_keys:
             kept.append(cand)
@@ -398,6 +412,9 @@ def filter_off_category_business(
     skipped = 0
     for r in rows:
         title = _candidate_title(r)
+        if _is_user_explicit_cand(r):  # [LOCAL-852] user's own stop never skipped
+            kept.append(r)
+            continue
         if anchor_keys and _fold(re.sub(r"\s*\([^)]*\)\s*", " ", title)) in anchor_keys:
             kept.append(r)
             continue
@@ -578,7 +595,95 @@ _GENERIC_LANDMARK_WORDS = (
 )
 
 
-def requested_activity(request: str) -> Optional[Dict]:
+# ── [LOCAL-852] Guard misfire suppressors ────────────────────────────────────
+#
+# WHY (LEAD, GCloud_Storied_1, Michael's own request, gen 00027-6sb, tour 523):
+# "Sophia's biking tour in Ho Chi Minh City, Vietnam" was treated as an
+# ACTIVITY-PROVIDER request ("biking" is a known activity + the weak trigger
+# "tour") and the provider guard then dropped the listener's OWN forced stops and
+# refused every normal sight as "not a 'sophia s biking' provider". A person's
+# NAMED tour of a city, by a transport MODE, is not a request to find bike-rental
+# shops — it is a themed city tour. Two deterministic suppressors below stop the
+# misfire at the source (requested_activity returns None), so no downstream guard
+# ever fires on this shape.
+
+# Transport MODES the tour is taken BY — the manner of moving through the city,
+# never the business to find. "biking tour", "walking tour", "driving tour",
+# "boat tour", "cycling tour" are themed city tours, not provider requests.
+_TRANSPORT_MODE_WORDS = frozenset({
+    "walk", "walking", "stroll", "strolling", "wander", "wandering",
+    "hike", "hiking", "ramble", "rambling", "promenade", "saunter",
+    "bike", "biking", "bicycle", "bicycling", "cycle", "cycling", "pedal",
+    "drive", "driving", "motor", "motoring", "road",
+    "boat", "boating", "cruise", "cruising", "sail", "sailing", "ferry",
+    "kayak", "kayaking", "canoe", "canoeing", "paddle", "paddling",
+    "scooter", "moped", "motorbike", "motorcycle", "tuktuk", "tuk tuk",
+    "rickshaw", "cyclo", "segway", "skate", "skating", "run", "running",
+    "jog", "jogging", "horse", "horseback", "carriage", "train", "tram",
+    "bus", "metro", "subway",
+})
+
+# A possessive subject — "Sophia's … tour", "Michael's walking tour of …" — names
+# a PERSON'S tour (a themed personal tour), never a business to find.
+_PERSONS_TOUR_RE = re.compile(
+    r"^\s*[\w.\-]+(?:'s|’s|\bs)\s+.*\btour\b", re.IGNORECASE)
+
+
+def _is_persons_tour(text: str) -> bool:
+    """True when the request SUBJECT is a person's own tour ("X's … tour").
+
+    Matches a leading possessive token ("Sophia's", "Michael's", or the
+    accent-stripped "sophia s" the folder produces) followed by "tour" somewhere
+    in the subject. Deterministic, offline. A plain "walking tour of Rome" (no
+    possessor) is NOT a person's tour and is handled by the transport-mode check
+    instead."""
+    raw = str(text or "")
+    if _PERSONS_TOUR_RE.search(raw):
+        return True
+    # Folded form: "sophia s biking tour" — a short leading token, then a bare
+    # "s" standing in for the stripped apostrophe-s, then "... tour".
+    folded = _fold(raw)
+    m = re.match(r"^([a-z][a-z.\-]+)\s+s\s+.*\btour\b", folded)
+    if m:
+        # Guard against an ordinary word that merely ends a sentence with "s";
+        # require the leading token to look like a name/subject (not a connector).
+        lead = m.group(1)
+        if lead not in {"the", "a", "an", "this", "that", "our", "your", "his",
+                        "her", "its", "their", "city", "old", "new"}:
+            return True
+    return False
+
+
+def _is_transport_mode_tour(text: str) -> bool:
+    """True when the request is a themed city tour taken BY a transport mode
+    ("biking tour", "walking tour of District 1", "boat tour") rather than a
+    request to find a provider of that mode ("bike rental", "kayak hire").
+
+    A transport-mode tour pairs a MODE word (bike/walk/drive/boat/…) with the
+    word "tour"/"tours"; the provider triggers that matter (rental/hire/lessons/
+    school/instructor/course) are NOT present. Deterministic, offline."""
+    folded = _fold(text)
+    if not folded:
+        return False
+    toks = folded.split()
+    if "tour" not in toks and "tours" not in toks:
+        return False
+    has_mode = any(t in _TRANSPORT_MODE_WORDS for t in toks)
+    if not has_mode:
+        return False
+    # If a STRONG provider trigger is present ("bike rental", "kayak lessons"),
+    # it IS a provider request despite the mode word — do not suppress.
+    strong = {"rental", "rentals", "hire", "hires", "lesson", "lessons",
+              "class", "classes", "course", "courses", "school", "schools",
+              "instructor", "instructors", "instruction", "academy",
+              "academies", "rent"}
+    if any(t in strong for t in toks):
+        return False
+    return True
+
+
+def requested_activity(request: str,
+                       tour_type: Optional[str] = None) -> Optional[Dict]:
     """Detect an ACTIVITY-PROVIDER request and return what it asks for.
 
     Returns ``{"activity": <leading activity word>, "tokens": <synonym tokens>,
@@ -592,7 +697,22 @@ def requested_activity(request: str) -> Optional[Dict]:
     (falls back to the activity word itself for an activity not in the synonym
     table). A food request ("cooking classes") is still detected as a provider
     request but flagged ``is_food`` so the caller keeps food venues.
+
+    [LOCAL-852] The guard is ALSO a no-op (returns None) when the request is a
+    transport-MODE tour ("biking tour", "walking tour of District 1", "boat tour")
+    or a PERSON'S named tour ("Sophia's biking tour") — these are themed city
+    tours, not requests to find a bike-rental / kite-school provider. ``tour_type``
+    (the raw tour-type label, when the caller has it) is checked in ADDITION to the
+    request string, so "Sophia's biking tour" supplied as tour_type is caught even
+    when the request string the guard sees is just the city.
     """
+    # [LOCAL-852] Suppress the misfire at the source. A transport-mode tour or a
+    # person's named tour is NEVER an activity-provider request, whether the
+    # tell-tale words arrive in the request string or the tour_type label.
+    for _blob in (request, tour_type):
+        if _blob and (_is_transport_mode_tour(_blob) or _is_persons_tour(_blob)):
+            return None
+
     subj = _fold(_request_subject(request))
     if not subj:
         return None
@@ -983,6 +1103,9 @@ def filter_off_category_activity(
     dropped = 0
     for cand in cands:
         title = _candidate_title(cand)
+        if _is_user_explicit_cand(cand):  # [LOCAL-852] user's own stop never dropped
+            kept.append(cand)
+            continue
         if anchor_keys and _fold(re.sub(r"\s*\([^)]*\)\s*", " ", title)) in anchor_keys:
             kept.append(cand)
             continue

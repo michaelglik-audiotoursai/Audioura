@@ -663,11 +663,50 @@ def same_building(a: Dict, b: Dict) -> bool:
     #    a subset of the other.
     pa, pb = _stop_latlng(a), _stop_latlng(b)
     if pa and pb and _haversine_m(pa, pb) <= _SAME_BUILDING_METERS:
+        # [LOCAL-852] Two USER stops are the listener's OWN explicit choices — two
+        # different typed names are two different places, and a CENTROID COLLAPSE
+        # (both on the same city-centroid fallback) means "coordinates unknown",
+        # not "same building". Suppress the coords signal for a pair of
+        # user_explicit stops (the alias / located-in / QID signals above, which
+        # are TEXTUAL identity, still merge a genuine duplicate). Belt-and-braces:
+        # also suppress when either side carries a fallback/centroid coord marker.
+        _both_user = (_stop_is_user_explicit(a) and _stop_is_user_explicit(b))
+        _either_user = (_stop_is_user_explicit(a) or _stop_is_user_explicit(b))
+        _fallback = (_stop_has_fallback_coord(a) or _stop_has_fallback_coord(b))
+        if _both_user or (_either_user and _fallback):
+            return False
         ta = _name_tokens_no_building(a.get("name") or "")
         tb = _name_tokens_no_building(b.get("name") or "")
         if ta and tb and (ta & tb or ta <= tb or tb <= ta):
             return True
     return False
+
+
+def _stop_is_user_explicit(s: Dict) -> bool:
+    """[LOCAL-852] True when a stop is one the listener chose by hand."""
+    return bool(isinstance(s, dict)
+                and (s.get("user_explicit") or s.get("_anchor")))
+
+
+def _stop_has_fallback_coord(s: Dict) -> bool:
+    """[LOCAL-852] True when a stop's coordinate is a fallback/centroid (unknown
+    coordinate), not an independently resolved point. Mirrors
+    identity_dedup._is_fallback_coord_stop; kept local so this module stays
+    dependency-free."""
+    if not isinstance(s, dict):
+        return False
+    for k in ("_coord_fallback", "coord_is_fallback", "_centroid_fallback",
+              "centroid_fallback", "is_fallback_coord", "coord_fallback"):
+        if s.get(k):
+            return True
+    src = str(s.get("coord_source") or s.get("_coord_source")
+              or s.get("coordinate_source") or "").strip().lower()
+    if src in ("fallback", "centroid", "city_centroid", "area_centroid",
+               "scope_centroid", "scope_center", "unknown"):
+        return True
+    conf = str(s.get("coord_confidence") or s.get("_coord_confidence")
+               or "").strip().lower()
+    return conf in ("fallback", "centroid", "none", "unknown")
 
 
 def _merge_pref(primary: Dict, dup: Dict) -> Dict:

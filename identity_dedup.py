@@ -820,6 +820,35 @@ def _distinctive_tokens(name: str) -> Set[str]:
     return {t for t in folded if t not in _class_tokens and len(t) >= 2}
 
 
+def _is_fallback_coord_stop(cand: Dict) -> bool:
+    """[LOCAL-852] True when a stop's coordinate is a FALLBACK / centroid, not an
+    independently resolved point.
+
+    A centroid collapse (several stops stamped the SAME city/area centroid because
+    their real place could not be located) means "coordinates unknown", NOT "same
+    building". Two such stops are NOT the same place just because their fallback
+    points coincide. We recognise a fallback coord from any marker the pipeline
+    stamps: an explicit flag (``_coord_fallback`` / ``coord_is_fallback`` /
+    ``_centroid_fallback``), or a coordinate source/confidence that says so.
+    Deterministic, offline, never raises."""
+    if not isinstance(cand, dict):
+        return False
+    for k in ("_coord_fallback", "coord_is_fallback", "_centroid_fallback",
+              "centroid_fallback", "is_fallback_coord", "coord_fallback"):
+        if cand.get(k):
+            return True
+    src = str(cand.get("coord_source") or cand.get("_coord_source")
+              or cand.get("coordinate_source") or "").strip().lower()
+    if src in ("fallback", "centroid", "city_centroid", "area_centroid",
+               "scope_centroid", "scope_center", "unknown"):
+        return True
+    conf = str(cand.get("coord_confidence") or cand.get("_coord_confidence")
+               or "").strip().lower()
+    if conf in ("fallback", "centroid", "none", "unknown"):
+        return True
+    return False
+
+
 def dedupe_by_location_or_qid(
     poi_list: Sequence[Dict],
     radius_m: float = 60.0,
@@ -864,15 +893,32 @@ def dedupe_by_location_or_qid(
         folded_set = _fold_place_tokens(name)
         folded = " ".join(sorted(folded_set)) if folded_set else ""
         distinct = _distinctive_tokens(name)
+        # [LOCAL-852] a user's own stop on a fallback/centroid coordinate must
+        # never collapse into another on proximity alone.
+        user_explicit = bool(cand.get("user_explicit") or cand.get("_anchor"))
+        fallback_coord = _is_fallback_coord_stop(cand)
 
         match_idx = None
         for i, meta in enumerate(kept_meta):
+            # [LOCAL-852] Two USER stops are the listener's OWN explicit choices:
+            # if they typed two different names they are two different places,
+            # whatever their coordinates say — and four share-link/name stops that
+            # fell to the same city centroid (a CENTROID COLLAPSE, "coordinates
+            # unknown") must never collapse into one. So suppress the PROXIMITY
+            # rules (b and d) for a pair of user_explicit stops; QID (a) and
+            # TEXTUAL identity (c, e) still merge a genuine same-place duplicate
+            # the listener happened to name twice. Belt-and-braces: also suppress
+            # when either side is explicitly flagged a fallback/centroid coord.
+            _suppress_proximity = (
+                (user_explicit and meta.get("user_explicit"))
+                or ((user_explicit or meta.get("user_explicit"))
+                    and (fallback_coord or meta.get("fallback_coord"))))
             # (a) QID — strongest, language-agnostic.
             if qid and meta["qid"] and qid == meta["qid"]:
                 match_idx = i
                 break
             # (b) proximity — one building is one stop.
-            if coords and meta["coords"]:
+            if coords and meta["coords"] and not _suppress_proximity:
                 if _haversine_m(coords, meta["coords"]) <= radius_m:
                     match_idx = i
                     break
@@ -885,7 +931,7 @@ def dedupe_by_location_or_qid(
             # (d) [LOCAL-791 defect 11] near (<=150 m) AND >=1 shared distinctive
             #     token → same place (geocodes a little apart, shared proper core).
             if (coords and meta["coords"] and distinct and meta["distinct"]
-                    and (distinct & meta["distinct"])
+                    and (distinct & meta["distinct"]) and not _suppress_proximity
                     and _haversine_m(coords, meta["coords"]) <= near_radius_m):
                 match_idx = i
                 break
@@ -910,6 +956,8 @@ def dedupe_by_location_or_qid(
 
         kept.append(cand)
         kept_meta.append({"qid": qid, "coords": coords, "norm": norm,
-                          "folded": folded, "distinct": distinct})
+                          "folded": folded, "distinct": distinct,
+                          "user_explicit": user_explicit,
+                          "fallback_coord": fallback_coord})
 
     return kept, dropped
