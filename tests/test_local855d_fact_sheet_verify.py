@@ -64,6 +64,30 @@ def _fake_labels(label_map):
     return _fake
 
 
+def _fake_serp(name_to_snippets):
+    """[LOCAL-855E / D759] Return a serp_fn stand-in. For a query it yields a
+    result whose title/snippet NAMES the venue when the venue's name appears in
+    ``name_to_snippets`` — so the stop counts as HAVING a venue-naming snippet
+    and the SUPPORTED/SENSORY label path runs. A venue absent from the map gets
+    no venue-naming result (so it falls to the deterministic grounded body)."""
+    def _fake(query):
+        q = query.lower()
+        for name, snip in name_to_snippets.items():
+            if name.lower() in q:
+                return ([{"title": name, "url": "https://example.com",
+                          "snippet": snip}], 1.0)
+        return ([], 1.0)
+    return _fake
+
+
+# Venue-naming snippets for the two Sophia stops, so retrieval yields a fact
+# sheet and the label logic (not the no-snippet deterministic path) is exercised.
+_SOPHIA_SNIPPETS = {
+    "Longan": "Longan is a fruit café in District 1 serving fresh juices.",
+    "Acoustic Bar": "Acoustic Bar on Ngô Thời Nhiệm hosts live acoustic sets.",
+}
+
+
 class TestFactSheet(unittest.TestCase):
     def test_fact_sheet_has_known_fields_only(self):
         poi = {"name": "Longan", "type_specialty": "Fruit Cafe",
@@ -103,7 +127,7 @@ class TestVerifyDrops(unittest.TestCase):
         })
         out, rep = usv.verify_user_stops_in_text(
             SOPHIA, ["Longan", "Acoustic Bar"], "Ho Chi Minh City, Vietnam",
-            api_key="x")
+            api_key="x", serp_fn=_fake_serp(_SOPHIA_SNIPPETS))
         self.assertTrue(rep["ran"])
         # Fabrications gone.
         for bad in ["mythic past", "Hagimex", "not directly tied",
@@ -119,7 +143,7 @@ class TestVerifyDrops(unittest.TestCase):
         logs = []
         out, rep = usv.verify_user_stops_in_text(
             SOPHIA, ["Longan", "Acoustic Bar"], "Ho Chi Minh City, Vietnam",
-            api_key="x", log=logs.append)
+            api_key="x", log=logs.append, serp_fn=_fake_serp(_SOPHIA_SNIPPETS))
         longan = next(s for s in rep["stops"] if s["stop"] == "Longan")
         self.assertTrue(longan["grounded"], rep["stops"])
         # Grounded body names the venue + kind, carries no fabrication.
@@ -135,20 +159,24 @@ class TestVerifyDrops(unittest.TestCase):
         logs = []
         usv.verify_user_stops_in_text(
             SOPHIA, ["Longan", "Acoustic Bar"], "Ho Chi Minh City",
-            api_key="x", log=logs.append)
+            api_key="x", log=logs.append, serp_fn=_fake_serp(_SOPHIA_SNIPPETS))
         self.assertTrue(any("[LOCAL-855D] verify Longan kept 2 dropped 2" in m
                             for m in logs), logs)
 
     def test_cost_is_reported_and_cheap(self):
         usv._call_openai = _fake_labels({0: {0: "SENSORY"}, 1: {0: "SENSORY"}})
         _, rep = usv.verify_user_stops_in_text(
-            SOPHIA, ["Longan", "Acoustic Bar"], "Ho Chi Minh City", api_key="x")
+            SOPHIA, ["Longan", "Acoustic Bar"], "Ho Chi Minh City", api_key="x",
+            serp_fn=_fake_serp(_SOPHIA_SNIPPETS))
         self.assertGreater(rep["cost_usd"], 0.0)
         self.assertLess(rep["cost_usd"], 0.005, rep)
 
     def test_no_api_key_leaves_text_unchanged(self):
+        # With retrieve=False and no key, the verifier makes no network call and
+        # leaves the regex-scrubbed text untouched (the D759 deterministic
+        # no-snippet path is covered separately in TestD759Retrieval).
         out, rep = usv.verify_user_stops_in_text(
-            SOPHIA, ["Longan"], "Ho Chi Minh City", api_key="")
+            SOPHIA, ["Longan"], "Ho Chi Minh City", api_key="", retrieve=False)
         self.assertFalse(rep["ran"])
         self.assertEqual(out, SOPHIA)
 
@@ -158,7 +186,8 @@ class TestVerifyDrops(unittest.TestCase):
             1: {0: "SENSORY", 1: "SUPPORTED", 2: "UNSUPPORTED"},
         })
         out, _ = usv.verify_user_stops_in_text(
-            SOPHIA, ["Longan", "Acoustic Bar"], "Ho Chi Minh City", api_key="x")
+            SOPHIA, ["Longan", "Acoustic Bar"], "Ho Chi Minh City", api_key="x",
+            serp_fn=_fake_serp(_SOPHIA_SNIPPETS))
         # Field lines and directions untouched.
         self.assertIn("Address: 8 Đ. Lê Lợi, Phường Bến Thành, Quận 1", out)
         self.assertIn("Coordinates: 10.7791, 106.6996", out)
@@ -192,7 +221,7 @@ class TestDocumentedKindAndConclusion(unittest.TestCase):
         logs = []
         out, rep = usv.verify_user_stops_in_text(
             tour, ["Notre-Dame Cathedral Basilica of Saigon"], "Saigon",
-            api_key="x", log=logs.append)
+            api_key="x", log=logs.append, retrieve=False)
         self.assertIn("1863 and 1880", out, "monument date was over-scrubbed")
         self.assertTrue(any("skipped (documented monument" in m for m in logs), logs)
 
@@ -210,7 +239,8 @@ class TestDocumentedKindAndConclusion(unittest.TestCase):
             "That's 1 stop in all.\n\n")
         usv._call_openai = _fake_labels({0: {0: "SENSORY"}})
         out, rep = usv.verify_user_stops_in_text(
-            tour, ["Acoustic Bar"], "Ho Chi Minh City", api_key="x")
+            tour, ["Acoustic Bar"], "Ho Chi Minh City", api_key="x",
+            serp_fn=_fake_serp({"Acoustic Bar": "Acoustic Bar hosts live sets."}))
         ab = next(s for s in rep["stops"] if s["stop"] == "Acoustic Bar")
         # Only 1 body sentence (conclusion excluded) -> grounded body.
         self.assertTrue(ab["grounded"], rep["stops"])

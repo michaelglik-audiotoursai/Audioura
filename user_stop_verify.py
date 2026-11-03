@@ -152,6 +152,150 @@ def _fact_sheet_text(facts: dict) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-855E item 3 / D759] RETRIEVAL — one Serper search per user stop
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# The second bounce proved the narrator invents a fresh phrasing faster than a
+# regex (or even the verifier) can learn it, because the verifier was judging
+# against a fact sheet that had NOTHING retrieved about the venue — so a plausible
+# invention ("played a critical role for many local artists") had nothing to
+# contradict it and slipped through as SENSORY/atmosphere. D759's fix is to give
+# the fact sheet REAL retrieved material: ONE Serper query per user stop,
+# "<name>" <district or city>, keeping only the snippets that actually NAME the
+# venue. The narrator and the verifier then have a concrete source to judge
+# against (SUPPORTED), and a stop with no venue-naming snippet is written ONLY
+# from the deterministic grounded body — no LLM invention at all.
+
+_GENERIC_NAME_TOKENS = {
+    "the", "a", "an", "and", "of", "bar", "spa", "cafe", "café", "restaurant",
+    "club", "lounge", "shop", "store", "street", "saigon", "city", "house",
+    "pub", "venue", "studio", "salon", "market", "star", "is", "born",
+}
+
+# Venue-kind words whose presence in a snippet corroborates that it is about an
+# actual VENUE (not a coincidental word match or a same-named film/song).
+_VENUE_KIND_SIGNAL = {
+    "bar", "pub", "club", "lounge", "restaurant", "cafe", "café", "bistro",
+    "spa", "salon", "massage", "wellness", "karaoke", "nightclub", "brewery",
+    "shop", "store", "boutique", "gallery", "bakery", "teahouse", "hotel",
+    "hostel", "venue", "eatery", "diner", "coffee", "street", "market",
+}
+
+
+def _name_tokens(name: str) -> list:
+    """Distinctive folded tokens of a venue name (drop generic/kind words). Used
+    to decide whether a snippet actually NAMES the venue."""
+    toks = []
+    for w in _fold(name).split():
+        if len(w) >= 3 and w not in _GENERIC_NAME_TOKENS:
+            toks.append(w)
+    return toks
+
+
+def _snippet_names_venue(name, title, snippet, poi=None, location=""):
+    """True when a Serper result (title + snippet) is about THIS venue — not a
+    coincidental word match and not a same-named film/song/other entity.
+
+    The venue NAME must appear as a contiguous folded phrase (so "acoustic
+    guitar tuning" does not match "Acoustic Bar"). When the name has NO
+    distinctive token beyond generic/kind words (e.g. "A Star is Born", whose
+    phrase collides with the 2018 film), a corroborating VENUE signal is also
+    required: a venue-kind word, the district, or the city in the same snippet —
+    a plain film-plot snippet carries none and is rejected."""
+    hay = _fold(f"{title} {snippet}")
+    if not hay:
+        return False
+    full = _fold(name)
+    name_in = bool(full and full in hay)
+    toks = _name_tokens(name)
+    # Require the full name phrase, OR (for a multi-distinctive-token name) all of
+    # its distinctive tokens present — but NEVER a single common token alone.
+    if not name_in:
+        if len(toks) >= 2 and all(t in hay for t in toks):
+            name_in = True
+        else:
+            return False
+    # The name phrase is present. If the name is distinctive (>= 1 distinctive
+    # token), that is enough. If it is a common phrase (no distinctive token),
+    # demand a corroborating venue signal so a same-named film/song is excluded.
+    if toks:
+        return True
+    kind_words = set()
+    if poi:
+        kind_words = {w for w in _fold(poi.get("type_specialty") or "").split()}
+    corroborators = set()
+    corroborators |= _VENUE_KIND_SIGNAL
+    corroborators |= kind_words
+    # locality tokens (district / city)
+    for src in (location or "", (poi or {}).get("address") or ""):
+        for w in _fold(src).split():
+            if len(w) >= 3:
+                corroborators.add(w)
+    hay_tokens = set(hay.split())
+    return bool(hay_tokens & corroborators)
+
+
+def _build_stop_query(name: str, poi: dict, location: str) -> str:
+    """D759: '"<name>" <district or city>'. Prefer a District/Quận fragment from
+    the stop's address, else the city from `location`."""
+    district = ""
+    addr = (poi.get("address") or "").strip()
+    if addr:
+        for p in (x.strip() for x in addr.split(",")):
+            if re.search(r"(?i)\b(?:district|qu[ậa]n)\b", p):
+                district = p
+                break
+    where = district or (location or "").split(",")[0].strip()
+    name = (name or "").strip()
+    return f'"{name}" {where}'.strip()
+
+
+def retrieve_user_stop_snippets(name, poi, location, serp_fn=None, log=None,
+                                max_snippets: int = 5):
+    """[D759 (a)] Run ONE Serper query for a user stop and return the snippets
+    that NAME the venue, plus the query string. Returns ``(snippets, query,
+    n_queries)``.
+
+    ``serp_fn(query) -> ([{title,url,snippet}], latency)`` is injected so tests
+    run offline; the default uses the project's metered Serper caller
+    (``work_story_searcher._serp_search`` — $0.001/query, one paid_api_calls row).
+    A failure degrades to no snippets (never raises), so a stop with no retrieval
+    falls to the deterministic grounded body."""
+    query = _build_stop_query(name, poi, location)
+    if serp_fn is None:
+        try:
+            from work_story_searcher import _serp_search as serp_fn
+        except Exception:
+            serp_fn = None
+    if serp_fn is None:
+        return [], query, 0
+    try:
+        results, _lat = serp_fn(query)
+    except Exception as _e:
+        if log:
+            log(f"[LOCAL-855E] serper query failed for {name!r}: {_e}")
+        return [], query, 1
+    results = results or []
+    kept = []
+    for r in results:
+        if not isinstance(r, dict):
+            continue
+        title = r.get("title", "") or ""
+        snippet = r.get("snippet", "") or ""
+        if _snippet_names_venue(name, title, snippet, poi=poi,
+                                location=location):
+            text = snippet.strip() or title.strip()
+            if text and text not in kept:
+                kept.append(text[:400])
+        if len(kept) >= max_snippets:
+            break
+    if log:
+        log(f"[LOCAL-855E] serper {name!r} q={query!r} -> "
+            f"{len(kept)}/{len(results)} venue-naming snippet(s)")
+    return kept, query, 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # The single batched verification call
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -164,21 +308,37 @@ _SYSTEM = (
     "(the venue's name, kind, address/district, listed offerings, or a listed "
     "source). Naming the venue, its kind, its district or its listed offerings "
     "is SUPPORTED.\n"
-    "  SENSORY    — a present-tense observation of what a visitor sees, hears, "
-    "smells or notices on arriving, making NO claim of fact about history, "
-    "people, events, dates, firsts, legends, or significance. Atmosphere is "
-    "SENSORY.\n"
-    "  UNSUPPORTED — any factual claim the fact sheet does not support: a date "
-    "or founding year, a named person or performer, a historical event, a "
-    "'first/pioneering/turning-point' claim, a legend or myth, a story 'passed "
-    "down' or 'among regulars', a tie to a company/artwork/figure, regional or "
-    "national history, or a significance/role claim ('played a critical role', "
-    "'opened doors', 'set a precedent'). If a sentence mixes a sensory clause "
-    "with an unsupported claim, label it UNSUPPORTED. A sentence that refers "
-    "back to a person, group, event or past that no SUPPORTED or SENSORY "
-    "sentence of the same stop introduces ('His playing…', 'those earlier "
-    "networks', 'that mythic past') is UNSUPPORTED.\n\n"
-    "Judge meaning, not wording. Return ONLY JSON of the exact shape:\n"
+    "  SENSORY    — a GENERIC, present-tense observation true of ANY venue of "
+    "this kind, naming NO specific object, decor, smell, sound source or "
+    "geography. Allowed: 'music carries from the stage', 'the room is warmly "
+    "lit', 'conversation and clinking glasses fill the air'. A sentence is "
+    "SENSORY ONLY if you could move it to any other venue of the same kind "
+    "without it becoming false.\n"
+    "  UNSUPPORTED — any factual claim the fact sheet does not support, AND any "
+    "sensory-sounding sentence that invents a SPECIFIC detail the fact sheet "
+    "does not list. In particular, label UNSUPPORTED:\n"
+    "    * a specific OBJECT or DECOR not in the fact sheet — 'the harp from the "
+    "first room', 'a corner altar', 'vintage film posters', 'a soft wooden sign "
+    "carved with Vietnamese characters', 'frosted glass panels', 'bamboo "
+    "accents';\n"
+    "    * a specific SMELL/TASTE not in the fact sheet — 'the scent of "
+    "caramelized sugar', 'brewing coffee', 'incense';\n"
+    "    * any GEOGRAPHY not in the fact sheet — a sea, coast, ocean, beach, "
+    "harbor, river, mountain, a named street/landmark, a direction or distance "
+    "('the coastal breeze', 'meets the South China Sea', 'a hundred kilometers "
+    "southeast', 'steps from Lam Sơn Square');\n"
+    "    * a date or founding year, a named person or performer, a historical "
+    "event, a 'first/pioneering/turning-point' claim, a legend or myth, a story "
+    "'passed down' or 'among regulars', a tie to a company/artwork/figure, "
+    "regional or national history, a significance/role claim ('played a "
+    "critical role', 'opened doors', 'set a precedent').\n"
+    "If a sentence mixes a generic sensory clause with ANY specific invented "
+    "object/decor/smell/geography or any unsupported claim, label it "
+    "UNSUPPORTED. A sentence that refers back to a person, group, event or past "
+    "that no SUPPORTED sentence of the same stop introduces ('His playing…', "
+    "'those earlier networks', 'that mythic past') is UNSUPPORTED.\n\n"
+    "Judge meaning, not wording. When in doubt between SENSORY and UNSUPPORTED, "
+    "choose UNSUPPORTED. Return ONLY JSON of the exact shape:\n"
     '{"stops":[{"id":<int>,"labels":[{"i":<int>,"label":"SUPPORTED|SENSORY|'
     'UNSUPPORTED"}]}]}'
 )
@@ -273,28 +433,39 @@ def verify_user_stops_in_text(
         tour_text: str, user_titles: List[str], location: str = "",
         api_key: str = None, model: str = None, log=None,
         outdoor_facts_by_title: Optional[Dict[str, list]] = None,
+        serp_fn=None, retrieve: bool = True,
         ) -> Tuple[str, dict]:
     """Fact-sheet verify every USER stop in an assembled tour text with ONE cheap
-    batched gpt-4.1-mini call.
+    batched gpt-4.1-mini call, after ONE Serper retrieval per user stop (D759).
 
-    For each user stop: build the fact sheet, number its body sentences, and send
-    them all in a single JSON request. Drop every sentence the model labels
-    UNSUPPORTED. If fewer than 2 sentences survive across the stop, replace the
-    stop's narration with ``grounded_user_stop_body()``. Logs
-    ``[LOCAL-855D] verify <stop> kept K dropped D`` per stop.
+    For each user stop (D759): run ONE Serper query, "<name>" <district or city>,
+    and keep only the snippets that NAME the venue — those become the fact
+    sheet's retrieved sources. Then number its body sentences and send them all
+    in a single JSON request. The model labels each SUPPORTED / SENSORY /
+    UNSUPPORTED against the fact sheet; drop every UNSUPPORTED sentence. SENSORY
+    is allowed only when generic to the venue kind (no specific object, decor,
+    smell or geography). A stop with NO venue-naming snippet is written ONLY from
+    the deterministic ``grounded_user_stop_body()`` plus a deterministic
+    orientation ("Look for <name>…") — no LLM body is kept at all. If fewer than
+    2 sentences survive a verified stop, it also falls to the grounded body.
 
     Returns ``(new_text, report)`` where report carries::
         {'ran': bool, 'model': str, 'input_tokens', 'output_tokens', 'cost_usd',
-         'stops': [{'stop','kept','dropped','grounded'}], 'dropped_total'}
+         'serper_queries', 'serper_cost_usd', 'queries': [..],
+         'stops': [{'stop','kept','dropped','grounded','snippets'}],
+         'dropped_total'}
 
-    The call is skipped (ran=False, cost 0) when there are no user stops, no
-    api_key, or requests is unavailable — the delivered text is returned
-    unchanged and the earlier regex scrub stands as the first pass.
+    ``serp_fn(query)->([{title,url,snippet}],latency)`` is injected for offline
+    tests; the default uses the project's metered Serper caller. Retrieval is
+    skipped when ``retrieve=False``. The verification call is skipped (ran=False)
+    when there are no user stops, no api_key, or requests is unavailable — the
+    delivered text is returned unchanged and the regex scrub stands as first pass.
     """
     model = model or _MODEL_DEFAULT
     report = {"ran": False, "model": model, "input_tokens": 0,
               "output_tokens": 0, "cost_usd": 0.0, "stops": [],
-              "dropped_total": 0}
+              "dropped_total": 0, "serper_queries": 0, "serper_cost_usd": 0.0,
+              "queries": []}
     if not tour_text or not tour_text.strip() or not user_titles:
         return tour_text or "", report
     folded = _folded_titles(user_titles)
@@ -353,6 +524,25 @@ def verify_user_stops_in_text(
                     f"kind — sourced dates kept)")
             continue
 
+        # [LOCAL-855E item 3 / D759 (a)] ONE Serper query per user stop; keep only
+        # venue-naming snippets and fold them into the fact sheet so the verifier
+        # has a concrete source to judge SUPPORTED against. A documented monument
+        # (skipped above) never reaches here, so no Serper spend on Notre-Dame.
+        _venue_snippets = []
+        if retrieve and not odf:
+            try:
+                _venue_snippets, _q, _nq = retrieve_user_stop_snippets(
+                    title, poi, location, serp_fn=serp_fn, log=log)
+                report["serper_queries"] += _nq
+                if _q:
+                    report["queries"].append(_q)
+                if _venue_snippets:
+                    existing = list(facts.get("retrieved_sources", []) or [])
+                    facts["retrieved_sources"] = (existing + _venue_snippets)[:8]
+            except Exception as _rerr:
+                if log:
+                    log(f"[LOCAL-855E] retrieval skipped for {title!r}: {_rerr}")
+
         # Number sentences across all body paragraphs of the stop, keeping a map
         # back to (block-line-index, is_orientation, sentence-within-paragraph).
         sentences = []
@@ -373,7 +563,16 @@ def verify_user_stops_in_text(
         stop_meta.append({"id": sid, "name": title, "poi": poi, "start": start,
                           "end": end, "sent_map": sent_map,
                           "para_sent_counts": para_sent_counts,
-                          "sentences": sentences})
+                          "sentences": sentences,
+                          "has_snippets": bool(_venue_snippets or odf
+                                               or not retrieve)})
+
+    # [LOCAL-855E item 3 / D759] Serper spend for this tour: one query per stop.
+    try:
+        from cost_rates import SERPER_COST_PER_QUERY as _spq
+    except Exception:
+        _spq = 0.001
+    report["serper_cost_usd"] = round(report["serper_queries"] * float(_spq), 6)
 
     if not batch:
         return tour_text, report
@@ -391,12 +590,31 @@ def verify_user_stops_in_text(
     except Exception:
         report["cost_usd"] = round(in_tok / 1e6 * 0.40 + out_tok / 1e6 * 1.60, 6)
     if parsed is None:
-        # The call did not run / failed — leave the text as the regex scrub left
-        # it (first pass stands). ran stays False.
+        # The verify call did not run / failed. The regex first pass stands for
+        # stops WITH snippets, but D759 (c) is deterministic and must still apply:
+        # a stop with NO venue-naming snippet is rewritten to the grounded body +
+        # orientation regardless of the model, so no invented SENSORY detail can
+        # ship just because the model was unavailable.
+        _det_applied = 0
+        for meta in stop_meta:
+            if meta.get("has_snippets"):
+                continue
+            grounded = (grounded_user_stop_body(meta["poi"], location) or "").strip()
+            orientation = _deterministic_orientation(meta["poi"], location)
+            if grounded or orientation:
+                _apply_grounded_with_orientation(lines, meta, grounded, orientation)
+                dropped_n = len(meta["sentences"])
+                report["dropped_total"] += dropped_n
+                report["stops"].append({"stop": meta["name"], "kept": 0,
+                                        "dropped": dropped_n, "grounded": True,
+                                        "snippets": 0})
+                _det_applied += 1
         if log:
             log("[LOCAL-855D] verify call did not run (no key / error) — "
-                "regex first pass stands")
-        return tour_text, report
+                "regex first pass stands; "
+                f"[LOCAL-855E] {_det_applied} no-snippet stop(s) -> deterministic "
+                "grounded body")
+        return ("\n".join(lines) if _det_applied else tour_text), report
     report["ran"] = True
 
     # 3) Index labels: {stop_id: {sentence_index: label}}.
@@ -414,12 +632,36 @@ def verify_user_stops_in_text(
                 continue
         labels_by_stop[sid] = lab
 
-    # 4) Apply: drop UNSUPPORTED; if <2 survive -> grounded body.
+    # 4) Apply: D759 — a stop with NO venue-naming snippet is written ONLY from
+    #    the deterministic grounded body + a deterministic orientation (no LLM
+    #    body kept). A stop WITH snippets keeps its SUPPORTED/SENSORY sentences;
+    #    drop UNSUPPORTED; if <2 survive, fall to the grounded body.
     for meta in stop_meta:
         sid = meta["id"]
         name = meta["name"]
         lab = labels_by_stop.get(sid, {})
         sentences = meta["sentences"]
+
+        # [LOCAL-855E item 3 / D759 (c)] No retrieved source NAMES this venue:
+        # take no LLM body at all. The stop is the deterministic grounded body
+        # plus a deterministic orientation — nothing the model wrote survives, so
+        # there is no SENSORY/atmosphere invention (no sea, harp, altar, poster).
+        if not meta.get("has_snippets"):
+            grounded = (grounded_user_stop_body(meta["poi"], location) or "").strip()
+            orientation = _deterministic_orientation(meta["poi"], location)
+            if grounded or orientation:
+                _apply_grounded_with_orientation(lines, meta, grounded, orientation)
+                dropped_n = len(sentences)
+                report["stops"].append({"stop": name, "kept": 0,
+                                        "dropped": dropped_n, "grounded": True,
+                                        "snippets": 0})
+                report["dropped_total"] += dropped_n
+                if log:
+                    log(f"[LOCAL-855E] verify {name}: no venue-naming snippet — "
+                        f"deterministic grounded body + orientation (dropped "
+                        f"{dropped_n} LLM sentence(s))")
+                continue
+
         # A sentence with no returned label is KEPT (conservative — the model
         # only removes what it positively calls UNSUPPORTED).
         keep_flags = [lab.get(i, "SUPPORTED") != "UNSUPPORTED"
@@ -434,7 +676,8 @@ def verify_user_stops_in_text(
             if grounded:
                 _apply_grounded(lines, meta, grounded)
                 report["stops"].append({"stop": name, "kept": kept_n,
-                                        "dropped": dropped_n, "grounded": True})
+                                        "dropped": dropped_n, "grounded": True,
+                                        "snippets": 1})
                 report["dropped_total"] += dropped_n
                 if log:
                     log(f"[LOCAL-855D] verify {name} kept {kept_n} dropped "
@@ -442,7 +685,8 @@ def verify_user_stops_in_text(
                 continue
             # No grounded body possible: keep as-is (never empty).
             report["stops"].append({"stop": name, "kept": len(sentences),
-                                    "dropped": 0, "grounded": False})
+                                    "dropped": 0, "grounded": False,
+                                    "snippets": 1})
             if log:
                 log(f"[LOCAL-855D] verify {name} kept {len(sentences)} dropped 0 "
                     f"(no grounded fallback; left unchanged)")
@@ -451,12 +695,32 @@ def verify_user_stops_in_text(
         # Rewrite each body paragraph keeping only its non-UNSUPPORTED sentences.
         _apply_drops(lines, meta, keep_flags)
         report["stops"].append({"stop": name, "kept": kept_n,
-                                "dropped": dropped_n, "grounded": False})
+                                "dropped": dropped_n, "grounded": False,
+                                "snippets": 1})
         report["dropped_total"] += dropped_n
         if log:
             log(f"[LOCAL-855D] verify {name} kept {kept_n} dropped {dropped_n}")
 
     return "\n".join(lines), report
+
+
+def _deterministic_orientation(poi: Dict, location: str = "") -> str:
+    """[LOCAL-855E item 3 / D759 (c)] A deterministic orientation for a user stop
+    with no retrieved source: "Look for <name> at <address/district/city>." No
+    invented object, decor, smell or geography — only the listener's own name and
+    a place fragment that is already on the fact sheet."""
+    name = (poi.get("name") or poi.get("title") or "").strip()
+    if not name:
+        return ""
+    where = ""
+    addr = (poi.get("address") or "").strip()
+    if addr:
+        where = addr.rstrip(",").strip()
+    if not where:
+        where = (location or "").split(",")[0].strip()
+    if where:
+        return f"Look for {name} at {where}."
+    return f"Look for {name}."
 
 
 def _apply_drops(lines: List[str], meta: dict, keep_flags: List[bool]):
@@ -497,3 +761,40 @@ def _apply_grounded(lines: List[str], meta: dict, grounded: str):
             first = False
         else:
             lines[abs_idx] = ""
+
+
+def _apply_grounded_with_orientation(lines: List[str], meta: dict,
+                                     grounded: str, orientation: str):
+    """[LOCAL-855E item 3 / D759 (c)] Write the stop as the deterministic
+    orientation + grounded body only. The orientation goes on the Orientation
+    line when the block has one (else it is prepended to the grounded body on the
+    first paragraph); the grounded body fills the first non-orientation
+    paragraph; all other body paragraphs are blanked. No model sentence survives.
+    """
+    keys = sorted(meta["para_sent_counts"].keys())
+    orientation_written = False
+    body_written = False
+    for abs_idx in keys:
+        is_or, _ss = meta["para_sent_counts"][abs_idx]
+        if is_or:
+            label = lines[abs_idx].split(":", 1)[0]
+            lines[abs_idx] = (f"{label}: {orientation}".rstrip()
+                              if orientation else f"{label}:")
+            orientation_written = bool(orientation)
+        elif not body_written:
+            if orientation and not orientation_written:
+                lines[abs_idx] = f"{orientation} {grounded}".strip()
+                orientation_written = True
+            else:
+                lines[abs_idx] = grounded
+            body_written = True
+        else:
+            lines[abs_idx] = ""
+    # If there was an Orientation line but no separate body paragraph to hold the
+    # grounded body, append the grounded body to the orientation line.
+    if grounded and not body_written and orientation_written:
+        for abs_idx in keys:
+            is_or, _ss = meta["para_sent_counts"][abs_idx]
+            if is_or:
+                lines[abs_idx] = f"{lines[abs_idx]} {grounded}".strip()
+                break

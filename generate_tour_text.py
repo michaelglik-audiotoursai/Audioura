@@ -22851,6 +22851,16 @@ your uncertainty markers and weave them into the storytelling naturally.
         _hedge_nm_applies = tour_category != 'museum' and (
             tour_category != 'walking' or not poi.get('verified', True)
         )
+        # [LOCAL-855E item 3] NEVER apply the HEDGE-NM block to a user-chosen stop.
+        # Its "storytelling framing" examples ("The story passed down through the
+        # neighborhood is that…", "One account — perhaps embellished over the
+        # years — describes…") literally invite the invented-anecdote class the
+        # user-stop path exists to prevent (and that LEAD caught shipping). A user
+        # stop is bound by user_stop_subject_block and verified against a
+        # retrieved fact sheet (D759) instead.
+        if _hedge_nm_applies and (poi.get('user_explicit') or poi.get('_anchor')
+                                  or _is_user_stop_title(poi_name)):
+            _hedge_nm_applies = False
         if _hedge_nm_applies:
             description_prompt += """
 NARRATIVE HONESTY — UNVERIFIED CLAIMS: No independent fact-checking has been performed on
@@ -33048,6 +33058,14 @@ RULES:
             complete_tour, _usv_rep = _usv855d.verify_user_stops_in_text(
                 complete_tour, _us_titles_855d, location,
                 api_key=api_key, log=print)
+            # [LOCAL-855E item 3 / D759] Report Serper retrieval per tour (one
+            # query per user stop; venue-naming snippets fold into the fact sheet).
+            _sq = _usv_rep.get("serper_queries", 0)
+            if _sq:
+                print(f"  [LOCAL-855E] Serper retrieval: {_sq} quer"
+                      f"{'y' if _sq == 1 else 'ies'} "
+                      f"(${_usv_rep.get('serper_cost_usd', 0.0):.4f}); queries="
+                      f"{_usv_rep.get('queries', [])}")
             if _usv_rep.get("ran"):
                 print(f"  [LOCAL-855D] fact-sheet verify: dropped "
                       f"{_usv_rep.get('dropped_total', 0)} UNSUPPORTED sentence(s) "
