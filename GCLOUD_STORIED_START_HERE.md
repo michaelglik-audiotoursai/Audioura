@@ -13,7 +13,9 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
-# ▶️ WAVE 21 — 2026-10-31 22:08 EDT (wdvrdazanw) — CURRENT gen **00027-6sb** (9ead5b87, 1Gi; LOCAL-851 museums $0 Gemini). Rollback 00026-cnb. Proof 519 Reina Sofía 5/5 fresh, $0.338, Gemini $0, peak RSS 221.5 MiB; hidden. audio_tours 411.
+# ▶️ WAVE 22 — 2026-11-03 08:52 EST (wdvrdazbfj) — CURRENT gen **00028-8s8** (24671e41, 1Gi; LOCAL-852 user stops safe). Rollback 00027-6sb. Sophia re-run = tour **525**, 7/7, $0.157, **left VISIBLE for Michael** (test user USER-1073427300). Android **91** (2.4.42) at C:dev-wtab91 for Michael to upload. Cloud shared_tours lacks audio_tour_id, so share codes 404. Next: LOCAL-855 (text quality).
+
+# ▶️ WAVE 21 — 2026-10-31 22:08 EDT (wdvrdazanw): gen **00027-6sb** (9ead5b87, 1Gi; LOCAL-851 museums $0 Gemini). Rollback 00026-cnb. Proof 519 Reina Sofía 5/5 fresh, $0.338, Gemini $0, peak RSS 221.5 MiB; hidden. audio_tours 411.
 
 # ▶️ WAVE 20 — 2026-10-31 03:18 EDT (wdvrdazag4): gen **00026-cnb** (957be93f, 1Gi; LOCAL-850 venue resolution + LOCAL-849). Rollback 00025-nxb. Proofs 516 Rijks → Q190804 5/5 (pin 52.36, 4.885), 517 Orsay → Q23402 5/5; both pool reuses, $0.12; hidden. audio_tours 409. Orch still 00013-lc6.
 
@@ -37,7 +39,7 @@ Do these in order:
    - Rule: when asking Michael to open anything, give the full URL and the account.
 
 **Live now:**
-- Generator **00027-6sb** (wave 21, 9ead5b87, 1Gi); rollback 00026-cnb.
+- Generator **00028-8s8** (wave 22, 24671e41, 1Gi); rollback 00027-6sb.
 - Orchestrator **00013-lc6** (8e5db189); rollback 00012-bxs.
 - Modernized 00006-9hq (layered, max 3); map 00005-smt; user-api 00003-hvw; gateway 00003-x4s.
 - audio_tours 411; proofs up to 519 hidden (restore SQL in AudiouraBackups\wave6_proofs_hide_20261030\latlng.json).
