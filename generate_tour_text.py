@@ -5385,6 +5385,132 @@ def _classify_tour_category(location, tour_type):
     return 'walking'
 
 
+# ─── [LOCAL-857] CLASSIFY-FIX venue-word guard ───────────────────────────────
+# The bag-of-words CLASSIFY-FIX scan promoted ANY walking tour whose location
+# string merely CONTAINED a venue word (museum/palace/house/…) to 'museum'. In
+# the field "Ben Thanh Market and Saigon Opera House walk, Ho Chi Minh City" was
+# promoted on the word "house" (Opera House), entered the museum pipeline, and
+# BLOCKER4b refused it — two of the best-known places in Ho Chi Minh City.
+# "Sydney Opera House" alone was promoted the same way.
+#
+# A venue word must NOT promote a walking tour to museum when EITHER:
+#   (a) the request explicitly asks to move through several places — a walk /
+#       stroll / ride / drive / "tour of", a comma list, or an "X and Y" list of
+#       named places; OR
+#   (b) the matched venue word is part of a COMPOUND BUILDING NAME that is not a
+#       collection: "Opera House", "Custom(s) House", "State House", "Coffee
+#       House", "Guest House", "Public House", "Town House", "Market", etc. —
+#       matched on TOKEN SEQUENCES, not a bag of words.
+# A single-venue house museum ("House of the Seven Gables") is NOT a compound of
+# this kind and stays 'museum'.
+
+# Modifiers that, immediately before "house", form a compound BUILDING NAME whose
+# stops are the building itself (a performance hall, a civic office, a café, a
+# pub…), never a catalogued collection. "<modifier> House" is one place a walk
+# passes, not a museum to catalogue.
+_COMPOUND_HOUSE_MODIFIERS = {
+    'opera', 'custom', 'customs', 'state', 'coffee', 'guest', 'public',
+    'town', 'court', 'chapter', 'tea', 'ale', 'beer', 'brew', 'brewhouse',
+    'power', 'pump', 'light', 'boat', 'bath', 'ware', 'warehouse',
+    'town-house', 'penthouse', 'club', 'round', 'meeting', 'play', 'bath-house',
+}
+
+# A venue word that forms a compound with a KNOWN trailing noun ("<X> House")
+# or that is itself a non-collection building word ("Market") is not a museum.
+# Checked as a token sequence so "Opera House" is caught but "House of the Seven
+# Gables" (a single-venue house museum) is not.
+def _classify_fix_venue_word_is_compound(location, matched_word):
+    """[LOCAL-857] True when `matched_word` sits inside a compound building name
+    that is NOT a collection, so promoting walking→museum would be wrong.
+
+    Matches on token SEQUENCES, not a bag of words:
+      - "<modifier> house"  (Opera House, Custom House, State House, Coffee House,
+        Guest House, Public House, Town House, Court House…) → compound building.
+      - "market" standing on its own as the venue word → a market is a place a
+        walk passes, never a catalogued collection.
+    A bare/leading "house" ("House of the Seven Gables", "Gardner House Museum")
+    is a single-venue house museum and is NOT treated as a compound here.
+    """
+    mw = (matched_word or '').lower()
+    loc = (location or '').lower()
+    # Tokenise on whitespace, keeping hyphenated compounds together but also
+    # splitting them so "court-house" and "court house" both resolve.
+    tokens = re.findall(r"[a-zà-ÿ'\-]+", loc)
+    if mw == 'house':
+        for i, tok in enumerate(tokens):
+            # "court-house" / "opera-house" one-token form.
+            if tok.endswith('-house') and tok != 'house':
+                return True
+            if tok == 'house' and i > 0:
+                prev = tokens[i - 1]
+                # Strip a trailing hyphen fragment ("coffee-" style).
+                prev = prev.rstrip('-')
+                if prev in _COMPOUND_HOUSE_MODIFIERS:
+                    return True
+        return False
+    # "Market" is a non-collection place word; if it is the venue word that
+    # matched, it never justifies the museum pipeline on its own.
+    if mw == 'market':
+        return True
+    return False
+
+
+def _classify_fix_requests_multi_place_walk(location, tour_type=""):
+    """[LOCAL-857] True when the request asks to move through SEVERAL places — a
+    walk/stroll/ride/drive/"tour of", a comma list, or an "X and Y" list of named
+    places. Such a request must stay on the walking (place-based) path even when
+    a venue word appears somewhere in the string.
+    """
+    loc = location or ''
+    # (a) An explicit mobility signal (walk/stroll/ride/drive/on foot/…), in any
+    # of the six supported languages, keeps the request on the walking path.
+    if _request_has_walking_signal(location, tour_type):
+        return True
+    low = loc.lower()
+    # A ride/drive/cruise/sail signal (not covered by the walking-word regex).
+    if re.search(r'\b(ride|drive|driving|cruise|sail(?:ing)?|boat\s+tour)\b', low):
+        return True
+    # "tour of X and Y" / "tour of several places" — an explicit multi-place tour.
+    if re.search(r'\btour\s+of\b', low):
+        return True
+    # (b) A comma list or an "X and Y" conjunction of place-like phrases names
+    # SEVERAL places. Only count the conjunction when BOTH sides look like a
+    # place name (a capitalised multiword phrase in the ORIGINAL casing), so a
+    # single venue "House of the Seven Gables" (its own internal "and"/commas) is
+    # not mistaken for a list. Operate on the segment before any city tail.
+    head = loc.split(',')[0] if ',' in loc else loc
+    if ',' in loc:
+        # A comma that separates two place-like segments (not just a city tail).
+        segs = [s.strip() for s in loc.split(',') if s.strip()]
+        placey = [s for s in segs if re.search(r'[A-Z]\w+\s+\w', s)]
+        if len(placey) >= 2:
+            return True
+    # "A and B" where both sides carry a capitalised place-like token.
+    m = re.search(r'(.+?)\b and \b(.+)', head)
+    if m:
+        left, right = m.group(1), m.group(2)
+        if re.search(r'[A-Z]\w+', left) and re.search(r'[A-Z]\w+', right):
+            return True
+    return False
+
+
+def _classify_fix_should_promote_to_museum(location, tour_type, matched_word):
+    """[LOCAL-857] Decide whether the CLASSIFY-FIX venue-word scan should promote
+    a 'walking' request to 'museum'.
+
+    Returns False (keep walking) when the request asks for a multi-place walk, or
+    when the matched venue word belongs to a compound building name that is not a
+    collection. Otherwise True — a bare venue word on an otherwise single-venue
+    request (a house museum, a palace) still promotes, preserving the museum
+    cases ("Palais Lascaris", "House of the Seven Gables", "Hearst Castle").
+    """
+    if _classify_fix_requests_multi_place_walk(location, tour_type):
+        return False
+    if _classify_fix_venue_word_is_compound(location, matched_word):
+        return False
+    return True
+
+
 # [LOCAL-474] Testable seams for the empty-tour_type path.
 #
 # An absent/empty tour_type means "classify it" (see tour_orchestrator_service.py
@@ -11988,6 +12114,12 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     # (1) intent extraction returned None entirely (second branch above)
     # (2) intent succeeded but venue_name=null, S15 didn't fire (first branch, else clause)
     #
+    # [LOCAL-857] Remember the category BEFORE this override so the museum path's
+    # BLOCKER4b address-scatter guard can fall BACK to walking (instead of
+    # refusing) when a request CLASSIFY-FIX promoted to museum turns out to be a
+    # city-scattered multi-place request.
+    _category_before_classify_fix = tour_category
+    #
     # [LOCAL-485] Worship/civic venue-class words (church, cathedral, basilica,
     # abbey, temple, synagogue, mosque, courthouse, town hall) were REMOVED from
     # this set. They named the exact defect: a parish church flipped to 'museum'
@@ -12000,10 +12132,28 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                  'library', 'institute', 'villa'}
     if tour_category == 'walking':
         _loc_words = set(location.lower().split())
-        if _loc_words & _VENUE_WORDS_FOR_CLASSIFY:
-            _matched_word = (_loc_words & _VENUE_WORDS_FOR_CLASSIFY).pop()
-            print(f"  [CLASSIFY-FIX] Location contains venue word '{_matched_word}' — overriding walking → museum")
-            tour_category = 'museum'
+        _matched_venue_words = _loc_words & _VENUE_WORDS_FOR_CLASSIFY
+        if _matched_venue_words:
+            # [LOCAL-857] Match on TOKEN SEQUENCES, not a bag of words. A venue
+            # word must not promote a multi-place walk ("X and Y walk", comma
+            # lists, "tour of …") or a compound building name that is not a
+            # collection ("Opera House", "Custom House", "Market", …). A bare
+            # venue word on an otherwise single-venue request (a house museum, a
+            # palace) still promotes, so "Palais Lascaris", "House of the Seven
+            # Gables" and "Hearst Castle" stay 'museum'.
+            _promote_words = [
+                _w for _w in sorted(_matched_venue_words)
+                if _classify_fix_should_promote_to_museum(location, tour_type, _w)
+            ]
+            if _promote_words:
+                _matched_word = _promote_words[0]
+                print(f"  [CLASSIFY-FIX] Location contains venue word '{_matched_word}' — overriding walking → museum")
+                tour_category = 'museum'
+            else:
+                _kept = sorted(_matched_venue_words)
+                print(f"  [LOCAL-857] CLASSIFY-FIX held: venue word(s) {_kept} belong to a "
+                      f"multi-place walk or a compound building name (not a collection) "
+                      f"— staying on the walking path.")
 
     # [LOCAL-480] FACILITY GUARD — runs AFTER convergence, overrides any museum
     # flip. Tour 423 arrived as "Walking tour around Logan Airport" and S15/
@@ -15916,18 +16066,44 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # Normalize: take first 30 chars to group similar addresses
                     _unique_addresses.add(addr[:30])
             if len(_unique_addresses) >= len(poi_list) // 2 and len(poi_list) >= 5:
-                print(f"  [BLOCKER4b] ⚠️ Address scatter: {len(_unique_addresses)} distinct addresses "
-                      f"for {len(poi_list)} stops — a contained museum tour should have 1-2 addresses.")
-                print(f"  [BLOCKER4b] Rejecting — this looks like a city-wide museum tour, not interior rooms.")
-                # [PALAIS-FIX B2] Structured clean-fail evidence for BLOCKER4b
-                _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
-                _J._LAST_CLEAN_FAIL_EVIDENCE.update({
-                    "error_type": "address_scatter",
-                    "venue_name": _museum_venue_name,
-                    "unique_addresses": len(_unique_addresses),
-                    "tier": _verification_tier if '_verification_tier' in dir() else 'unknown',
-                })
-                return None, None, (None, None)
+                # [LOCAL-857] Safety net: a request CLASSIFY-FIX (or S15) promoted
+                # to 'museum' that, once built, scatters across ≥3 distinct real
+                # addresses in a CITY is not a contained interior tour — it is the
+                # city walk the listener actually asked for (the Ben Thanh Market +
+                # Saigon Opera House field refusal: five correct landmarks rejected
+                # by this very guard). When the request was ORIGINALLY classified
+                # walking, fall BACK to the walking path and deliver, instead of
+                # refusing. The branches converge below (PHASE 4.5), so the already
+                # discovered, real-addressed landmarks carry straight through.
+                _scatter_n = len(_unique_addresses)
+                _orig_walking = (_category_before_classify_fix == 'walking')
+                _scope_is_city = True
+                try:
+                    _sp = (intent.get('scope_precision') or '').upper() if intent else ''
+                    if _sp in ('BUILDING', 'CORRIDOR'):
+                        _scope_is_city = False
+                except Exception:
+                    _scope_is_city = True
+                if _orig_walking and _scatter_n >= 3 and _scope_is_city:
+                    print(f"  [LOCAL-857] museum→walking fallback (address scatter, {_scatter_n} addresses)")
+                    print(f"  [LOCAL-857] request was originally classified walking and the museum "
+                          f"path scattered across {_scatter_n} city addresses — delivering as a "
+                          f"walking tour instead of refusing.")
+                    tour_category = 'walking'
+                    _museum_venue_name = None
+                else:
+                    print(f"  [BLOCKER4b] ⚠️ Address scatter: {len(_unique_addresses)} distinct addresses "
+                          f"for {len(poi_list)} stops — a contained museum tour should have 1-2 addresses.")
+                    print(f"  [BLOCKER4b] Rejecting — this looks like a city-wide museum tour, not interior rooms.")
+                    # [PALAIS-FIX B2] Structured clean-fail evidence for BLOCKER4b
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.clear()
+                    _J._LAST_CLEAN_FAIL_EVIDENCE.update({
+                        "error_type": "address_scatter",
+                        "venue_name": _museum_venue_name,
+                        "unique_addresses": len(_unique_addresses),
+                        "tier": _verification_tier if '_verification_tier' in dir() else 'unknown',
+                    })
+                    return None, None, (None, None)
 
         # -------- [WALK-D1] Landmark verification for walking tours (Phase 3) --------
         elif tour_category == 'walking':
