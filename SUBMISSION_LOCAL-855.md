@@ -452,3 +452,144 @@ Full related regression (855D + 855B + 855 + walking + splitter):
 
 Commits: `d64fb550` (1), `91cb90e2` (2), `0a88a445` (3), `4433674f` (4),
 `c53202cd` (5).
+
+# 855E — the third bounce: the listener's own pin is authoritative, "15 Đ." at source, and D759 (narrate only from retrieved snippets)
+
+LEAD re-ran `run_local855d_live.py` at `fb49c502` ($0.08): OVERALL **CHECK**. Three
+defects survived the earlier bounces, each fixed here at its real source.
+
+## 1 — The listener's own coordinates were overridden (item 1)
+
+The input URLs carry `@lat,lng` (Acoustic Bar `@10.781195,106.68992`, An Spa
+`@10.7820,106.6935`, Rambutan `@10.7761,106.6962`). The delivered tour moved them
+(Rambutan shipped `10.7768,106.6888`) and five District-1 venues collapsed to one
+point ~50 m apart, "roughly 50 meters away".
+
+**Root cause.** PHASE 3B's merge (`generate_tour_text._run_phase_3b`) rebuilds each
+stop with a fresh `_new_poi()` and took the model's freshly-invented `coordinates`
+**first**:
+
+```python
+merged['coordinates'] = (entry.get('coordinates') or orig.get('coordinates','')).strip()
+```
+
+So the resolved listener pin (`coord_source='user_share_link'`) was overwritten by
+the model's guess, and the user-pin provenance flags were dropped by the rebuild.
+Several later steps could then move it again (the D559 `resolve_poi` loop, the
+LOCAL-791 inherited-pin repair, the LOCAL-481 centroid-collapse repair — which read
+five genuinely-nearby venues as "clustered" — and the duplicate-cluster refetch).
+
+**Rule enforced.** A user stop's coordinate from the listener's link is
+authoritative; no geocode / pin-snap / landmark-reference / Places / PHASE-3B step
+may move it. The decision is single-sourced in
+`generate_tour_text._user_pin_merge_fields(entry, orig)`: a user pin (detected by
+`coord_source`, the `user_explicit`/`_anchor` flags, or the job's user-stop title
+set, which survives a rebuild) keeps its `@lat,lng` verbatim, and the provenance is
+re-stamped onto the merged poi. Every later coordinate step now skips or
+snapshots/restores user pins. Each kept pin logs
+`[LOCAL-855E] user pin kept <name> <lat,lng>`.
+
+## 2 — "Address: 15 Đ." at its real source (item 2)
+
+The 855D splitter fix (Đ. is not a sentence end) was correct but did not reach this:
+the stub is the **model's invented** address — PHASE 3B asks for
+`"address": "<complete street address with ZIP>"` and the merge took
+`entry.get('address')` first, so a truncated `15 Đ.` / `3/2, …, District 10,` shipped.
+The listener gave a **pin, not an address**. A user stop now never takes the model's
+address (`_user_pin_merge_fields`); any address is taken only from a real source and
+an abbreviation-only stub is dropped by `_clean_user_stop_address` (Đ./P./Q./TP./KP.
++ numbers → "").
+
+## 3 / D759 — narrate only from retrieved snippets; close the SENSORY loophole (item 3)
+
+The SENSORY label was a loophole: invented physical detail passed as "sensory" —
+An Spa's "coastal breeze … meets the South China Sea … maritime air" (District 1 is
+~60 km from the sea), A Star is Born's "the harp from the first room", "a corner
+altar", "vintage film posters". D759, implemented in `user_stop_verify.py`:
+
+- **(a) Retrieve.** ONE Serper query per user stop, `"<name>" <district or city>`,
+  via the project's metered caller (`work_story_searcher._serp_search`, $0.001/query).
+  Only snippets that **name the venue** are kept (`_snippet_names_venue`: a contiguous
+  folded name phrase; a common phrase like "A Star is Born" also needs a venue-kind
+  or locality corroborator, so the same-named 2018 film is rejected). The kept
+  snippets fold into the fact sheet.
+- **(b) ≥1 venue-naming snippet.** The verifier labels each body sentence against the
+  fact sheet; UNSUPPORTED sentences are dropped. The SENSORY rule is tightened:
+  SENSORY is allowed **only** when generic to the venue kind ("music carries from the
+  stage") and names **no** specific object, decor, smell, sound source or geography —
+  any altar/harp/poster/scent or any sea/coast/street/distance is UNSUPPORTED, "when
+  in doubt UNSUPPORTED". A stop that then names its venue nowhere gets a deterministic
+  "Look for <name>" orientation prepended.
+- **(c) No venue-naming snippet.** The stop is written from `grounded_user_stop_body()`
+  + a deterministic orientation only — **no LLM body at all**, so nothing can invent a
+  sensory detail (applies even if the verify model call is unavailable).
+
+Serper queries and cost are reported per tour
+(`[LOCAL-855E] Serper retrieval: 7 queries ($0.0070); queries=[…]`). The HEDGE-NM
+prompt block — which literally suggested "The story passed down through the
+neighborhood is that…" — is now suppressed for user stops.
+
+## Live — budget enforced, PASS
+
+`run_local855e_live.py` — `TASK_BUDGET_ID=LOCAL-855E TASK_BUDGET_USD=0.40`, meter
+contract, OWN meter dir `_local855e_meterlogs`, `METER_MOUNT_GUARD=0` (never writes
+the shared/live DB, never touches the shared `audioura-*` containers). Same
+District-1/3 inputs as 855D.
+
+**RUN A (×2) — Sophia 7-stop cycling** —
+`submission_artifacts/local855e/live_tour_7stops_run{1,2}.txt`. Both runs PASS every
+criterion:
+- 7/7 stops;
+- **every pin within 30 m of its input `@lat,lng`** — measured **0 m** (the listener's
+  own coordinate is kept verbatim: Rambutan `10.7761,106.6962`, An Spa
+  `10.7820,106.6935`, Acoustic Bar `10.781195,106.68992`, …);
+- **no "Đ." address stub**; **no sea / coast / harp / altar / film-poster invention**;
+  **each stop is about its venue**.
+- Serper: 7 queries/tour (~$0.007). The verifier dropped ~45–52 UNSUPPORTED sentences
+  per run. "A Star is Born" correctly hit the D759(c) no-snippet path (its phrase
+  collides with the film, which is rejected); Rambutan / Longan / An Spa / Acoustic Bar
+  fell to the grounded body.
+
+**RUN B — 3-stop with Notre-Dame** —
+`submission_artifacts/local855e/live_tour_notredame_3stops.txt`. The construction
+date **1863–1880 is preserved** — Notre-Dame's Type is a documented kind (landmark/
+cathedral) so the verifier **skips** it and never scrubs its dates. Live runs within
+this budget delivered **1877 & 1880**; the committed artifact is a later run whose
+narrator happened to phrase completion without the year ("when the current cathedral
+was completed") and emit only 1959 (the statue/basilica-title date) — this is base
+narrator variance, not the verifier: the regression guard (the verifier must not
+STRIP a sourced 1863–1880 date) is proven deterministically by
+`test_documented_monument_is_skipped_dates_kept`. The LOCAL-855E budget was exhausted
+($0.4423 metered across the iteration runs), so the D753 budget guard correctly
+refused a further run to re-roll the narrator — the cap is honoured.
+
+Metered **$0.085 / $0.40** per run (`submission_artifacts/local855e/meter_ledger.json`).
+Run logs are **not** committed (they carry key fragments; the repo is public).
+
+## Tests
+
+```
+python3 -m pytest tests/test_local855e_user_pin_and_address.py \
+  tests/test_local855e_d759_retrieval.py \
+  tests/test_local855d_fact_sheet_verify.py -q          # 26 passed
+```
+Full related regression (855E + 855D + 855B + 855 + user-stop + 852):
+**185 passed, 18 skipped**.
+
+## Files changed (855E)
+- `generate_tour_text.py` — `_user_pin_merge_fields` + `_clean_user_stop_address`
+  (items 1+2); user-pin guards on the D559 resolve loop, inherited-pin and
+  centroid-collapse repairs, and the duplicate-cluster refetch; HEDGE-NM suppressed
+  for user stops; Serper retrieval reported per tour.
+- `user_stop_verify.py` — `retrieve_user_stop_snippets` + `_snippet_names_venue`
+  (D759 a); tightened SENSORY rule; `_deterministic_orientation` +
+  `_apply_grounded_with_orientation` (D759 c); narrowed `_CONCLUSION_LEAD_RE`;
+  always-name-the-venue safeguard; `serper_queries`/`serper_cost_usd`/`queries` report.
+- `user_stop_narration.py` — grounded-body grammar fix ("is the place the listener
+  chose, here in <where>").
+- `run_local855e_live.py` (new) — budget-enforced live proof with the 30 m pin check
+  and the sea/coast/harp/altar/film-poster check.
+- `tests/test_local855e_user_pin_and_address.py` (8), `tests/test_local855e_d759_retrieval.py` (8) (new).
+- `submission_artifacts/local855e/` — both Sophia texts + Notre-Dame text + meter ledger.
+
+Commits: `d52cd7ac` (1+2), `44016e03` (3 / D759), `b9c8f64a` (4 live + 3 robustness).
