@@ -1143,6 +1143,165 @@ def _parse_coords(s):
     return (float(m.group(1)), float(m.group(2))) if m else None
 
 
+def _city_center_for_request(location, scope="", intent=None):
+    """[LOCAL-858] Geocode a RELIABLE city centre for a walking request.
+
+    The scope-sanity / identity guards (pin_snap off-scope bound, the Wikidata
+    landmark lookup's metro-radius test) need a city centre. The obvious strings
+    fail: "Hoan Kiem Lake and Temple of Literature walk, Hanoi" does not geocode
+    (Nominatim chokes on the "… walk," prefix), nor does the resolved scope
+    "Hoan Kiem Lake and Temple of Literature". With no centre the guards go dark
+    and an authority P625 from a SAME-NAME place in another country is trusted —
+    the live Hanoi run snapped "St. Joseph's Cathedral" to the cathedral in
+    BAGHDAD (6,144 km away). The fix: fall back to the CITY component.
+
+    Tries, in order: the resolved scope, the location hint, the full location,
+    the declared geographic_scope, then — crucially — each COMMA-separated tail
+    component of the request/scope ("…, Ho Chi Minh City", "…, Hanoi",
+    "…, Boston"), longest first. Returns (lat, lng) or None. Best-effort,
+    never raises.
+    """
+    try:
+        from geocode_stops import geocode as _gc, location_hint as _lh
+    except Exception:
+        return None
+    cands = []
+    for c in (scope, _lh(location) if _lh else None, location,
+              (intent.get('geographic_scope') if isinstance(intent, dict) else None)):
+        if c and c not in cands:
+            cands.append(c)
+    # Comma tails of the request and scope — the city is the trailing component.
+    for src in (location, scope):
+        if not src:
+            continue
+        parts = [p.strip() for p in str(src).split(",") if p.strip()]
+        # Prefer the LAST component (the city), then progressively longer tails.
+        for k in range(len(parts)):
+            tail = ", ".join(parts[k:]).strip()
+            # Drop a leading "… walk"/"… tour" qualifier that defeats Nominatim.
+            tail2 = re.sub(r'^.*\b(walk|tour)\b[\s,]*', '', tail,
+                           flags=re.IGNORECASE).strip(" ,")
+            for t in (parts[-1], tail, tail2):
+                if t and t not in cands:
+                    cands.append(t)
+    for c in cands:
+        try:
+            pt = _gc(c)
+        except Exception:
+            pt = None
+        if pt:
+            return pt
+    return None
+
+
+def _establish_landmark_coordinates(poi_list, scope, scope_center=None,
+                                    scope_bbox=None, tour_language="en",
+                                    city_centroid=None, log=None):
+    """[LOCAL-858] Give a named landmark its REAL coordinate BEFORE route ordering.
+
+    The HCMC tour-527 failure is twofold: PHASE-3B asks the model for each stop's
+    coordinate and, for a well-known landmark it cannot place, the model returns
+    the CITY CENTROID for every stop (Ben Thanh, the Opera House and the War
+    Remnants Museum all shipped at 10.776,106.695). Route ordering then logs
+    "0 stops with coordinates" (or routes on identical points), and the centroid
+    ships as a real pin.
+
+    pin_snap already snaps these to the authoritative Wikidata P625 — but only at
+    PACKING, AFTER route ordering. This runs the SAME Wikidata-P625 landmark
+    lookup EARLY, for every stop whose shipped pin is missing or is a
+    centroid/shared-fallback guess, so routing is computed on real positions and
+    ROUTE-ORDER counts every placed stop. A stop the lookup cannot place is LEFT
+    for the normal geocode/pin-snap path (never centroided here). Best-effort and
+    non-fatal: any failure leaves the stop's shipped coordinate untouched.
+
+    The landmark lookup resolves by the place's own name in the TOUR language and,
+    when the scope implies a non-English language, the LOCAL language too
+    (Vietnamese for HCMC/Hanoi), so "Chợ Bến Thành" / "Ben Thanh Market" and
+    "Nhà hát Thành phố" / "Saigon Opera House" both resolve. Returns the number of
+    stops given a real coordinate.
+    """
+    emit = log or (lambda _m: None)
+    if not poi_list:
+        return 0
+    try:
+        from wikidata_landmark_lookup import lookup as _wd_lookup
+    except Exception as _imp:
+        emit(f"  [LOCAL-858] landmark lookup unavailable ({_imp}) — "
+             f"coordinates left to the normal geocode path")
+        return 0
+
+    # A stop's current coordinate is a centroid guess when it is missing, marked a
+    # fallback, equal to the city centroid, or shared with another stop. Compute
+    # the shared-point set once (model centroid guesses coincide to the metre).
+    def _pt(p):
+        return _parse_coords(p.get('coordinates', '') or '')
+
+    pts = [_pt(p) for p in poi_list]
+
+    def _shared(idx):
+        # Uses the ORIGINAL shipped positions (``orig_pts``) so the collapse
+        # signal — the model stamped one point on several stops — is read before
+        # any stop is moved to its real place.
+        a = orig_pts[idx]
+        if not a:
+            return False
+        for j, b in enumerate(orig_pts):
+            if j != idx and b and _haversine_km(a, b) * 1000.0 <= 30.0:
+                return True
+        return False
+
+    def _is_centroid_guess(idx, p):
+        a = orig_pts[idx]
+        if a is None:
+            return True
+        try:
+            from identity_dedup import _is_fallback_coord_stop as _ifb
+            if _ifb(p):
+                return True
+        except Exception:
+            pass
+        if city_centroid and _haversine_km(a, city_centroid) * 1000.0 <= 30.0:
+            return True
+        return _shared(idx)
+
+    # Snapshot the shipped positions once; classify every stop against it before
+    # the loop mutates any coordinate (so loop order cannot hide a collapsed stop
+    # once its neighbours have moved to their real pins).
+    orig_pts = list(pts)
+    _to_fix = [i for i, p in enumerate(poi_list)
+               if (p.get('name') or '').strip()
+               and p.get('coord_source') != 'user_share_link'
+               and _is_centroid_guess(i, p)]
+
+    n_fixed = 0
+    for i in _to_fix:
+        poi = poi_list[i]
+        name = (poi.get('name') or '').strip()
+        try:
+            hit = _wd_lookup(
+                name, scope=scope or "", scope_center=scope_center,
+                scope_bbox=list(scope_bbox) if scope_bbox else None,
+                tour_language=tour_language or "en")
+        except Exception:
+            hit = None
+        if hit:
+            lat, lng = float(hit[0]), float(hit[1])
+            poi['coordinates'] = f"{lat:.6f}, {lng:.6f}"
+            if 'latitude' in poi or 'longitude' in poi:
+                poi['latitude'] = lat
+                poi['longitude'] = lng
+            poi['_landmark_coord'] = True
+            poi['_coord_source'] = hit[2] if len(hit) > 2 else 'wikidata_p625'
+            pts[i] = (lat, lng)
+            n_fixed += 1
+            emit(f"  [LOCAL-858] landmark pin {name} → {lat:.6f},{lng:.6f} "
+                 f"({poi['_coord_source']})")
+    if n_fixed:
+        emit(f"  [LOCAL-858] established {n_fixed} real landmark coordinate(s) "
+             f"before route ordering")
+    return n_fixed
+
+
 def _compute_route_order(poi_list):
     """[LOCAL-7] Compute a deterministic walking-route order using nearest-neighbor + 2-opt.
     
@@ -18494,6 +18653,39 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # BEFORE asking GPT for structured details/directions. Uses real Wikidata
         # coordinates for verified stops, GPT's guessed coordinates as fallback.
         if tour_category == 'walking' and len(poi_list) >= 3:
+            # [LOCAL-858] Establish REAL landmark coordinates first so routing is
+            # computed on real positions and ROUTE-ORDER counts every stop — not on
+            # the city-centroid the model guesses for landmarks it cannot place
+            # (HCMC tour 527). pin_snap repeats this with the same authority at
+            # packing; doing it here fixes the "0 stops with coordinates" log and a
+            # route through identical points. Best-effort, non-fatal.
+            try:
+                import os as _os858
+                _os858.environ.setdefault("LANDMARK_LIVE_LOOKUP", "1")
+                _scope_858 = ""
+                try:
+                    _scope_858 = _scope_from_request(location, intent) or location
+                except Exception:
+                    _scope_858 = location
+                _center_858 = None
+                _bbox_858 = None
+                try:
+                    _center_858 = _city_center_for_request(
+                        location, scope=_scope_858, intent=intent)
+                except Exception:
+                    _center_858 = None
+                try:
+                    from stop_existence_gate import _geocode_scope_bbox as _gsb858
+                    _bbox_858 = _gsb858(_scope_858) if _scope_858 else None
+                except Exception:
+                    _bbox_858 = None
+                _establish_landmark_coordinates(
+                    poi_list, scope=_scope_858, scope_center=_center_858,
+                    scope_bbox=_bbox_858, tour_language="en",
+                    city_centroid=_center_858, log=print)
+            except Exception as _le858:
+                print(f"  [LOCAL-858] early landmark coordinate pass skipped "
+                      f"(non-fatal): {_le858}")
             poi_list = _compute_route_order(poi_list)
 
         # ──── [LOCAL-329] PERSIST SELECTION REASONS AS CORPUS ─────────────────
@@ -28962,20 +29154,13 @@ REWRITE RULES (all mandatory):
         if _pin_center_791c is None:
             # Resolve a scope centre so the reference lookup's scope-sanity bound is
             # active (a bare name must not snap to a same-name place in another
-            # city). Try the resolved scope first, then the fuller request/location.
+            # city). [LOCAL-858] Use the robust city-tail resolver — the plain
+            # scope/location strings ("… walk, Hanoi") do not geocode, which left
+            # the centre None and let an authority P625 from Baghdad be trusted for
+            # "St. Joseph's Cathedral". The city tail ("…, Hanoi") does geocode.
             try:
-                from geocode_stops import geocode as _pc_geocode, \
-                    location_hint as _pc_hint
-                for _cand_scope in (_pin_scope_791c, _pc_hint(location) if _pc_hint else None,
-                                    location, (intent.get('geographic_scope') if intent else None)):
-                    if not _cand_scope:
-                        continue
-                    try:
-                        _pin_center_791c = _pc_geocode(_cand_scope)
-                    except Exception:
-                        _pin_center_791c = None
-                    if _pin_center_791c:
-                        break
+                _pin_center_791c = _city_center_for_request(
+                    location, scope=_pin_scope_791c, intent=intent)
             except Exception:
                 _pin_center_791c = None
         # [LOCAL-803] Resolve the scope bounding box so the LIVE Wikidata P625
@@ -29025,11 +29210,17 @@ REWRITE RULES (all mandatory):
             poi_list, scope=_pin_scope_791c, scope_center=_pin_center_791c,
             scope_bbox=_pin_bbox_803, tour_language="en",
             venue_fallback_coordinate=_pin_venue_fallback_813,
+            city_centroid=_pin_center_791c,
             log=print)
         _n_snapped_791c = sum(1 for r in _snap_rows_791c if r.get("snapped"))
         _n_noref_791c = sum(1 for r in _snap_rows_791c if r.get("reference") is None)
+        # [LOCAL-858] Stops whose centroid pin was cleared (never shipped as a real
+        # pin). These are announced as having no coordinate; the stop is kept.
+        _n_centroid_cleared_858 = sum(
+            1 for r in _snap_rows_791c if r.get("centroid_cleared"))
         print(f"  [LOCAL-791C] pin snap complete — {_n_snapped_791c} snapped, "
               f"{_n_noref_791c} left unsnapped (no in-scope reference), "
+              f"{_n_centroid_cleared_858} centroid pin(s) cleared [LOCAL-858], "
               f"{len(_snap_rows_791c)} total stop(s)")
     except Exception as _snap_err_791c:
         print(f"  [LOCAL-791C] pin snap skipped (non-fatal): {_snap_err_791c}")
