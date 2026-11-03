@@ -31,6 +31,8 @@ import '../services/translate_download_manager.dart';
 import '../utils/tour_display.dart';
 import '../config.dart';
 import '../config/endpoints.dart';
+import '../config/map_tiles.dart';
+import '../services/resilient_tile_provider.dart';
 import '../utils/share_code.dart';
 import '../utils/downloaded_message.dart';
 import '../utils/search_dispatch.dart';
@@ -4822,8 +4824,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   mapController: _mapController,
                   externalReset: _mapSizeReset.stream,
                   builder: (reset) => TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.audioura.audiotours',
+                    // [LOCAL-853] URL from ONE config value (default unchanged:
+                    // the live OSM host). ResilientTileProvider adds an on-disk
+                    // cache (previously-seen tiles show offline / on a flaky
+                    // network — Michael's Vietnam DNS failures), retry+backoff,
+                    // and fallback hosts tried on a primary DNS/connect failure.
+                    // It NEVER throws: on total failure the tile is transparent,
+                    // so the cached-or-grey map with pins still shows and Home
+                    // is never blocked.
+                    urlTemplate: MapTiles.primaryTemplate,
+                    userAgentPackageName: MapTiles.userAgentPackageName,
+                    tileProvider: ResilientTileProvider(),
                     reset: reset,
                   ),
                 ),

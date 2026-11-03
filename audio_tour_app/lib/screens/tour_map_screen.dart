@@ -5,6 +5,8 @@ import 'package:geolocator/geolocator.dart';
 import 'dart:io';
 import 'dart:async';
 import '../screens/debug_log_viewer_screen.dart';
+import '../config/map_tiles.dart';
+import '../services/resilient_tile_provider.dart';
 
 class TourPoi {
   final int index;
@@ -311,8 +313,9 @@ class _TourMapScreenState extends State<TourMapScreen> {
       ),
       children: [
         TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.audioura.audiotours',
+          urlTemplate: MapTiles.primaryTemplate,
+          userAgentPackageName: MapTiles.userAgentPackageName,
+          tileProvider: ResilientTileProvider(),
         ),
         // Arrow line from user to nearest POI
         if (_userLocation != null && next != null)

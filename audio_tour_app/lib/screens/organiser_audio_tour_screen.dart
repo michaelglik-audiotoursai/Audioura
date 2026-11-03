@@ -38,14 +38,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/communities_service.dart';
 import '../services/builder_location_provider.dart';
+import '../services/resilient_tile_provider.dart';
+import '../config/map_tiles.dart';
 
 /// [LOCAL-758] The tile provider used by the builder's maps. Production uses the
 /// real network tiles (OpenStreetMap). Widget tests swap in
 /// [transparentTileProvider] so the map renders without any network — otherwise
 /// flutter_map's default provider throws unhandled ClientExceptions in the test
 /// zone. This seam keeps the production code path unchanged.
+///
+/// [LOCAL-853] Production now uses [ResilientTileProvider] (on-disk cache +
+/// retry/backoff + fallback hosts, never throws) so the builder maps survive a
+/// flaky network just like Home. The test override seam is unchanged.
 TileProvider builderTileProvider() =>
-    _overrideTileProvider ?? NetworkTileProvider();
+    _overrideTileProvider ?? ResilientTileProvider();
 
 TileProvider? _overrideTileProvider;
 
@@ -1037,8 +1043,8 @@ class _OrganiserAudioTourScreenState extends State<OrganiserAudioTourScreen> {
       ),
       children: [
         TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.audioura.audiotours',
+          urlTemplate: MapTiles.primaryTemplate,
+          userAgentPackageName: MapTiles.userAgentPackageName,
           tileProvider: builderTileProvider(),
         ),
         MarkerLayer(
@@ -1105,8 +1111,8 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
             ),
             children: [
               TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.audioura.audiotours',
+                urlTemplate: MapTiles.primaryTemplate,
+                userAgentPackageName: MapTiles.userAgentPackageName,
                 tileProvider: builderTileProvider(),
               ),
               if (_picked != null)

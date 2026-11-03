@@ -744,6 +744,8 @@ class _MyToursScreenState extends State<MyToursScreen>
     // Convert voice command to search pattern
     final searchPattern = await _convertVoiceToSearch(voiceCommand);
     
+    // [LOCAL-853] Disposed-State guard after the await above.
+    if (!mounted) return;
     // Apply the search directly as filter
     setState(() {
       _searchQuery = searchPattern;
@@ -868,6 +870,8 @@ class _MyToursScreenState extends State<MyToursScreen>
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('app_mode') ?? 'Tours';
     final savedFilter = prefs.getString('listen_page_filter') ?? 'All';
+    // [LOCAL-853] Disposed-State guard after the await above.
+    if (!mounted) return;
     setState(() {
       _appMode = mode;
       _selectedTypeFilter = savedFilter;
@@ -899,6 +903,9 @@ class _MyToursScreenState extends State<MyToursScreen>
     
     await DebugLogHelper.addDebugLog('LISTEN: Successfully loaded ${articles.length} articles (all languages)');
     
+    // [LOCAL-853] Same disposed-State guard as _loadTours (the addendum names
+    // _loadNews:902 as a second site of sig 3a2c9d85ab9e287b).
+    if (!mounted) return;
     setState(() {
       _news = articles.reversed.toList();
     });
@@ -1005,6 +1012,11 @@ class _MyToursScreenState extends State<MyToursScreen>
       // Reload news and reapply filters
       await _loadNews();
       
+      // [LOCAL-853] Guard against a disposed State after the awaits above
+      // (same class as sig 3a2c9d85ab9e287b): both the ScaffoldMessenger
+      // context lookup and the setState below would throw if the user left the
+      // tab mid-delete.
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Deleted ${selectedIndices.length} articles'),
@@ -1047,6 +1059,8 @@ class _MyToursScreenState extends State<MyToursScreen>
       filtered = searchFiltered;
     }
     
+    // [LOCAL-853] Disposed-State guard after the await'd search filtering above.
+    if (!mounted) return;
     setState(() {
       _filteredNews = filtered;
       // Initialize selection array
@@ -1332,6 +1346,10 @@ class _MyToursScreenState extends State<MyToursScreen>
     for (final t in healedList) {
       try { healedParsed.add(Map<String, dynamic>.from(json.decode(t) as Map)); } catch (_) {}
     }
+    // [LOCAL-853] sig 3a2c9d85ab9e287b: "Null check operator used on a null
+    // value" at State.setState ← _loadTours — setState after the awaits above
+    // when the user left the Listen tab and this State was disposed. Guard it.
+    if (!mounted) return;
     setState(() { _tours = healedParsed.reversed.toList(); });
 
     // [LOCAL-716] If we arrived here from a download's "View" button for a
