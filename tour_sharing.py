@@ -71,9 +71,16 @@ from typing import Optional
 
 _logger = logging.getLogger(__name__)
 
+# [LOCAL-856] Has the additive audio_tour_id ensure logged its marker in THIS
+# process yet? The marker is logged exactly once per process so the required
+# "[LOCAL-856] shared_tours.audio_tour_id ensured" line is emitted on the
+# write-side service too, without spamming it on every share.
+_SHARED_TOURS_AUDIO_TOUR_ID_LOGGED = False
+
 
 def _ensure_shared_tours_table(conn) -> None:
     """Create shared_tours table if not exists (idempotent)."""
+    global _SHARED_TOURS_AUDIO_TOUR_ID_LOGGED
     with conn.cursor() as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS shared_tours (
@@ -100,11 +107,38 @@ def _ensure_shared_tours_table(conn) -> None:
         #
         # Additive and nullable on purpose: the 3 existing rows keep working through
         # tour_text while audio_tour_id is NULL, so nothing breaks and no data is lost.
+        #
+        # [LOCAL-856] This is the SAME additive ALTER the read service
+        # (map_delivery/app.py) now also runs at its start. The cloud 404'd because
+        # only this write path created the column and the write path was never hit
+        # there; ensuring it on both sides closes that gap.
         cur.execute("""
             ALTER TABLE shared_tours
             ADD COLUMN IF NOT EXISTS audio_tour_id INTEGER
         """)
     conn.commit()
+    if not _SHARED_TOURS_AUDIO_TOUR_ID_LOGGED:
+        _SHARED_TOURS_AUDIO_TOUR_ID_LOGGED = True
+        _logger.info("[LOCAL-856] shared_tours.audio_tour_id ensured")
+        print("[LOCAL-856] shared_tours.audio_tour_id ensured", flush=True)
+
+
+def ensure_shared_tours_schema(db_url: str) -> bool:
+    """[LOCAL-856] Run the shared_tours ensure (table + additive audio_tour_id)
+    once at service start, on its own connection. Call this from the startup of
+    any service that mounts the sharing endpoints, so the column exists before the
+    first request rather than only on the first share. Best-effort and non-fatal:
+    returns True on success, False on any error (the per-request ensure in
+    store_shared_tour / get_shared_tour remains the safety net)."""
+    try:
+        conn = psycopg2.connect(db_url)
+        _ensure_shared_tours_table(conn)
+        conn.close()
+        return True
+    except Exception as e:  # pragma: no cover - boot-time best effort
+        _logger.warning(f"[LOCAL-856] startup ensure of shared_tours skipped "
+                        f"(non-fatal): {e}")
+        return False
 
 
 def store_shared_tour(
