@@ -108,6 +108,17 @@ def _coord_is_marked_fallback(poi: Dict) -> bool:
     return False
 
 
+def _is_user_pin(poi: Dict) -> bool:
+    """[LEAD 858 review] True for a stop the listener placed themselves
+    (LOCAL-855E marks it user_explicit + coord_source='user_share_link')."""
+    if not isinstance(poi, dict):
+        return False
+    src = str(poi.get("coord_source") or "").strip().lower()
+    return src == "user_share_link" or (
+        bool(poi.get("user_explicit")) and _parse_coord(poi.get("coordinates")) is not None
+        and src not in ("fallback", "centroid", "city_centroid"))
+
+
 def _poi_coord(poi: Dict) -> Optional[Tuple[float, float]]:
     """A poi's current coordinate, from the 'coordinates' string or lat/lng."""
     c = _parse_coord(poi.get("coordinates"))
@@ -570,6 +581,16 @@ def snap_poi_coordinates(poi_list: List[Dict],
     for i, poi in enumerate(poi_list):
         title = poi.get("name", "")
         coord = coords_all[i]
+        if _is_user_pin(poi):
+            # [LEAD 858 review] A listener's own pin (LOCAL-855E) is authoritative:
+            # never snapped, never cleared. Recorded as snapped-in-place so the
+            # centroid pass below skips it too.
+            rows.append({"title": title, "snapped": True,
+                         "new_coordinate": coord, "reference": coord,
+                         "source": "user_share_link", "distance_m": 0.0,
+                         "reason": "user pin kept"})
+            emit(f"[LOCAL-855E] user pin kept {title!r} (pin snap skipped)")
+            continue
         wd = _wikidata_coord(poi)
         _centroid_i = None if _injected else _centroid_excluding(i)
         _bound_i = 0.0 if _injected else _adaptive_bound(i, _centroid_i)

@@ -317,3 +317,25 @@ class TestAuthorityOffScopeGuard(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLeadReviewUserPins(unittest.TestCase):
+    """LEAD review: a listener's own pin (LOCAL-855E) is never snapped or cleared,
+    even when two user stops share a building or sit on the city centre."""
+
+    def test_user_pins_never_cleared_or_snapped(self):
+        import pin_snap
+        pois = [
+            {"name": "Bar A", "coordinates": "10.776000, 106.695000",
+             "user_explicit": True, "coord_source": "user_share_link"},
+            {"name": "Bar B", "coordinates": "10.776010, 106.695010",
+             "user_explicit": True, "coord_source": "user_share_link"},
+        ]
+        out, rows = pin_snap.snap_poi_coordinates(
+            pois, scope="Ho Chi Minh City", scope_center=(10.776, 106.695),
+            city_centroid=(10.776, 106.695),
+            reference_fn=lambda *a, **k: (10.80, 106.70, "fake"),
+            landmark_fn=lambda *a, **k: None, log=lambda *a: None)
+        self.assertEqual(out[0]["coordinates"], "10.776000, 106.695000")
+        self.assertEqual(out[1]["coordinates"], "10.776010, 106.695010")
+        self.assertFalse(out[0].get("_no_coordinate"))
