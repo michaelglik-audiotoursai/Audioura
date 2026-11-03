@@ -164,3 +164,150 @@ Same 7-stop "Sophia's biking tour in Ho Chi Minh City" request as LOCAL-852.
 - `run_local855_live.py` (new) — budget-enforced live reproduction + PASS checks.
 - `tests/test_local855_user_stop_narration.py` (new) — 24 tests.
 - `submission_artifacts/local855/` — delivered text + meter ledger.
+
+
+---
+
+# 855B — the bounce: the delivered Sophia text was still not shippable
+
+LEAD read the delivered `submission_artifacts/local855/live_tour_7stops.txt` and
+listed ten defects still present. The root problem was not ten separate bugs —
+it was that **the user-stop scrub was regex-brittle and the live runner's checks
+were vacuous substring bans**: the model re-wrote every defect in a NEW phrasing
+on the 855B run, the old literal bans did not match the new wording, and the
+runner reported PASS while the defects shipped. The fix is twofold: (a) make the
+scrub catch the DEFECT CLASS, not a phrasing, and add a decisive grounded-body
+substitution when a thin stop is fabrication end-to-end; (b) make the runner
+HONEST — a semantic scan that re-runs the scrub and FAILS the old artifact.
+
+## Diagnosis (why the first 855B run still shipped the defects)
+
+- The scrub's `_LEGEND_/_ANECDOTE_/_ART_PROVENANCE_` markers were the exact
+  strings from the 855 run. On 855B the model wrote *"the layered urban fabric
+  Caillebotte studied"* (not "Art Institute of Chicago"), *"One account that
+  lingers among regulars … opened doors to professional contracts … springboard"*
+  (not "first record deal"), *"marks a turning point … opened a door … step into
+  public view"* (not "pivotal night"), *"near Hồ Tràm, a coastal commune … a
+  hundred kilometers southeast of Saigon"* (not "Đồng Khởi / Lam Sơn Square").
+  None matched — zero sentences were dropped.
+- The scrub's **never-empty rule** kept the WHOLE fabricated body when every
+  sentence was off-venue (the delivered An Spa / Acoustic bodies).
+- A phantom **cross-stop motif** — *"a launching point not unlike the sackbut you
+  paused beside earlier"* — slipped the D636 callback budget ("paused beside" was
+  not a recap verb and the budget had room).
+- The closer read *"the history of the twenty-first century … they trace how this
+  place changed across the twenty-first century"* — a FALSE period thread derived
+  from the 2025 references the scrub left behind.
+- `_NATIONAL_FIGURE_RE` had a global `(?i)` so `born [A-Z]` matched the lowercase
+  "is" in the venue's OWN name — *"A Star is Born is known…"* was wrongly dropped.
+- **Longan narrated as a Fruit Market, An Spa placed at Hồ Tràm beach ~100 km
+  away** are RESOLUTION artifacts, not narration defects: in this offline
+  reproduction the listener's Google share links are munged placeholders
+  (`https___share.google_z20B`) that do not resolve, so "Longan" geocodes BY NAME
+  to a real HCMC fruit market and "An Spa" to the Hồ Tràm resort. Narration is
+  faithful to what resolved; the field request had working links. Documented in
+  the runner (the fruit-market subject is deliberately NOT banned); the narration
+  DEFECT for that stop (the dragon legend) is gone.
+
+## The fixes, at source
+
+1. **Title (defect 1):** `title_line_guard` reads the real category
+   ("featuring a cycling tour" / "the biking category") and NEVER defaults to
+   "museum" — delivered header is "… - Cycling Tour".
+2. **Transit (defect 2):** generic prompt forbids naming a transit station
+   unless sourced for THIS city (`generate_tour_text.py:18055`); no "T station".
+3. **Legend (defect 3):** `_LEGEND_MARKER_RE` broadened to plural
+   legends/dragons and the contentless legend-ALLUSION filler ("carries a tale",
+   "legends of this land", "timeless narrative", "the tale is tangible").
+4. **Art digression (defect 3 class):** `_ART_PROVENANCE_RE` now catches the
+   painter + art vocabulary ("the canvas", "brushwork", a famous painter's
+   surname, "<Name> studied the urban fabric"), not just "Art Institute".
+5. **Fabricated anecdote / firsts (defect 4):** `_ANECDOTE_MARKER_RE` broadened to
+   the rephrased discovery/launch story ("one account", "tells of", "fledgling
+   artist", "opened doors to professional contracts", "springboard", "trajectory
+   from local obscurity") and the pioneering claim ("turning point", "opened a
+   door", "step into public view", "before this … confined to underground").
+6. **Hedge / off-venue biography (defect 5):** `_NO_DIRECT_TIE_RE` already caught
+   it; fixed the `_NATIONAL_FIGURE_RE` false positive ("born <Capital>" is now
+   case-sensitive, so "A Star is Born is known…" is kept).
+7. **Off-pin placement (defect 6):** `scrub_offpin_landmarks` keeps the
+   ~300 m-radius landmark check; `_ADMIN_GEOGRAPHY_RE` extended for the Hồ Tràm
+   relocation ("coastal commune", "N kilometers southeast", "Xuyên Mộc",
+   "Bà Rịa–Vũng Tàu", "sprawling new wards") and a bare "population … N million".
+8. **Crazy-street pin (defect 7):** resolves via `landmark_reference` + `pin_snap`
+   to Bùi Viện (10.767, 106.693) — delivered pin is 0 m off.
+9. **Date scope (defect 8):** the dated/anecdote drop is source-gated by the
+   stop's KIND; the documented-kind set was TIGHTENED (dropped "market", "gallery",
+   "park", "square", "tower", "theatre" — a thin/mis-resolved venue routinely
+   carries one, e.g. "Fruit Market") so a monument (Notre-Dame, a cathedral) keeps
+   "built 1863–1880" while a mis-resolved "Fruit Market" is still date-gated.
+10. **Thread safety (defect 9):** `_USER_STOP_TITLES` lives in a per-job
+    `contextvars` scope copied into the worker pool; a two-concurrent-jobs test
+    proves isolation.
+11. **Closer (defect 10):** for a user-stops tour `build_conclusion` forces the
+    thread to "the places you chose across <city>" (no derived period/subject, no
+    named example); `_COUNT_OPENER` now also matches a spelled-out count so the
+    number-spelled spine recap ("That's seven stops …") is stripped before the
+    thematic close.
+
+**New, robust controls (the step past whack-a-mole):**
+- `grounded_user_stop_body()` — when the scrub would drop EVERY sentence of a thin
+  user stop, the body is REPLACED with a deterministic 2–4 sentence description
+  built from what is known (name, kind, district, the listener's examples), which
+  can carry no date/anecdote/legend/landmark.
+- `strip_all_cross_stop_callbacks_in_text()` — a user-stops tour has no shared
+  thread, so EVERY cross-stop callback is dropped (budget zero); this removes the
+  phantom "sackbut you paused beside earlier".
+
+## Runner is now honest
+
+`run_local855b_live.py` adds the rephrased markers AND a **semantic defect scan**
+that re-runs the scrub + the user-stops callback strip over each delivered body;
+any sentence the scrub would still drop FAILS the run. The scan FAILS the old
+855 artifact (14 residual) — proof it is not vacuous.
+
+## Live — budget enforced, PASS
+
+`TASK_BUDGET_ID=LOCAL-855B TASK_BUDGET_USD=0.50`, meter contract, own meter dir
+`_local855b_meterlogs` (D753 Mac-local no-mount; never writes the live DB, never
+touches the shared `audioura-*` containers).
+
+**RUN A — Sophia's 7-stop biking tour** — `submission_artifacts/local855b/live_tour_7stops.txt`
+- 7/7 delivered (Rambutan, Longan, The Crazy street, Thi Bar Saigon, A Star is
+  Born, Acoustic Bar, An Spa);
+- title "Ho Chi Minh City, Vietnam - Cycling Tour" (not Museum);
+- all banned markers absent; **semantic defect scan clean**;
+- The Crazy street pin (10.7672, 106.693) is **0 m** from Bùi Viện;
+- closer: "the places you chose across Ho Chi Minh City" — no generic/century
+  thread, no "carry with you", no "sackbut" callback.
+
+**RUN B — 3-stop with a FAMOUS stop** — `submission_artifacts/local855b/live_tour_notredame_3stops.txt`
+- Notre-Dame Cathedral Basilica of Saigon keeps its sourced dates **1863 / 1877 /
+  1880** (defect 8 does not over-scrub a documented monument).
+
+Metered **$0.041 / $0.50** (`submission_artifacts/local855b/meter_ledger.json`).
+
+## Tests
+
+`tests/test_local855b_fixes.py` — **37 passed** (offline/deterministic): the ten
+defects plus the bounce rephrasings (Caillebotte/canvas, the rephrased Acoustic
+anecdote, the Thi pioneering claim, the An-Spa Hồ Tràm placement, the vague
+legend allusion), the national-figure false-positive guard, the grounded-body
+substitution, the user-stops cross-stop callback strip, and the spelled-recap
+strip. Full related regression (user-stop / conclusion / cross-stop / title
+suites): **207 passed, 3 skipped (network)**.
+
+## Files changed (855B)
+- `user_stop_narration.py` — broadened legend/anecdote/art/admin-geography/
+  national-figure detectors; `grounded_user_stop_body()`; tightened
+  documented-kind date gate; synthetic-poi now carries Address + examples.
+- `cross_stop_reference_guard.py` — `strip_all_cross_stop_callbacks_in_text()`
+  (user-stops zero-budget callback strip + broadened "paused beside … earlier").
+- `tour_conclusion.py` — user-stops thread override; `_COUNT_OPENER` matches a
+  spelled-out count.
+- `generate_tour_text.py` — wired the user-stops callback strip; passes
+  `user_stops` into `rebuild_conclusion`.
+- `run_local855b_live.py` (new) — budget-enforced two-run proof + the honest
+  semantic defect scan.
+- `tests/test_local855b_fixes.py` (new) — 37 tests.
+- `submission_artifacts/local855b/` — both delivered texts + meter ledger.

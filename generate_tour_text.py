@@ -5945,6 +5945,15 @@ _J = _jss.attach_to_module(__name__, {
     "_LAST_VENUE_PREFLIGHT": dict,
     "_LAST_PREFLIGHT_COST": dict,
     "_DIRECT_SNIPPETS_PER_STOP": dict,
+    # [LOCAL-855B defect 9] The clean display names of the user-chosen stops,
+    # per JOB. Was a plain module global (_USER_STOP_TITLES) — the cloud generator
+    # serves concurrent jobs in one process, so tour A's titles leaked into tour B
+    # and a second job's seeding overwrote the first's. Backed by the same per-job
+    # contextvars scope as the other _LAST_* holders (job_scoped_state), which the
+    # LOCAL-562 executor-context propagation copies into the narration/story worker
+    # ThreadPool — so each job reads only its own user-stop titles, in the main
+    # thread and in the workers.
+    "_USER_STOP_TITLES_NAMES": set,
     # [LOCAL-644] The LAST generation's structured records (Stop/Opening/Closing),
     # serialized to JSON-safe dicts, so the STOP-POOL orchestrator can carry the
     # generator's OWN records through the pool delivery instead of re-parsing the
@@ -9788,9 +9797,13 @@ _CA_CTX = _ca_threading.local()
 # recorded once at generation start. The narration subject-binding block and the
 # off-venue body scrub consult this as a fallback so they still fire for a user
 # stop even if a poi_list rebuild dropped the stop's `user_explicit` flag (the
-# D571 rebuild hazard). A folded-name set. NOT thread-local: the narration runs
-# in a worker ThreadPool, which must read what the main generation thread set.
-_USER_STOP_TITLES = {"names": set()}
+# D571 rebuild hazard). A folded-name set.
+#
+# [LOCAL-855B defect 9] PER JOB, not a module global. The store lives in the
+# per-job contextvars scope `_J._USER_STOP_TITLES_NAMES` (registered above), which
+# the LOCAL-562 executor-context propagation copies into the narration/story
+# worker ThreadPool. Two concurrent jobs in one process each see only their own
+# user-stop titles; a second job's seeding cannot overwrite the first's.
 
 
 def _set_user_stop_titles(names):
@@ -9805,12 +9818,21 @@ def _set_user_stop_titles(names):
         s = " ".join(s.split())
         if s:
             folded.add(s)
-    _USER_STOP_TITLES["names"] = folded
+    # Assign a fresh set into THIS job's scope (never mutate a shared object).
+    _J._USER_STOP_TITLES_NAMES = folded
+
+
+def _get_user_stop_titles() -> set:
+    """This job's folded user-stop title set (empty set when none seeded)."""
+    try:
+        return _J._USER_STOP_TITLES_NAMES or set()
+    except Exception:
+        return set()
 
 
 def _is_user_stop_title(name) -> bool:
     import unicodedata as _ud
-    folded = _USER_STOP_TITLES.get("names")
+    folded = _get_user_stop_titles()
     if not folded or not name:
         return False
     s = _ud.normalize("NFKD", str(name))
@@ -9998,6 +10020,21 @@ def _apply_delivery_hours_guard(result):
             if _n_recap:
                 print(f"  [LOCAL-627 #9] dropped {_n_recap} previous-stop recap / "
                       f"extra-bridge sentence(s) from delivered text", flush=True)
+            # [LOCAL-855B bounce] A USER-STOPS tour has no shared thread, so NO
+            # cross-stop callback is legitimate — the model invented a recurring
+            # "sackbut you paused beside earlier" motif across the Sophia stops.
+            # Strip every callback (budget zero) for this path only. Keyed on the
+            # per-job user-stop title store.
+            try:
+                if _get_user_stop_titles():
+                    final, _n_us_cb = _csrg.strip_all_cross_stop_callbacks_in_text(final)
+                    if _n_us_cb:
+                        print(f"  [LOCAL-855B] user-stops tour: dropped {_n_us_cb} "
+                              f"cross-stop callback sentence(s) (no shared thread)",
+                              flush=True)
+            except Exception as _uscb_e:  # pragma: no cover
+                _import_logger.error(f"[LOCAL-855B] user-stop callback strip "
+                                     f"skipped: {_uscb_e}")
         except Exception as _rce:  # pragma: no cover
             _import_logger.error(f"[LOCAL-627] text recap guard skipped: {_rce}")
         # 1d. [LOCAL-634] Drop any callback that tells the listener they already
@@ -10527,11 +10564,18 @@ def _apply_delivery_hours_guard(result):
                           f"(every-path guard)", flush=True)
                 else:
                     _concl_use_llm = not _has_thematic(final)
+                    # [LOCAL-855B defect 10] A user-stops tour must close on the
+                    # places the listener chose, never a derived period/subject
+                    # thread or a "<stop> is one you might carry with you." named
+                    # example. Signal it from the per-job user-stop title store.
+                    _concl_user_stops = bool(_get_user_stop_titles())
                     final = _rebuild_concl(final, venue_name=_concl_venue,
+                                           user_stops=_concl_user_stops,
                                            use_llm=_concl_use_llm)
                     print(f"  [LOCAL-619B] thematic conclusion built from final "
                           f"text (every-path guard): {_count_delivered(final)} "
                           f"delivered stop(s), venue={_concl_venue!r}, "
+                          f"user_stops={_concl_user_stops}, "
                           f"llm={'on' if _concl_use_llm else 'off (re-build)'}",
                           flush=True)
         except ImportError:
@@ -18030,7 +18074,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 "in the order shown (this order has been optimised algorithmically — do NOT change it):\n"
                 + "\n".join(s_lines) + "\n\n"
                 "For each stop IN THE EXACT ORDER ABOVE, provide all the JSON fields below.\n"
-                "For stop #1, 'directions_from_previous' should describe how to reach it from a reasonable arrival point (T station, parking, main street).\n"
+                "For stop #1, 'directions_from_previous' should describe how to reach it from a reasonable nearby arrival point (a main street, a central square, or a parking area). Do NOT name a specific transit station, line, or transit system unless it has been given to you in this stop's sourced facts — transit names are city-specific and must never be invented.\n"
                 f"For subsequent stops, 'directions_from_previous' should be {'turn-by-turn walking directions' if transport_mode == 'on_foot' else f'route directions suitable for {transport_mode} travel'} from the IMMEDIATELY PREVIOUS stop in the list.\n"
                 "IMPORTANT: each 'directions_from_previous' should END with one brief observational or connective sentence — "
                 "something the visitor might notice in transit (a change in architecture, a glimpse of something ahead, the sound of a market). "
@@ -24106,15 +24150,58 @@ Write the story FIRST, then add physical description if space allows.
                     # offensive). On-topic venue sentences are kept; never empties.
                     try:
                         import user_stop_narration as _usn855b
+                        # [LOCAL-855B] Resilient detection: re-mark the poi
+                        # user_explicit when its title matches a seeded user-stop
+                        # title, exactly as the subject-block site does. Without
+                        # this the scrub silently skipped stops whose flag a
+                        # poi_list rebuild had dropped (the D571 hazard) — which is
+                        # why the airport / Cần Thơ / 1975 / Hồ Chí Minh digressions
+                        # still shipped.
+                        if (not _usn855b.is_user_stop(poi)) and _is_user_stop_title(poi_name):
+                            poi["user_explicit"] = True
                         if _usn855b.is_user_stop(poi):
+                            # [LOCAL-855B defect 8] Pass the retrieved facts so the
+                            # scrub keeps sourced dates (a famous named stop keeps
+                            # "built 1863–1880") and only drops the fabrication
+                            # class when NO source names the venue.
+                            _of_855b = None
+                            try:
+                                _of_855b = _outdoor_facts
+                            except NameError:
+                                _of_855b = None
                             _d_scrub, _d_dropped = _usn855b.scrub_user_stop_body(
-                                description, poi, location, log=print)
+                                description, poi, location, log=print,
+                                outdoor_facts=_of_855b)
                             if _d_dropped:
                                 description = _d_scrub
                             _o_scrub, _o_dropped = _usn855b.scrub_user_stop_body(
-                                orientation, poi, location, log=print)
+                                orientation, poi, location, log=print,
+                                outdoor_facts=_of_855b)
                             if _o_dropped:
                                 orientation = _o_scrub
+                            # [LOCAL-855B defect 6] A user stop's orientation/body
+                            # may cite a landmark only when it is within ~300 m of
+                            # the stop's OWN pin (An Spa, District 3, was placed at
+                            # the District-1 Municipal Theatre / Đồng Khởi / Lam Sơn
+                            # Square ~1.5 km away). Resolve each named landmark and
+                            # drop the sentence when it is off-pin. Live Wikidata
+                            # P625 lookup is used when available; the offline table
+                            # covers the HCMC anchors.
+                            try:
+                                import wikidata_landmark_lookup as _wll855b
+                                _lm_fn_855b = (lambda _n: _wll855b.lookup(_n))
+                            except Exception:
+                                _lm_fn_855b = None
+                            _od_scrub, _od_dropped = _usn855b.scrub_offpin_landmarks(
+                                description, poi, location, log=print,
+                                landmark_fn=_lm_fn_855b)
+                            if _od_dropped:
+                                description = _od_scrub
+                            _oo_scrub, _oo_dropped = _usn855b.scrub_offpin_landmarks(
+                                orientation, poi, location, log=print,
+                                landmark_fn=_lm_fn_855b)
+                            if _oo_dropped:
+                                orientation = _oo_scrub
                     except Exception as _usn855b_err:
                         print(f"  [LOCAL-855] user-stop body scrub skipped: "
                               f"{_usn855b_err}")
@@ -28610,6 +28697,33 @@ REWRITE RULES (all mandatory):
     else:
         _display_category = tour_category.replace('_', ' ').title()
 
+    # [LOCAL-855B defect 1] A USER-CHOSEN-STOPS tour is a list of named venues the
+    # listener typed — it is never a museum, so its title must never read
+    # "… - Museum Tour". The delivered Sophia biking tour shipped titled
+    # "… the biking category - Museum Tour": an upstream classify flip left
+    # tour_category=='museum' and transport_mode landed on 'on_foot' at this
+    # point, so the else branch above wrote "Museum". Fix it at the title builder
+    # (the ticket's instruction): when any delivered stop is user-chosen
+    # (user_explicit / _anchor) and the computed label is the museum label, use
+    # the transport mode's own display name when we have one (Cycling/Driving/…),
+    # else the neutral "Places". Non-user-stop museum tours are untouched.
+    try:
+        _us_tour_855b = any(
+            isinstance(_p, dict) and (_p.get('user_explicit') or _p.get('_anchor'))
+            for _p in (poi_list or []))
+        if not _us_tour_855b:
+            # Fall back to the generation-scoped user-stop title list, which
+            # survives poi_list rebuilds that drop the per-stop flag (D571).
+            _us_tour_855b = bool(_get_user_stop_titles())
+    except Exception:
+        _us_tour_855b = False
+    if _us_tour_855b and (tour_category == 'museum'
+                          or _display_category.strip().lower() == 'museum'):
+        _mode_label_855b = _TRANSPORT_DISPLAY_NAMES.get(transport_mode)
+        _display_category = _mode_label_855b or 'Places'
+        print(f"  [LOCAL-855B] user-stops tour — title category forced off "
+              f"'museum' to '{_display_category}' (a named-venue list is not a museum)")
+
     # [LOCAL-843] CATEGORY-LABEL LEAK FIX. 'restaurant' is the INTERNAL name of the
     # places/business arm (dining and non-food businesses share it). For a tour
     # whose request is NOT about food — an activity-provider request ("Kitesurf
@@ -28666,6 +28780,14 @@ REWRITE RULES (all mandatory):
     # places/business tour — use the neutral machine category computed above.
     if _neutral_header_843:
         _header_category = _neutral_header_843
+    # [LOCAL-855B defect 1] The machine header must not say 'museum' for a
+    # user-stops movement tour either (the app surfaces it as metadata + icon).
+    # Mirror the display-label fix: biking → 'biking', other modes → the mode,
+    # on_foot → 'walking'.
+    if _us_tour_855b and _header_category == 'museum':
+        _header_category = {'bike': 'biking', 'vehicle': 'driving',
+                            'animal': 'animal', 'country_scale': 'road_trip'
+                            }.get(transport_mode, 'walking')
     complete_tour = tour_title + "\n" + f"Tour-Category: {_header_category}" + "\n\n"
 
     # -------- [LOCAL-11] Venue-identity mining (free path — no new API calls) --------
@@ -31902,9 +32024,22 @@ RULES:
         # conclusion (it is thematic + count-correct), so the discovered theme and
         # the LLM body survive to delivery.
         with _sub_step('packing_conclusion_llm'):
+            # [LOCAL-855B defect 10] A user-stops tour gets no generic
+            # "<first stop> is one you might carry with you." closer. Detect it
+            # from the delivered stops' flags, with the generation-scoped
+            # user-stop title set as the rebuild-proof fallback.
+            try:
+                _us_concl_855b = any(
+                    isinstance(_p, dict)
+                    and (_p.get('user_explicit') or _p.get('_anchor'))
+                    for _p in (poi_list or []))
+                if not _us_concl_855b:
+                    _us_concl_855b = bool(_get_user_stop_titles())
+            except Exception:
+                _us_concl_855b = False
             complete_tour = _rebuild_concl(
                 complete_tour, venue_name=_concl_venue, theme=_concl_theme,
-                use_llm=True)
+                user_stops=_us_concl_855b, use_llm=True)
         _n_after = _count_delivered(complete_tour)
         print(f"  [LOCAL-619B] thematic conclusion built from final text: "
               f"{_n_after} delivered stop(s)"
@@ -32505,6 +32640,39 @@ RULES:
     _phase_timer.start('verification')  # End packing, start verification marker
     _phase_timer.end('verification')  # Immediately end (verification is interspersed above)
     _phase_timer.summary()
+
+    # [LOCAL-855B] FINAL-TEXT user-stop scrub — THE LAST WORD on the delivered
+    # text. The per-stop scrub runs inside the generation loop, but several later
+    # passes rewrite complete_tour (scorer-retry, story-spine render, the
+    # LOCAL-826B/831 delivery finalize), reintroducing the fabrications a user
+    # stop must not carry (the airport sentence, the 1975 offensive, the VietPride
+    # date, a dragon legend, an off-pin landmark). Running here — after every
+    # rewrite, just before return — guarantees whatever ships is scrubbed. Only
+    # user stops are touched; a famous/sourced stop keeps its dates. Guarded.
+    try:
+        import user_stop_narration as _usn855f
+        _us_titles_855f = sorted(_get_user_stop_titles())
+        if _us_titles_855f and complete_tour:
+            try:
+                import wikidata_landmark_lookup as _wll855f
+                _lm_fn_855f = (lambda _n: _wll855f.lookup(_n))
+            except Exception:
+                _lm_fn_855f = None
+            complete_tour, _n_fscrub = _usn855f.scrub_tour_text_user_stops(
+                complete_tour, _us_titles_855f, location, log=print,
+                landmark_fn=_lm_fn_855f)
+            if _n_fscrub:
+                print(f"  [LOCAL-855B] final-text user-stop scrub dropped "
+                      f"{_n_fscrub} sentence(s) from the delivered text")
+                if output_file:
+                    try:
+                        with open(output_file, "w", encoding="utf-8") as _fsf:
+                            _fsf.write(complete_tour)
+                    except Exception:
+                        pass
+    except Exception as _fscrub_err:
+        print(f"  [LOCAL-855B] final-text user-stop scrub skipped (non-fatal): "
+              f"{_fscrub_err}")
 
     return complete_tour, output_file, first_poi_coordinates
 

@@ -113,8 +113,11 @@ _THREAD_OPENER = re.compile(
     r'|On this tour you have followed the thread\b)',
 )
 # A bare single-/zero-stop count opener (no From→to), also treated as a recap.
-_COUNT_OPENER = re.compile(r"\bThat['\u2019]s\s+\d+\s+stops?\b",
-                           re.IGNORECASE)
+_COUNT_OPENER = re.compile(
+    r"\bThat['\u2019]s\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|"
+    r"ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|"
+    r"nineteen|twenty)\s+stops?\b",
+    re.IGNORECASE)
 # Sign-off / treat / news offer openers that trail some closings — swept so the
 # restaurant sentence is the genuine LAST sentence of the rebuilt conclusion.
 _TRAILING_OFFER_PATTERNS = (
@@ -1075,6 +1078,7 @@ def build_conclusion(
     theme: Optional[str] = None,
     restaurant_offer: bool = True,
     offer_text: Optional[str] = None,
+    user_stops: bool = False,
     use_llm: bool = False,
     llm_fn=None,
     api_key: Optional[str] = None,
@@ -1156,6 +1160,28 @@ def build_conclusion(
         stops, venue_name=venue_name,
         is_art_tour=_is_art, request_theme=_request_theme)
     thread_phrase = theme or common.get("thread_phrase") or ""
+    # [LOCAL-855B defect 10 — bounce] A USER-STOPS tour has NO discovered subject
+    # or period thread; the places were chosen by the listener. The derived
+    # common element on the Sophia tour was "the history of the twenty-first
+    # century" (every stop's scrubbed body left a 2025 reference), producing the
+    # false closer "one thread runs through: the history of the twenty-first
+    # century. … they trace how this place changed across the twenty-first
+    # century." For a user-stops tour the honest thread is the places the listener
+    # chose across the city — never a fabricated period/subject thread. Force it
+    # and give it a matching meaning so the closer names the ACTUAL thread.
+    if user_stops:
+        v = (venue_name or "").strip()
+        thread_phrase = (f"the places you chose across {v}" if v
+                         else "the places you chose on this route")
+        common = dict(common)
+        common["thread_phrase"] = thread_phrase
+        common["meaning"] = (
+            "Each was picked by you, and together they trace your own route "
+            "through the city.")
+        # Suppress any derived subject/period so the template names no example
+        # and asserts no period thread.
+        common["subject_phrase"] = ""
+        common["period_label"] = ""
     if not thread_phrase:
         v = (venue_name or "").strip()
         if _is_art:
@@ -1166,8 +1192,11 @@ def build_conclusion(
 
     # Build the thematic body (a)+(b)[+c]. Try the LLM first when asked; validate
     # against the delivered stops; fall back to the deterministic template.
+    # [LOCAL-855B defect 10] For a user-stops tour, skip the LLM body: the
+    # deterministic template (with the generic named example suppressed) is the
+    # correct close, and the LLM could re-introduce a stop-naming closer.
     body = ""
-    if use_llm:
+    if use_llm and not user_stops:
         body = _llm_thematic_body(
             stops, thread_phrase=thread_phrase, theme=theme,
             venue_name=venue_name, titles=titles,
@@ -1183,7 +1212,7 @@ def build_conclusion(
     if not body:
         body = _template_thematic_body(
             stops, thread_phrase=thread_phrase, theme=theme,
-            common=common, titles=titles, n=n)
+            common=common, titles=titles, n=n, user_stops=user_stops)
 
     # [LOCAL-652] Final enforcement: if the body still names a foreign work/artist
     # (e.g. a template example lifted from a stray title), strip the offending
@@ -1464,7 +1493,7 @@ def _derive_common_elements(stops: List[Dict], *, venue_name: str = "",
 
 def _template_thematic_body(
     stops: List[Dict], *, thread_phrase: str, theme: str, common: Dict,
-    titles: List[str], n: int,
+    titles: List[str], n: int, user_stops: bool = False,
 ) -> str:
     """Deterministic thematic body (a)+(b)[+c] — the fallback and the no-key path.
 
@@ -1472,6 +1501,12 @@ def _template_thematic_body(
     thread is a derived/venue phrase (not a strong subject/period), ONE delivered
     title may be named as a single illustrative example — never a list, never
     "From X to Y".
+
+    [LOCAL-855B defect 10] For a USER-STOPS tour the optional named example is
+    SUPPRESSED. On the Sophia tour it produced "Rambutan is one you might carry
+    with you." — a generic closer naming the first stop for no thematic reason. A
+    user-stops tour has no discovered subject/period thread to make one stop the
+    memorable example, so the close is the thread + meaning only.
     """
     thread_phrase = (thread_phrase or "this collection").strip()
     meaning = common.get("meaning") or (
@@ -1485,9 +1520,10 @@ def _template_thematic_body(
 
     # (c) OPTIONAL single example — only when the thread is generic (no strong
     # subject/period element), to keep the close concrete. At most ONE title.
+    # Never for a user-stops tour (LOCAL-855B defect 10).
     example_sentence = ""
     strong = bool(common.get("subject_phrase") or common.get("period_label"))
-    if not strong and titles:
+    if not strong and titles and not user_stops:
         example = _best_example_title(stops) or titles[0]
         if example:
             example_sentence = f"{example} is one you might carry with you."
@@ -1894,6 +1930,7 @@ def rebuild_conclusion(
     theme: Optional[str] = None,
     restaurant_offer: bool = True,
     offer_text: Optional[str] = None,
+    user_stops: bool = False,
     use_llm: bool = False,
     llm_fn=None,
     api_key: Optional[str] = None,
@@ -1930,6 +1967,7 @@ def rebuild_conclusion(
         theme=theme,
         restaurant_offer=restaurant_offer,
         offer_text=offer_text,
+        user_stops=user_stops,
         use_llm=use_llm,
         llm_fn=llm_fn,
         api_key=api_key,
