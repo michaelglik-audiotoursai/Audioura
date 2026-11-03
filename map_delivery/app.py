@@ -145,6 +145,13 @@ def get_tour_by_code(code):
         conn = get_db_connection()
         cur = conn.cursor()
 
+        # [LOCAL-856] Safety net: ensure the additive audio_tour_id column exists
+        # before we read it, in case this process started before the column was
+        # added (or the boot-time ensure was skipped by a transient DB blip).
+        # Idempotent and cached, so this is a no-op after the first request.
+        _ensure_shared_tours_audio_tour_id(cur)
+        conn.commit()
+
         # ST-1 put the reference here. Legacy rows predate it and hold NULL; they
         # resolve through their stored text and cannot be surfaced as a map entry, so
         # they are a clean 404 rather than a half-populated row.
@@ -320,6 +327,67 @@ def get_db_connection():
         password=os.getenv('DB_PASSWORD', 'password123'),
         port=os.getenv('DB_PORT', '5432')
     )
+
+# [LOCAL-856] Has the shared_tours.audio_tour_id ensure already run in THIS
+# process? Cached so the DDL is attempted at most once per process (same pattern
+# as _HAS_UNLOCK_CONSUMPTION_COLS below).
+_HAS_SHARED_TOURS_AUDIO_TOUR_ID = False
+
+
+def _ensure_shared_tours_audio_tour_id(cur):
+    """[LOCAL-856] Self-healing, ADDITIVE ensure of shared_tours.audio_tour_id.
+
+    This service OWNS the shared_tours read path (/tour-by-code), whose query
+    selects audio_tour_id. The ADD COLUMN that creates it, however, lived only in
+    the write service (tour_sharing._ensure_shared_tours_table, repo root), which
+    is not in THIS image's build context (map_delivery/, COPY . .). On the cloud
+    map-delivery therefore never ran the ALTER, the column never appeared, and
+    EVERY /tour-by-code 404'd (the SELECT raised, caught as 'tour not found').
+
+    The fix is the same inline, idempotent DDL the sibling services use: an
+    ``ALTER TABLE ... ADD COLUMN IF NOT EXISTS`` run here, where the column is
+    read. Additive and nullable on purpose — existing rows keep working with
+    audio_tour_id NULL, nothing is dropped, nothing is backfilled. Caches success
+    so the DDL is touched at most once per process. Does NOT commit (the caller
+    owns the transaction). Logs the required marker exactly once on success."""
+    global _HAS_SHARED_TOURS_AUDIO_TOUR_ID
+    if _HAS_SHARED_TOURS_AUDIO_TOUR_ID:
+        return True
+    cur.execute(
+        "ALTER TABLE shared_tours ADD COLUMN IF NOT EXISTS audio_tour_id INTEGER"
+    )
+    _HAS_SHARED_TOURS_AUDIO_TOUR_ID = True
+    print("[LOCAL-856] shared_tours.audio_tour_id ensured")
+    sys.stdout.flush()
+    return True
+
+
+def _ensure_shared_tours_audio_tour_id_at_start():
+    """[LOCAL-856] Run the shared_tours.audio_tour_id ensure once at service start,
+    on its own connection/transaction, so the column exists before the first
+    /tour-by-code request rather than only being healed lazily on the first read.
+    Best-effort and strictly non-fatal: a DB blip at boot must never stop the
+    service coming up (the lazy ensure inside get_tour_by_code is the safety net).
+    The table itself must already exist (the schema creates shared_tours); this
+    only adds the additive column, so a missing table is logged and skipped."""
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        _ensure_shared_tours_audio_tour_id(cur)
+        conn.commit()
+        cur.close()
+    except Exception as e:  # pragma: no cover - boot-time best effort
+        print(f"[LOCAL-856] startup ensure of shared_tours.audio_tour_id skipped "
+              f"(non-fatal): {e}")
+        sys.stdout.flush()
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
 
 def _ensure_tour_reports_table(cur):
     """LOCAL-724 item 5: self-healing create of tour_reports (migration 042), so
@@ -3842,6 +3910,13 @@ def _geocode_via_nominatim(query):
     print(f"GEOCODE: nominatim '{query}' -> {name} ({lat},{lng})")
     sys.stdout.flush()
     return {'lat': lat, 'lng': lng, 'name': name}
+
+
+# [LOCAL-856] Ensure the additive shared_tours.audio_tour_id column at service
+# start — on import, so it runs under both `python app.py` and any WSGI server
+# that imports this module without executing __main__. Non-fatal; the lazy ensure
+# inside /tour-by-code is the safety net.
+_ensure_shared_tours_audio_tour_id_at_start()
 
 
 if __name__ == '__main__':

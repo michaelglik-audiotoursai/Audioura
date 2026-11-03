@@ -109,6 +109,20 @@ CORS(app)
 from sharing_endpoints import sharing_bp
 app.register_blueprint(sharing_bp)
 
+# [LOCAL-856] Ensure the shared_tours schema (table + additive audio_tour_id
+# column) at service start, since this service owns the share WRITE path. The
+# cloud 404'd /tour-by-code because the column was only ever created by this
+# write path and that path was never exercised there; running the ensure at
+# start guarantees the column exists regardless. Best-effort and non-fatal.
+try:
+    from tour_sharing import ensure_shared_tours_schema as _ensure_shared_tours_schema
+    _ensure_shared_tours_schema(
+        os.getenv('DATABASE_URL',
+                  'postgresql://admin:admin@localhost:5432/audiotours'))
+except Exception as _share_ensure_err:  # pragma: no cover - boot-time best effort
+    print(f"[LOCAL-856] startup ensure of shared_tours skipped (non-fatal): "
+          f"{_share_ensure_err}", flush=True)
+
 # Register referral blueprint (LOCAL-114: POST /referral/create + POST /referral/redeem)
 from referral_endpoints import referral_bp
 app.register_blueprint(referral_bp)

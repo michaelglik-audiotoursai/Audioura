@@ -733,7 +733,7 @@ signal.signal(signal.SIGTERM, _graceful_shutdown)
 
 
 def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, request_string,
-                        language, stops=None):
+                        language, stops=None, is_test=None):
     """Enqueue a tour generation task to Cloud Tasks.
     The task will HTTP-push to tour-worker's /run-job endpoint."""
     try:
@@ -760,7 +760,16 @@ def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, reque
             # the worst shape of bug, because local testing proves nothing about it.
             # Omitted entirely when absent, so the worker's payload is unchanged for
             # ordinary requests.
-            **({"stops": stops} if stops else {})
+            **({"stops": stops} if stops else {}),
+            # [LOCAL-856] Carry the resolved is_test flag onto the CLOUD path too.
+            # Like `stops` above, this function did not take it, so a request that
+            # resolved is_test=True reached the local thread worker (which forwards
+            # it to orchestrate_tour_async → store_audio_tour) but was SILENTLY
+            # DROPPED the moment Cloud Tasks was the transport — the tour-worker
+            # then fell back to the TOUR_TEST_MODE env (false in prod) and stored
+            # is_test=false. Sophia's re-run hit exactly this. Omitted when not True
+            # so ordinary requests carry no extra field and the env default stands.
+            **({"is_test": True} if is_test else {}),
         })
 
         task = {
@@ -791,8 +800,14 @@ def _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id, reque
         return False
 
 
-def _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request_string, language):
-    """Create a job row in job_status table (for database-backed job tracking)."""
+def _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request_string, language,
+                      is_test=None):
+    """Create a job row in job_status table (for database-backed job tracking).
+
+    [LOCAL-856] ``is_test`` (the flag already resolved by /generate under the
+    LOCAL-103 trust boundary) is persisted in output_data so the worker/status
+    paths can recover it. Only stored when True — an absent/False flag keeps
+    output_data unchanged and the worker falls back to its env default."""
     try:
         import psycopg2
         conn = psycopg2.connect(
@@ -803,11 +818,14 @@ def _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request
             port=os.getenv('DB_PORT', '5432')
         )
         cur = conn.cursor()
-        output_data = json.dumps({
+        _output = {
             "user_id": user_id,
             "request_string": request_string,
             "language": language,
-        })
+        }
+        if is_test:
+            _output["is_test"] = True
+        output_data = json.dumps(_output)
         cur.execute("""
             INSERT INTO job_status (job_id, service_name, status, progress, location, tour_type, total_stops, output_data)
             VALUES (%s, 'tour-orchestrator', 'queued', 'Job queued for processing', %s, %s, %s, %s)
@@ -4041,9 +4059,10 @@ def generate_complete_tour():
     if _use_cloud_tasks:
         # Part B: Enqueue to Cloud Tasks — worker does generation synchronously
         # Job state lives in Cloud SQL (job_status table), readable by any instance
-        _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request_string, language)
+        _create_job_in_db(job_id, location, tour_type, total_stops, user_id, request_string, language,
+                          is_test=is_test_override)
         enqueued = _enqueue_cloud_task(job_id, location, tour_type, total_stops, user_id,
-                                       request_string, language, stops)
+                                       request_string, language, stops, is_test=is_test_override)
         if not enqueued:
             # Fallback: if Cloud Tasks enqueue fails, fall back to thread
             print(f"[CLOUD_TASKS] Enqueue failed, falling back to thread mode for job {job_id}")
