@@ -1,0 +1,11 @@
+# [LOCAL-854] keep the build context tiny.
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+tile_cache/
+*.md
+test_app.py
+.DS_Store

@@ -40,6 +40,7 @@ import '../services/communities_service.dart';
 import '../services/builder_location_provider.dart';
 import '../services/resilient_tile_provider.dart';
 import '../config/map_tiles.dart';
+import '../widgets/osm_attribution.dart';
 
 /// [LOCAL-758] The tile provider used by the builder's maps. Production uses the
 /// real network tiles (OpenStreetMap). Widget tests swap in
@@ -1127,6 +1128,8 @@ class _MapPickerScreenState extends State<_MapPickerScreen> {
                     ),
                   ],
                 ),
+              // [LOCAL-854] OSM attribution stays visible (tiles are OSM data).
+              const OsmAttribution(),
             ],
           ),
           const Positioned(

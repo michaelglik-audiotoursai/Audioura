@@ -29,33 +29,44 @@ class MapTiles {
   /// agent is throttled. Unchanged from the previous hardcoded value.
   static const String userAgentPackageName = 'com.audioura.audiotours';
 
-  /// The primary tile URL template. Default unchanged: the live OSM host.
-  /// Overridable at build time via
-  /// `--dart-define=MAP_TILE_URL=https://…/{z}/{x}/{y}.png` so LEAD can point
-  /// the app at a CDN-backed provider or our own caching proxy WITHOUT a code
-  /// change (the key, if any, is baked into the template there).
+  /// The primary tile URL template.
+  ///
+  /// [LOCAL-854] (D757) The default is now OUR tile-cache proxy, not the OSM
+  /// host directly. The proxy (tile_proxy/, deployed as the Cloud Run service
+  /// `tile-proxy-subscribed`) is a read-through cache in front of a tile
+  /// origin: it honours OSM's tile-usage policy (one identified client, cached,
+  /// no bulk prefetch) and survives the Vietnam DNS/connect failures that greyed
+  /// the Home map, by serving stale cached tiles when the origin is unreachable.
+  ///
+  /// The value below is a NON-SECRET placeholder host — there is no key or
+  /// account baked into the app. The real proxy URL is supplied at build time
+  /// via `--dart-define=MAP_TILE_URL=https://<cloud-run-host>/{z}/{x}/{y}.png`,
+  /// so LEAD can repoint the app (proxy host, CDN, or MapTiler-backed proxy)
+  /// WITHOUT a code change. Direct OSM remains only as the LAST fallback below.
   static const String primaryTemplate = String.fromEnvironment(
     'MAP_TILE_URL',
-    defaultValue: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    defaultValue: 'https://tile-proxy-subscribed.audioura.com/{z}/{x}/{y}.png',
   );
 
-  /// Fallback tile URL templates, tried in order ONLY when [primaryTemplate]'s
-  /// host fails to resolve or connect. Each uses the identical
-  /// `{z}/{x}/{y}.png` contract and is key-less + OSM-tile-policy compatible,
-  /// so no account is needed. These are community/CDN mirrors of the same
-  /// OSM raster tiles; LEAD may replace them with a commercial CDN provider.
+  /// Fallback tile URL templates, tried in order ONLY when [primaryTemplate]
+  /// (the proxy) fails to resolve or connect. Each uses the identical
+  /// `{z}/{x}/{y}.png` contract and is key-less, so no account is needed.
   ///
-  /// NB: the OSM Foundation asks heavy/commercial apps NOT to lean on
-  /// tile.openstreetmap.org — these mirrors are a stop-gap so the map survives
-  /// a primary-host DNS failure; the long-term answer is the CDN provider LEAD
-  /// picks from the comparison. Overridable via
+  /// [LOCAL-854] (D757) The primary is now our cache proxy, so these are the
+  /// DEGRADED path used only if the proxy is itself unreachable. They are the
+  /// OSM CDN mirrors, with the canonical `tile.openstreetmap.org` host LAST:
+  /// direct OSM is the final fallback, matching D757's requirement that the app
+  /// never relies on OSM first. The OSM Foundation asks heavy/commercial apps
+  /// NOT to lean on these hosts, which is exactly why the proxy is primary;
+  /// they stay only so the map survives a total proxy outage. Overridable via
   /// `--dart-define=MAP_TILE_FALLBACKS=url1,url2`.
   static const String _rawFallbacks = String.fromEnvironment(
     'MAP_TILE_FALLBACKS',
     defaultValue:
         'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png,'
         'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png,'
-        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png,'
+        'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
   );
 
   static List<String> get fallbackTemplates => _rawFallbacks

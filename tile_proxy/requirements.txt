@@ -1,0 +1,7 @@
+# [LOCAL-854] tile_proxy runtime dependencies (pinned).
+Flask==3.0.3
+gunicorn==22.0.0
+requests==2.32.3
+# GCS client is only needed when TILE_CACHE_BUCKET is set (Cloud Run). It is
+# harmless locally: the local-dir cache path never imports it.
+google-cloud-storage==2.18.2
