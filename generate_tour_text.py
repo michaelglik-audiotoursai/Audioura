@@ -32868,6 +32868,39 @@ RULES:
         print(f"  [LOCAL-855B] final-text user-stop scrub skipped (non-fatal): "
               f"{_fscrub_err}")
 
+    # [LOCAL-855D item 3] FACT-SHEET VERIFICATION — the second bounce proved
+    # regexes cannot win the fabrication fight (every phrasing the scrub learned,
+    # the narrator re-invented). The 855B regex scrub above stays as the cheap
+    # first pass; this adds ONE cheap gpt-4.1-mini call per tour that batches ALL
+    # user stops into a single JSON request, labels each body sentence SUPPORTED /
+    # SENSORY / UNSUPPORTED against a FACT SHEET of what is actually known, drops
+    # the UNSUPPORTED ones, and falls back to grounded_user_stop_body() when fewer
+    # than 2 survive. NO new regex is added. Logs per stop; reports added cost
+    # (well under $0.005). Guarded; a failed/absent call leaves the regex-scrubbed
+    # text untouched.
+    try:
+        import user_stop_verify as _usv855d
+        _us_titles_855d = sorted(_get_user_stop_titles())
+        if _us_titles_855d and complete_tour:
+            complete_tour, _usv_rep = _usv855d.verify_user_stops_in_text(
+                complete_tour, _us_titles_855d, location,
+                api_key=api_key, log=print)
+            if _usv_rep.get("ran"):
+                print(f"  [LOCAL-855D] fact-sheet verify: dropped "
+                      f"{_usv_rep.get('dropped_total', 0)} UNSUPPORTED sentence(s) "
+                      f"across {len(_usv_rep.get('stops', []))} user stop(s); "
+                      f"added cost ${_usv_rep.get('cost_usd', 0.0):.5f} "
+                      f"(in={_usv_rep.get('input_tokens', 0)} "
+                      f"out={_usv_rep.get('output_tokens', 0)} tok)")
+                if output_file:
+                    try:
+                        with open(output_file, "w", encoding="utf-8") as _vf:
+                            _vf.write(complete_tour)
+                    except Exception:
+                        pass
+    except Exception as _usv_err:
+        print(f"  [LOCAL-855D] fact-sheet verify skipped (non-fatal): {_usv_err}")
+
     return complete_tour, output_file, first_poi_coordinates
 
 if __name__ == "__main__":
