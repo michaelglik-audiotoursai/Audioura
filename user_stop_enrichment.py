@@ -773,7 +773,12 @@ def gather_material(poi: Dict, location: str, *, places_fn=None,
             if claim and len(claim) >= 40 and not claim.endswith(("...", "…")):
                 add("unconfirmed", claim, url, layer=3)
             else:
-                add("story", sn["text"], url)
+                try:   # [LOCAL-862C] a review/web definition never redefines the kind
+                    import user_stop_context as _uscA
+                    stext = _uscA.attribute_story(sn["text"], name, category)
+                except Exception:
+                    stext = sn["text"]
+                add("story", stext, url)
 
     # 5) [LOCAL-862B / D760] layer 2 (true connected context) and layer 3 (a
     # disclosed legend). Sourced from Wikipedia + Serper, tied to the venue's NAME,
@@ -998,7 +1003,14 @@ _NARR_SYSTEM = (
     "confirm this, but ...' (that includes the fact 'The venue may have taken its "
     "name from that title': say 'We couldn't confirm this, but the name may nod to "
     "it'). Never state a layer-3 fact as plain fact, and never put "
-    "a disclosure on a layer-1 or layer-2 sentence.\n"
+    "a disclosure on a layer-1 or layer-2 sentence. A [legend] fact is ONE short "
+    "retelling: tell it as ONE block of consecutive sentences with the disclosure "
+    "ONLY on its first sentence, self-contained; never split it up or mix it with "
+    "other facts.\n"
+    "KIND: what kind of place the venue is comes ONLY from the Google Maps category "
+    "fact. A story or review fact that describes it as something else is what "
+    "reviewers or web pages SAY ('reviews mention live bands'); never let it "
+    "redefine the venue. Never repeat the same name twice in one list or sentence.\n"
     "RULES (strict):\n"
     "- Every claim comes from the FACT LIST. Do not use anything you know from "
     "memory. Do not add a year, a person, an event, a 'first', a dish, decor, a "
@@ -1260,6 +1272,7 @@ def enrich_user_stops_in_text(
     per_stop_llm = (report["llm_cost_usd"] / len(batch)) if batch else 0.0
 
     # apply — walk headers bottom-up so line indices stay valid
+    bridge_by_title: Dict[str, str] = {}
     by_title = {w["title"]: w for w in work if not w.get("landmark")}
     id_of = {w["title"]: i for i, w in enumerate(rich)}
     for h_idx in range(len(headers) - 1, -1, -1):
@@ -1295,16 +1308,26 @@ def enrich_user_stops_in_text(
             try:
                 import user_stop_context as _usc2
                 if body_:
-                    body_, n_fix = _usc2.ensure_disclosure(body_, select_facts(mat))
+                    sel_ = select_facts(mat)
+                    # [LOCAL-862C] a legend is ONE coherent block, disclosed once
+                    body_, n_leg = _usc2.apply_legend_blocks(body_, sel_)
+                    body_, n_fix = _usc2.ensure_disclosure(body_, sel_)
                     if n_fix and log:
                         log(f"[LOCAL-862B] {title}: added the disclosure marker to "
                             f"{n_fix} layer-3 sentence(s)")
+                    # [LOCAL-862C] bridge from the name to the venue
+                    body_, br_ = _usc2.insert_bridge(body_, title, sourced_kind(title, mat), sel_)
+                    if br_:
+                        bridge_by_title[title] = br_
+                    body_ = " ".join(_usc2.dedupe_names(x) for x in _split_sentences(body_))
+                    body_ = _usc2.kind_guard(body_, mat.get("category") or "")
             except Exception:
                 pass
             _rewrite_block(lines, start, end, text, ori, body_)
             entry.update(mode="narrated", llm_cost_usd=round(per_stop_llm, 6),
                          narration=text, used=nar.get("used"))
-            report["material_by_title"][title] = material_lines(mat)
+            report["material_by_title"][title] = material_lines(mat) + (
+                [f"[context] {bridge_by_title[title]}"] if title in bridge_by_title else [])
             report["specifics_ge2"] += 1
         else:
             body = thin_stop_body(w["poi"], mat, location)

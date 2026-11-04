@@ -1,0 +1,19 @@
+== (a) legend source facts from 862B through the 862C block gate ==
+  Rambutan: OMITTED (fragment / does not tie back to the name)
+  Longan: OMITTED (fragment / does not tie back to the name)
+
+== (b) final bridge / kind guard on the live 862C facts ==
+  The Crazy street     category='Tourist attraction' bridge=None
+  Thi Bar Saigon       category='Gay bar'            bridge=None
+  Rambutan             category=''                   bridge='Its name probably comes from the rambutan fruit.'
+  A Star is Born       category=''                   bridge='Its name probably comes from a well-known title.'
+  Longan               category=''                   bridge='Its name probably comes from the longan fruit.'
+  An Spa               category='Massage spa'        bridge=None
+  Acoustic Bar         category='Live music bar'     bridge=None
+
+  Thi Bar before: Thi Bar Saigon is rated 4.4 out of 5 from about 1,200 Google reviews and is known as a live music bar with events like drag shows and pride celebrations. The gay scene in
+  Thi Bar after : Thi Bar Saigon is rated 4.4 out of 5 from about 1,200 Google reviews and reviews describe it as a live music bar with events like drag shows and pride celebrations. The gay scene in Ho Chi Minh City i
+
+== (c) 862B Thi Bar sentence, duplicate street name ==
+  before: The bar is located on Đề Thám Street, which along with Phạm Ngũ Lão and Đề Thám Streets, forms Saigon's Backpacker District.
+  after : The bar is located on Đề Thám Street, which along with Phạm Ngũ Lão Street, forms Saigon's Backpacker District.

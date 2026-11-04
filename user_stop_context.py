@@ -47,6 +47,8 @@ __all__ = [
     "ensure_disclosure", "has_disclosure", "is_name_meaning_sentence", "name_words",
     "street_from_address", "gather_context", "layer_gate", "layer_tag",
     "strip_layer_tag", "clear_cache",
+    "legend_block", "legend_block_text", "apply_legend_blocks", "enforce_legend_blocks",
+    "bridge_sentence", "insert_bridge", "dedupe_names", "attribute_story", "kind_guard",
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -351,8 +353,10 @@ def _name_meaning_facts(word: str, wiki_fn, calls: Dict) -> Tuple[List[Dict], Li
             ss = [_clean_sentence(x) for x in _split_sentences(b)]
             ss = [x for x in ss if x and _good_sentence(x, lo=25)]
             if ss and _LEGEND_CUE_RE.search(ss[0]) or (ss and re.search(r"(?i)\btells\b", ss[0])):
-                leg.append({"kind": "legend", "layer": 3, "text": " ".join(ss[:3]),
-                            "source": src, "specific": True})
+                blk = legend_block(ss[:4], word)      # [LOCAL-862C] one coherent block, or none
+                if blk:
+                    leg.append({"kind": "legend", "layer": 3, "text": blk,
+                                "source": src, "specific": True})
                 break
     return ctx[:6], leg[:2]
 
@@ -393,8 +397,17 @@ def _legend_facts(word: str, serp_fn, calls: Dict, log=None) -> List[Dict]:
             if not (_LEGEND_CUE_RE.search(s) or _STORYTIME_RE.search(s)
                     or "name" in f.split()):
                 continue
-            if all(_ffold(o["text"]) != f for o in out):
-                out.append({"kind": "legend", "layer": 3, "text": s,
+            # [LOCAL-862C] the sentence plus the ones that follow it in the same
+            # snippet form ONE retelling; a lone clause ("A legend tells of a young
+            # man named Longan.") is a fragment and is omitted.
+            sents = [_clean_sentence(x) for x in _split_sentences(snippet)]
+            try:
+                at = sents.index(s)
+            except ValueError:
+                at = 0
+            blk = legend_block([x for x in sents[at:at + 4] if x], word)
+            if blk and all(_ffold(o["text"]) != _ffold(blk) for o in out):
+                out.append({"kind": "legend", "layer": 3, "text": blk,
                             "source": r.get("link") or r.get("url") or "serper_search:legend",
                             "specific": True})
                 break
@@ -767,6 +780,299 @@ def gather_context(poi: Dict, location: str, *, place: Optional[Dict] = None,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-862C] a legend is ONE short coherent retelling, disclosed ONCE
+# ─────────────────────────────────────────────────────────────────────────────
+
+_DANGLING_RE = re.compile(
+    r"(?i)^(?:he|she|it|they|his|her|its|their|him|them|this|that|these|those|then|there|"
+    r"and|but|so|who|which|where)\b")
+
+
+def legend_block(sentences: List[str], word: str) -> Optional[str]:
+    """Return the legend as ONE block (2-4 whole sentences) or None.
+
+    Kept only when it is self-contained and ties to the name: it opens on a
+    capital letter and not on a dangling pronoun, every sentence is a whole one
+    (no ellipsis, no clause fragment), and the LAST sentence names the word the
+    legend explains.  Otherwise omitted - never a fragment."""
+    ss = [" ".join((x or "").split()) for x in sentences or []]
+    ss = [x for x in ss if x]
+    if len(ss) < 2:
+        return None
+    ss = ss[:4]
+    for i, x in enumerate(ss):
+        if len(x.split()) < 5 or "..." in x or "\u2026" in x:
+            return None
+        if not x[0].isupper() and not x[0].isdigit():
+            return None
+        if x[-1] not in ".!\"'\u201d)":
+            return None
+        if i == 0 and _DANGLING_RE.match(x):
+            return None
+    w = _ffold(word)
+    if not w or w not in _ffold(ss[-1]).split():
+        return None
+    return " ".join(ss)
+
+
+def legend_block_text(fact_text: str) -> str:
+    """The legend block with its disclosure marker ONCE, on the first sentence."""
+    ss = _split_sentences(fact_text)
+    if not ss:
+        return ""
+    first = ss[0]
+    if not has_disclosure(first):
+        core = _LEAD_TELLS_RE.sub("", first).strip()
+        head = core.split(" ", 1)[0] if core else ""
+        if head in _LOWER_FIRST:
+            core = core[:1].lower() + core[1:]
+        first = f"A folk tale tells that {core}"
+    return " ".join([first] + ss[1:])
+
+
+def _legend_tokens(facts: List[Dict]) -> List[set]:
+    base = _content_tokens(" ".join(f["text"] for f in facts if f.get("layer") != 3))
+    return [(f, _content_tokens(f["text"]) - base) for f in facts
+            if f.get("layer") == 3 and f.get("kind") == "legend"]
+
+
+def apply_legend_blocks(body: str, facts: List[Dict]) -> Tuple[str, int]:
+    """Replace whatever the narrator wrote about a legend fact with the legend
+    block itself, disclosed once, at the end of the body."""
+    legs = _legend_tokens(facts)
+    if not legs or not body:
+        return body, 0
+    sents = _split_sentences(body)
+    base = _content_tokens(" ".join(g["text"] for g in facts if g.get("layer") != 3))
+    for f, lt in legs:
+        sents = [x for x in sents if len((_content_tokens(x) - base) & lt) < 2]
+        sents.append(legend_block_text(f["text"]))
+    return " ".join(sents), len(legs)
+
+
+def _legend_runs(sentences: List[str], source_lines: List[str]) -> List[List[int]]:
+    """Index runs: a disclosed sentence that draws on a [legend] line plus the
+    consecutive undisclosed sentences that keep retelling it."""
+    leg = []
+    plain = []
+    for ln in source_lines or []:
+        m = _TAG_RE.match(ln or "")
+        (leg if (m and m.group(1) == "legend") else plain).append(strip_layer_tag(ln))
+    if not leg:
+        return []
+    base = _content_tokens(" ".join(plain))
+    lts = [_content_tokens(x) - base for x in leg]
+    runs, cur = [], []
+    for i, s in enumerate(sentences):
+        st = _content_tokens(s) - base
+        hit = max((len(st & lt) for lt in lts), default=0)
+        if has_disclosure(s) and hit >= 2:
+            if cur:
+                runs.append(cur)
+            cur = [i]
+        elif cur and hit >= 1 and not has_disclosure(s):
+            cur.append(i)
+        else:
+            if cur:
+                runs.append(cur)
+            cur = []
+    if cur:
+        runs.append(cur)
+    return runs
+
+
+def enforce_legend_blocks(sentences: List[str], keep: List[bool], name: str,
+                          source_lines: List[str]) -> List[bool]:
+    """A legend block is one disclosed unit: if the gate or the labeler dropped any
+    sentence of it, drop all of it (never a fragment); if a kept block's marker
+    sentence survives, its continuation sentences are licensed by that marker."""
+    keep = list(keep)
+    for run in _legend_runs(sentences, source_lines):
+        if not all(keep[i] for i in run):
+            for i in run:
+                keep[i] = False
+    return keep
+
+
+def gate_body(sentences: List[str], name: str, source_lines: List[str]) -> List[Optional[str]]:
+    """layer_gate per sentence, but a legend block is gated as ONE disclosed unit:
+    its continuation sentences ride on the first sentence's marker."""
+    runs = _legend_runs(sentences, source_lines)
+    cont = {i for r in runs for i in r[1:]}
+    out: List[Optional[str]] = []
+    for i, s in enumerate(sentences):
+        if i in cont:
+            marked = "A folk tale tells that " + s     # licensed by the block's marker
+            why = layer_gate(marked, name, source_lines)
+            out.append(why)
+        else:
+            out.append(layer_gate(s, name, source_lines))
+    return out
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-862C] the bridge from the NAME to the venue
+# ─────────────────────────────────────────────────────────────────────────────
+
+_BRIDGE_RE = re.compile(r"(?i)\bprobably\s+(?:takes\s+its\s+name|comes\s+from)\b")
+_NAME_KINDS = ("name_meaning", "legend", "unconfirmed")
+
+
+def bridge_sentence(name: str, kind: str, facts: List[Dict]) -> Optional[str]:
+    """One sentence that links the venue to the word / title its name is, or None
+    when the stop is not name-based.  'The bar probably takes its name from ...'
+    when the Places kind is known, else 'Its name probably comes from ...'.  Always
+    hedged - nothing says the owner chose it for that meaning."""
+    if not any(f.get("kind") in _NAME_KINDS for f in facts or []):
+        return None
+    folded = _ffold(name)
+    word = next((w for w in name_words(name)
+                 if any(w in _ffold(f["text"]).split() for f in facts
+                        if f.get("kind") in _NAME_KINDS)), "")
+    if word:
+        fruit = any(word in _ffold(f["text"]).split() and "fruit" in _ffold(f["text"]).split()
+                    for f in facts if f.get("kind") in _NAME_KINDS)
+        tail = f"the {word} fruit" if fruit else f'the word "{word.capitalize()}"'
+    elif any(f.get("kind") == "name_meaning" and folded and folded in _ffold(f["text"])
+             for f in facts):
+        tail = "a well-known title"
+    else:
+        return None
+    k = (kind or "").strip().lower()
+    if k:
+        return f"The {k} probably takes its name from {tail}."
+    return f"Its name probably comes from {tail}."
+
+
+def insert_bridge(body: str, name: str, kind: str, facts: List[Dict]) -> Tuple[str, Optional[str]]:
+    """Insert the bridge right before the first body sentence that talks about the
+    name (a name-meaning / title / legend sentence), else at the start."""
+    br = bridge_sentence(name, kind, facts)
+    if not br or not body or _BRIDGE_RE.search(body):
+        return body, None
+    sents = _split_sentences(body)
+    key = set(name_words(name))
+    at = 0
+    for i, x in enumerate(sents):
+        fx = set(_ffold(x).split())
+        if re.search(r"(?i)\b(the name|title of a|the words)\b", x) or (
+                (key & fx) and _NAME_MEANING_CUE_RE.search(x)):
+            at = i
+            break
+    sents.insert(at, br)
+    return " ".join(sents), br
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-862C] no repeated names in one list; review claims stay attributed
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ALONG_RE = re.compile(
+    r"(?P<head>(?:[^\W\d_][\w'\u2019-]*\s+){1,3})Street,\s+which\s+(?P<mid>along\s+with\s+)"
+    r"(?P<a>(?:[^\W\d_][\w'\u2019-]*\s*){1,4}?)\s+and\s+(?P<b>(?:[^\W\d_][\w'\u2019-]*\s*){1,4}?)\s+Streets?\b")
+
+
+def dedupe_names(sentence: str) -> str:
+    """Drop a repeated name from a list inside one sentence:
+    'D Street, which along with P and D Streets' -> 'D Street, which along with P Street'
+    and 'A, B and A' -> 'A and B'."""
+    if not sentence:
+        return sentence
+    m = _ALONG_RE.search(sentence)
+    if m:
+        hw, a, b = m.group("head").split(), m.group("a").strip(), m.group("b").strip()
+        for k in range(1, len(hw) + 1):               # the street's own name = last k words
+            head = " ".join(hw[-k:])
+            if _ffold(b) == _ffold(head) or _ffold(a) == _ffold(head):
+                other = a if _ffold(b) == _ffold(head) else b
+                pre = " ".join(hw[:-k])
+                sentence = (sentence[:m.start()] + (pre + " " if pre else "")
+                            + f"{head} Street, which {m.group('mid')}{other} Street"
+                            + sentence[m.end():])
+                break
+    # generic 'X, Y and X' within one list
+    def _fix(mm):
+        items = [x.strip() for x in re.split(r",\s*|\s+and\s+", mm.group(0)) if x.strip()]
+        seen, keep = set(), []
+        for it in items:
+            k = _ffold(it)
+            if k in seen:
+                continue
+            seen.add(k)
+            keep.append(it)
+        if len(keep) == len(items):
+            return mm.group(0)
+        return keep[0] if len(keep) == 1 else ", ".join(keep[:-1]) + " and " + keep[-1]
+    cap = r"[A-Z\u0110][\w'\u2019-]*(?:\s+[A-Z\u0110][\w'\u2019-]*){0,2}"
+    return re.sub(rf"{cap}(?:,\s*{cap})*,?\s+and\s+{cap}", _fix, sentence)
+
+
+_DEFINES_RE = re.compile(r"^(?P<n>.+?)\s+(?:is|are)\s+(?P<d>(?:an?|the)\s+.+)$", re.S)
+
+
+_KIND_NOUNS = {"bar", "club", "pub", "venue", "restaurant", "cafe", "caf", "spa", "shop",
+               "lounge", "hotel", "market", "a", "an", "the"}
+
+
+def _kind_consistent(category: str, desc: str) -> bool:
+    """A description agrees with the Places category when it carries the category's
+    distinguishing words ('gay' in 'Gay bar'); a category that is only a generic
+    noun ('Bar') agrees with any description sharing that noun."""
+    ck = set(_ffold(category).split())
+    head = set(" ".join(_ffold(desc).split()[:8]).split())
+    distinct = ck - _KIND_NOUNS
+    return distinct <= head if distinct else bool(ck & head)
+
+
+_KIND_CLAIM_RE = re.compile(
+    r"(?i)\b(?:is|are)\s+(?:also\s+)?(?:known\s+as\s+|described\s+as\s+|called\s+)?"
+    r"(an?\s+[^,.;]*?\b(?:venue|bar|club|pub|caf[e\u00e9]|restaurant|lounge|spa|hotel|shop|market)\b)")
+_ATTRIB_RE = re.compile(
+    r"(?i)(?:according\s+to\s+[\w\s]{0,20}|reviews?\s+(?:say|describe|mention\w*)|"
+    r"(?:reviewers?|visitors?|guests?|sources?)\s+(?:\w+\s+)?(?:say|call|describe|mention\w*|praise)|"
+    r"web\s+reviews?\s+describe)\W*(?:that\W+)?(?:it\W+)?$")
+
+
+def kind_guard(body: str, category: str) -> str:
+    """After narration: a body sentence that says the venue IS something other than
+    its Google Maps category ('... is known as a live music bar') becomes what
+    reviews say ('... reviews describe it as a live music bar')."""
+    if not category or not body:
+        return body
+    ck = set(_ffold(category).split())
+    out = []
+    for sent in _split_sentences(body):
+        m = _KIND_CLAIM_RE.search(sent)
+        if m and not _ATTRIB_RE.search(re.sub(r"(?i)\s+and\s*$", "", sent[:m.start()])):
+            if not _kind_consistent(category, m.group(1)):
+                pre, post = sent[:m.start()], sent[m.end():]
+                if re.search(r"(?i)\band\s+$", pre):
+                    sent = pre + "reviews describe it as " + m.group(1) + post
+                else:
+                    sent = pre.rstrip() + ", according to reviews, " + m.group(0) + post
+        out.append(sent)
+    return " ".join(out)
+
+
+def attribute_story(text: str, name: str, category: str) -> str:
+    """A web/review sentence that DEFINES the venue as something other than its
+    Google Maps category ('X is a popular live music venue') is kept, but as what
+    reviewers say - it never redefines the kind."""
+    if not category or not text:
+        return text
+    out = []
+    ck = set(_ffold(category).split())
+    for sent in _split_sentences(text):
+        m = _DEFINES_RE.match(sent)
+        if m and _ffold(name) in _ffold(m.group("n")):
+            desc = m.group("d")
+            if not _kind_consistent(category, desc):
+                sent = f"Web reviews describe it as {desc[0].lower()}{desc[1:]}"
+        out.append(sent)
+    return " ".join(out)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # fact-line tags (so the verifier knows which layer a source line belongs to)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -897,16 +1203,22 @@ def ensure_disclosure(body: str, facts: List[Dict]) -> Tuple[str, int]:
         return body, 0
     base_t = _content_tokens(" ".join(f["text"] for f in facts if f.get("layer") != 3))
     out, fixed = [], 0
+    in_legend = False        # [LOCAL-862C] inside an already-disclosed legend block
     for sent in _split_sentences(body):
-        if has_disclosure(sent):
-            out.append(sent)
-            continue
         st = _content_tokens(sent) - base_t
         best, kind = 0, None
         for f in l3:
             n = len(st & (_content_tokens(f["text"]) - base_t))
             if n > best:
                 best, kind = n, f.get("kind")
+        if has_disclosure(sent):
+            in_legend = kind == "legend" and best >= 1
+            out.append(sent)
+            continue
+        if in_legend and kind == "legend" and best >= 1:
+            out.append(sent)              # continuation of the one disclosed block
+            continue
+        in_legend = False
         if best >= 2 and kind in ("legend", "unconfirmed"):
             core = _LEAD_TELLS_RE.sub("", sent).strip()
             first = core.split(" ", 1)[0] if core else ""

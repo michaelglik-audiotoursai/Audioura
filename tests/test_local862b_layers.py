@@ -170,11 +170,13 @@ class Cleaning(unittest.TestCase):
                                  "came to be. One day, a man came across a ..."},
                      {"title": "y", "link": "http://b",
                       "snippet": "The name dragon eye fruit comes from a well-known legend in "
-                                 "china: a hero who slayed a dragon to save his village, and "
-                                 "from his spirit grew the ..."}], 0)
+                                 "china: a hero who slayed a dragon to save his village. "
+                                 "From his spirit grew a tree with sweet round fruit. "
+                                 "The villagers named the fruit longan, the dragon eye."}], 0)
         out = usc._legend_facts("longan", serp, {})
         self.assertEqual(len(out), 1)
         self.assertIn("slayed a dragon", out[0]["text"])
+        self.assertTrue(out[0]["text"].rstrip().endswith("dragon eye."))   # whole block, ties to the name
 
 
 class EnsureDisclosure(unittest.TestCase):
@@ -246,8 +248,8 @@ class Context(unittest.TestCase):
     def test_legend_from_serper_is_layer3(self):
         def serp(q):
             return ([{"title": "The legend of longan", "link": "http://l/1",
-                      "snippet": "Folk tales say a dragon gave its eye to a poor boy, and the "
-                                 "longan fruit grew from it. It tastes sweet."}], 0.1)
+                      "snippet": "Folk tales say a dragon gave its eye to a poor boy, and a tree "
+                                 "grew from it. The villagers named the sweet fruit longan."}], 0.1)
         ctx = usc.gather_context(POI, LOC, wiki_fn=lambda t: None if t != "Longan" else
                                  dict(LONGAN_WIKI, text=LONGAN_WIKI["text"]),
                                  wiki_search_fn=lambda q: [], serp_fn=serp)
@@ -328,7 +330,8 @@ class Pipeline(unittest.TestCase):
             return ({"stops": [dict(self.NARR, id=0, used=["F1"])]}, 500, 150)
         serp = serp or (lambda q: ([{"title": "Longan legend", "link": "http://l/1",
                                      "snippet": "Folk tales say a dragon gave its eye to a poor "
-                                                "boy, and the longan fruit grew from it."}], 0.1))
+                                                "boy, and a tree grew from it. The villagers "
+                                                "named the sweet fruit longan."}], 0.1))
         usc._CACHE.clear()
         usc._default_wiki_fn = wiki
         try:
@@ -361,7 +364,8 @@ class Pipeline(unittest.TestCase):
             return ({"stops": [dict(narr, id=0, used=["F1"])]}, 1, 1)
         serp = lambda q: ([{"title": "t", "link": "http://l/1", "snippet":
                             "The story tells that a long time ago, there was a dragon in Fujian, China. "
-                            "More text follows here for the legend of the name."}], 0)
+                            "Its eye fell to the ground and a tree grew from it. "
+                            "The villagers named the fruit longan, the dragon eye."}], 0)
         usc._CACHE.clear()
         usc._default_wiki_fn = wiki
         try:
@@ -371,6 +375,9 @@ class Pipeline(unittest.TestCase):
         finally:
             usc._default_wiki_fn = lambda t: None
         self.assertIn("A folk tale tells that a long time ago, there was a dragon", out)
+        # [LOCAL-862C] one block, one marker, no fragment
+        self.assertEqual(len(usc.DISCLOSURE_RE.findall(out)), 1)
+        self.assertIn("The villagers named the fruit longan, the dragon eye.", out)
 
     def test_all_layers_empty_stays_short_deterministic(self):
         usc._CACHE.clear()
