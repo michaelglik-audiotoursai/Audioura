@@ -139,7 +139,9 @@ class TestScopeFallbackCandidates:
         assert seg._scope_fallback_candidates("") == []
 
     def test_geocode_center_falls_back_when_full_fails(self, monkeypatch):
-        # Full scope geocodes to nothing; the next comma segment resolves.
+        # Full scope geocodes to nothing. [LOCAL-863] The bare-country tail
+        # ("Vietnam") is NEVER used any more (wave 27: the bbox became all of
+        # Vietnam); the curated town named in the scope (Mui Ne) is used instead.
         calls = []
 
         class _Resp:
@@ -160,8 +162,9 @@ class TestScopeFallbackCandidates:
 
         monkeypatch.setattr(seg, "_nominatim_request", _fake_request)
         center = seg._geocode_scope_center("Mui Ne beach area, Vietnam")
-        assert center == (16.0, 108.0)
-        assert "Mui Ne beach area, Vietnam" in calls and "Vietnam" in calls
+        assert center != (16.0, 108.0)
+        assert abs(center[0] - 10.93) < 0.1 and abs(center[1] - 108.28) < 0.15
+        assert "Mui Ne beach area, Vietnam" in calls and "Vietnam" not in calls
 
     def test_geocode_bbox_falls_back_when_full_fails(self, monkeypatch):
         class _Resp:

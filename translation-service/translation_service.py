@@ -15,6 +15,11 @@ import threading
 import psycopg2
 import logging
 import requests
+
+# [LOCAL-863] emoji/pictographs are never spoken (direct boto3 Polly path).
+_EMOJI_RE_863 = re.compile(
+    "[\U0001F000-\U0001FAFF\U0001F1E6-\U0001F1FF\u2600-\u27BF\u2B00-\u2BFF"
+    "\u2300-\u23FF\u200D\uFE0E\uFE0F\u20E3\U000E0020-\U000E007F]+")
 from concurrent.futures import ThreadPoolExecutor
 import os
 import json
@@ -1027,6 +1032,14 @@ class TranslationService:
         voice_id = voice_map.get(target_language, 'Joanna')
         # Polly's synthesize_speech here caps Text at 3000 chars, so the characters we are
         # actually billed for are len(text[:3000]).
+        # [LOCAL-863] This boto3 call bypasses polly-tts and its LOCAL-860 strip,
+        # so strip emoji/pictographs here (logged) before billing and speaking.
+        if text:
+            _n863 = len(_EMOJI_RE_863.findall(text))
+            if _n863:
+                text = re.sub(r"[ \t]{2,}", " ", _EMOJI_RE_863.sub(" ", text))
+                logging.info(f"[LOCAL-863] TTS emoji strip at translation-service: "
+                             f"removed {_n863} emoji run(s)")
         submitted_text = text[:3000] if text else ''
         char_count = len(submitted_text)
         engine = 'neural' if voice_id in self._POLLY_NEURAL_VOICES else 'standard'

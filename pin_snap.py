@@ -120,15 +120,30 @@ def _coord_is_marked_fallback(poi: Dict) -> bool:
     return False
 
 
+#  A coordinate is a genuine user pin ONLY when it came from a real user
+# source: a share link, a share link resolved via the Knowledge Graph, or a
+# name lookup the user supplied. 'user_explicit' alone (set whenever a
+# listener typed/selected a stop) says nothing about where the COORDINATE
+# came from — a model-invented Phase-3B guess can carry user_explicit=True
+# too. Checking user_explicit + "not literally tagged fallback" let those
+# model guesses through as if the user had placed the pin (LOCAL-863 wave 27:
+# every one of 7 Phase-3B guesses was kept as a "user pin" and never
+# snapped/cleared). Gate strictly on coord_source instead.
+_USER_PIN_COORD_SOURCES = (
+    "user_share_link", "user_share_link_kg", "user_name_lookup",
+)
+
+
 def _is_user_pin(poi: Dict) -> bool:
-    """[LEAD 858 review] True for a stop the listener placed themselves
-    (LOCAL-855E marks it user_explicit + coord_source='user_share_link')."""
+    """[LOCAL-863] True only for a stop whose COORDINATE came from a real
+    user source: coord_source in {user_share_link, user_share_link_kg,
+    user_name_lookup}. A stop the user typed but whose coordinate the model
+    guessed (user_explicit=True, coord_source unset/model/llm/...) is NOT a
+    user pin: it must be snapped/looked up like any other stop."""
     if not isinstance(poi, dict):
         return False
     src = str(poi.get("coord_source") or "").strip().lower()
-    return src in ("user_share_link", "user_share_link_kg") or (
-        bool(poi.get("user_explicit")) and _parse_coord(poi.get("coordinates")) is not None
-        and src not in ("fallback", "centroid", "city_centroid"))
+    return src in _USER_PIN_COORD_SOURCES
 
 
 def _poi_coord(poi: Dict) -> Optional[Tuple[float, float]]:
