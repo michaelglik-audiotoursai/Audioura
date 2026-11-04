@@ -1,0 +1,36 @@
+### asian_A_run1
+[LOCAL-864] stop 'Head of a Buddha': refused 'Asian Art' (https://mag.rochester.edu/collection/asian-art/) — not this venue's work / generic-word title match
+[LOCAL-864] stop 'Landscape of the four seasons, one of a ': refused 'Thatched Hut by Water's Edge' (https://chitra.art/communities/shikibu-terutada/artwork/that) — not this venue's work / generic-word title match
+[LOCAL-864] stop 'Landscape of the four seasons, one of a ': refused 'The Collections' (https://asia.si.edu/explore-art-culture/collections/) — not this venue's work / generic-word title match
+[LOCAL-864] Claim gate: dropped 5 sentence(s), stated catalog facts on 0 stop(s) (6 scanned)
+[LOCAL-864] stop 1 DROPPED (dated event (2013) appears in no source for this stop): "Orientation: In the stops ahead, you will see a Buddha dated 338 at this work and a seated crowned and bejewel"
+[LOCAL-864] stop 2 DROPPED (dated event (2013) appears in no source for this stop): "This statue, crafted during the Ly Dynasty, is recognized as a national treasure since 2013."
+[LOCAL-864] stop 3 DROPPED (named agent 'Rue de Chabrol' appears in no source for this stop): "This resulted in editions produced with artist, poet, and printer all working within the same workshop, Mourlo"
+[LOCAL-864] stop 3 DROPPED (narrates 'asian art' from another museum's work): "Directions: Proceed to Landscape of the four seasons, one of a pair (Asian Art Museum B60D49+)."
+[LOCAL-864] stop 5 DROPPED (named agent 'Six Persimmons' appears in no source for this stop): "This gift enabled the museum to present exhibitions such as The Heart of Zen, which featured seminal works lik"
+### orsay_A
+[LOCAL-864] stop 'Une moderne Olympia': refused 'A Modern Olympia by Paul Cezanne' (https://artwiki.art/artworks/paul-cezanne/a-modern-olympia) — not this venue's work / generic-word title match
+[LOCAL-864] stop 'Une moderne Olympia': refused 'Guide des œuvres d'étudiants' (https://wahooart.com/fr/art/student-guide/paul-cezanne-une-m) — not this venue's work / generic-word title match
+[LOCAL-864] Claim gate: dropped 2 sentence(s), stated catalog facts on 0 stop(s) (6 scanned)
+[LOCAL-864] stop 2 DROPPED (named agent 'Fridman' appears in no source for this stop): "Fridman, a Russian collector specialized in livres d’artiste, assembled one of the largest private collections"
+[LOCAL-864] stop 2 DROPPED (named agent 'Van Gogh’s' appears in no source for this stop): "His gift brought the museum’s holdings of collaborative printed works to a critical mass, enriching the contex"
+### asian_A
+[LOCAL-864] stop 'Head of a Buddha': refused 'Asian Art' (https://mag.rochester.edu/collection/asian-art/) — not this venue's work / generic-word title match
+[LOCAL-864] stop 'Head of a Buddha': refused '1998.315: Head of a Buddha, Gandharan style' (https://harvardartmuseums.org/art/192167) — not this venue's work / generic-word title match
+[LOCAL-864] stop 'Landscape of the four seasons, one of a ': refused 'Thatched Hut by Water's Edge' (https://chitra.art/communities/shikibu-terutada/artwork/that) — not this venue's work / generic-word title match
+[LOCAL-864] stop 'Landscape of the four seasons, one of a ': refused 'Thatched Hut by Water's Edge' (https://chitra.art/communities/shikibu-terutada/artwork/that) — not this venue's work / generic-word title match
+[LOCAL-864] stop 'Fragment of a Manichaen Mandala': refused 'Arts of Asia' (https://www.denverartmuseum.org/en/collection/arts-asia) — not this venue's work / generic-word title match
+[LOCAL-864] Claim gate: dropped 13 sentence(s), stated catalog facts on 0 stop(s) (6 scanned)
+[LOCAL-864] stop 1 DROPPED (flagged UNSOURCED by the verifier): "The statue’s significance grew in 2013 when the State recognized it as a national cultural artifact, underscor"
+[LOCAL-864] stop 1 DROPPED (narrates a work at 'Byodo-in', not this venue): "The 11th-century Amida Buddha statue of the Byodo-in temple was built as a monumental devotional figure covere"
+[LOCAL-864] stop 1 DROPPED (flagged UNSOURCED by the verifier): "The State’s recognition of the Buddha Amitabha statue as a national cultural artifact in 2013 led to increased"
+[LOCAL-864] stop 2 DROPPED (named agent 'Avery Brundage' appears in no source for this stop): "The donor Avery Brundage gave this work to the museum because it anchors the collection’s historical depth."
+[LOCAL-864] stop 3 DROPPED (credits a work to 'Joan Miró', who is not in this venue's record for the stop): "Joan Miró painted Head of a Catalan Peasant between 1924 and 1925, creating a sequence of images grounded in C"
+[LOCAL-864] stop 3 DROPPED (narrates 'miro' from another museum's work): "Miró’s approach here was part of his ongoing exploration of folk themes from his native Catalonia, a cultural "
+[LOCAL-864] stop 3 DROPPED (narrates 'miro' from another museum's work): "At this moment in his life, Miró was moving beyond purely surrealist experiments to engage with symbolic forms"
+[LOCAL-864] stop 4 DROPPED (credits a work to 'Jean-', who is not in this venue's record for the stop): "This painting, executed in oil on canvas by Jean-Baptiste Camille Corot between 1865 and 1870, offers more tha"
+[LOCAL-864] stop 4 DROPPED (credits a work to 'Corot’s', who is not in this venue's record for the stop): "Corot’s technique, marked by a silvery tonal range and a loose, searching brushstroke, blurs the boundaries be"
+[LOCAL-864] stop 4 DROPPED (narrates 'corot’s' from another museum's work): "Havemeyer, a noted collector who commissioned Corot’s paintings to enrich American collections with European l"
+[LOCAL-864] stop 5 DROPPED (dated event (2000) appears in no source for this stop): "Michelin commissioned the statue’s conservation efforts in the early 2000s, ensuring that its structural integ"
+[LOCAL-864] stop 6 DROPPED (named agent 'Printer Matsuda' appears in no source for this stop): "Printer Matsuda then produced precise copies, ensuring the image’s survival despite regional turmoil."
+[LOCAL-864] stop 6 DROPPED (named agent 'Collector Tanaka' appears in no source for this stop): "Collector Tanaka gave this mandala to the museum, expanding the narrative of religious art across Asia."

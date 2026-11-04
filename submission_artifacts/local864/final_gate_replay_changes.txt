@@ -1,0 +1,28 @@
+ - 1 CATALOG: material 'stone' contradicts catalog 'wood and iron, with lac | This Buddha Amitabha statue is carved from blue stone and seated in a meditative posture o
+ - 1 CATALOG: material 'stone' contradicts catalog 'wood and iron, with lac | The statue’s surface is smooth yet retains the natural qualities of the stone, emphasizing
+ - 1 CATALOG: 'Ly Dynasty' not in catalog record | Its origin traces back to the Ly Dynasty, which ruled in Vietnam from the 11th to 13th cen
+ - 1 CATALOG: 'Ly Dynasty' not in catalog record | Though the artist remains unnamed, the statue reflects the Ly Dynasty’s artistic prioritie
+ - 1 CATALOG: century [11] contradicts catalog [19] | This stone Buddha Amitabha stands in the main hall alongside a gold-leaf-covered Amida Bud
+ - 1 refers back to a dropped unsourced sentence | The contrast of materials and scale between the two statues illustrates different regional
+ - 1 CATALOG: material 'stone' contradicts catalog 'wood and iron, with lac | The presence of both statues in this hall reflects the Asian Art Museum’s dedication to pr
+ - 1 refers back to a dropped unsourced sentence | The museum’s curators arranged this pairing to emphasize the intersection of artistic tech
+ - 2 CATALOG: material 'stone' contradicts catalog 'bronze with gilding' | This statue is carved from blue stone, a durable material that allows for detailed sculptu
+ - 2 CATALOG: 'Ly Dynasty' not in catalog record | Ly Dynasty sculptors created this statue in a cultural environment that emphasized Buddhis
+ - 2 CATALOG: material 'stone' contradicts catalog 'bronze with gilding' | Standing before this statue, one confronts the weight of centuries—both in the stone’s per
+ - 3 narrates 'catalan peasant', another venue's work | Orientation: As you stand just a few steps past the Buddha dated 338, turn your attention 
+ - 3 describes the other venue's work after its name was removed | Position yourself so the light catches the canvas’s texture—this reveals the subtle layeri
+ - 3 credits a work to 'Joan Miró', who is not in this venue's record for t | Joan Miró painted Head of a Catalan Peasant between 1924 and 1925.
+ - 3 describes the other venue's work after its name was removed | Oil paint combined with pencil on canvas allows the sharpness of the pencil’s outline to c
+ - 3 narrates 'catalan peasant' from another museum's work | The Head of a Catalan Peasant marks a turning point as the artist began to abstract human 
+ - 3 narrates 'peasant' from another museum's work | The simplified head becomes a symbol of the peasant class in Catalonia, embodying both the
+ - 3 describes the other venue's work after its name was removed | The painting evokes a quiet reflection on identity and place, stripped of extraneous detai
+ - 3 says the work is held by 'The Scottish National Gallery of Modern Art' | The Scottish National Gallery of Modern Art later ensured the piece was integrated into th
+ - 4 describes the other venue's work after its name was removed | Orientation: Stand slightly to the right of the center of the gallery wall to catch the fu
+ - 4 describes the other venue's work after its name was removed | From this vantage point, the subtle transitions in brushwork and the interplay of light ac
+ - 4 credits a work to 'Corot', who is not in this venue's record for the s | Corot created this work at a turning point in his career.
+ - 4 describes the other venue's work after its name was removed | Long established as a landscape artist, he was experimenting with blending classical subje
+ - 4 describes the other venue's work after its name was removed | The stillness here evokes a contemplative tranquility, a quiet moment suspended between th
+ - 4 describes the other venue's work after its name was removed | It invites a pause akin to the calm presence of the Head of a Buddha you saw earlier on th
+ - 4 describes the other venue's work after its name was removed | A story embedded in this work’s history involves H.O.
+ - 4 says the work is held by 'The Metropolitan Museum of Art', not this ve | The Metropolitan Museum of Art in New York now holds this painting in its collection, link
+ - 4 describes the other venue's work after its name was removed | Another episode in this painting’s journey involves Avery Brundage, whose collection forme

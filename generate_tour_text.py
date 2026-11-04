@@ -6895,13 +6895,13 @@ STORY INSTRUCTION (LOCAL-407/412/419):
 Use the reference material above. Your text MUST include at least TWO of the following NAMED FIELDS if the snippets provide them:
 
   1. DATE — the year the work was created or published (e.g. "1955", "1974")
-  2. PUBLISHER — the publisher's name (e.g. "Tériade", "Louis Broder")
-  3. PRINTER — the printer's name (e.g. "Mourlot Frères", "Crommelynck")
+  2. PUBLISHER — the publisher's name, exactly as the snippets give it
+  3. PRINTER — the printer's name, exactly as the snippets give it
   4. EDITION — the edition size or number (e.g. "edition of 220", "set of 10")
   5. MEDIUM/TECHNIQUE — what it is made of (e.g. "lithographs on Arches wove paper", "drypoints on sheepskin")
-  6. COLLABORATOR — who wrote the text or poems (e.g. "Pierre Reverdy", "Sigmund Freud")
+  6. COLLABORATOR — who wrote the text or poems, exactly as the snippets give it
 
-PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "published by Tériade in 1955, printed by Mourlot Frères in an edition of 220" beats "an intriguing fusion of visual and textual elements."
+PRIORITY RULE: a concrete detail ALWAYS beats a general claim. "published by [PUBLISHER] in [YEAR], printed by [PRINTER] in an edition of [N]" (filled from the snippets; never a name that is not in them) beats "an intriguing fusion of visual and textual elements."
 
 FAILURE MODE TO AVOID: Do NOT write sentences like "reveals a deep connection" or "beckons us to question" or "stands out for its intriguing fusion" — these are EMPTY. Instead write: WHO made it, WHEN, HOW (technique), WHERE (printer/workshop), and HOW MANY (edition).
 
@@ -6930,18 +6930,15 @@ do not state a donation year, do NOT assert one. Write ONLY what the sources con
 Self-contradictions (e.g. "15 lithographs" in one sentence and "40 lithographs" in
 another) cause AUTOMATIC REJECTION — pick one number and cite which snippet supports it.
 
-WHAT COUNTS AS A STORY:
-  - "Boris Fridman donated this work to the MFA in 2003. Fridman, a Boston-based collector
-    who specialized in livres d'artiste, assembled one of the largest private collections
-    of artist's books in New England. His gift brought the museum's holdings of
-    Surrealist-era printed works to a critical mass."
-  - "Dalí chose Freud's Moses and Monotheism because he considered Freud's work
-    foundational to Surrealism. Dalí had attempted to visit Freud in London in 1938
-    and sketched the dying psychoanalyst during that meeting."
-  - "Louis Broder commissioned this work from Miró as part of a deliberate campaign to
-    revive the livre d'artiste tradition after the war. Broder's editions were tiny —
-    rarely more than 150 copies — and he insisted on direct collaboration between
-    artist, poet, and printer at the same workshop."
+WHAT COUNTS AS A STORY (shapes only — [BRACKETS] are slots you fill ONLY from the
+reference material above; never reuse a name from these templates, LOCAL-864):
+  - "[DONOR] gave this work to [MUSEUM] in [YEAR]. [DONOR], a [ROLE the sources state],
+    had [WHAT THE SOURCES SAY THEY DID]. The gift [CONSEQUENCE the sources state]."
+  - "[ARTIST] chose [SUBJECT] because [REASON a source gives]. [ARTIST] had [DOCUMENTED
+    EVENT, with its date], and [WHAT FOLLOWED]."
+  - "[PUBLISHER/PATRON] commissioned this work from [ARTIST] as part of [DOCUMENTED
+    AIM]. [CONSEQUENCE a source states]."
+If a slot cannot be filled from the reference material, do not write that sentence.
 
 WHAT DOES NOT COUNT:
   - A list of facts with no narrative thread (just naming publisher + printer + date)
@@ -6956,7 +6953,7 @@ involvement meant. If truly nothing supports even that, write only what you can 
 ENTITY NAMING RULE (LOCAL-421 — NON-NEGOTIABLE):
 Every named person in the credit line (donor, publisher, printer, collaborator) MUST
 appear BY NAME in your text. Never write "the generous donation" when the data says
-"Gift of Boris Fridman". Never write "the publisher" when you know the name. The name
+"Gift of [DONOR]". Never write "the publisher" when you know the name. The name
 IS the story's starting point.
 """
     # [LOCAL-407] Artist name is NON-NEGOTIABLE in the snippet block
@@ -6965,7 +6962,7 @@ IS the story's starting point.
 ARTIST ATTRIBUTION (LOCAL-407 — NON-NEGOTIABLE):
 The artist for this work is {artist}. The surname "{_artist_surname}" MUST appear
 in your text. The people named in the snippets (publishers, printers, donors) are
-IN ADDITION TO the artist, never instead of. If you write about Broder or Mourlot
+IN ADDITION TO the artist, never instead of. If you write about a publisher or printer
 without mentioning {_artist_surname}, your response will be REJECTED.
 """
     return block
@@ -22557,6 +22554,36 @@ Exempt: navigation directions ("Turn left", "Continue past").
             # Populate the module-level dict so per-stop injection picks it up
             if _local410_snippets:
                 _J._DIRECT_SNIPPETS_PER_STOP = _local410_snippets
+                # [LOCAL-864] Stop-identity: a snippet that is another museum's
+                # collection RECORD for a work whose title shares only generic words
+                # with this stop ("Head of a Catalan Peasant" for "Head of a Buddha")
+                # is not this stop's evidence. Drop it and remember the foreign work
+                # so its narration is also stripped from the delivered text.
+                if tour_category == 'museum':
+                    try:
+                        import museum_claim_gate as _mcg
+                        _mcg.clear_rejected_matches()
+                        _mcg_dropped = 0
+                        for _mk, _mv in list(_J._DIRECT_SNIPPETS_PER_STOP.items()):
+                            if _mk.startswith('__') or not isinstance(_mv, list):
+                                continue
+                            _mkeep = []
+                            for _msn in _mv:
+                                _mfw = _mcg.foreign_record_snippet(
+                                    _msn, _mk, _museum_venue_name, _museum_site_url)
+                                if _mfw:
+                                    _mcg.register_rejected_match(_mk, _mfw)
+                                    _mcg_dropped += 1
+                                    print(f"    [LOCAL-864] stop '{_mk[:40]}': refused "
+                                          f"'{_mfw['title'][:50]}' ({_mfw['url'][:60]}) — "
+                                          f"not this venue's work / generic-word title match")
+                                else:
+                                    _mkeep.append(_msn)
+                            _J._DIRECT_SNIPPETS_PER_STOP[_mk] = _mkeep
+                        if _mcg_dropped:
+                            print(f"  [LOCAL-864] {_mcg_dropped} foreign-work snippet(s) removed")
+                    except Exception as _mcg_err:
+                        print(f"  [LOCAL-864] snippet scoping error (non-fatal): {_mcg_err}")
                 _total_raw = sum(len(v) for k, v in _local410_snippets.items() if not k.startswith('__'))
                 print(f"\n  [LOCAL-410] SERP search complete: {_local410_total_queries} queries, "
                       f"{_local410_total_results} results, "
@@ -24885,18 +24912,20 @@ that follows this shape:
 
   SENTENCE 1: Name a person (donor/publisher/printer/collaborator) and state
     ONE SPECIFIC THING they did — a decision, a commission, a gift.
-    Example: "Louis Broder commissioned Miró for this portfolio because Broder
-    specialized in limited editions requiring direct artist-printer collaboration."
+    Shape: "[PERSON from the reference material] commissioned/gave/chose [THIS
+    WORK] because [REASON the sources state]."
 
   SENTENCE 2: State the CONSEQUENCE or REASON — why it mattered, what it caused,
     what it meant for the work.
-    Example: "Broder's editions were produced with artist, poet, and printer working
-    in the same workshop — Mourlot's atelier on Rue de Chabrol in Paris."
+    Shape: "Because of that, [CONSEQUENCE the sources state]."
 
   SENTENCE 3: Connect to a SECOND named person or to the wider story.
-    Example: "Boris Fridman, a Russian collector who assembled livres d'artiste,
-    donated this work to the MFA, adding to the museum's holdings of
-    collaborative printed works."
+    Shape: "[SECOND PERSON from the reference material] then [DOCUMENTED ACT]."
+
+  [LOCAL-864] The [BRACKETS] are slots, not names. Every person, place, workshop
+  and date you write must come from THIS stop's reference material. A name that is
+  not there is fabricated and will be removed. If the material names no person,
+  write no story sentence about one.
 
 WHAT TO AVOID:
   - "X's collaboration... showcasing a unique fusion" (evaluation, not story)
@@ -32136,6 +32165,141 @@ RULES:
         except Exception as _mmg_err:
             print(f"  [LOCAL-623] Museum-motif filter error (non-fatal): {_mmg_err}")
     _l654ck("LOCAL-623 museum_motif")
+
+    # -------- [LOCAL-864] Delivered-text claim gate --------------------------
+    # LOCAL-861: the research log flagged "Louis Broder commissioned limited",
+    # Fridman, Freeman, Nguyen UNSOURCED and the text still shipped them -- the
+    # LOCAL-423 strip removed only the one sentence holding the extracted span, and
+    # later phases rewrote stop text after it ran. This is the last word on the
+    # DELIVERED text: a sentence naming an agent / dated event that no source for
+    # that stop contains, or that the verifier flagged, is dropped unless disclosed
+    # (D760 "It is sometimes said ..."). The museum's own catalog record wins for
+    # date/culture/material: sentences contradicting it go, its facts are stated.
+    if tour_category == 'museum':
+        try:
+            import museum_claim_gate as _mcg2
+            _mc_ev, _mc_known, _mc_flag, _mc_cat, _mc_titles = {}, {}, {}, {}, {}
+            _mc_own, _mc_art, _mc_makers, _mc_snips = {}, {}, {}, {}
+            # The venue's own URL. `_museum_site_url` is set only on some paths
+            # (empty on the LOCAL-864 Asian Art run), so fall back to the
+            # resolved venue entity / the D1v2 result.
+            _mc_vurl = _museum_site_url
+            for _mc_src in ('_det_entity', '_d1v2_result', '_venue_entity'):
+                if _mc_vurl:
+                    break
+                try:
+                    _mc_vurl = getattr(locals().get(_mc_src), 'official_url', '') or ''
+                except Exception:
+                    _mc_vurl = ''
+            # The venue's own collection list (SPARQL venue works, with creators):
+            # the authoritative maker for a stop, over any search hit.
+            _mc_works = []
+            for _mc_src in ('_det_sparql', '_pre_works'):
+                _v = locals().get(_mc_src)
+                if isinstance(_v, list) and _v:
+                    _mc_works = _v
+                    break
+            print(f"  [LOCAL-864] claim gate venue_url={_mc_vurl or '(none)'} "
+                  f"venue_works={len(_mc_works)}")
+            for _si, _sp in enumerate(poi_list, 1):
+                _nm = _sp.get('name', '') or ''
+                _mc_titles[_si] = _nm
+                _sn = []
+                if _J._DIRECT_SNIPPETS_PER_STOP:
+                    _sn = (_J._DIRECT_SNIPPETS_PER_STOP.get(_nm, [])
+                           or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_si-1}__", []))
+                _mc_ev[_si] = [f"{x.get('title','')} {x.get('snippet','')}" for x in _sn
+                               if isinstance(x, dict)]
+                _kn = [_sp.get(k, '') for k in ('artist', 'publisher', 'printed_by',
+                                                 'credit_line', 'collaborator')]
+                _evl = _d1_evidence_log.get(_nm) if isinstance(_d1_evidence_log, dict) else None
+                if isinstance(_evl, dict):
+                    _mc_ev[_si].append(' '.join(str(_evl.get(k, '')) for k in
+                                                ('snippet', 'material', 'period', 'origin')))
+                if _exhibition_checklist_result and hasattr(_exhibition_checklist_result, 'works'):
+                    _mw = match_work_for_stop(_nm, _exhibition_checklist_result.works)
+                    if _mw:
+                        _kn += [str(_mw.get(k, '')) for k in
+                                ('artist', 'publisher', 'credit_line', 'medium', 'date')]
+                _mc_known[_si] = _kn
+                _vr = _l423_verification_results.get(_nm) or {}
+                _mc_flag[_si] = [d.get('text', '') for d in _vr.get('unsourced_details', [])]
+                # catalog record: the museum's own entry, best effort (a few GETs, no LLM).
+                # [LOCAL-864] The record wins over a search hit for date/culture/material.
+                _cat = {}
+                if isinstance(_evl, dict) and _evl.get('method') == 'catalogue_work':
+                    _cat = {'date': _evl.get('period', ''), 'material': _evl.get('material', ''),
+                            'origin': _evl.get('origin', '')}
+                _rec = {}
+                try:
+                    if _mc_vurl:
+                        from object_record import _fetch as _mc_fetch, parse_object_page as _mc_pop
+                        _all_sn = [x for _v in (_J._DIRECT_SNIPPETS_PER_STOP or {}).values()
+                                   if isinstance(_v, list) for x in _v]
+                        # pages this run already fetched (LOCAL-427 page cache): the
+                        # museum's object page is often there even when no snippet kept it
+                        try:
+                            import exhibition_checklist as _mc_ec
+                            with _mc_ec._PAGE_CACHE_LOCK:
+                                _all_sn += [{'url': _u, 'title': ''} for _u in list(_mc_ec._PAGE_CACHE)]
+                        except Exception:
+                            pass
+                        for _cu in _mcg2.catalog_urls_from_snippets(_nm, _all_sn, _mc_vurl)[:2]:
+                            _html = _mc_fetch(_cu)
+                            _rec = _mcg2.parse_label_block(_html, _nm)
+                            if not _rec:
+                                _em = _mc_pop(_html)
+                                if _em.get('culture') or _em.get('date'):
+                                    _rec = {'date': _em.get('date', ''), 'culture': _em.get('culture', ''),
+                                            'material': _em.get('medium', ''),
+                                            'accession_number': _em.get('accession_number', '')}
+                            if _rec:
+                                _rec['url'] = _cu
+                                break
+                        if not _rec:
+                            from object_record import find_object_record as _mc_find
+                            _em, _rurl = _mc_find(_nm, _mc_vurl, artist=_sp.get('artist', '') or '')
+                            if _em:
+                                _rec = {'date': _em.get('date', ''), 'culture': _em.get('culture', ''),
+                                        'material': _em.get('medium', ''),
+                                        'accession_number': _em.get('accession_number', ''),
+                                        'url': _rurl}
+                except Exception as _mc_ferr:
+                    print(f"  [LOCAL-864] stop {_si} catalog fetch skipped: {_mc_ferr}")
+                if _rec:
+                    _cat, _ov = _mcg2.reconcile_with_catalog(_cat, _rec)
+                    print(f"  [LOCAL-864] stop {_si} catalog record {_rec.get('url','')} WINS "
+                          f"(overrode {_ov or 'nothing'}): culture={_cat.get('culture','')!r} "
+                          f"date={_cat.get('date','')!r} material={_cat.get('material','')!r}")
+                # what THIS venue says about the work: its record + its own pages
+                _mc_own[_si] = [str(_rec)] + [
+                    f"{x.get('title','')} {x.get('snippet','')}" for x in _sn
+                    if isinstance(x, dict) and _mc_vurl and
+                    _mcg2.host_matches_venue(str(x.get('url') or x.get('link') or ''), _mc_vurl)]
+                _mc_art[_si] = _sp.get('artist', '') or ''
+                _mc_makers[_si] = ([_sp.get('artist')] if _sp.get('artist') else []) + \
+                    _mcg2.makers_from_venue_works(_nm, _mc_works)
+                _snd = [x for x in _sn if isinstance(x, dict)]
+                if _snd:
+                    _mc_snips[_si] = _snd
+                _cat = {k: v for k, v in _cat.items() if v}
+                if _cat:
+                    _mc_cat[_si] = _cat
+            complete_tour, _mc_rep = _mcg2.filter_tour_text_claims(
+                complete_tour, stop_evidence=_mc_ev, stop_known=_mc_known,
+                stop_flagged=_mc_flag, stop_catalogs=_mc_cat, stop_titles=_mc_titles,
+                stop_own_evidence=_mc_own, stop_artists=_mc_art, stop_makers=_mc_makers,
+                stop_snippets=_mc_snips,
+                venue_name=_museum_venue_name or (location or '').split(',')[0].strip())
+            print(f"  [LOCAL-864] Claim gate: dropped {_mc_rep['dropped']} sentence(s), "
+                  f"stated catalog facts on {_mc_rep['injected']} stop(s) "
+                  f"({_mc_rep['stops']} scanned)")
+            for _r in _mc_rep['removed']:
+                print(f"    [LOCAL-864] stop {_r['stop']} DROPPED ({_r['reason']}): "
+                      f"\"{_r['sentence'][:110]}\"")
+        except Exception as _mc_err:
+            print(f"  [LOCAL-864] Claim gate error (non-fatal): {_mc_err}")
+    _l654ck("LOCAL-864 museum_claim_gate")
 
     # -------- [LOCAL-617 item 5/6] Fresh-path shortfall reconciliation --------
     # When a LATE gate drops a stop AFTER the D616/D612 shortfall sentence was
