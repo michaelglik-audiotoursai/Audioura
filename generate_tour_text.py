@@ -1270,7 +1270,8 @@ def _establish_landmark_coordinates(poi_list, scope, scope_center=None,
     orig_pts = list(pts)
     _to_fix = [i for i, p in enumerate(poi_list)
                if (p.get('name') or '').strip()
-               and p.get('coord_source') != 'user_share_link'
+               and p.get('coord_source') not in ('user_share_link',
+                                                  'user_name_lookup')
                and _is_centroid_guess(i, p)]
 
     n_fixed = 0
@@ -10212,7 +10213,7 @@ def _user_pin_merge_fields(entry, orig):
     name = entry.get('name') or orig.get('name') or ''
     is_user_pin = bool(
         orig.get('user_explicit') or orig.get('_anchor')
-        or orig.get('coord_source') == 'user_share_link'
+        or orig.get('coord_source') in ('user_share_link', 'user_name_lookup')
         or _is_user_stop_title(name))
     coord_kept = bool(is_user_pin and orig_coords)
     if coord_kept:
@@ -13674,6 +13675,62 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     print(f"  [LOCAL-852] user stop {_poi['name']!r} pinned from "
                           f"share link at {_poi['coordinates']} "
                           f"(via {_ps.get('how')})")
+
+        # ── [LOCAL-859] NAME-LOOKUP FALLBACK for user stops a share link could
+        # not resolve ───────────────────────────────────────────────────────
+        # Google changed the share.google flow (share.google/<id> now 302s to a
+        # JS-only www.google.com/share.google?q=<id> page with no coordinate), so
+        # a share link may come back unresolved (needs_geocode). Rather than let
+        # the stop fall to the city centroid (tour 529: 5/7 pins wrong, An Spa on
+        # the centroid), look the venue up by NAME inside the tour city's bounding
+        # box — Serper /places first (≈$0.001), else Nominatim — and keep the best
+        # name match INSIDE the box. The pin is marked coord_source=
+        # 'user_name_lookup' (weaker than 'user_share_link'). If nothing matches in
+        # the box the stop keeps NO coordinate and is announced — NEVER the
+        # centroid.
+        _us_unresolved = [
+            _i for _i, _poi in enumerate(poi_list)
+            if _poi.get("coord_source") != "user_share_link"
+            and _us_parsed and _i < len(_us_parsed)
+            and _us_parsed[_i].get("needs_geocode", True)
+        ]
+        if _us_unresolved:
+            try:
+                _nl_center = _city_center_for_request(location, intent=intent)
+            except Exception:
+                _nl_center = None
+            _nl_bbox = None
+            try:
+                from stop_existence_gate import _geocode_scope_bbox as _gsb859
+                _nl_bbox = _gsb859(location)
+            except Exception:
+                _nl_bbox = None
+            _nl_city = (location or "").split(",")[-1].strip() or location
+            for _i_poi in _us_unresolved:
+                _poi = poi_list[_i_poi]
+                _nm = (_poi.get("name") or "").strip()
+                if not _nm:
+                    continue
+                try:
+                    _hit = _usi.name_lookup_in_bbox(
+                        _nm, _nl_city, bbox=_nl_bbox, center=_nl_center,
+                        log=print)
+                except Exception as _nl_err:
+                    print(f"  [LOCAL-859] name lookup error for {_nm!r} "
+                          f"(non-fatal): {_nl_err}")
+                    _hit = None
+                if _hit:
+                    _poi["coordinates"] = f"{_hit[0]:.6f}, {_hit[1]:.6f}"
+                    _poi["coord_source"] = "user_name_lookup"
+                    _poi["coord_confidence"] = "name_lookup"
+                    print(f"  [LOCAL-859] user stop {_nm!r} pinned by NAME lookup "
+                          f"at {_poi['coordinates']} (source {_hit[2]}, match "
+                          f"{_hit[3]!r}) — weaker than a share link, never centroid")
+                else:
+                    # No in-box match: leave the stop WITHOUT a coordinate so it is
+                    # announced. Never the centroid.
+                    print(f"  [LOCAL-859] user stop {_nm!r} has no in-box name "
+                          f"match — announced with NO coordinate (never centroid)")
         # Override total_stops to match the forced list length
         total_stops = len(forced_stops)
         print(f"\n{'=' * 70}")
