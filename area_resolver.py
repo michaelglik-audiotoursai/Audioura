@@ -901,7 +901,18 @@ def extract_named_places_from_clause(location_string: str) -> List[str]:
     """
     m = _NAMED_PLACE_CLAUSE_RE.search(location_string or "")
     if not m:
-        return []
+        # [LOCAL-860 items 5+7] No "including X" clause: the SUBJECT itself may
+        # name the places — "Boston Common and Old North Church walk, Boston",
+        # "Hoan Kiem Lake and Temple of Literature walk, Hanoi". The intent
+        # extractor skips these (its named_places is defined for restaurants/
+        # venues and excludes areas), so before this the walking path never
+        # protected them and the discovery pool replaced them with the State House
+        # / Paul Revere House (Boston) and dropped the Temple of Literature (Hanoi).
+        try:
+            from text_polish import named_places_from_subject as _subj860
+            return _subj860(location_string or "")
+        except Exception:
+            return []
     tail = m.group(1).strip().rstrip('.').strip()
     if not tail:
         return []
@@ -2142,8 +2153,25 @@ def apply_named_place_policy(poi_list, named_places, area, landmarks, new_poi_fn
                 poi['user_explicit'] = True
                 poi['_anchor'] = True
                 poi['verified'] = True
-                _lat = _chosen.get('latitude', _chosen.get('lat'))
-                _lng = _chosen.get('longitude', _chosen.get('lng'))
+                # [LOCAL-860] places_search returns OSM-shaped records
+                # (``lat`` / ``lon`` STRINGS), and a key that is present but None
+                # (``latitude: None``) defeats ``dict.get(default)``. The old read
+                # looked only at latitude/longitude/lng, so an inserted named stop
+                # (Old North Church) carried NO coordinate and a later phase pinned
+                # it ~600 m away from an LLM guess. Take the first usable value of
+                # each, as a float.
+                def _first_num(_d, *keys):
+                    for _k in keys:
+                        _v = _d.get(_k)
+                        if _v is None or _v == "":
+                            continue
+                        try:
+                            return float(_v)
+                        except (TypeError, ValueError):
+                            continue
+                    return None
+                _lat = _first_num(_chosen, 'latitude', 'lat')
+                _lng = _first_num(_chosen, 'longitude', 'lng', 'lon')
                 if _lat is not None and _lng is not None:
                     poi['latitude'] = _lat
                     poi['longitude'] = _lng

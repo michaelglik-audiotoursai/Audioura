@@ -69,6 +69,12 @@ def _strip_nav_fields_for_tts(text):
     Strips: Museum Information, Address, Coordinates, Type/Specialty, Specific
     Examples, Operational Details.
     The .txt files are written from the original text and remain unchanged."""
+    # [LOCAL-860 item 4] No emoji/pictographs in anything sent to TTS.
+    try:
+        from text_polish import strip_emoji_for_tts as _se860
+        text = _se860(text)
+    except Exception:
+        pass
     lines = text.split('\n')
     kept = [l for l in lines if not _NAV_LABEL_RE.match(l)]
     # [LEAD 2026-10-08 / LOCAL-633] "Museum Information:" is now dropped WHOLE above

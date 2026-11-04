@@ -76,6 +76,7 @@ RUN pip install --no-cache-dir \
 # the model). kokoro_engine imports numpy/kokoro lazily inside functions, so the
 # module import stays cheap.
 COPY polly_tts_service.py .
+COPY text_polish.py .
 # [LOCAL-692B/706, LEAD] the name-pronunciation aid; without these the import
 # fails open and NO pronunciation fix runs.
 COPY vietnamese_name_aid.py .

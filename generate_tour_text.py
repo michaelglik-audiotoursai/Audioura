@@ -11193,6 +11193,20 @@ def _apply_delivery_hours_guard(result):
                 _uncovered = _ar799.reconcile_named_place_announcement(
                     _np_names, _final_pois, name_coords=_np_coords,
                     places_search_fn=_ps_fn, scope=_np_scope)
+                # [LOCAL-860] A named place that is on the map but is NOT a final
+                # stop was rescued from the announcement by places_search — that is
+                # the silent-replacement path (Boston: State House / Paul Revere
+                # House delivered instead). Make it loud in the log.
+                try:
+                    for _nm860 in _np_names:
+                        if (not _ar799._named_place_is_covered(
+                                _nm860, _final_pois, name_coord=_np_coords.get(_nm860))
+                                and _nm860 not in _uncovered):
+                            print(f"  [LOCAL-860] WARNING: named place {_nm860!r} is on "
+                                  f"the map but is NOT a stop in the final tour.",
+                                  flush=True)
+                except Exception:
+                    pass
                 _np_sentence = _ar799.build_named_place_intro_sentence(_uncovered)
                 if _np_sentence:
                     import screen_work_tour as _swt_np
@@ -16652,6 +16666,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 if _area_input and _area_input != _location_normalized:
                     print(f"  [LOCAL-779] area resolver input: {_area_input!r} "
                           f"(stripped poi/near-me from {_location_normalized!r})")
+                # [LOCAL-860 items 5+7] A request whose SUBJECT names the places
+                # ("Boston Common and Old North Church walk, Boston") produced an
+                # area input made of the place names themselves, which cannot
+                # resolve as a city; the walk then ran "unverified" and only
+                # ANNOUNCED the two places while the pool supplied the State House
+                # and Paul Revere House. Resolve the area off the trailing locality.
+                try:
+                    from text_polish import scope_without_named_places as _swnp860
+                    _area_input_860 = _swnp860(_area_input, location, _walk_named_places)
+                    if _area_input_860 != _area_input:
+                        print(f"  [LOCAL-860] area resolver input: {_area_input_860!r} "
+                              f"(dropped the named places from {_area_input!r})")
+                        _area_input = _area_input_860
+                except Exception as _swnp_err:
+                    print(f"  [LOCAL-860] scope strip skipped (non-fatal): {_swnp_err}")
                 # [LOCAL-799] Remember the scope so the guard's places_search
                 # rescue binds to the right town (LOCAL-786/790).
                 _J._LAST_WALK_SCOPE = (_area_input or _location_normalized or "")
@@ -16740,6 +16769,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                                     if _area.center_lat or _area.center_lng:
                                         _np_center = (_area.center_lat, _area.center_lng)
                                     _np_bbox = getattr(_area, 'union_bbox', None)
+                                    # [LOCAL-860] No district union box: bind the
+                                    # named-place geocode to the resolved CITY extent
+                                    # (centre +/- bounding radius), not places_search's
+                                    # fixed ~8 km radius about a boundary centroid.
+                                    if not _np_bbox:
+                                        from text_polish import bbox_from_center as _bfc860
+                                        _np_bbox = _bfc860(_area.center_lat, _area.center_lng,
+                                                           getattr(_area, 'bounding_radius_km', 0))
                             except Exception as _a5e:
                                 print(f"  [LOCAL-802] named-place geocode setup "
                                       f"skipped (non-fatal): {_a5e}")
@@ -16786,8 +16823,26 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # "we could not confirm" — rather than quietly removed.
                     if _walk_named_places:
                         from area_resolver import AreaResolution as _AR751
+                        # [LOCAL-860 items 5+7] Unresolved area is no reason to
+                        # drop a named place: for place-anchor tours geocode it in
+                        # the request's scope and make it a stop (LOCAL-802
+                        # addendum 5), exactly as the resolved branch does.
+                        _np_ps_fn860 = None
+                        _np_geo860 = False
+                        try:
+                            import local802_relevance_gate as _l802a860
+                            if _l802a860.is_place_anchor_tour_category(tour_category):
+                                import places_search as _ps860
+                                _np_ps_fn860 = _ps860.places_search
+                                _np_geo860 = True
+                        except Exception as _a860e:
+                            print(f"  [LOCAL-860] named-place geocode setup skipped "
+                                  f"(non-fatal): {_a860e}")
                         poi_list, _np_announce = apply_named_place_policy(
-                            poi_list, _walk_named_places, _AR751(resolved=False), [], _new_poi)
+                            poi_list, _walk_named_places, _AR751(resolved=False), [], _new_poi,
+                            places_search_fn=_np_ps_fn860,
+                            scope=(_J._LAST_WALK_SCOPE or ""),
+                            geocode_to_stop=_np_geo860)
                         if _np_announce:
                             _J._LAST_NAMED_PLACE_ANNOUNCEMENTS = list(_np_announce)
             except Exception as e:
