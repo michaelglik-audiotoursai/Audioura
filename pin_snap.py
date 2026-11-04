@@ -126,7 +126,7 @@ def _is_user_pin(poi: Dict) -> bool:
     if not isinstance(poi, dict):
         return False
     src = str(poi.get("coord_source") or "").strip().lower()
-    return src == "user_share_link" or (
+    return src in ("user_share_link", "user_share_link_kg") or (
         bool(poi.get("user_explicit")) and _parse_coord(poi.get("coordinates")) is not None
         and src not in ("fallback", "centroid", "city_centroid"))
 

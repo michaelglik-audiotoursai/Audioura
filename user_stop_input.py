@@ -84,6 +84,9 @@ __all__ = [
     "parse_plain_latlng",
     "default_resolver",
     "name_lookup_in_bbox",
+    "parse_kg_search_url",
+    "kg_confidence",
+    "resolve_share_link_kg",
 ]
 
 # ── URL recognition ───────────────────────────────────────────────────────────
@@ -121,6 +124,25 @@ _PLAIN_LATLNG_RE = re.compile(
     r"^\s*(-?\d{1,3}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)\s*$")
 # ``/maps/place/<Name>/…`` — the place name segment.
 _PLACE_NAME_RE = re.compile(r"/maps/place/([^/@?]+)")
+
+# [LOCAL-859B] The share.google flow Google serves TODAY (GCloud_Storied_1 probed
+# Michael's REAL links, orch ef0cee57, 2026-11-03):
+#   1. share.google/<id>                 -> 302 www.google.com/share.google?q=<id>
+#   2. www.google.com/share.google?q=<id> -> 301 www.google.com/search?kgmid=<KG
+#        id>&q=<place name>&source=sh/x/(loc|kp)/…
+#   3. a JS-only search page (NO /maps/place, @lat,lng, !3d!4d, 0x…:0x… or ftid
+#      anywhere in the HTTP response).
+# HEAD stops at hop 2, so the resolver must follow with GET. The canonical
+# ``search?kgmid=…&q=…&source=…`` URL (hop 2's target, the final URL of the GET)
+# carries the place NAME in ``q`` and the Knowledge-Graph id in ``kgmid``; we read
+# those and do NOT fetch the JS page.
+_KG_SEARCH_HOST_RE = re.compile(
+    r"(?i)(?:www\.)?google\.[a-z.]+/search\b")
+_KGMID_RE = re.compile(r"[?&]kgmid=([^&#\s]+)", re.IGNORECASE)
+# The ``source`` parameter: sh/x/<kind>/… where <kind> is ``loc`` (a local place)
+# or ``kp`` (a Knowledge-Panel topic, not a place).
+_KG_SOURCE_RE = re.compile(r"[?&]source=([^&#\s]+)", re.IGNORECASE)
+_KG_Q_RE = re.compile(r"[?&]q=([^&#\s]+)", re.IGNORECASE)
 
 
 def unmangle_url(url: str) -> str:
@@ -286,6 +308,152 @@ def _share_id(url: str):
     if m and m.group(1).lower() not in ("error", ""):
         return m.group(1)
     return None
+
+
+def _truncate_share_id(share_id, n: int = 4) -> str:
+    """[LOCAL-859B] A share id truncated to its first ``n`` chars for logging.
+    Michael's share.google ids are PUBLIC — we never log the full id (ticket)."""
+    s = (share_id or "").strip()
+    if not s:
+        return "?"
+    return (s[:n] + "…") if len(s) > n else s
+
+
+def parse_kg_search_url(url: str):
+    """[LOCAL-859B] Parse the canonical ``google.com/search?kgmid=…&q=…&source=…``
+    URL the new share.google flow lands on (GET hop 2) for
+    ``(q, kgmid, source)``.
+
+    ``q``       — the place NAME Google chose (often with address or city), unquoted.
+    ``kgmid``   — the Knowledge-Graph id: ``/g/…`` = a specific entity (a local
+                  place when source=…loc), ``/m/…`` = a Freebase topic (often a
+                  concept, e.g. the FRUIT for "Rambutan").
+    ``source``  — the ``source`` parameter, e.g. ``sh/x/loc/…`` or ``sh/x/kp/…``.
+
+    Any of the three may be None. Deterministic, offline — reads the URL STRING
+    only (no network, no JS page fetch). Returns ``(None, None, None)`` when
+    ``url`` is not a ``google.*/search`` URL."""
+    if not url or not _KG_SEARCH_HOST_RE.search(url):
+        return None, None, None
+    q = kgmid = source = None
+    m = _KG_Q_RE.search(url)
+    if m:
+        cand = unquote(m.group(1)).replace("+", " ").strip()
+        cand = re.sub(r"\s+", " ", cand)
+        # A bare share id (the hop-1 ``?q=<id>`` form, e.g. "1v4xAbC9", "z20Bk")
+        # is NOT a place name. Share ids always mix letters with DIGITS and carry
+        # no space; a real ``q`` is a place name (a word like "Rambutan", or a
+        # multi-word name with address/accents). So reject only a single
+        # space-free token that contains a digit.
+        _looks_like_id = (
+            " " not in cand
+            and bool(re.search(r"\d", cand))
+            and bool(re.fullmatch(r"[0-9A-Za-z_\-]+", cand)))
+        q = cand if (cand and not _looks_like_id) else None
+    m = _KGMID_RE.search(url)
+    if m:
+        kgmid = unquote(m.group(1)).strip() or None
+    m = _KG_SOURCE_RE.search(url)
+    if m:
+        source = unquote(m.group(1)).strip() or None
+    return q, kgmid, source
+
+
+def kg_confidence(kgmid, source) -> str:
+    """[LOCAL-859B] Confidence of a Knowledge-Graph share resolution.
+
+    HIGH — ``kgmid`` starts ``/g/`` AND ``source`` names a local place (contains
+           ``loc``). A ``/g/…loc`` id is a specific place entity: trust ``q`` and
+           look it up with Serper ``/places``.
+    LOW  — ``kgmid`` starts ``/m/`` (a Freebase topic — often a concept, e.g. the
+           FRUIT for "Rambutan"), OR ``source`` is a knowledge panel (contains
+           ``kp``), OR we have no kgmid/source at all. Ignore ``q`` (it may be the
+           topic, not the venue) and use the stop NAME the listener typed.
+
+    Returns ``"high"`` or ``"low"``."""
+    kg = (kgmid or "").strip().lower()
+    src = (source or "").strip().lower()
+    is_g = kg.startswith("/g/")
+    is_m = kg.startswith("/m/")
+    src_loc = "loc" in src
+    src_kp = "kp" in src
+    if is_g and src_loc and not src_kp:
+        return "high"
+    # A /g/ id with no explicit kp but a loc source already returned high above;
+    # anything topic-shaped (/m/) or knowledge-panel (kp) is low.
+    if is_m or src_kp:
+        return "low"
+    # A /g/ id without a loc source, or missing source: be conservative — LOW, so
+    # we never trust an ambiguous q over the listener's typed name.
+    return "low"
+
+
+def resolve_share_link_kg(
+    url: str,
+    *,
+    resolve: Optional[Callable[[str], Optional[str]]] = None,
+    log: Optional[Callable[[str], None]] = None,
+):
+    """[LOCAL-859B] Resolve a share.google link through the NEW Knowledge-Graph
+    flow and return a structured dict, WITHOUT fetching the JS search page.
+
+    Follows the chain with ``resolve`` (default ``default_resolver``: GET, browser
+    UA, redirects) to the final URL. When that final URL is the canonical
+    ``google.com/search?kgmid=…&q=…&source=…`` page, reads ``q``/``kgmid``/
+    ``source`` and computes the confidence. When the final URL is instead a
+    classic ``/maps/place`` URL carrying a coordinate (an older short link), that
+    coordinate is returned directly as ``lat``/``lng``.
+
+    Returns ``{q, kgmid, source, confidence, lat, lng, final_url}`` (all keys
+    always present; coordinate keys None unless a maps URL carried one), or
+    ``None`` when the link is not a share.google link or nothing resolved. Never
+    raises.
+
+    Logs exactly one ``[LOCAL-859B]`` line with the share id truncated to 4 chars
+    (Michael's ids are public — never log the full id)."""
+    emit = log or (lambda *_a, **_k: None)
+    if not url or not _MAPS_HOST_RE.search(url):
+        return None
+    resolve = resolve if resolve is not None else default_resolver
+
+    sid = _share_id(url)
+    try:
+        final = resolve(url)
+    except Exception:
+        final = None
+
+    q = kgmid = source = None
+    lat = lng = None
+
+    # A classic maps URL (older short link) with a coordinate wins outright.
+    if final:
+        _n, _la, _ln = parse_maps_place_url(final)
+        if _la is not None and _ln is not None:
+            lat, lng = _la, _ln
+        q, kgmid, source = parse_kg_search_url(final)
+
+    conf = kg_confidence(kgmid, source)
+    out = {
+        "q": q, "kgmid": kgmid, "source": source, "confidence": conf,
+        "lat": lat, "lng": lng, "final_url": final,
+    }
+
+    # The mandated [LOCAL-859B] line — truncated id, q, kgmid, source, result,
+    # confidence. Never the full share id.
+    if lat is not None and lng is not None:
+        result = f"{lat:.6f},{lng:.6f}"
+    elif q and conf == "high":
+        result = "q→name_lookup"
+    elif kgmid or q:
+        result = "typed_name→name_lookup"
+    else:
+        result = "none"
+    src_kind = ("loc" if source and "loc" in source.lower()
+                else "kp" if source and "kp" in source.lower()
+                else (source or "none"))
+    emit(f"[LOCAL-859B] share link {_truncate_share_id(sid)} → q={q!r} "
+         f"kgmid={kgmid or 'none'} source={src_kind} → {result} ({conf})")
+    return out
 
 
 def default_resolver(url: str) -> Optional[str]:
@@ -644,6 +812,10 @@ def parse_user_stop(
         "raw": raw, "name": name, "url": url,
         "lat": None, "lng": None, "resolved_name": None,
         "how": "name_only", "needs_geocode": True,
+        # [LOCAL-859B] Knowledge-Graph fields read from the new share.google flow
+        # (google.com/search?kgmid=…&q=…&source=…). Set only for a share link that
+        # resolved to the KG search page without a coordinate.
+        "kg_q": None, "kgmid": None, "kg_source": None, "kg_confidence": None,
     }
 
     if not url:
@@ -669,8 +841,8 @@ def parse_user_stop(
         # network.
         pname, lat, lng = parse_maps_place_url(url)
         how = "maps_url"
+        final = None
         if lat is None or lng is None:
-            final = None
             try:
                 final = resolve(url)
             except Exception:
@@ -690,6 +862,29 @@ def parse_user_stop(
             # was pure URL junk; otherwise keep what the listener typed.
             if not name:
                 out["name"] = pname
+
+        # [LOCAL-859B] No coordinate from the chain: read the NEW share.google KG
+        # search URL (google.com/search?kgmid=…&q=…&source=…) the GET lands on,
+        # WITHOUT fetching the JS page. Stamp q/kgmid/source + confidence so the
+        # caller can confidence-gate: /g/+loc → HIGH (look q up via /places),
+        # /m/ or kp → LOW (ignore q, use the typed name).
+        if out["lat"] is None and final:
+            kg_q, kgmid, kg_source = parse_kg_search_url(final)
+            if kgmid or kg_q or kg_source:
+                conf = kg_confidence(kgmid, kg_source)
+                out["kg_q"], out["kgmid"] = kg_q, kgmid
+                out["kg_source"], out["kg_confidence"] = kg_source, conf
+                how = "share_kg"
+                sid = _share_id(url) or _share_id(final)
+                src_kind = ("loc" if kg_source and "loc" in kg_source.lower()
+                            else "kp" if kg_source and "kp" in kg_source.lower()
+                            else (kg_source or "none"))
+                result = (f"q={kg_q!r}→name_lookup" if conf == "high" and kg_q
+                          else "typed_name→name_lookup")
+                emit(f"[LOCAL-859B] share link {_truncate_share_id(sid)} → "
+                     f"q={kg_q!r} kgmid={kgmid or 'none'} source={src_kind} → "
+                     f"{result} ({conf})")
+
         out["how"] = how
         _coord = (f"{out['lat']:.6f},{out['lng']:.6f}"
                   if out["lat"] is not None else "unresolved")
@@ -700,8 +895,13 @@ def parse_user_stop(
             emit(f"[LOCAL-859] user link resolved {out['name']!r} {_coord} "
                  f"via {how}")
         else:
-            emit(f"[LOCAL-859] user link unresolved {out['name']!r} ({url}) "
-                 f"→ name lookup pending (never centroid)")
+            # [LOCAL-859B] NEVER log the full share.google id (it is public). For
+            # a share.google link, show the host + the 4-char-truncated id only.
+            _sid = _share_id(url)
+            _url_for_log = (f"share.google/{_truncate_share_id(_sid)}"
+                            if _sid else url)
+            emit(f"[LOCAL-859] user link unresolved {out['name']!r} "
+                 f"({_url_for_log}) → name lookup pending (never centroid)")
         return out
 
     # A plain website URL (an-spa.vn): keep the name, geocode by name in the city.
