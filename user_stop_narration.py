@@ -326,7 +326,12 @@ _ADMIN_GEOGRAPHY_RE = re.compile(
     r"\bpopulation\s+(?:of\s+|surpassing\s+|exceeding\s+|nearing\s+|over\s+|above\s+)?"
     r"[\d.,]+\s*million\b|"
     # population written out ("population of 4,199,824", "4,199,824 as of 2024")
-    r"\bpopulation\s+(?:of\s+)?[\d.,]{4,}\b|\b[\d]{1,3}(?:,\d{3}){1,}\b|"
+    # [LOCAL-862] a comma-grouped number is a population figure UNLESS it counts
+    # reviews/ratings/followers ("4.4 out of 5 from about 28,000 reviews" is the
+    # venue's sourced Google record, not encyclopedia geography).
+    r"\bpopulation\s+(?:of\s+)?[\d.,]{4,}\b|\b[\d]{1,3}(?:,\d{3}){1,}\b"
+    r"(?!\s+(?:Google\s+|TripAdvisor\s+)?(?:reviews?|ratings?|followers|likes|"
+    r"visitors\s+on\s+Google))|"
     r"\bmerg(?:ed|ing)\s+(?:into|with)\b|\bprovinces?\s+into\b|"
     r"\bnational\s+assembly\b|\bresolution\s+no\.?\b|"
     # administrative reorganization / ward-commune counts / annexation into a city
@@ -627,7 +632,22 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
         off_marker = bool(_OFF_TOPIC_MARKER_RE.search(sent))
         dated = bool(_DATED_CLAIM_RE.search(sent))
         legend = bool(_LEGEND_MARKER_RE.search(sent))
-        anecdote = bool(_ANECDOTE_MARKER_RE.search(sent))
+        _disclosed862b = False
+        # [LOCAL-862B / D760] A sentence that carries a disclosure marker ("A
+        # Vietnamese folk tale tells …", "We couldn't confirm this, but …") is layer
+        # 3: its legend / anecdote vocabulary is allowed; the SAME sentence without
+        # a marker stays dropped. A sentence explaining the word in the venue's name
+        # ("Longan comes from the Chinese lóngyǎn, 'dragon eye'") is layer 2 and its
+        # legend vocabulary is allowed too. A date / first / geography still drops.
+        try:
+            from user_stop_context import has_disclosure as _hd862b, \
+                is_name_meaning_sentence as _nm862b
+            _disclosed862b = _hd862b(sent)
+            if legend and (_disclosed862b or _nm862b(sent, name)):
+                legend = False
+        except Exception:
+            pass
+        anecdote = bool(_ANECDOTE_MARKER_RE.search(sent)) and not _disclosed862b
         hedge = bool(_NO_DIRECT_TIE_RE.search(sent))
         art_prov = bool(_ART_PROVENANCE_RE.search(sent))
         admin_geo = bool(_ADMIN_GEOGRAPHY_RE.search(sent))
@@ -1055,6 +1075,15 @@ def scrub_tour_text_user_stops(tour_text, user_titles, location="", log=None,
             "mausoleum", "fort", "citadel",
         }
         _documented = bool(set(_ts_fold.split()) & _DOCUMENTED_KINDS)
+        # [LOCAL-862 item 4] Same landmark test as the verifier/enrichment
+        # (name + type), so "Independence Palace" typed "Historical Site" keeps
+        # its sourced dates.
+        if not _documented:
+            try:
+                from user_stop_enrichment import classify_stop_kind as _csk862
+                _documented = _csk862(title, poi.get("type_specialty") or "") == "landmark"
+            except Exception:
+                pass
         _scrub_block(poi, start, end, source_gated=(not _documented))
 
     return "\n".join(lines), total_dropped

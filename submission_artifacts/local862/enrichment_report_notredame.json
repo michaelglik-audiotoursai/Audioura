@@ -1,0 +1,57 @@
+{
+  "ran": false,
+  "model": "gpt-4.1-mini",
+  "stops": [
+    {
+      "stop": "Bến Thành Market",
+      "kind": "business",
+      "specifics": 1,
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [
+        "serper_places",
+        "serper_places:cid=10190288580948819760"
+      ],
+      "facts": [
+        [
+          "F1",
+          "category",
+          "Google Maps lists Bến Thành Market as: Market.",
+          "serper_places:cid=10190288580948819760"
+        ],
+        [
+          "F2",
+          "rating",
+          "Google reviewers give it 4 out of 5 from about 88,000 reviews.",
+          "serper_places"
+        ]
+      ],
+      "mode": "thin_deterministic",
+      "llm_cost_usd": 0.0,
+      "total_cost_usd": 0.004
+    },
+    {
+      "stop": "Independence Palace",
+      "kind": "landmark"
+    },
+    {
+      "stop": "Notre-Dame Cathedral Basilica of Saigon",
+      "kind": "landmark"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "llm_cost_usd": 0.0,
+  "serper_cost_usd": 0.004,
+  "total_cost_usd": 0.004,
+  "material_by_title": {},
+  "precomposed": [
+    "Bến Thành Market"
+  ],
+  "specifics_ge2": 0
+}

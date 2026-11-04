@@ -6331,6 +6331,10 @@ _J = _jss.attach_to_module(__name__, {
     # ThreadPool — so each job reads only its own user-stop titles, in the main
     # thread and in the workers.
     "_USER_STOP_TITLES_NAMES": set,
+    # [LOCAL-862] {display title: place name resolved from the listener's Maps
+    # URL} per JOB ("The Crazy street" -> "Bui Vien Walking Street"), so the
+    # user-stop enrichment can look the venue up under its real name.
+    "_USER_STOP_ALIASES": dict,
     # [LOCAL-644] The LAST generation's structured records (Stop/Opening/Closing),
     # serialized to JSON-safe dicts, so the STOP-POOL orchestrator can carry the
     # generator's OWN records through the pool delivery instead of re-parsing the
@@ -13773,6 +13777,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # stops even if a later poi_list rebuild drops their `user_explicit` flag.
         try:
             _set_user_stop_titles(_forced_titles)
+        except Exception:
+            pass
+        # [LOCAL-862] Remember the Maps-URL place name per user stop (alias).
+        try:
+            _J._USER_STOP_ALIASES = {
+                _t: (_p.get("resolved_name") or "").strip()
+                for _t, _p in zip(_forced_titles, _us_parsed or [])
+                if (_p or {}).get("resolved_name")}
         except Exception:
             pass
         poi_list = [_new_poi(name) for name in _forced_titles]
@@ -33526,13 +33538,52 @@ RULES:
     # than 2 survive. NO new regex is added. Logs per stop; reports added cost
     # (well under $0.005). Guarded; a failed/absent call leaves the regex-scrubbed
     # text untouched.
+    # [LOCAL-862] ENRICH BEFORE VERIFYING. A user stop of BUSINESS kind (bar,
+    # restaurant, café, spa, karaoke, shop, club, gallery, street/market) gets the
+    # same sourced material a business stop gets — Serper Places record,
+    # customer_voice, the venue's own site (<= 2 pages, robots respected) and one
+    # story search — and the narrator writes from that list ONLY. The verifier
+    # below then checks every sentence against the SAME list. Landmark-kind stops
+    # are untouched. Thin material (< 2 sourced specifics) stays short and uses
+    # the Places data. Disable with USER_STOP_ENRICH=0.
+    _enrich_rep_862 = None
+    try:
+        if os.environ.get("USER_STOP_ENRICH", "1").strip() != "0":
+            import user_stop_enrichment as _use862
+            _us_titles_862 = sorted(_get_user_stop_titles())
+            if _us_titles_862 and complete_tour:
+                try:
+                    _aliases_862 = dict(_J._USER_STOP_ALIASES or {})
+                except Exception:
+                    _aliases_862 = {}
+                complete_tour, _enrich_rep_862 = _use862.enrich_user_stops_in_text(
+                    complete_tour, _us_titles_862, location,
+                    api_key=api_key, log=print, aliases_by_title=_aliases_862)
+                _use862.LAST_REPORT = _enrich_rep_862
+                print(f"  [LOCAL-862] enrichment: "
+                      f"{_enrich_rep_862.get('specifics_ge2', 0)} narrated stop(s), "
+                      f"{len(_enrich_rep_862.get('precomposed', []))} thin; cost "
+                      f"${_enrich_rep_862.get('total_cost_usd', 0.0):.4f} "
+                      f"(serper ${_enrich_rep_862.get('serper_cost_usd', 0.0):.4f}, "
+                      f"llm ${_enrich_rep_862.get('llm_cost_usd', 0.0):.4f})")
+                if output_file:
+                    try:
+                        with open(output_file, "w", encoding="utf-8") as _ef:
+                            _ef.write(complete_tour)
+                    except Exception:
+                        pass
+    except Exception as _use862_err:
+        print(f"  [LOCAL-862] enrichment skipped (non-fatal): {_use862_err}")
+
     try:
         import user_stop_verify as _usv855d
         _us_titles_855d = sorted(_get_user_stop_titles())
         if _us_titles_855d and complete_tour:
             complete_tour, _usv_rep = _usv855d.verify_user_stops_in_text(
                 complete_tour, _us_titles_855d, location,
-                api_key=api_key, log=print)
+                api_key=api_key, log=print,
+                material_by_title=(_enrich_rep_862 or {}).get("material_by_title"),
+                precomposed_titles=(_enrich_rep_862 or {}).get("precomposed"))
             # [LOCAL-855E item 3 / D759] Report Serper retrieval per tour (one
             # query per user stop; venue-naming snippets fold into the fact sheet).
             _sq = _usv_rep.get("serper_queries", 0)

@@ -1,0 +1,8 @@
+{
+  "task_budget_id": "LOCAL-862B",
+  "hard_cap_usd": 0.5,
+  "generation_run_ledger_usd": 0.265126,
+  "replays_and_probes_paid_log_usd": 0.19,
+  "estimated_total_usd": 0.455,
+  "note": "One full Sophia generation run (ledger) + 4 enrichment/verify replays on that generated tour + a few probe queries. Paid-API log total 0.249; ledger counts the generation run at 0.265 (it includes LLM tokens)."
+}
