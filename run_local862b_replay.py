@@ -57,5 +57,58 @@ def main(src, dst, rep_path=None):
           f" dropped={vrep.get('dropped_total')}")
 
 
+def truth_report(tour_path, rep_path):
+    """Offline truth checks on a delivered tour: sentences per stop, every layer-3
+    sentence with its marker, and any year / 'first' in the prose that no gathered
+    fact for that stop contains."""
+    import user_stop_context as usc
+    text = open(tour_path, encoding="utf-8").read()
+    rep = json.load(open(rep_path))
+    facts_by = {s["stop"]: s.get("facts", []) for s in rep.get("stops", [])}
+    blocks = re.split(r"(?mi)^Stop\s+\d+:\s*", text)[1:]
+    ok = True
+    print("\n== TRUTH CHECKS ==")
+    for blk in blocks:
+        title = blk.split("\n", 1)[0].strip()
+        prose = []
+        for ln in blk.split("\n")[1:]:
+            t = ln.strip()
+            if not t or re.match(r"(?i)^(Coordinates|Type/Specialty|Directions|Address|Specific Examples):", t):
+                continue
+            if re.match(r"(?i)^(across these stops|if you would like to eat)", t):
+                break
+            prose.append(re.sub(r"(?i)^Orientation:\s*", "", t))
+        sents = usc._split_sentences(" ".join(prose))
+        corpus = " ".join(f[2] for f in facts_by.get(title, [])) + " " + title
+        bad = []
+        for sn in sents:
+            for y in re.findall(r"\b(1[0-9]{3}|20[0-2][0-9])\b", sn):
+                if y not in corpus:
+                    bad.append(f"year {y} in: {sn[:90]}")
+            if re.search(r"(?i)\b(first[- ]ever|the first|oldest|pioneer)", sn) and not re.search(
+                    r"(?i)\b(first[- ]ever|the first|oldest|pioneer)", corpus):
+                bad.append(f"'first' claim in: {sn[:90]}")
+        l3 = [(sn, usc.DISCLOSURE_RE.search(sn)) for sn in sents
+              if usc.has_disclosure(sn) or re.search(
+                  r"(?i)\b(legends?|myths?|folk\s*tales?|fables?|fairy|folklore|once\s+upon)\b", sn)]
+        print(f"- {title}: {len(sents)} sentence(s); layer-3 sentences: {len(l3)}; "
+              f"invented-specific hits: {len(bad)}")
+        if len(sents) < 4:
+            ok = False
+            print("    FAIL: under 4 sentences")
+        for sn, m in l3:
+            mark = m.group(0) if m else None
+            flag = "" if (mark or usc.is_name_meaning_sentence(sn, title)) else "   <-- NO MARKER"
+            if flag:
+                ok = False
+            print(f"    L3 marker={mark!r}: {sn}{flag}")
+        for b in bad:
+            ok = False
+            print("    INVENTED:", b)
+    print("TRUTH CHECKS:", "PASS" if ok else "FAIL")
+
+
 if __name__ == "__main__":
     main(*sys.argv[1:4])
+    if len(sys.argv) > 3:
+        truth_report(sys.argv[2], sys.argv[3])

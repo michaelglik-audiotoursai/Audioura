@@ -44,7 +44,7 @@ from text_polish import city_from_scope
 from user_stop_narration import _fold, _split_sentences
 
 __all__ = [
-    "has_disclosure", "is_name_meaning_sentence", "name_words",
+    "ensure_disclosure", "has_disclosure", "is_name_meaning_sentence", "name_words",
     "street_from_address", "gather_context", "layer_gate", "layer_tag",
     "strip_layer_tag", "clear_cache",
 ]
@@ -869,3 +869,53 @@ def layer_gate(sentence: str, name: str, source_lines: List[str]) -> Optional[st
         if f" {w}" not in all_f and w not in all_f:
             return f"geography '{m.group(1)}' no source carries"
     return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# composition-time disclosure (the narrator is asked for the marker; this makes it
+# certain).  Runs BEFORE verification, so the verifier can stay strict: a layer-3
+# sentence that still lacks a marker there is dropped.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_LEAD_TELLS_RE = re.compile(
+    r"(?i)^(?:an?|the|one)\s+(?:[\w'’-]+\s+){0,2}(?:stor(?:y|ies)|tales?|legends?|myths?)\s+"
+    r"(?:tells?|says?|goes|holds)(?:\s+that)?\s*,?\s*")
+
+
+_LOWER_FIRST = {"The", "A", "An", "It", "Its", "This", "These", "Those", "There", "In", "On",
+                "At", "Their", "They", "He", "She", "His", "Her", "When", "One", "Long",
+                "Once", "After", "Before", "Over", "Many", "Some", "Each", "Every"}
+
+
+def ensure_disclosure(body: str, facts: List[Dict]) -> Tuple[str, int]:
+    """Prefix the right disclosure marker onto any body sentence that retells a
+    layer-3 fact (>= 2 distinctive words in common) without carrying one.
+    [legend] -> 'A folk tale tells that ...'; [unconfirmed] -> "We couldn't confirm
+    this, but ...".  Returns (new_body, n_fixed)."""
+    l3 = [f for f in facts if f.get("layer") == 3]
+    if not l3 or not body:
+        return body, 0
+    base_t = _content_tokens(" ".join(f["text"] for f in facts if f.get("layer") != 3))
+    out, fixed = [], 0
+    for sent in _split_sentences(body):
+        if has_disclosure(sent):
+            out.append(sent)
+            continue
+        st = _content_tokens(sent) - base_t
+        best, kind = 0, None
+        for f in l3:
+            n = len(st & (_content_tokens(f["text"]) - base_t))
+            if n > best:
+                best, kind = n, f.get("kind")
+        if best >= 2 and kind in ("legend", "unconfirmed"):
+            core = _LEAD_TELLS_RE.sub("", sent).strip()
+            first = core.split(" ", 1)[0] if core else ""
+            if first in _LOWER_FIRST:
+                core = core[:1].lower() + core[1:]
+            if kind == "legend":
+                sent = f"A folk tale tells that {core}"
+            else:
+                sent = f"We couldn't confirm this, but {core}"
+            fixed += 1
+        out.append(sent)
+    return " ".join(out), fixed

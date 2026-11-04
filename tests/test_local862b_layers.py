@@ -177,6 +177,35 @@ class Cleaning(unittest.TestCase):
         self.assertIn("slayed a dragon", out[0]["text"])
 
 
+class EnsureDisclosure(unittest.TestCase):
+    FACTS = [{"kind": "name_meaning", "layer": 2, "text": "The word Longan is derived from lóngyǎn."},
+             {"kind": "legend", "layer": 3,
+              "text": "The story tells that a long time ago, there was a dragon in Fujian, China."},
+             {"kind": "unconfirmed", "layer": 3,
+              "text": "Founded in 2007, Acoustic Bar shares music culture through many styles."}]
+
+    def test_legend_gets_folk_tale_marker(self):
+        b = "The name is Chinese. A story tells that a long time ago, there was a dragon in Fujian, China."
+        out, n = usc.ensure_disclosure(b, self.FACTS)
+        self.assertEqual(n, 1)
+        self.assertIn("A folk tale tells that a long time ago, there was a dragon in Fujian, China.", out)
+        self.assertTrue(usc.has_disclosure(out.split(". ", 1)[1]))
+
+    def test_unconfirmed_gets_cant_confirm_marker(self):
+        out, n = usc.ensure_disclosure("Acoustic Bar was founded in 2007 sharing music culture in many styles.",
+                                       self.FACTS)
+        self.assertEqual(n, 1)
+        self.assertTrue(out.startswith("We couldn't confirm this, but Acoustic Bar"))
+
+    def test_layer1_and_layer2_sentences_are_left_alone(self):
+        b = "The word Longan is derived from lóngyǎn. It is a bar."
+        self.assertEqual(usc.ensure_disclosure(b, self.FACTS), (b, 0))
+
+    def test_marked_sentence_unchanged(self):
+        b = "A folk tale tells that there was a dragon in Fujian."
+        self.assertEqual(usc.ensure_disclosure(b, self.FACTS), (b, 0))
+
+
 class Context(unittest.TestCase):
     def test_name_meaning_longan_and_rambutan(self):
         ctx = usc.gather_context(POI, LOC, wiki_fn=wiki, wiki_search_fn=wiki_search,
@@ -321,6 +350,27 @@ class Pipeline(unittest.TestCase):
         self.assertIn("[legend]", seen["user"])
         self.assertIn("disclosure", seen["system"])
         self.assertNotIn("one of the places you chose", out)
+
+    def test_narrator_without_marker_is_repaired_before_verification(self):
+        narr = {"orientation": "Longan is one of the stops you chose.",
+                "body": ("The word longan comes from the Chinese lóngyǎn, which literally means "
+                         "dragon eye. A story tells that a long time ago, there was a dragon in "
+                         "Fujian, China. Longan also names a fruit. The name matches the fruit.")}
+
+        def llm(system, user):
+            return ({"stops": [dict(narr, id=0, used=["F1"])]}, 1, 1)
+        serp = lambda q: ([{"title": "t", "link": "http://l/1", "snippet":
+                            "The story tells that a long time ago, there was a dragon in Fujian, China. "
+                            "More text follows here for the legend of the name."}], 0)
+        usc._CACHE.clear()
+        usc._default_wiki_fn = wiki
+        try:
+            out, rep = use.enrich_user_stops_in_text(
+                TOUR, ["Longan"], LOC, api_key="k", places_fn=lambda *a: [],
+                fetch_page=lambda u: None, serp_fn=serp, review_snippets=[], llm_fn=llm)
+        finally:
+            usc._default_wiki_fn = lambda t: None
+        self.assertIn("A folk tale tells that a long time ago, there was a dragon", out)
 
     def test_all_layers_empty_stays_short_deterministic(self):
         usc._CACHE.clear()

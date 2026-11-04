@@ -1291,7 +1291,17 @@ def enrich_user_stops_in_text(
                 city_ = city_from_scope(location)
                 ori = (f"{title} is one of the stops you chose" +
                        (f", here in {city_}." if city_ else "."))
-            _rewrite_block(lines, start, end, text, ori, nar.get("body"))
+            body_ = nar.get("body")
+            try:
+                import user_stop_context as _usc2
+                if body_:
+                    body_, n_fix = _usc2.ensure_disclosure(body_, select_facts(mat))
+                    if n_fix and log:
+                        log(f"[LOCAL-862B] {title}: added the disclosure marker to "
+                            f"{n_fix} layer-3 sentence(s)")
+            except Exception:
+                pass
+            _rewrite_block(lines, start, end, text, ori, body_)
             entry.update(mode="narrated", llm_cost_usd=round(per_stop_llm, 6),
                          narration=text, used=nar.get("used"))
             report["material_by_title"][title] = material_lines(mat)
