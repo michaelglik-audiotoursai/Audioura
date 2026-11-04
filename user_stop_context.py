@@ -222,7 +222,8 @@ def _clean_sentence(s: str) -> str:
         s = re.sub(r"(?:simplified|traditional)\s+Chinese:\s*[^;.]*;?\s*", "", s)
         s = _CJK_RE.sub("", s)
         s = re.sub(r"\s*;\s*;", ";", s)
-        if re.search(r"(?i)\b(character|means?)\b", s):
+        s = re.sub(r"\s+([,.;:])", r"\1", s)
+        if re.search(r"(?i)\b(?:characters?|while|and)\s+(?:means?|mean)\b|\bso\s+together\s*[,.]", s):
             return ""
     if re.search(r"[A-Za-z]\d\b", s):          # tone-number romanisation: lung4 ngaan5
         return ""
@@ -311,7 +312,7 @@ def _name_meaning_facts(word: str, wiki_fn, calls: Dict) -> Tuple[List[Dict], Li
     # no etymology section -> this is just a dictionary entry, not a name story
     if not ety_sents:
         return [], []
-    for s in ety_sents[:3]:
+    for s in ety_sents[:4]:
         d = {"kind": "name_meaning", "layer": 2, "text": s, "source": src,
              "specific": True}
         if _LEGEND_CUE_RE.search(s):
@@ -326,16 +327,34 @@ def _name_meaning_facts(word: str, wiki_fn, calls: Dict) -> Tuple[List[Dict], Li
             ctx.append({"kind": "name_meaning", "layer": 2, "specific": True,
                         "text": f'As a plain word, "{word}" also names a plant. {s}',
                         "source": src})
-    # the first sentence of a Description section often explains the word (hair)
-    desc = next((b for h, b in secs if re.search(r"(?i)^(?:description|fruit)$", h or "")), "")
-    for s in _split_sentences(desc)[:3]:
-        s = _clean_sentence(s)
-        if s and _good_sentence(s) and re.search(
-                r"(?i)\b(hair\w*|spin\w*|spik\w*|eye\w*|dragon|skin|shell|seed)\b", s):
-            ctx.append({"kind": "name_meaning", "layer": 2, "text": s,
-                        "source": src, "specific": True})
+    # a Description/Fruit sentence that explains the word ("hence the name ... hairy";
+    # "This gives the illusion of an eye") - with the sentence it refers back to
+    for h, b in secs:
+        if not re.search(r"(?i)^(?:description|fruit)$", h or ""):
+            continue
+        ss = [_clean_sentence(x) for x in _split_sentences(b)]
+        for i, x in enumerate(ss):
+            if x and _good_sentence(x) and re.search(
+                    r"(?i)hence\s+the\s+name|illusion\s+of|resembl\w+", x):
+                if re.match(r"(?i)(this|it|these|they)\b", x) and i > 0 and ss[i - 1] \
+                        and _good_sentence(ss[i - 1]):
+                    x = f"{ss[i - 1]} {x}"
+                ctx.append({"kind": "name_meaning", "layer": 2, "text": x,
+                            "source": src, "specific": True})
+                break
+        if ctx and ctx[-1]["text"].find("hence the name") >= 0 or any(
+                "illusion" in c["text"] for c in ctx):
             break
-    return ctx[:5], leg[:2]
+    # the page's own folklore section -> layer 3 (a legend, to be disclosed)
+    for h, b in secs:
+        if re.search(r"(?i)^(?:in\s+culture|folklore|legends?|mythology|culture|in\s+popular\s+culture)$", h or ""):
+            ss = [_clean_sentence(x) for x in _split_sentences(b)]
+            ss = [x for x in ss if x and _good_sentence(x, lo=25)]
+            if ss and _LEGEND_CUE_RE.search(ss[0]) or (ss and re.search(r"(?i)\btells\b", ss[0])):
+                leg.append({"kind": "legend", "layer": 3, "text": " ".join(ss[:3]),
+                            "source": src, "specific": True})
+                break
+    return ctx[:6], leg[:2]
 
 
 _NARRATIVE_VERB_RE = re.compile(
