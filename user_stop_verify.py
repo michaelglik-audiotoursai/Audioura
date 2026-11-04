@@ -735,17 +735,22 @@ def verify_user_stops_in_text(
         # layer-3 source is dropped, and a year / "first" / geography no source
         # line contains is dropped whether or not it is marked.
         try:
-            from user_stop_context import layer_gate as _lg862b
+            from user_stop_context import (gate_body as _gb862c,
+                                           enforce_legend_blocks as _elb862c)
+            _srcl = meta.get("source_lines") or []
+            _whys = _gb862c(sentences, name, _srcl)      # [LOCAL-862C] block-aware
             for _i, _s in enumerate(sentences):
                 if not keep_flags[_i]:
                     continue
-                _why = _lg862b(_s, name, meta.get("source_lines") or [])
+                _why = _whys[_i]
                 if _why:
                     keep_flags[_i] = False
                     lab[_i] = "UNSUPPORTED"
                     if log:
                         log(f"[LOCAL-862B] verify {name}: gate dropped "
                             f"({_why}): {_s[:120]}")
+            # a legend is ONE disclosed block: all of it or none of it
+            keep_flags = _elb862c(sentences, keep_flags, name, _srcl)
         except Exception as _ge:
             if log:
                 log(f"[LOCAL-862B] layer gate skipped: {_ge}")
