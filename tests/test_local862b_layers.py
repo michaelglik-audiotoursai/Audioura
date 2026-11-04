@@ -244,7 +244,27 @@ class Context(unittest.TestCase):
         self.assertTrue(all("204,899" not in t for t in dist))      # population skipped
         ctx = usc.gather_context({"name": "Y"}, LOC, wiki_fn=wf, wiki_search_fn=ws,
                                  serp_fn=lambda q: ([], 0))
-        self.assertTrue(any(f["kind"] == "city" for f in ctx["facts"]))
+        self.assertFalse(any(f["kind"] == "city" for f in ctx["facts"]))   # no city padding
+
+    def test_name_is_a_film_title(self):
+        page = {"title": "A Star Is Born", "disambiguation": True,
+                "url": "https://en.wikipedia.org/wiki/A_Star_Is_Born",
+                "text": ("A Star Is Born may refer to:\n== Film ==\n"
+                         "A Star Is Born (1937 film), starring Janet Gaynor and Fredric March, directed by W\n"
+                         "A Star Is Born (1954 film), starring Judy Garland and James Mason, directed by G\n"
+                         "A Star Is Born (1976 film), starring Barbra Streisand and Kris Kristofferson, directed by F\n"
+                         "A Star Is Born (2018 film), starring Lady Gaga and Bradley Cooper, directed by B\n")}
+        ctx = usc.gather_context({"name": "A Star is Born"}, LOC,
+                                 wiki_fn=lambda t: page if t == "A Star is Born" else None,
+                                 wiki_search_fn=lambda q: [], serp_fn=lambda q: ([], 0))
+        l2 = [f["text"] for f in ctx["facts"] if f["layer"] == 2]
+        l3 = [f["text"] for f in ctx["facts"] if f["layer"] == 3]
+        self.assertTrue(any("title of a film" in t and "1937" in t for t in l2), l2)
+        self.assertTrue(any("Judy Garland in 1954" in t for t in l2), l2)
+        self.assertEqual(len(l3), 1)
+        self.assertIsNone(usc.layer_gate(
+            "We couldn't confirm this, but the name may nod to the film title.", "A Star is Born",
+            [f"[context] {t}" for t in l2] + [f"[unconfirmed] {l3[0]}"]))
 
     def test_no_search_no_facts(self):
         self.assertEqual(usc.gather_context(POI, LOC, allow_search=False)["facts"], [])

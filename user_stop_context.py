@@ -242,7 +242,7 @@ def _trim_truncated(s: str) -> str:
         return s
     s = _ELLIPSIS_RE.sub("", s)
     cut = max(s.rfind(", "), s.rfind("; "), s.rfind(". "))
-    if cut < 40:
+    if cut < 80:
         return ""
     s = s[:cut].rstrip(" ,;")
     return s if s.endswith((".", "!", "?")) else s + "."
@@ -343,6 +343,9 @@ _NARRATIVE_VERB_RE = re.compile(
     r"lived|came|ate|fell|died|rescued|saved|wished|rolled|laid|hatched|fought|"
     r"transformed|sprang|planted|buried|dropped|wept|fled|protected|defeated|"
     r"stabbed|witnessing|terroriz\w+|connects|is\s+about|tells\s+of)\b")
+_STORYTIME_RE = re.compile(
+    r"(?i)\b(story\s+(?:tells|goes)|tale\s+(?:tells|goes)|long\s+ago|a\s+long\s+time\s+ago|"
+    r"there\s+(?:was|lived)|once\s+upon)\b")
 _ANNOUNCE_RE = re.compile(
     r"(?i)(tells\s+the\s+(?:story|tale)\s+of|the\s+legend\s+of\b|discover\b|enchanting|"
     r"how\s+to\b|recipe|benefits|buy\b|follow\s+\w+\s+through|distinguishing|"
@@ -364,9 +367,12 @@ def _legend_facts(word: str, serp_fn, calls: Dict, log=None) -> List[Dict]:
             f = _ffold(s)
             if word not in f.split() and not (word == "longan" and "dragon" in f):
                 continue
-            if not _NARRATIVE_VERB_RE.search(s) or _ANNOUNCE_RE.search(s):
+            if _ANNOUNCE_RE.search(s):
                 continue
-            if not (_LEGEND_CUE_RE.search(s) or "name" in f.split()):
+            if not (_NARRATIVE_VERB_RE.search(s) or _STORYTIME_RE.search(s)):
+                continue
+            if not (_LEGEND_CUE_RE.search(s) or _STORYTIME_RE.search(s)
+                    or "name" in f.split()):
                 continue
             if all(_ffold(o["text"]) != f for o in out):
                 out.append({"kind": "legend", "layer": 3, "text": s,
@@ -376,6 +382,55 @@ def _legend_facts(word: str, serp_fn, calls: Dict, log=None) -> List[Dict]:
         if len(out) >= 2:
             break
     return out
+
+
+_WORK_RE = re.compile(r"(?i)\b(film|movie|song|album|novel|musical|television|play|opera)\b")
+
+
+def _name_work_facts(name: str, wiki_fn, wiki_search_fn, calls: Dict) -> List[Dict]:
+    """A venue whose name (3+ words) is the title of a well-known work shares its
+    name with it.  We state THAT as context (layer 2) and, separately, that we
+    could not confirm the venue was named for it (layer 3, disclosed)."""
+    toks = _ffold(name).split()
+    if len(toks) < 3 or len(toks) > 6:
+        return []
+    calls["wiki"] = calls.get("wiki", 0) + 1
+    page = wiki_fn(name)
+    if not page or _ffold(page["title"]) != _ffold(name):
+        return []
+    text = page["text"]
+    if page.get("disambiguation"):
+        # "A Star Is Born may refer to: A Star Is Born (1937 film) ... remakes"
+        years = sorted({m.group(1) for m in re.finditer(r"\((1[89]\d{2}|20\d{2})\s+(?:film|soundtrack)\)", text)})
+        if not years or not re.search(r"(?i)\bfilm\b", text):
+            return []
+        phrase = ", ".join(years[:-1]) + (" and " if len(years) > 1 else "") + years[-1]
+        ctx = (f'The words "{name}" are also the title of a film, first made in {years[0]} '
+               f'and remade in {phrase.split(" and ")[-1] if len(years) > 1 else years[0]}.')
+        if len(years) > 2:
+            ctx = (f'The words "{name}" are also the title of a film, first made in {years[0]} '
+                   f'and remade several times, most recently in {years[-1]}.')
+    else:
+        lead = _clean_sentence(_split_sentences(next((b for h, b in _sections(text) if not h), ""))[0]
+                               if text.strip() else "")
+        if not lead or not _WORK_RE.search(lead):
+            return []
+        ctx = f'The words "{name}" are also the title of a work: {lead}'
+    extra: List[Dict] = []
+    stars = re.findall(r"\((1[89]\d{2}|20\d{2})\s+film\),\s+starring\s+([^,\n]+?)(?:\s+and\s+[^,\n]+)?,", text)
+    if page.get("disambiguation") and len(stars) >= 2:
+        first = [f"{n.strip()} in {y}" for y, n in stars[1:4]]
+        listed = ", ".join(first[:-1]) + (", and " if len(first) > 2 else " and ") + first[-1]
+        extra.append({"kind": "name_meaning", "layer": 2, "specific": True,
+                      "source": page["url"],
+                      "text": f"The remakes starred {listed}."})
+    return [
+        {"kind": "name_meaning", "layer": 2, "text": ctx, "source": page["url"],
+         "specific": True}, *extra,
+        {"kind": "unconfirmed", "layer": 3, "specific": True, "source": page["url"],
+         "text": (f'The venue may have taken its name from that title, but no source we '
+                  f'found says so.')},
+    ]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -530,8 +585,10 @@ def _lead_story_sentences(page: Dict, max_n: int) -> List[str]:
 
 def _place_story_facts(poi: Dict, place: Optional[Dict], city: str, wiki_fn,
                        wiki_search_fn, calls: Dict) -> List[Dict]:
-    """The district's documented story when the stop's address names one, else the
-    city's.  Text is Wikipedia's own; population/area figures are skipped."""
+    """The district's documented story when the stop's address names one.  Text is
+    Wikipedia's own; population/area figures are skipped.  There is deliberately NO
+    city-level fallback: the city's GDP, rivers and airport are padding, not a
+    story that connects to the venue."""
     addr = " , ".join(a for a in ((place or {}).get("_serper_address"), poi.get("address")) if a)
     m = _DISTRICT_RE.search(addr or "")
     facts: List[Dict] = []
@@ -550,13 +607,6 @@ def _place_story_facts(poi: Dict, place: Optional[Dict], city: str, wiki_fn,
                     break
         if facts:
             return facts
-    if city:
-        calls["wiki"] = calls.get("wiki", 0) + 1
-        page = wiki_fn(city)
-        if page and not page.get("disambiguation") and _ffold(page["title"]).split()[0] == _ffold(city).split()[0]:
-            for s in _lead_story_sentences(page, 3):
-                facts.append({"kind": "city", "layer": 2, "text": s,
-                              "source": page["url"], "specific": True})
     return facts
 
 
@@ -646,6 +696,13 @@ def gather_context(poi: Dict, location: str, *, place: Optional[Dict] = None,
     except Exception as e:  # pragma: no cover
         if log:
             log(f"[LOCAL-862B] legend search failed for {name!r}: {e}")
+
+    # 2a' — the whole name is also the title of a work (A Star Is Born)
+    try:
+        facts.extend(_name_work_facts(name, wiki_fn, wiki_search_fn, calls))
+    except Exception as e:  # pragma: no cover
+        if log:
+            log(f"[LOCAL-862B] name-work context failed for {name!r}: {e}")
 
     # 2b — the street / district
     try:
@@ -761,7 +818,9 @@ def layer_gate(sentence: str, name: str, source_lines: List[str]) -> Optional[st
         base_t = _content_tokens(" ".join(plain) + " " + name)
         sent_t = _content_tokens(sentence) - base_t
         best = max((len(sent_t & (_content_tokens(x) - base_t)) for x in l3), default=0)
-        if best < 2:
+        loose_t = _content_tokens(sentence) - _content_tokens(name)
+        best_loose = max((len(loose_t & _content_tokens(x)) for x in l3), default=0)
+        if best < 2 and best_loose < 2:
             return "disclosure marker without a layer-3 source"
     else:
         # retelling a layer-3 line (>= 3 shared content words) without a marker
