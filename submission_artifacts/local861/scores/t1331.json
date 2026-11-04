@@ -1,0 +1,40 @@
+{
+  "venue_from_text": "Palais Lascaris, Nice, France",
+  "stops_delivered": 1,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "Raquel (panneau, fin du XVIe siècle)",
+      "d511_story": "n",
+      "story_quote": "In 1902, Gabriel Fauré performed his piano compositions in the salon of Palais Lascaris, a space where this panel now shares silent witness",
+      "sourced_specifics": 1,
+      "specifics_traced": [
+        "Palais Lascaris houses a musical instrument collection, 17th-century building, city of Nice since 1901 (documented)"
+      ],
+      "fabrications": [
+        {
+          "claim": "'Raquel, a figure whose historical presence is less known but whose role in politics was critical during her era'",
+          "why": "invents a real political role for an unidentified sitter in an unattributed panel; log shows the work's artist/subject are unrecorded"
+        },
+        {
+          "claim": "Fauré performed in the Palais salon in 1902 in a scene 'linking' to this specific panel",
+          "why": "unverifiable connection between an unrelated anecdote and this object, presented as established fact"
+        }
+      ],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 0,
+    "fabrication_count": 2,
+    "wrong_venue_count": 0,
+    "sourced_specifics_total": 1
+  },
+  "defects": [
+    "Only 1/6 stops delivered (shortfall, honestly flagged in text)"
+  ],
+  "overall_0_10": 2.5,
+  "one_line_verdict": "Severe shortfall (1/6); the one stop invents a political biography for an unknown sitter.",
+  "id": "t1331"
+}

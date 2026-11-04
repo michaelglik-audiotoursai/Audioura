@@ -1,0 +1,105 @@
+{
+  "venue_from_text": "Rijksmuseum, Amsterdam, Netherlands",
+  "stops_delivered": 6,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "Winterlandschap met ijsvermaak",
+      "d511_story": "n",
+      "story_quote": "He adapted compositional elements reminiscent of Pieter Bruegel, whose expansive crowd scenes Avercamp reinterpreted",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Avercamp, c.1608, oil on oak panel, ~23 years old (documented, consistent with his 1585 birth year)",
+        "style recalls Bruegel's 1565 Winter Landscape (confirmed, Wikipedia)",
+        "kolf game depicted (confirmed, museum sources)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 2,
+      "title": "Gezicht op huizen in Delft ('The Little Street')",
+      "d511_story": "n",
+      "story_quote": "A 1696 auction catalogue records 'The Little House' as one of at least three cityscapes by Vermeer",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Vermeer, c.1658, painted from his own window (documented)",
+        "1696 Amsterdam sale catalogue listing (confirmed, WGA provenance)",
+        "one of only ~2-3 known Vermeer cityscapes (confirmed)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 3,
+      "title": "De bedreigde zwaan (The Threatened Swan)",
+      "d511_story": "n",
+      "story_quote": "Later, the museum's director Van de Weyer insisted on displaying the painting prominently",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Jan Asselijn, c.1650, 144x171cm (documented)",
+        "later read as political allegory re: Dutch sovereignty (confirmed)"
+      ],
+      "fabrications": [
+        {
+          "claim": "a museum 'director Van de Weyer' insisted on displaying it prominently",
+          "why": "no such Rijksmuseum director found in the historical record (the documented first-purchase decision was by Cornelis Sebille Roos/Alexander Gogel for the Nationale Kunst-Galerij, not a 'Van de Weyer'); appears invented"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 4,
+      "title": "Het melkmeisje (The Milkmaid)",
+      "d511_story": "y",
+      "story_quote": "Because of a debate, the government decided to buy the work for the Rijksmuseum. As a result, 'The Milkmaid' remained in the Netherlands",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Vermeer, oil on canvas, ~45.5x41cm (documented)",
+        "Dutch government controversially purchased it in 1908 to keep it from leaving the country (broadly consistent with documented history)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 5,
+      "title": "De grote golf bij Kanagawa (The Great Wave)",
+      "d511_story": "n",
+      "story_quote": "The delicate gradations of Prussian blue pigment, first synthesized in Germany and imported from Europe",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Hokusai, aizuri-e (blue printing) technique (documented)",
+        "Prussian blue pigment imported to Japan via Europe/China (documented art-historical fact)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 6,
+      "title": "A Militiaman Holding a Berkemeyer",
+      "d511_story": "n",
+      "story_quote": "This work reflects a turning point in his career, where he moved beyond formal group portraits to capture individuals",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Frans Hals, c.1628-1630, 81x66.5cm (documented)",
+        "known for militia group portraits (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 1,
+    "fabrication_count": 1,
+    "wrong_venue_count": 0,
+    "sourced_specifics_total": 14
+  },
+  "defects": [
+    "One invented museum-director name/anecdote",
+    "far fewer D511 stories than the other Rijksmuseum text (1 vs 3) despite similar factual accuracy — mostly description, not narrative"
+  ],
+  "overall_0_10": 7.0,
+  "one_line_verdict": "Accurate and well-sourced but mostly descriptive rather than story-driven; one invented curatorial anecdote.",
+  "id": "t8494"
+}

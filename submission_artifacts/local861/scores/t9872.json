@@ -1,0 +1,105 @@
+{
+  "venue_from_text": "Musée d'Orsay, Paris, France",
+  "stops_delivered": 6,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "Le Déjeuner sur l'herbe",
+      "d511_story": "y",
+      "story_quote": "Louis Broder commissioned limited editions of prints inspired by Manet's work, insisting on close collaboration",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Manet, 1863, oil on canvas, rejected by the Salon, shown at the Salon des Refusés (documented)"
+      ],
+      "fabrications": [
+        {
+          "claim": "Monet's 'interpretation' of this painting held at Orsay",
+          "why": "Manet/Monet conflation — no such Monet interpretation of this painting is documented at Orsay"
+        },
+        {
+          "claim": "Louis Broder commissioned print editions of this specific 1863 painting at Mourlot's workshop",
+          "why": "Broder's documented work (with Miró, Braque etc.) is mid-20th-century and unconnected to this painting; flagged UNSOURCED in the research log and still present in the delivered text"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 2,
+      "title": "La Nuit étoilée (Starry Night Over the Rhône)",
+      "d511_story": "n",
+      "story_quote": "He chose a spot on the riverbank to capture the reflections of gas lighting on the water",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Sept 1888, Arles, near the Yellow House (documented)",
+        "letters to Theo (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 3,
+      "title": "L'Église d'Auvers-sur-Oise",
+      "d511_story": "y",
+      "story_quote": "Theo's widow preserved these paintings...eventually enabling them to enter public collections like this one",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "June 1890, Auvers-sur-Oise, ~70 works in final weeks (documented)",
+        "Theo's support and Jo van Gogh-Bonger's role preserving the estate (broadly documented)",
+        "letters to Theo and sister Wilhelmina (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 4,
+      "title": "L'Origine du monde",
+      "d511_story": "y",
+      "story_quote": "After Jacques Lacan died in 1981, his family faced a substantial inheritance tax bill...accepted L'Origine du monde itself as payment...using 'dation en paiement'",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Lacan owned the painting (documented)",
+        "dation en paiement transfer to the French state, entering Orsay in 1995 (documented)",
+        "Courbet, 1866, commissioned by Khalil-Bey (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 5,
+      "title": "Bal du moulin de la Galette",
+      "d511_story": "n",
+      "story_quote": "This approach paved the way for future artists to explore the subjective perception of time and atmosphere",
+      "sourced_specifics": 1,
+      "specifics_traced": [
+        "Renoir, Impressionist social scene, Moulin de la Galette (documented subject)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 6,
+      "title": "Une moderne Olympia (A Modern Olympia)",
+      "d511_story": "n",
+      "story_quote": "Moderne Olympia was part of Cézanne's ongoing effort to redefine the nude, abstracting the figure into geometric shapes",
+      "sourced_specifics": 1,
+      "specifics_traced": [
+        "Cézanne painted in response to Manet's Olympia (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 3,
+    "fabrication_count": 2,
+    "wrong_venue_count": 0,
+    "sourced_specifics_total": 12
+  },
+  "defects": [
+    "Manet/Monet conflation and Broder fabrication (the Broder claim is flagged UNSOURCED in the research log yet still delivered)"
+  ],
+  "overall_0_10": 6.5,
+  "one_line_verdict": "Good story content at 3/6 stops but carries a Monet/Manet mix-up and an unsourced Broder print claim.",
+  "id": "t9872"
+}

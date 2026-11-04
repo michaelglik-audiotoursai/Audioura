@@ -1,0 +1,110 @@
+{
+  "t1106": {
+    "arm": "B",
+    "error": null,
+    "location": "Museum of Fine Arts, Boston, MA",
+    "museum": "mfa",
+    "narration_model": "gpt-4.1",
+    "seconds": 845.4,
+    "usd": 1.012587
+  },
+  "t1331": {
+    "arm": "A",
+    "error": null,
+    "location": "Palais Lascaris, Nice, France",
+    "museum": "lascaris",
+    "narration_model": "gpt-4.1-mini",
+    "seconds": 301.3,
+    "usd": 0.070904
+  },
+  "t2206": {
+    "arm": "B",
+    "error": null,
+    "location": "Mus\u00e9e d'Orsay, Paris, France",
+    "museum": "orsay",
+    "narration_model": "gpt-4.1",
+    "seconds": 689.9,
+    "usd": 1.061274
+  },
+  "t4425": {
+    "arm": "A",
+    "error": null,
+    "location": "Asian Art Museum, San Francisco, CA",
+    "museum": "asian",
+    "narration_model": "gpt-4.1-mini",
+    "seconds": 784.4,
+    "usd": 0.370957
+  },
+  "t4736": {
+    "arm": "B",
+    "error": null,
+    "location": "Palais Lascaris, Nice, France",
+    "museum": "lascaris",
+    "narration_model": "gpt-4.1",
+    "seconds": 265.6,
+    "usd": 0.166269
+  },
+  "t6291": {
+    "arm": "B",
+    "error": null,
+    "location": "Asian Art Museum, San Francisco, CA",
+    "museum": "asian",
+    "narration_model": "gpt-4.1",
+    "seconds": 714.8,
+    "usd": 1.06284
+  },
+  "t7075": {
+    "arm": "A",
+    "error": null,
+    "location": "Isabella Stewart Gardner Museum, Boston, MA",
+    "museum": "gardner",
+    "narration_model": "gpt-4.1-mini",
+    "seconds": 678.7,
+    "usd": 0.399005
+  },
+  "t7154": {
+    "arm": "B",
+    "error": null,
+    "location": "Rijksmuseum, Amsterdam, Netherlands",
+    "museum": "rijks",
+    "narration_model": "gpt-4.1",
+    "seconds": 833.6,
+    "usd": 1.075333
+  },
+  "t7346": {
+    "arm": "A",
+    "error": null,
+    "location": "Museum of Fine Arts, Boston, MA",
+    "museum": "mfa",
+    "narration_model": "gpt-4.1-mini",
+    "seconds": 1108.1,
+    "usd": 0.407452
+  },
+  "t8494": {
+    "arm": "A",
+    "error": null,
+    "location": "Rijksmuseum, Amsterdam, Netherlands",
+    "museum": "rijks",
+    "narration_model": "gpt-4.1-mini",
+    "seconds": 857.4,
+    "usd": 0.46624
+  },
+  "t9171": {
+    "arm": "B",
+    "error": null,
+    "location": "Isabella Stewart Gardner Museum, Boston, MA",
+    "museum": "gardner",
+    "narration_model": "gpt-4.1",
+    "seconds": 577.8,
+    "usd": 1.123247
+  },
+  "t9872": {
+    "arm": "A",
+    "error": null,
+    "location": "Mus\u00e9e d'Orsay, Paris, France",
+    "museum": "orsay",
+    "narration_model": "gpt-4.1-mini",
+    "seconds": 686.9,
+    "usd": 0.447626
+  }
+}

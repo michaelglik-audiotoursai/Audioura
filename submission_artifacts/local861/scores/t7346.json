@@ -1,0 +1,118 @@
+{
+  "venue_from_text": "Museum of Fine Arts, Boston, MA",
+  "stops_delivered": 6,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "The artist is in his studio",
+      "d511_story": "y",
+      "story_quote": "The painting's survival owes much to Chevalier Antoine de la Roque...who preserved the work through his collection",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Rembrandt, oil on panel, 1629 (documented)",
+        "Chevalier Antoine de la Roque, b.1672, provenance (confirmed, MFA collections record)",
+        "MFA Center for Netherlandish Art (real department)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 2,
+      "title": "Madame Monet wearing a kimono",
+      "d511_story": "y",
+      "story_quote": "the critic Simon Boubée reviewed the painting and wrote that Monet 'has shown a Chinese in a red robe with two heads...'",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "contemporary critics called the figure a 'demimondaine', a 'two-headed Chinese' (confirmed, MFA conservation page, close paraphrase)",
+        "exhibited 1876, Camille Doncieux as model (confirmed)",
+        "2015 kimono try-on event and the controversy it caused (confirmed)"
+      ],
+      "fabrications": [
+        {
+          "claim": "attributing the exact quoted review specifically to a named critic 'Simon Boubée'",
+          "why": "the MFA's own page attributes similar language to unnamed 'conservative critics' collectively; a specific named attribution could not be verified and may be invented"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 3,
+      "title": "Watson and the Shark",
+      "d511_story": "y",
+      "story_quote": "Copley introduced despite originally sketching only white figures...a detail Copley introduced",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "1749 Havana attack, 1778 painting, MFA original version (documented)",
+        "black sailor added in revision (documented via infrared/compositional study)",
+        "Watson became Lord Mayor/Alderman of London (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 4,
+      "title": "Dance at Bougival",
+      "d511_story": "y",
+      "story_quote": "When Félix François Depeaux bought Dance at Bougival from Paul Durand-Ruel in 1894, he promised to eventually give it to the Musée de Rouen...he later needed money to finance a costly divorce",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Depeaux was a real Rouen-based collector and major donor of Impressionist works (documented)",
+        "Durand-Ruel was the dealer (documented, per MFA provenance)"
+      ],
+      "fabrications": [
+        {
+          "claim": "the specific 1894 purchase date, the promise to the Musée de Rouen, and the divorce motive for selling",
+          "why": "MFA's own provenance record shows a different, more convoluted ownership chain (deposited/returned/sold through Durand-Ruel in the 1880s) with no mention of Depeaux, Rouen, or a divorce; this looks like an invented, overly tidy causal story"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 5,
+      "title": "Bocca Baciata",
+      "d511_story": "y",
+      "story_quote": "Rossetti's choice of Fanny Cornforth as the model...lends a quiet, personal gravity",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Rossetti, 1859, oil on panel, Fanny Cornforth model (documented)",
+        "signature/date 1859 (documented)",
+        "letter to William Bell Scott about the stippling fault (documented anecdote)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 6,
+      "title": "Fray Hortensio Félix Paravicino",
+      "d511_story": "n",
+      "story_quote": "He argued for the destruction of all nude paintings, believing their existence threatened moral order",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Paravicino was a Trinitarian friar, poet, orator (documented)",
+        "El Greco painted this c.1609 (documented)"
+      ],
+      "fabrications": [
+        {
+          "claim": "Paravicino 'argued for the destruction of all nude paintings'",
+          "why": "no source found tying this specific extreme position to Paravicino; looks invented to manufacture dramatic conflict"
+        }
+      ],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 5,
+    "fabrication_count": 3,
+    "wrong_venue_count": 0,
+    "sourced_specifics_total": 16
+  },
+  "defects": [
+    "Depeaux/divorce story contradicts the MFA's own provenance record",
+    "invented extremist position for Paravicino",
+    "Calls the MFA's full-scale replica the 'large, original version' (original is NGA Washington)"
+  ],
+  "overall_0_10": 7.0,
+  "one_line_verdict": "Strong D511 story count (5/6) and mostly real specifics, but a fabricated/overwritten provenance anecdote at stop 4 and an invented position at stop 6.",
+  "id": "t7346"
+}

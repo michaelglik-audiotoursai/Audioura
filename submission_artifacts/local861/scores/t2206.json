@@ -1,0 +1,102 @@
+{
+  "venue_from_text": "Musée d'Orsay, Paris, France",
+  "stops_delivered": 6,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "Le Déjeuner sur l'herbe",
+      "d511_story": "y",
+      "story_quote": "He originally titled the work Le Bain, but ultimately presented it as Le Déjeuner sur l'herbe...Manet's action led to a public reckoning",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Manet 1863, oil on canvas (documented)",
+        "originally titled Le Bain (documented)",
+        "contemporary-dress men beside nude woman, bather behind (documented subject)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 2,
+      "title": "La Nuit étoilée (Starry Night Over the Rhône)",
+      "d511_story": "n",
+      "story_quote": "he wrote to his brother Theo describing his efforts to paint the night sky using vibrant colors",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Sept 1888, Arles, Yellow House (documented)",
+        "letter to Theo about painting night with colour (documented)",
+        "couple of lovers at bottom (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 3,
+      "title": "L'Église d'Auvers-sur-Oise",
+      "d511_story": "y",
+      "story_quote": "Van Gogh used the building's familiar presence to channel the turmoil and melancholy he felt in those last weeks",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "June 1890, Auvers-sur-Oise (documented)",
+        "~70 works in final weeks (documented)",
+        "letters to Theo (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 4,
+      "title": "L'Origine du monde",
+      "d511_story": "y",
+      "story_quote": "Khalil-Bey displayed the painting in his dressing room, concealed behind a green curtain",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Khalil-Bey commissioned it 1866 (documented)",
+        "oil on canvas ~46x55cm (documented)",
+        "kept hidden/curtained (documented anecdote)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 5,
+      "title": "Bal du moulin de la Galette",
+      "d511_story": "y",
+      "story_quote": "Auguste Renoir struggled to paint Bal du moulin de la Galette on the spot, as the wind constantly threatened to blow his canvas away",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "plein-air painting at Montmartre (documented)",
+        "131.5x176.5cm (approximately right for the Orsay canvas)",
+        "galettes / friends as models (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 6,
+      "title": "Une moderne Olympia (A Modern Olympia)",
+      "d511_story": "n",
+      "story_quote": "Cézanne chose not to simply copy the earlier work but instead reworked its provocations",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Cézanne painted in response to Manet's Olympia (documented)",
+        "1865 Olympia scandal reference (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 4,
+    "fabrication_count": 0,
+    "wrong_venue_count": 0,
+    "sourced_specifics_total": 17
+  },
+  "defects": [
+    "Stop 5: hedged 'critics have speculated' sentence about which version was painted outdoors is thinly sourced"
+  ],
+  "overall_0_10": 8.0,
+  "one_line_verdict": "Strong, accurate, story-driven Orsay tour: 6/6 real works, 4 stories, no fabrication found.",
+  "id": "t2206"
+}

@@ -1,0 +1,127 @@
+{
+  "venue_from_text": "Asian Art Museum, San Francisco, CA",
+  "stops_delivered": 6,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "Crowned and bejeweled Buddha image",
+      "d511_story": "n",
+      "story_quote": "The jewels on Amitabha's crown remain silent, their meaning guarded",
+      "sourced_specifics": 1,
+      "specifics_traced": [
+        "museum reopened March 20, 2003 after relocating (true, AAM history)"
+      ],
+      "fabrications": [
+        {
+          "claim": "the statue is Ly Dynasty Vietnamese blue stone 'Amitabha'",
+          "why": "museum catalog identifies this as 19th-c. Burmese (Mandalay-area) lacquer/gilt object, not Vietnamese Ly Dynasty stone"
+        },
+        {
+          "claim": "'In 2013, the State officially recognized the Buddha Amitabha statue as a national treasure'",
+          "why": "unverifiable/fabricated, inconsistent with the real object's actual (Burmese) origin"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 2,
+      "title": "Buddha dated 338",
+      "d511_story": "n",
+      "story_quote": "Tran, a curator at the museum, worked with Vietnamese conservators in 2013 to prepare documentation",
+      "sourced_specifics": 0,
+      "specifics_traced": [],
+      "fabrications": [
+        {
+          "claim": "the work is a blue-stone Ly Dynasty statue",
+          "why": "museum catalog: earliest known dated Chinese BRONZE Buddha (338 CE) — wrong country, dynasty, and material"
+        },
+        {
+          "claim": "named officials 'Nguyen' and 'Tran' handling a 2013 national-treasure designation",
+          "why": "log explicitly flags this exact sentence as removed/unsourced ('Nguyen → DEGRADED (name dropped)'); invented names"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 3,
+      "title": "Head of a Buddha",
+      "d511_story": "n",
+      "story_quote": "Joan Miró created Head of a Catalan Peasant between 1924 and 1925...Through the support of the Art Fund",
+      "sourced_specifics": 0,
+      "specifics_traced": [],
+      "fabrications": [
+        {
+          "claim": "entire stop body is about Miró's 'Head of a Catalan Peasant', not the titled 'Head of a Buddha'",
+          "why": "A6 stop-identity violation: two unrelated, disjoint works merged under one title"
+        }
+      ],
+      "wrong_venue_works": [
+        {
+          "work": "Head of a Catalan Peasant (Miró)",
+          "actually_at": "not described as an Asian Art Museum object anywhere; this stop's own body never discusses a Buddha head"
+        }
+      ]
+    },
+    {
+      "n": 4,
+      "title": "Landscape of the four seasons, one of a pair",
+      "d511_story": "n",
+      "story_quote": "Jean-Baptiste-Camille Corot painted \"Bacchante in a Landscape\" between 1865 and 1870",
+      "sourced_specifics": 0,
+      "specifics_traced": [],
+      "fabrications": [
+        {
+          "claim": "stop titled as an Asian four-seasons landscape pair but body is entirely about a Corot 'Bacchante in a Landscape'",
+          "why": "same bleed defect as the other Asian Art Museum text — title and content describe two different works"
+        }
+      ],
+      "wrong_venue_works": [
+        {
+          "work": "Bacchante in a Landscape (Corot)",
+          "actually_at": "a Western 19th-c. painting, not an Asian Art Museum landscape pair"
+        }
+      ]
+    },
+    {
+      "n": 5,
+      "title": "Seated crowned and bejeweled Buddha",
+      "d511_story": "n",
+      "story_quote": "Their work required the coordinated effort of master carvers and spiritual advisors",
+      "sourced_specifics": 0,
+      "specifics_traced": [],
+      "fabrications": [
+        {
+          "claim": "generic royal-regalia description with no venue-specific or dated claims, implied to be this exact catalogued object",
+          "why": "content is too generic to verify but is presented with confident specificity ('their work required...')"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 6,
+      "title": "Fragment of a Manichaen Mandala",
+      "d511_story": "n",
+      "story_quote": "The artist, whose name is now lost, worked during a time when Manichaean and Buddhist visual traditions often intersected",
+      "sourced_specifics": 1,
+      "specifics_traced": [
+        "mandala, 1300-1400, paint on textile (plausible per museum-style description)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 0,
+    "fabrication_count": 7,
+    "wrong_venue_count": 2,
+    "sourced_specifics_total": 2
+  },
+  "defects": [
+    "Same systemic dynasty/country fabrication as the other Asian Art Museum text",
+    "same two stop-identity collapses (Miró, Corot) reproduced in both Asian Art Museum texts — a pipeline defect, not a narration-quality one"
+  ],
+  "overall_0_10": 1.5,
+  "one_line_verdict": "Nearly identical fabrication profile to the other Asian Art Museum text — the wrong-dynasty and stop-bleed defects are shared.",
+  "id": "t6291"
+}
