@@ -13,6 +13,16 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️▶️ RESUME HERE — NEXT SESSION (written 2026-11-04 ~01:45 EST; Michael shut the laptop down to travel)
+
+1. `date`, prefix replies `[GCloud_Storied_1]@…`. Ask Michael for `/remote-control`. LEAD = Storied_Tours (bridge:session_0162Qu7k54NgjdiBu8pVkpwb).
+2. Restart the proxy (`scratchpad\cloud-sql-proxy.exe --token $(gcloud auth print-access-token) --port 5447 audiotours-migration:us-central1:audioura-db`). Check ClickUp `1000410000000733` for waves newer than **27** (wdvrdazc93). Re-arm the 3-hour CronCreate watch. Tell LEAD you're back.
+3. **Wave 27 needs a LEAD fix** (Sophia pins, see below). Its images `subscribed-{generator,orchestrator,modernized}:7ab51728` are built; redeploy = 3× `run services update --image` (gen `--memory 1Gi`) + `update-traffic --to-latest`. Use NEW proof strings (D622). runproof_s.py + wave27.json in the scratchpad.
+4. **Wave 25 (tile proxy) — Michael said "yes 854" directly 2026-11-04 ~01:30.** Created: bucket `audioura-tile-cache-subscribed` (us-central1, 90-day delete) + SA `tile-proxy-subscribed@` (objectAdmin on that bucket only). Image `services/subscribed-tile-proxy:7ab51728` (build ad4f6b7f). **LIVE:** `tile-proxy-subscribed` rev 00002, MAP_TILE_URL=https://tile-proxy-subscribed-60899077572.us-central1.run.app/{z}/{x}/{y}.png; cache writes verified. (Rev 00001 had a PowerShell-merged env var; set env vars as ONE quoted string in PowerShell.) Posted on wdvrdazc4r.
+5. Still waiting on Michael: "yes" for D758 (TOUR_TEST_MODE_ALLOW_REQUEST=true on tour-orchestrator-subscribed only); Android 91 upload (https://play.google.com/console, michael.glik@audioura.com; C:\adev-wt\aab91\audioura-subscribed-2.4.42+91.aab).
+
+**Live now (Subscribed):** gen 00032-r8x, orch 00014-glv, modernized 00006-9hq, map 00006-6kk, user-api 00003-hvw, gateway 00003-x4s. audio_tours 429. Visible for Michael: 525 (share I1RvI8IA), 529 (share ti3ekwyQ). All other proofs hidden.
+
 # ▶️ WAVE 27 — 2026-11-04 ~01:20 EST (wdvrdazc93) — DEPLOYED then ROLLED BACK. 7ab51728 as gen 00033-6pf / orch 00015-mfj / modernized 00007-rxn; Sophia (534) failed: bbox fell back to 'Vietnam', pin-snap HCMC centre ≈ Hanoi, LLM coords kept as "user pins", 6/7, 🌈 still in text. 527/535/536/537 PASS. Live again: gen 00032-r8x, orch 00014-glv, modernized 00006-9hq. Proofs 527,534–537 hidden (backup AudiouraBackups\wave27_proof_hide_20261104). polly not deployed (no Subscribed polly-tts). Wave 25 approval was only RELAYED by LEAD; holding for Michael's own "yes 854".
 
 # ▶️ WAVE 26b — 2026-11-03 ~19:45 EST — LIVE gen **00032-r8x** (298b1a8a, LOCAL-858). Hanoi P625 pins OK (533); HCMC pins still ~centroid (532) -> LEAD. Proofs hidden.
