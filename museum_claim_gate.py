@@ -44,7 +44,7 @@ __all__ = [
     "is_disclosed", "unsourced_sentences", "filter_stop_body",
     "filter_tour_text_claims", "register_rejected_match", "rejected_matches_for",
     "clear_rejected_matches", "foreign_record_snippet", "parse_label_block",
-    "catalog_urls_from_snippets", "record_names_stop", "makers_from_venue_works", "maker_bound_to_stop", "foreign_makers", "catalog_statement",
+    "catalog_urls_from_snippets", "catalog_urls_by_search", "lexicon_artists", "scrub_artists_tour", "record_names_stop", "makers_from_venue_works", "maker_bound_to_stop", "foreign_makers", "catalog_statement",
 ]
 
 _STOP_HEADER_RE = re.compile(r"(?mi)^(Stop\s+\d+\s*[:\-][^\n]*)$")
@@ -342,6 +342,67 @@ def catalog_urls_from_snippets(stop_title: str, snippets: Iterable[Dict], venue_
     return out
 
 
+def _slugify(title: str) -> str:
+    t = re.sub(r"\([^)]*\)", " ", title or "")
+    return "-".join(re.findall(r"[a-z0-9]+", _fold(t)))
+
+
+def catalog_urls_by_search(stop_title: str, venue_url: str, fetch, serper=None,
+                           max_urls: int = 3) -> Tuple[List[str], str]:
+    """[LOCAL-864B] Find the venue's own record page for a stop when no retrieved
+    snippet carried its URL (the live Asian Art path).  Tries, in order, the
+    venue's collection-site search page (``?s=`` / ``/search/<q>``), the title
+    slug under the usual record paths, and (when given) one Serper query
+    restricted to the venue domain.  ``fetch(url) -> html``.  Returns
+    (urls, why) -- ``why`` explains an empty result for the miss log."""
+    dom = _domain(venue_url)
+    if not dom or not stop_title:
+        return [], "no venue url or title"
+    bare = re.sub(r"\s*\([^)]*\)", "", stop_title).strip() or stop_title
+    from urllib.parse import quote_plus
+    hosts = [f"collections.{dom}", dom]
+    out: List[str] = []
+    tried = 0
+    link_re = re.compile(r"""href=["'](https?://[^"'#?\s]+|/[^"'#?\s]+)["']""")
+    for h in hosts:
+        for tmpl in (f"https://{h}/?s={quote_plus(bare)}", f"https://{h}/search/{quote_plus(bare)}"):
+            tried += 1
+            html = fetch(tmpl) or ""
+            for m in link_re.finditer(html):
+                u = m.group(1)
+                if u.startswith("/"):
+                    u = f"https://{h}{u}"
+                if not host_matches_venue(u, venue_url) or not _RECORD_PATH_RE.search(u):
+                    continue
+                slug = urlparse(u).path.rstrip("/").split("/")[-1].replace("-", " ").replace("_", " ")
+                if record_names_stop(stop_title, slug) and u not in out:
+                    out.append(u)
+            if out:
+                return out[:max_urls], ""
+    slugs = [x for x in dict.fromkeys([_slugify(bare), _slugify(stop_title.replace("(", " ").replace(")", " "))]) if x]
+    for slug in slugs:
+        for h in hosts:
+            for path in ("collection", "objects", "collections", "art"):
+                u = f"https://{h}/{path}/{slug}/"
+                tried += 1
+                if (fetch(u) or ""):
+                    return [u], ""
+    if serper:
+        try:
+            res = serper(f'site:{hosts[0]} "{bare}"') or {}
+            for it in res.get("organic", []) or []:
+                u = str(it.get("link") or "")
+                if u and host_matches_venue(u, venue_url) and _RECORD_PATH_RE.search(u):
+                    ttl = re.split(r"\s+[|\u2013\u2014\-]\s+", str(it.get("title") or ""))[0]
+                    if record_names_stop(stop_title, ttl) and u not in out:
+                        out.append(u)
+            if out:
+                return out[:max_urls], ""
+        except Exception as e:  # noqa: BLE001
+            return [], f"serper failed: {e}"
+    return [], f"no record page for '{bare}' on {dom} ({tried} lookups)"
+
+
 # ═══ 3. CATALOG WINS ═════════════════════════════════════════════════════════
 
 _CATALOG_FIELDS = ("date", "culture", "material", "medium", "period", "origin",
@@ -389,6 +450,9 @@ _CENTURY_RE = re.compile(
     r"\b(\d{1,2})(?:st|nd|rd|th)[\s\-]+century\b|\b(" + "|".join(_CENTURY_WORDS) +
     r")[\s\-]+century\b", re.I)
 _NATIONAL_TREASURE_RE = re.compile(r"national\s+treasure", re.I)
+_STONE_CLAIM_RE = re.compile(
+    r"\bblue stone\b|\b(?:solid|single|polished|grey|gray|green|white|dark|pale)\s+stone\b|"
+    r"\b(?:carved|cut|hewn)\s+(?:in|from|out of)\s+(?:\w+\s+){0,2}stone\b")
 _MATERIAL_FAMILIES = {
     "stone": ("stone", "sandstone", "limestone", "marble", "schist", "granite", "basalt"),
     "metal": ("bronze", "gilt", "gilded", "gilding", "copper", "brass", "iron"),
@@ -465,6 +529,10 @@ def sentence_contradicts_catalog(sentence: str, catalog: Dict, stop_title: str =
         if said and not (said & cat_c):
             return f"century {sorted(said)} contradicts catalog {sorted(cat_c)}"
     cat_mat = _fold(str(catalog.get("material") or catalog.get("medium") or ""))
+    if cat_mat and "stone" not in cat_mat and _STONE_CLAIM_RE.search(low):
+        return f"material 'stone' contradicts catalog '{cat_mat[:40]}'"
+    if re.search(r"\b(amitabha|amida)\b", low) and not re.search(r"\b(amitabha|amida)\b", blob + " " + _fold(stop_title)):
+        return "names Amitabha/Amida; the catalog record does not"
     if cat_mat:
         for fam, words in _MATERIAL_FAMILIES.items():
             hit = next((w for w in words if re.search(r"\b" + w + r"\b", low)), None)
@@ -565,7 +633,8 @@ _MAKER_VERB = (r"(?:painted|created|made|produced|sculpted|drew|executed|rendere
                r"engraved|worked|used|employed|applied|chose)")
 _MAKER_RE = re.compile(
     r"\b(" + _NAME_TOK + r"(?:\s+" + _NAME_TOK + r"){0,2})(?:'s|’s)?\s+(?:" + _MAKER_VERB +
-    r"|brushwork|technique|palette|style)\b"
+    r"|brushwork|brushstrokes?|brush|technique|palette|style|hand|touch|canvas|canvases|"
+    r"paintings?|drawings?|sculptures?|work|works|vision|approach|genius|signature)\b"
     r"|\bby\s+(" + _NAME_TOK + r"(?:\s+" + _NAME_TOK + r"){0,2})\b")
 # A different object located at a different named place.
 _ELSEWHERE_RE = re.compile(
@@ -702,6 +771,70 @@ _STRUCTURAL_RE = re.compile(r"(?i)^\s*(directions|continue to|coordinates|addres
                             r"next stop|proceed to)\b")
 
 
+# ═══ 4. LOCAL-864B: ARTIST LEXICON, FUZZY FLAGGED SPANS, INSTITUTIONAL DATES ═══
+
+# Surnames of artists that a model reaches for from its own memory (the Corot /
+# Miro bleed).  A sentence naming one is kept only when the stop's own maker,
+# catalog, venue pages or a snippet bound to THIS work sources the name.
+ARTIST_LEXICON = frozenset("""
+corot miro picasso monet manet degas renoir cezanne gogh gauguin matisse rembrandt
+vermeer dali klee kandinsky mondrian rodin courbet millet seurat signac pissarro
+sisley lautrec delacroix ingres turner constable goya velazquez titian raphael
+leonardo michelangelo caravaggio rubens durer holbein cranach bruegel brueghel hals
+whistler sargent hopper pollock warhol rothko cassatt morisot bonnard vuillard
+daumier gericault chagall modigliani braque leger duchamp magritte ernst munch
+klimt schiele hokusai hiroshige utamaro tintoretto veronese botticelli
+giotto fragonard watteau boucher chardin poussin lorrain canaletto gainsborough
+reynolds blake hockney lichtenstein basquiat kahlo rivera cranach vigee
+""".split())
+_LEX_RE = re.compile(r"\b([A-ZÀ-ÖØ-Þ][a-zà-ÿ]+(?:-[A-ZÀ-ÖØ-Þ]?[a-zà-ÿ]+)*)(?:['’]s)?\b")
+
+
+def lexicon_artists(sentence: str) -> List[str]:
+    """Famous-artist surnames named in a sentence (folded, de-duplicated)."""
+    out: List[str] = []
+    for m in _LEX_RE.finditer(sentence or ""):
+        f = _fold(m.group(1))
+        parts = [f] + (f.split("-") if "-" in f else [])
+        for w in parts:
+            if w in ARTIST_LEXICON and w not in out:
+                out.append(w)
+    return out
+
+
+def artist_allowed(surname: str, stop_title: str, allow_blob: str,
+                   stop_snippets: Optional[Sequence[Dict]]) -> bool:
+    """True when the stop's own record sources this artist, or a snippet about
+    THIS work names him."""
+    if re.search(r"\b" + re.escape(surname) + r"\b", allow_blob):
+        return True
+    if stop_snippets and maker_bound_to_stop(surname.capitalize(), stop_title, stop_snippets):
+        return True
+    return False
+
+
+_INSTITUTIONAL_DATE_RE = re.compile(
+    r"(?i)\b(?:since|from|in|by)\s+(?:(?:january|february|march|april|may|june|july|august|"
+    r"september|october|november|december)\s+)?(1[89]\d{2}|20[0-2]\d)\b")
+_INSTITUTIONAL_CUE_RE = re.compile(
+    r"(?i)\b(mission|expanded|expansion|renovat\w+|reopen\w*|rebrand\w*|"
+    r"(?:museum|institution)['’]s (?:new|expanded|current)|launched|inaugurat\w+)\b")
+
+
+def _span_hit(span: str, sentence: str) -> bool:
+    """A flagged claim span is (nearly) in the sentence: contained, or most of
+    its content words are (the verifier quotes a paraphrase)."""
+    sf, lf = _fold(span), _fold(sentence)
+    if sf and sf in lf:
+        return True
+    toks = [w for w in re.findall(r"[a-z0-9]+", sf)
+            if (len(w) >= 4 or w.isdigit()) and w not in _STOPWORDS]
+    if len(toks) < 3:
+        return False
+    sw = set(re.findall(r"[a-z0-9]+", lf))
+    return sum(1 for w in toks if w in sw) >= max(3, int(0.7 * len(toks) + 0.999))
+
+
 def unsourced_sentences(sentences: Sequence[str], evidence: Iterable[str],
                         known: Iterable[str] = (), flagged: Iterable[str] = (),
                         catalog: Optional[Dict] = None, stop_title: str = "",
@@ -743,6 +876,9 @@ def unsourced_sentences(sentences: Sequence[str], evidence: Iterable[str],
     else:
         own = _fold(" ".join(list(own_evidence) + list(known) + [_catalog_blob(catalog or {})]))
     vtoks = _venue_host_tokens(venue_name)
+    allow_blob = _fold(" ".join(
+        [str(m) for m in makers] + [stop_title, stop_artist, _catalog_blob(catalog or {})]
+        + [str(x) for x in own_evidence] + [str(k) for k in known]))
 
     for i, s in enumerate(sentences):
         if is_disclosed(s) or _STRUCTURAL_RE.match(s):
@@ -765,6 +901,18 @@ def unsourced_sentences(sentences: Sequence[str], evidence: Iterable[str],
                     foreign_l.append(" ".join(sorted(dt, key=lambda w: _fold(tm.group(0)).find(w))))
                     foreign_l.extend(w for w in dt if len(w) >= 6)
             continue
+        if "blue stone" in low and "blue stone" not in own:
+            # the Vietnamese Phat Tich Amitabha leaking across stops: only this
+            # venue's own record may say a work is blue stone
+            drop[i] = "material 'blue stone' is not in this venue's record for the stop"
+            continue
+        lex_bad = [a for a in lexicon_artists(s)
+                   if not artist_allowed(a, stop_title, allow_blob, stop_snippets)]
+        if lex_bad:
+            drop[i] = (f"names '{lex_bad[0].capitalize()}', an artist who is not in this "
+                       f"venue's record for the stop (another museum's work)")
+            foreign_l.append(lex_bad[0])
+            continue
         hm = _HELD_ELSEWHERE_RE.search(s) or _COLLECTION_OF_RE.search(s)
         if hm:
             inst = hm.group(1) or hm.group(2) or ""
@@ -781,7 +929,7 @@ def unsourced_sentences(sentences: Sequence[str], evidence: Iterable[str],
             if why:
                 drop[i] = "CATALOG: " + why
                 continue
-        if any(f and _fold(f) in low for f in flagged_spans):
+        if any(f and _span_hit(f, s) for f in flagged_spans):
             drop[i] = "flagged UNSOURCED by the verifier"
             continue
         hit = next((n for n in flagged_names if _fold(n) in low), None)
@@ -802,6 +950,10 @@ def unsourced_sentences(sentences: Sequence[str], evidence: Iterable[str],
                         if y not in blob and y not in " ".join(known)]
                 if miss and (_NATIONAL_TREASURE_RE.search(s) or _AGENT_CUE_RE.search(s)):
                     drop[i] = f"dated event ({miss[0]}) appears in no source for this stop"
+            if i not in drop and _INSTITUTIONAL_CUE_RE.search(s):
+                dm = _INSTITUTIONAL_DATE_RE.search(s)
+                if dm and dm.group(1) not in blob and dm.group(1) not in " ".join(known):
+                    drop[i] = f"institutional dated claim ({dm.group(1)}) appears in no source for this stop"
 
     # a foreign maker found anywhere in the stop removes every mention of him
     foreign_l = [_fold(_depossess(x)) for x in foreign_l]
@@ -962,3 +1114,106 @@ def filter_tour_text_claims(tour_text: str,
         i += 2
     report["changed"] = bool(report["dropped"] or report["injected"])
     return "".join(out), report
+
+
+# ═══ 5. LOCAL-864B: EVERY-PATH ARTIST SCRUB (backstop) ═══════════════════════
+
+def _tail_cut(tour_text: str) -> int:
+    """Index where the trailing conclusion starts (len(text) when none)."""
+    try:
+        import tour_conclusion as _tc
+        hdrs = list(_tc._STOP_HEADER.finditer(tour_text))
+        frm = hdrs[-1].end() if hdrs else 0
+        cut = len(tour_text)
+        for rx in (_tc._THREAD_OPENER, _tc._COUNT_OPENER):
+            m = rx.search(tour_text, frm)
+            if m:
+                cut = min(cut, m.start())
+        m = _tc._SOURCES_LINE.search(tour_text)
+        if m:
+            cut = min(cut, m.start())
+        return cut
+    except Exception:
+        return len(tour_text)
+
+
+def _scrub_block(block: str, title: str, allow_blob: str, snippets, venue_name: str,
+                 where: str, n: int) -> Tuple[str, List[Dict]]:
+    removed: List[Dict] = []
+    paras = re.split(r"(\n\s*\n)", block)
+    out = []
+    for seg in paras:
+        if not seg.strip() or re.fullmatch(r"\n\s*\n", seg):
+            out.append(seg)
+            continue
+        label = re.match(r"\s*(Orientation|Directions)\s*:\s*", seg)
+        sents = _sentences(seg)
+        kept = []
+        for sn in sents:
+            if _STRUCTURAL_RE.match(sn) or re.match(r"\s*(Coordinates|Address|Type|Specific Examples)\s*:", sn):
+                kept.append(sn)
+                continue
+            bad = [a for a in lexicon_artists(sn) if not artist_allowed(a, title, allow_blob, snippets)]
+            if bad:
+                removed.append({"stop": n, "where": where, "artist": bad[0].capitalize(),
+                                "sentence": sn})
+                continue
+            kept.append(sn)
+        if len(kept) == len(sents):
+            out.append(seg)
+            continue
+        if label and kept and not re.match(r"\s*(Orientation|Directions)\s*:", kept[0]):
+            kept[0] = label.group(0) + kept[0]
+        if not kept and label and label.group(1) == "Orientation" and title:
+            kept = [f"Orientation: This is {re.sub(chr(92) + 's*[(][^)]*[)]', '', title).strip()}."]
+        out.append(" ".join(kept))
+    return re.sub(r"(\n\s*\n){2,}", "\n\n", "".join(out)), removed
+
+
+def scrub_artists_tour(tour_text: str, stop_allow: Optional[Dict[int, str]] = None,
+                       stop_snippets: Optional[Dict[int, List[Dict]]] = None,
+                       stop_titles: Optional[Dict[int, str]] = None,
+                       venue_name: str = "") -> Tuple[str, Dict]:
+    """Last-word backstop over the WHOLE delivered text (intro, every stop, the
+    conclusion): a sentence naming a well-known artist who is neither the stop's
+    own maker/catalog nor a sourced comparison is dropped.  The intro and the
+    conclusion may name only an artist that a delivered stop (title/body) names.
+    ``stop_allow[n]`` is the folded-able text of what sources stop n (artist,
+    makers, catalog, the venue's own pages)."""
+    rep = {"dropped": 0, "removed": []}
+    if not tour_text or not tour_text.strip():
+        return tour_text, rep
+    parts = _STOP_HEADER_RE.split(tour_text)
+    if len(parts) < 3:
+        return tour_text, rep
+    cut_abs = _tail_cut(tour_text)
+    stops = []          # [header, scrubbed main, raw tail]
+    n = 0
+    i = 1
+    while i < len(parts):
+        header, body = parts[i], (parts[i + 1] if i + 1 < len(parts) else "")
+        n += 1
+        title = (stop_titles or {}).get(n) or re.sub(r"(?i)^\s*Stop\s+\d+\s*[:\-]\s*", "", header).strip()
+        allow = _fold(" ".join([(stop_allow or {}).get(n, ""), title]))
+        main, tail = body, ""
+        if i + 2 >= len(parts):          # last stop: the conclusion lives in its tail
+            k = cut_abs - (len(tour_text) - len(body))
+            if 0 <= k < len(body):
+                main, tail = body[:k], body[k:]
+        main2, r1 = _scrub_block(main, title, allow, (stop_snippets or {}).get(n),
+                                 venue_name, "stop", n)
+        rep["removed"].extend(r1)
+        stops.append([header, main2, tail])
+        i += 2
+    # what the intro / conclusion may name: the delivered (scrubbed) stops
+    deliv_blob = _fold(" ".join(h + " " + m for h, m, _ in stops))
+    pre2, r0 = _scrub_block(parts[0], "", deliv_blob, None, venue_name, "intro", 0)
+    rep["removed"].extend(r0)
+    out = [pre2]
+    for h, m, t in stops:
+        if t:
+            t, r2 = _scrub_block(t, "", deliv_blob, None, venue_name, "conclusion", len(stops))
+            rep["removed"].extend(r2)
+        out.extend([h, m + t])
+    rep["dropped"] = len(rep["removed"])
+    return "".join(out), rep

@@ -32175,6 +32175,7 @@ RULES:
     # that stop contains, or that the verifier flagged, is dropped unless disclosed
     # (D760 "It is sometimes said ..."). The museum's own catalog record wins for
     # date/culture/material: sentences contradicting it go, its facts are stated.
+    _ctx_864b = {}
     if tour_category == 'museum':
         try:
             import museum_claim_gate as _mcg2
@@ -32231,6 +32232,7 @@ RULES:
                     _cat = {'date': _evl.get('period', ''), 'material': _evl.get('material', ''),
                             'origin': _evl.get('origin', '')}
                 _rec = {}
+                _mc_why = ''
                 try:
                     if _mc_vurl:
                         from object_record import _fetch as _mc_fetch, parse_object_page as _mc_pop
@@ -32244,7 +32246,19 @@ RULES:
                                 _all_sn += [{'url': _u, 'title': ''} for _u in list(_mc_ec._PAGE_CACHE)]
                         except Exception:
                             pass
-                        for _cu in _mcg2.catalog_urls_from_snippets(_nm, _all_sn, _mc_vurl)[:2]:
+                        _mc_urls = _mcg2.catalog_urls_from_snippets(_nm, _all_sn, _mc_vurl)[:2]
+                        _mc_why = 'no snippet carried a record URL'
+                        if not _mc_urls:
+                            # [LOCAL-864B] no snippet kept the record's URL (the live
+                            # Asian Art path): ask the venue's own collection site.
+                            try:
+                                from exhibition_site_js import default_serper as _mc_serper
+                            except Exception:
+                                _mc_serper = None
+                            _mc_urls, _mc_why2 = _mcg2.catalog_urls_by_search(
+                                _nm, _mc_vurl, _mc_fetch, serper=_mc_serper)
+                            _mc_why = _mc_why2 or _mc_why
+                        for _cu in _mc_urls:
                             _html = _mc_fetch(_cu)
                             _rec = _mcg2.parse_label_block(_html, _nm)
                             if not _rec:
@@ -32265,7 +32279,15 @@ RULES:
                                         'accession_number': _em.get('accession_number', ''),
                                         'url': _rurl}
                 except Exception as _mc_ferr:
+                    _mc_why = f"fetch error: {_mc_ferr}"
                     print(f"  [LOCAL-864] stop {_si} catalog fetch skipped: {_mc_ferr}")
+                if _rec:
+                    print(f"  [LOCAL-864B] catalog bound stop {_si} <- {_rec.get('accession_number') or _rec.get('title') or '?'} "
+                          f"({_rec.get('url','')})")
+                elif not _mc_vurl:
+                    print(f"  [LOCAL-864B] catalog miss stop {_si}: no venue URL resolved")
+                else:
+                    print(f"  [LOCAL-864B] catalog miss stop {_si}: {locals().get('_mc_why', 'no record')}")
                 if _rec:
                     _cat, _ov = _mcg2.reconcile_with_catalog(_cat, _rec)
                     print(f"  [LOCAL-864] stop {_si} catalog record {_rec.get('url','')} WINS "
@@ -32285,6 +32307,13 @@ RULES:
                 _cat = {k: v for k, v in _cat.items() if v}
                 if _cat:
                     _mc_cat[_si] = _cat
+            _ctx_864b['allow'] = {k: ' '.join([str(_mc_art.get(k, ''))] + [str(m) for m in _mc_makers.get(k, [])]
+                                              + [str(x) for x in _mc_own.get(k, [])]
+                                              + [str(x) for x in _mc_known.get(k, [])]
+                                              + [str(v) for v in _mc_cat.get(k, {}).values()])
+                                  for k in _mc_titles}
+            _ctx_864b['snips'] = dict(_mc_snips)
+            _ctx_864b['titles'] = dict(_mc_titles)
             complete_tour, _mc_rep = _mcg2.filter_tour_text_claims(
                 complete_tour, stop_evidence=_mc_ev, stop_known=_mc_known,
                 stop_flagged=_mc_flag, stop_catalogs=_mc_cat, stop_titles=_mc_titles,
@@ -33194,6 +33223,26 @@ RULES:
     except Exception as _concl_err:
         print(f"  [LOCAL-619] conclusion rebuild skipped (non-fatal): "
               f"{type(_concl_err).__name__}: {_concl_err}")
+
+    # -------- [LOCAL-864B] Every-path artist scrub (backstop) -----------------
+    # Runs on the FINAL text: intro, every stop (Orientation included) and the
+    # conclusion. A sentence naming a well-known artist who is neither the stop's
+    # own maker/catalog nor a sourced comparison (Corot on a Japanese landscape,
+    # Miro on a Buddha) is dropped; the intro/conclusion may name only an artist
+    # a delivered stop names.
+    if tour_category == 'museum':
+        try:
+            import museum_claim_gate as _mcg3
+            complete_tour, _sc_rep = _mcg3.scrub_artists_tour(
+                complete_tour, stop_allow=_ctx_864b.get('allow'),
+                stop_snippets=_ctx_864b.get('snips'), stop_titles=_ctx_864b.get('titles'),
+                venue_name=(_museum_venue_name if '_museum_venue_name' in dir() else '') or '')
+            print(f"  [LOCAL-864B] artist scrub: dropped {_sc_rep['dropped']} sentence(s)")
+            for _r in _sc_rep['removed']:
+                print(f"    [LOCAL-864B] {_r['where']} {_r['stop']} DROPPED ({_r['artist']}): "
+                      f"\"{_r['sentence'][:110]}\"")
+        except Exception as _sc_err:
+            print(f"  [LOCAL-864B] artist scrub error (non-fatal): {_sc_err}")
 
     # Print total cost
     print(f"\nTotal API cost: ${total_cost:.4f} ({total_tokens} tokens)")

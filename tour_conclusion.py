@@ -1071,6 +1071,44 @@ def _conclusion_names_foreign_entity(text: str, delivered_grounding: set) -> Lis
     return foreign
 
 
+def _conclusion_ungrounded_names(text: str, corpus: set) -> List[str]:
+    """[LOCAL-864B] Proper names in a conclusion that no delivered stop (title or
+    narration) contains.  Catches the single-word artist the multi-word entity
+    detector misses ("Miro's shift to abstract visual language" on a Buddha).
+    Capitalised words that are not sentence-initial, plus any well-known artist
+    surname anywhere; each is flagged unless its folded form is in ``corpus``."""
+    if not text or not corpus:
+        return []
+    try:
+        import museum_claim_gate as _g
+        lex = _g.ARTIST_LEXICON
+    except Exception:
+        lex = frozenset()
+    bad: List[str] = []
+    for sent in re.split(r'(?<=[.!?])\s+', text.strip()):
+        words = list(re.finditer(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\-]*", sent))
+        for k, m in enumerate(words):
+            w = m.group(0)
+            f = _concl_fold(w.lower())
+            if f in corpus:
+                continue
+            if f in lex or (k > 0 and w[0].isupper() and len(f) >= 4):
+                if w not in bad:
+                    bad.append(w)
+    return bad
+
+
+def _delivered_text_corpus(stops: List[Dict], venue_name: str = "") -> set:
+    toks = set()
+    blob = " ".join(((s.get("title") or "") + " " + (s.get("narration") or "")) for s in stops or [])
+    blob += " " + (venue_name or "")
+    for w in re.findall(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\-']*", blob):
+        toks.add(_concl_fold(w.lower()).strip("'"))
+        for part in w.split("-"):
+            toks.add(_concl_fold(part.lower()).strip("'"))
+    return toks
+
+
 def build_conclusion(
     tour_text: str,
     *,
@@ -1136,6 +1174,7 @@ def build_conclusion(
     # theme, (b) reject a foreign LLM body, and (c) strip a foreign example from
     # the final body. Empty grounding (non-art tour) disables the check.
     _delivered_grounding = _delivered_conclusion_grounding(stops)
+    _corpus_864b = _delivered_text_corpus(stops, venue_name)
     # The venue name is a legitimate thread subject ("the collection of {venue}"),
     # so its tokens are part of the allowed grounding — never flagged as foreign.
     _delivered_grounding |= _concl_grounding_tokens(venue_name or "")
@@ -1201,6 +1240,14 @@ def build_conclusion(
             stops, thread_phrase=thread_phrase, theme=theme,
             venue_name=venue_name, titles=titles,
             llm_fn=llm_fn, api_key=api_key)
+        # [LOCAL-864B] Reject an LLM body naming anyone no delivered stop names.
+        if body:
+            _ug = _conclusion_ungrounded_names(body, _corpus_864b)
+            if _ug:
+                logger.warning(
+                    "[LOCAL-864B] rejected LLM conclusion body naming %s, absent "
+                    "from the delivered stops -- falling back to template", _ug)
+                body = ""
         # [LOCAL-652] Reject an LLM body that names a foreign work/artist.
         if body and _delivered_grounding:
             _foreign = _conclusion_names_foreign_entity(body, _delivered_grounding)
@@ -1239,6 +1286,24 @@ def build_conclusion(
                 logger.warning(
                     "[LOCAL-652] rebuilt conclusion with no named example — every "
                     "candidate sentence named a foreign work/artist %s", _foreign)
+
+    # [LOCAL-864B] Final: whatever built the body (LLM, template, theme), it names
+    # nobody and no work that the delivered stops do not.
+    if body:
+        _ug = _conclusion_ungrounded_names(body, _corpus_864b)
+        if _ug:
+            _sents = [x for x in re.split(r'(?<=[.!?])\s+', body.strip()) if x.strip()]
+            _kept = [x for x in _sents if not _conclusion_ungrounded_names(x, _corpus_864b)]
+            logger.warning("[LOCAL-864B] conclusion sentence(s) naming %s dropped: absent "
+                           "from the delivered stops", _ug)
+            if _kept:
+                body = " ".join(_kept)
+            else:
+                body = _template_thematic_body(
+                    stops, thread_phrase=(common.get("thread_phrase") or thread_phrase),
+                    theme="", common=common, titles=[], n=n)
+                if _conclusion_ungrounded_names(body, _corpus_864b):
+                    body = "Taken together, the stops add up to more than any one of them seen alone."
 
     # (d) The count, only when correct — appended as its own short sentence so it
     #     is optional and never an enumeration. Omit for a 1-stop overview (a
