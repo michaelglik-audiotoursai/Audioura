@@ -7,6 +7,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import user_stop_enrichment as use
 import user_stop_verify as usv
+import user_stop_context as _usc
+
+# LOCAL-862B: layer-2/3 context reads Wikipedia; these LOCAL-862 tests stay offline.
+_usc._default_wiki_fn = lambda t: None
+_usc._default_wiki_search_fn = lambda q: []
 
 LOC = "Sophia's biking tour in Ho Chi Minh City"
 
