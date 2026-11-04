@@ -18,11 +18,14 @@ from typing import List, Sequence, Tuple
 
 __all__ = [
     "tour_type_display_label",
+    "derive_tour_name",
     "BACKREF_OPENER_RE",
     "starts_with_backref",
     "apply_orphan_rule",
     "strip_emoji_for_tts",
     "named_places_from_subject",
+    "scope_without_named_places",
+    "bbox_from_center",
     "city_from_scope",
 ]
 
@@ -53,6 +56,19 @@ def tour_type_display_label(tour_type: str) -> str:
     if not label:
         label = " ".join(w[:1].upper() + w[1:] for w in key.replace("_", " ").split())
     return f"{label} Tour".strip()
+
+
+def derive_tour_name(location: str, tour_type: str, first_line: str = "") -> str:
+    """The stored ``tour_name``: ``"<location> - <X> Tour"``. ``X`` comes from the
+    " - <X> Tour" suffix of the generated text's header line when it has one (the
+    effective category); otherwise from the transport-mode display label
+    (``"biking"`` -> ``"Cycling Tour"``), never the raw ``tour_type``."""
+    fl = (first_line or "").strip()
+    if " - " in fl and fl.endswith(" Tour"):
+        suffix = fl.rsplit(" - ", 1)[-1]
+    else:
+        suffix = tour_type_display_label(tour_type)
+    return f"{location} - {suffix}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -218,6 +234,49 @@ def named_places_from_subject(request: str) -> List[str]:
         seen.add(k)
         out.append(p)
     return out if len(out) >= 2 else []
+
+
+def scope_without_named_places(area_input: str, location: str,
+                               named_places: Sequence[str]) -> str:
+    """The geographic scope for the area resolver when the request's SUBJECT names
+    the places. ``"Boston Common and Old North Church, Boston"`` yields an area
+    input of ``"Boston Common and Old North Church"`` (the first non-filler
+    segment), which cannot resolve as a city — so the walking path ran
+    "unverified" and only ANNOUNCED the two places instead of making them stops
+    (LOCAL-860 items 5+7). When the area input contains a named place and the
+    request has a trailing locality, return that locality ("Boston"); otherwise
+    return ``area_input`` unchanged."""
+    ai = (area_input or "").strip()
+    if not ai or not named_places:
+        return area_input
+    low = ai.lower()
+    if not any((n or "").strip().lower() in low for n in named_places if n):
+        return area_input
+    loc = (location or "").strip()
+    if "," not in loc:
+        return area_input
+    tail = loc.split(",", 1)[1].strip(" ,")
+    return tail or area_input
+
+
+def bbox_from_center(lat, lng, radius_km):
+    """``[south, north, west, east]`` box of half-side ``radius_km`` about a centre,
+    or ``None`` when the inputs are unusable. Used to bind a named-place geocode to
+    the resolved CITY extent: the resolver's centre for Boston is the centroid of
+    the whole admin boundary (harbour included), 7.6 km from the Old North Church,
+    and places_search's fixed ~8 km radius around it rejected the church."""
+    import math
+    try:
+        lat = float(lat)
+        lng = float(lng)
+        r = float(radius_km)
+    except (TypeError, ValueError):
+        return None
+    if r <= 0 or (lat == 0.0 and lng == 0.0):
+        return None
+    dlat = r / 111.0
+    dlng = r / (111.0 * max(0.2, math.cos(math.radians(lat))))
+    return [lat - dlat, lat + dlat, lng - dlng, lng + dlng]
 
 
 # ─────────────────────────────────────────────────────────────────────────────

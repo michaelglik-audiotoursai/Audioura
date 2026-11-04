@@ -70,8 +70,19 @@ class TestTourLabel(unittest.TestCase):
         src = open(os.path.join(os.path.dirname(os.path.dirname(
             os.path.abspath(__file__))), "tour_orchestrator_service.py"),
             encoding="utf-8").read()
-        self.assertIn("_effective_tour_suffix = _tt_label860(tour_type)", src)
+        self.assertIn("tour_name = _derive_tour_name860(location, tour_type, _first_line)", src)
         self.assertNotIn('_effective_tour_suffix = f"{tour_type} Tour"', src)
+
+    def test_derive_tour_name_field_case(self):
+        # wave 26: header has no suffix (tour_type "biking" already in the title)
+        loc = "Sophia's biking tour in Ho Chi Minh City"
+        hdr = "Step-by-Step Audio Guided Tour: " + loc
+        self.assertEqual(loc + " - Cycling Tour", tp.derive_tour_name(loc, "biking", hdr))
+        self.assertEqual(loc + " - Cycling Tour", tp.derive_tour_name(loc, "biking", ""))
+
+    def test_derive_tour_name_prefers_header_category(self):
+        hdr = "Step-by-Step Audio Guided Tour: Rome - Museum Tour"
+        self.assertEqual("Rome - Museum Tour", tp.derive_tour_name("Rome", "walking", hdr))
 
 
 # ── 3. orphaned back-reference ───────────────────────────────────────────────
@@ -305,6 +316,42 @@ class TestNamedPlacesBecomeStops(unittest.TestCase):
         lake = next(p for p in pois if p["name"] == "Hoan Kiem Lake")
         self.assertTrue(lake["user_explicit"], "the existing candidate is flagged, not replaced")
         self.assertEqual([], announce)
+
+    def test_osm_shaped_hit_gives_the_stop_a_real_pin(self):
+        # places_search returns OSM-shaped records: lat/lon STRINGS, and a
+        # latitude key that is present but None. The old read dropped the pin.
+        hits = {"Old North Church": [{"name": "Old North Church", "latitude": None,
+                                      "longitude": None, "lat": "42.366325",
+                                      "lon": "-71.0544", "type": "yes"}]}
+        pois, announce = self._run(
+            "Boston Common and Old North Church walk, Boston",
+            [{"name": "Massachusetts State House"}], hits, "Boston")
+        onc = next(p for p in pois if p["name"] == "Old North Church")
+        self.assertAlmostEqual(42.366325, onc["latitude"], places=5)
+        self.assertAlmostEqual(-71.0544, onc["longitude"], places=5)
+        self.assertEqual("42.366325,-71.0544", onc["coordinates"])
+
+    def test_city_extent_box_contains_old_north_church(self):
+        # The resolver's Boston centre is the boundary centroid (7.6 km away).
+        box = tp.bbox_from_center(42.3124, -70.9979, 18.47)
+        s, n, w, e = box
+        self.assertTrue(s < 42.366325 < n and w < -71.0544 < e)
+        self.assertIsNone(tp.bbox_from_center(0, 0, 10))
+        self.assertIsNone(tp.bbox_from_center("x", 1, 10))
+
+    def test_area_scope_drops_the_place_names(self):
+        req = "Boston Common and Old North Church walk, Boston"
+        names = ["Boston Common", "Old North Church"]
+        self.assertEqual("Boston", tp.scope_without_named_places(
+            "Boston Common and Old North Church", req, names))
+        self.assertEqual("Hanoi", tp.scope_without_named_places(
+            "Hoan Kiem Lake and Temple of Literature",
+            "Hoan Kiem Lake and Temple of Literature walk, Hanoi",
+            ["Hoan Kiem Lake", "Temple of Literature"]))
+        # unrelated scope, or no named places: untouched
+        self.assertEqual("West Roxbury, MA", tp.scope_without_named_places(
+            "West Roxbury, MA", "gyms near me, West Roxbury, MA", []))
+        self.assertEqual("Boston", tp.scope_without_named_places("Boston", req, names))
 
 
 # ── 6. Serper query context ──────────────────────────────────────────────────

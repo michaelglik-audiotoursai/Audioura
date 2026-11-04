@@ -2529,14 +2529,13 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         # Derive tour_name from the generated content's title (uses effective category, not raw tour_type)
         # Parse the " - <X> Tour" suffix from the content's first line, fall back to raw tour_type
-        # [LOCAL-860 item 2] Display label from the transport mode ("biking" ->
-        # "Cycling Tour"), never the raw tour_type ("biking Tour").
-        from text_polish import tour_type_display_label as _tt_label860
-        _effective_tour_suffix = _tt_label860(tour_type)
+        # [LOCAL-860 item 2] When the header carries no " - <X> Tour" suffix, the
+        # fallback is the transport-mode display label ("biking" -> "Cycling
+        # Tour"), never the raw tour_type ("biking Tour").
+        from text_polish import derive_tour_name as _derive_tour_name860
+        _first_line = ""
         if tour_content_raw := ACTIVE_JOBS[job_id].get("tour_content", ""):
             _first_line = tour_content_raw.split('\n')[0] if tour_content_raw else ""
-            if ' - ' in _first_line and _first_line.endswith(' Tour'):
-                _effective_tour_suffix = _first_line.rsplit(' - ', 1)[-1]
         elif tour_file:
             # Read first line from tour file to get effective category
             _tf_path = os.path.join(TOURS_DIR, tour_file)
@@ -2544,11 +2543,9 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
                 try:
                     with open(_tf_path, 'r', encoding='utf-8') as _tf:
                         _first_line = _tf.readline().strip()
-                    if ' - ' in _first_line and _first_line.endswith(' Tour'):
-                        _effective_tour_suffix = _first_line.rsplit(' - ', 1)[-1]
                 except Exception:
                     pass
-        tour_name = f"{location} - {_effective_tour_suffix}"
+        tour_name = _derive_tour_name860(location, tour_type, _first_line)
         print(f"Tour name (from effective category): {tour_name}")
         
         # Extract coordinates
