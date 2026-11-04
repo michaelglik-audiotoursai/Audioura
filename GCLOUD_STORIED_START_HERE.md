@@ -13,6 +13,8 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 26b — 2026-11-03 ~19:45 EST — LIVE gen **00032-r8x** (298b1a8a, LOCAL-858). Hanoi P625 pins OK (533); HCMC pins still ~centroid (532) -> LEAD. Proofs hidden.
+
 # ▶️ WAVE 26 — 2026-11-03 ~19:30 EST (wdvrdazc6c) — LIVE gen **00031-hp4** (5712c485). Sophia v2 = tour **529**, 7/7, share **ti3ekwyQ**, VISIBLE. ❌ share.google links no longer resolve (302 → google.com/share.google?q=…), so 5/7 pins wrong; not this wave's code, kept live, LEAD told. Still on hold for Michael: wave 25 tile proxy ("yes 854") and D758.
 
 # ▶️ WAVE 24 — 2026-11-03 ~16:10 EST (wdvrdazc2h) — LIVE gen **00030-c98** (70737c2a, LOCAL-857 Opera House walks). Proofs 527 (Ben Thanh 3/3, pins centroid -> LEAD task) and 528 (Palais Lascaris 1/3) hidden. **On hold for Michael:** wave 25 tile proxy (wdvrdazc4r, "yes 854", new service+bucket+SA) and D758 (TOUR_TEST_MODE_ALLOW_REQUEST=true on tour-orchestrator-subscribed).
@@ -45,11 +47,11 @@ Do these in order:
    - Rule: when asking Michael to open anything, give the full URL and the account.
 
 **Live now:**
-- Generator **00031-hp4** (wave 26, 5712c485, 1Gi, LOCAL-855 user-stop narration); rollback 00030-c98.
+- Generator **00032-r8x** (wave 26b, 298b1a8a = 5712c485 + LOCAL-858 pins, 1Gi); rollback 00031-hp4.
 - Orchestrator **00014-glv** (4ed2e3f4); rollback 00013-lc6.
 - Map **00006-6kk** (4ed2e3f4, shared_tours.audio_tour_id ensured); rollback 00005-smt.
 - Modernized 00006-9hq (layered, max 3); user-api 00003-hvw; gateway 00003-x4s.
-- audio_tours 423; proofs 526-528, 530-531 hidden (wave24_/wave26_proof_hide_20261103); 529 (Sophia v2, share ti3ekwyQ) VISIBLE for Michael (AudiouraBackups\wave23_proof_hide_20261103\latlng.json); earlier proofs in wave6_proofs_hide_20261030.
+- audio_tours 425; proofs 526-528, 530-533 hidden (also wave26b_proof_hide_20261104) (wave24_/wave26_proof_hide_20261103); 529 (Sophia v2, share ti3ekwyQ) VISIBLE for Michael (AudiouraBackups\wave23_proof_hide_20261103\latlng.json); earlier proofs in wave6_proofs_hide_20261030.
 - tour_requests has 0 stale 'started' rows.
 
 **Nothing is pending from LEAD.** Open items are LEAD's: LOCAL-830/841 app builds, iOS 88 on TestFlight.
