@@ -349,6 +349,22 @@ _SYSTEM = (
     "does NOT state it. A date, founding year, person, event, address, rating or "
     "item that a fact-sheet line or listed source states IS SUPPORTED — e.g. "
     "'Founded in 2007' is SUPPORTED when a source says 'Founded in 2007'.\n"
+    "LAYERS (LOCAL-862B / D760). Source lines may be tagged. An untagged line is a "
+    "VENUE fact. A [context] line is true background on the venue's name, street or "
+    "tradition. A [legend] or [unconfirmed] line is a folk tale or an unverified "
+    "claim.\n"
+    "  * A sentence that restates a venue or [context] line, and ties it back to the "
+    "venue (names it, or says 'the bar's name', 'the street it sits on'), is "
+    "SUPPORTED.\n"
+    "  * A sentence that retells a [legend] or [unconfirmed] line AND carries a "
+    "disclosure phrase ('A folk tale tells that', 'Legend has it', 'We couldn't "
+    "confirm this, but') is SUPPORTED. The disclosure does not license anything the "
+    "line does not say: a marked sentence that adds a date, a person, an event, a "
+    "'first' or a place the line does not contain is UNSUPPORTED.\n"
+    "  * A sentence that tells a [legend] or [unconfirmed] line WITHOUT a disclosure "
+    "phrase is UNSUPPORTED.\n"
+    "  * A [context] fact presented as the VENUE's own history, owner or menu (the "
+    "fruit's story told as if the bar sells it) is UNSUPPORTED.\n"
     "Judge meaning, not wording. When in doubt between SENSORY and UNSUPPORTED, "
     "choose UNSUPPORTED. Return ONLY JSON of the exact shape:\n"
     '{"stops":[{"id":<int>,"labels":[{"i":<int>,"label":"SUPPORTED|SENSORY|'
@@ -543,7 +559,7 @@ def verify_user_stops_in_text(
                     _mat = _v
                     break
         if _mat:
-            facts["retrieved_sources"] = [str(x)[:400] for x in _mat][:16]
+            facts["retrieved_sources"] = [str(x)[:400] for x in _mat][:20]
             odf = list(_mat)
 
         # [LOCAL-855D] A documented monument/institution (cathedral, basilica,
@@ -603,7 +619,12 @@ def verify_user_stops_in_text(
         sid = len(batch)
         batch.append({"id": sid, "name": title, "facts": facts,
                       "sentences": sentences})
+        _src_lines = [f"{k}: {facts[k]}" for k in ("name", "kind", "address",
+                                                    "district", "examples", "city")
+                      if facts.get(k)]
+        _src_lines += list(facts.get("retrieved_sources") or [])
         stop_meta.append({"id": sid, "name": title, "poi": poi, "start": start,
+                          "source_lines": _src_lines,
                           "end": end, "sent_map": sent_map,
                           "para_sent_counts": para_sent_counts,
                           "sentences": sentences,
@@ -709,6 +730,25 @@ def verify_user_stops_in_text(
         # only removes what it positively calls UNSUPPORTED).
         keep_flags = [lab.get(i, "SUPPORTED") != "UNSUPPORTED"
                       for i in range(len(sentences))]
+        # [LOCAL-862B / D760] deterministic layer gate AFTER the model's labels: a
+        # legend without its disclosure marker is dropped, a marker without a
+        # layer-3 source is dropped, and a year / "first" / geography no source
+        # line contains is dropped whether or not it is marked.
+        try:
+            from user_stop_context import layer_gate as _lg862b
+            for _i, _s in enumerate(sentences):
+                if not keep_flags[_i]:
+                    continue
+                _why = _lg862b(_s, name, meta.get("source_lines") or [])
+                if _why:
+                    keep_flags[_i] = False
+                    lab[_i] = "UNSUPPORTED"
+                    if log:
+                        log(f"[LOCAL-862B] verify {name}: gate dropped "
+                            f"({_why}): {_s[:120]}")
+        except Exception as _ge:
+            if log:
+                log(f"[LOCAL-862B] layer gate skipped: {_ge}")
         # [LOCAL-860 item 3] A kept sentence that opens with a back-reference
         # (This/These/It/Its/…/The contrast) right after a dropped one has lost its
         # antecedent (An Spa: "This juxtaposition…"). Drop it too; never empties.

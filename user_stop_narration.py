@@ -632,7 +632,22 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
         off_marker = bool(_OFF_TOPIC_MARKER_RE.search(sent))
         dated = bool(_DATED_CLAIM_RE.search(sent))
         legend = bool(_LEGEND_MARKER_RE.search(sent))
-        anecdote = bool(_ANECDOTE_MARKER_RE.search(sent))
+        _disclosed862b = False
+        # [LOCAL-862B / D760] A sentence that carries a disclosure marker ("A
+        # Vietnamese folk tale tells …", "We couldn't confirm this, but …") is layer
+        # 3: its legend / anecdote vocabulary is allowed; the SAME sentence without
+        # a marker stays dropped. A sentence explaining the word in the venue's name
+        # ("Longan comes from the Chinese lóngyǎn, 'dragon eye'") is layer 2 and its
+        # legend vocabulary is allowed too. A date / first / geography still drops.
+        try:
+            from user_stop_context import has_disclosure as _hd862b, \
+                is_name_meaning_sentence as _nm862b
+            _disclosed862b = _hd862b(sent)
+            if legend and (_disclosed862b or _nm862b(sent, name)):
+                legend = False
+        except Exception:
+            pass
+        anecdote = bool(_ANECDOTE_MARKER_RE.search(sent)) and not _disclosed862b
         hedge = bool(_NO_DIRECT_TIE_RE.search(sent))
         art_prov = bool(_ART_PROVENANCE_RE.search(sent))
         admin_geo = bool(_ADMIN_GEOGRAPHY_RE.search(sent))

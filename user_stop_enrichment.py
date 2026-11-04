@@ -647,21 +647,23 @@ def _fmt_hours(h) -> str:
 
 def gather_material(poi: Dict, location: str, *, places_fn=None,
                     fetch_page=None, serp_fn=None, review_snippets=None,
-                    allow_search: bool = True, log=None, alias: str = "") -> Dict:
+                    allow_search: bool = True, log=None, alias: str = "",
+                    wiki_fn=None, wiki_search_fn=None) -> Dict:
     """Collect everything sourced about ONE business user stop.
 
     Returns {"name", "facts": [{"id","kind","text","source"}], "specifics": int,
     "place": rec|None, "calls": {...}} — ``facts`` is the narrator's ONLY source."""
     name = (poi.get("name") or poi.get("title") or "").strip()
     pin = _parse_pin(poi.get("coordinates"))
-    calls = {"places": 0, "review_search": 0, "story_search": 0, "pages": 0}
+    calls = {"places": 0, "review_search": 0, "story_search": 0, "pages": 0,
+             "ctx_serp": 0, "wiki": 0}
     facts: List[Dict] = []
 
-    def add(kind, text, source, specific=True):
+    def add(kind, text, source, specific=True, layer=1):
         text = " ".join(str(text).split())
         if text:
             facts.append({"kind": kind, "text": text, "source": source,
-                          "specific": specific})
+                          "specific": specific, "layer": layer})
 
     # 1) Places record
     rec = None
@@ -750,13 +752,60 @@ def gather_material(poi: Dict, location: str, *, places_fn=None,
         snips, q, nq = story_snippets(name, poi, location, serp_fn=serp_fn, log=log,
                                       alias=alias, place=rec)
         calls["story_search"] = nq
+        own_host = (urlparse(website if "//" in (website or "") else f"https://{website}")
+                    .hostname or "").lower().replace("www.", "") if website else ""
         for sn in snips:
-            add("story", sn["text"], sn.get("url") or "serper_search:story")
+            url = sn.get("url") or "serper_search:story"
+            host = (urlparse(url).hostname or "").lower().replace("www.", "")
+            third_party = not (own_host and host and own_host == host)
+            # [LOCAL-862B / D760] a specific claim (a year, a "first", an owner, a
+            # legend) that rests on ONE third-party web snippet is unconfirmed:
+            # layer 3, to be told with "We couldn't confirm this, but …".
+            if third_party and _SPECIFIC_CLAIM_RE.search(sn["text"]):
+                add("unconfirmed", sn["text"], url, layer=3)
+            else:
+                add("story", sn["text"], url)
+
+    # 5) [LOCAL-862B / D760] layer 2 (true connected context) and layer 3 (a
+    # disclosed legend). Sourced from Wikipedia + Serper, tied to the venue's NAME,
+    # STREET, and the TRADITION behind what it offers.
+    ctx_calls = {"wiki": 0, "serp": 0}
+    if allow_search:
+        try:
+            import user_stop_context as _usc
+            kt = set(_fold(category).split()) | set(_fold(name).split())
+            ctx = _usc.gather_context(poi, location, place=rec, alias=alias,
+                                      kind_tokens=kt, serp_fn=serp_fn, log=log,
+                                      wiki_fn=wiki_fn, wiki_search_fn=wiki_search_fn)
+            ctx_calls = ctx["calls"]
+            for cf in ctx["facts"]:
+                add(cf["kind"], cf["text"], cf["source"], layer=cf["layer"])
+        except Exception as e:
+            if log:
+                log(f"[LOCAL-862B] context skipped for {name!r}: {e}")
+    calls["ctx_serp"] = ctx_calls.get("serp", 0)
+    calls["wiki"] = ctx_calls.get("wiki", 0)
 
     for i, f in enumerate(facts, 1):
         f["id"] = f"F{i}"
     return {"name": name, "facts": facts, "place": rec, "calls": calls,
-            "category": category, "specifics": count_specifics(facts)}
+            "category": category, "specifics": count_specifics(facts),
+            "layers": layer_counts(facts)}
+
+
+_SPECIFIC_CLAIM_RE = re.compile(
+    r"(?i)\b(1[89]\d{2}|20[0-2]\d|first|founded|established|opened\s+in|"
+    r"legend|rumou?r|said\s+to|named\s+after)\b")
+
+
+def layer_counts(facts: List[Dict]) -> Dict[str, int]:
+    """Specific facts per layer: 1 = venue facts, 2 = connected context, 3 = legend
+    or unconfirmed claim."""
+    out = {"1": 0, "2": 0, "3": 0}
+    for f in facts:
+        if f.get("specific", True):
+            out[str(f.get("layer", 1))] = out.get(str(f.get("layer", 1)), 0) + 1
+    return out
 
 
 def count_specifics(facts: List[Dict]) -> int:
@@ -766,7 +815,7 @@ def count_specifics(facts: List[Dict]) -> int:
     seen = set()
     n = 0
     for f in facts:
-        if not f.get("specific", True):
+        if not f.get("specific", True) or f.get("layer", 1) != 1:
             continue
         key = (f["kind"], _fold(f["text"]))
         if key in seen:
@@ -776,8 +825,26 @@ def count_specifics(facts: List[Dict]) -> int:
     return n
 
 
-def material_lines(material: Dict, limit: int = 14) -> List[str]:
-    return [f["text"] for f in material.get("facts", [])][:limit]
+def select_facts(material: Dict, caps=(12, 6, 3)) -> List[Dict]:
+    """The facts handed to the narrator and the verifier: layer 1 (venue), then
+    layer 2 (context), then layer 3 (legend/unconfirmed), each capped."""
+    out: List[Dict] = []
+    for layer, cap in zip((1, 2, 3), caps):
+        out.extend([f for f in material.get("facts", [])
+                    if f.get("layer", 1) == layer][:cap])
+    return out
+
+
+def material_lines(material: Dict, limit: int = 21) -> List[str]:
+    """Fact-sheet lines for the verifier. Layer-2/3 lines carry a [context] /
+    [legend] / [unconfirmed] tag so the verifier knows which sentences need a
+    disclosure marker."""
+    import user_stop_context as _usc
+    lines = []
+    for f in select_facts(material)[:limit]:
+        tag = _usc.layer_tag(f)
+        lines.append(f["text"] if tag == "venue" else f"[{tag}] {f['text']}")
+    return lines
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -890,36 +957,62 @@ def _set_sourced_fields(lines: List[str], start: int, end: int,
 
 _NARR_SYSTEM = (
     "You write short spoken audio-tour stops about small venues a listener chose. "
-    "For each stop you are given a numbered FACT LIST. It is your ONLY source.\n"
+    "For each stop you are given a numbered FACT LIST in up to three layers. It is "
+    "your ONLY source.\n"
+    "THE THREE LAYERS, told in this order:\n"
+    "  LAYER 1 - VENUE FACTS (about the venue itself). State them as fact.\n"
+    "  LAYER 2 - CONNECTED CONTEXT (true background on the venue's NAME, its STREET "
+    "or district, or the TRADITION behind what it offers). State as fact, but every "
+    "layer-2 sentence must visibly tie back to the venue: name the venue or say 'the "
+    "bar's name', 'the street it sits on', 'the tradition it belongs to'. Never "
+    "suggest a context fact is part of the venue's own history, owner or menu "
+    "(a fruit's story is the story of the WORD in the name, not of what is sold).\n"
+    "  LAYER 3 - LEGEND OR UNCONFIRMED (facts tagged [legend] or [unconfirmed]). "
+    "EVERY layer-3 sentence MUST carry a disclosure: for a [legend] fact open with "
+    "'A folk tale tells that ...' (say 'Vietnamese' only if the fact does) or "
+    "'Legend has it that ...'; for an [unconfirmed] fact open with 'We couldn't "
+    "confirm this, but ...'. Never state a layer-3 fact as plain fact, and never put "
+    "a disclosure on a layer-1 or layer-2 sentence.\n"
     "RULES (strict):\n"
-    "- Every factual claim must come from the FACT LIST. Do not use anything you "
-    "know about the venue from memory. Do not add a year, a person, an event, a "
-    "dish, a decor detail, a smell, a view, or any geography that is not in the list.\n"
+    "- Every claim comes from the FACT LIST. Do not use anything you know from "
+    "memory. Do not add a year, a person, an event, a 'first', a dish, decor, a "
+    "smell, a view, or any geography that is not in the list.\n"
     "- 'orientation': ONE sentence that names the venue, says what kind of place it "
-    "is, and where to find it — using only the kind/address facts given.\n"
-    "- 'body': 3 to 6 sentences of natural spoken English for the ear. Use as many "
-    "facts as read naturally: what makes it distinctive; what people come for "
-    "(signature items); what reviewers say (rating: 'Google reviewers give it …', "
-    "numbers exactly as given); one human detail ONLY if a fact supplies it "
-    "(owner, founding year, a known event).\n"
-    "- Never list more than three items in a row; pick the three most telling.\n"
-    "- Do NOT tell the listener what to feel; do NOT end with a question or a "
-    "command; never write 'the place you chose' filler; no superlatives the facts "
-    "do not state.\n"
-    "Return ONLY JSON: {\"stops\":[{\"id\":<int>,\"orientation\":\"…\","
-    "\"body\":\"…\",\"used\":[\"F1\",\"F3\"]}]} where \"used\" lists the fact ids "
+    "is and where to find it, using only the kind/address facts given. If no kind "
+    "is given, say it is one of the stops on the listener's route and where.\n"
+    "- 'body': 4 to 7 sentences of natural spoken English, ordered layer 1, then "
+    "layer 2, then layer 3. Use the facts of every layer that has any. With fewer "
+    "facts, write fewer sentences, but never pad: no filler, no feelings, no "
+    "questions, no commands, no superlatives the facts do not state.\n"
+    "- Never list more than three items in a row. Numbers exactly as given. Keep "
+    "foreign words and names exactly as given.\n"
+    "Return ONLY JSON: {\"stops\":[{\"id\":<int>,\"orientation\":\"...\","
+    "\"body\":\"...\",\"used\":[\"F1\",\"F3\"]}]} where \"used\" lists the fact ids "
     "you relied on."
 )
 
+_LAYER_HEAD = {
+    1: "LAYER 1 - VENUE FACTS",
+    2: "LAYER 2 - CONNECTED CONTEXT (true; tie each sentence back to the venue)",
+    3: "LAYER 3 - LEGEND / UNCONFIRMED (every sentence needs a disclosure)",
+}
+
 
 def _narr_user(batch: List[Dict], location: str) -> str:
+    import user_stop_context as _usc
     city = city_from_scope(location)
     parts = [f"City: {city}\n"]
     for b in batch:
-        parts.append(f"STOP id={b['id']} — \"{b['name']}\"")
-        parts.append("FACT LIST:")
-        for f in b["facts"]:
-            parts.append(f"  {f['id']}. {f['text']}")
+        parts.append(f"STOP id={b['id']} - \"{b['name']}\" - FACT LIST by layer")
+        for layer in (1, 2, 3):
+            fl = [f for f in b["facts"] if f.get("layer", 1) == layer]
+            if not fl:
+                continue
+            parts.append(f"{_LAYER_HEAD[layer]}:")
+            for f in fl:
+                tag = _usc.layer_tag(f)
+                pre = f"[{tag}] " if layer == 3 else ""
+                parts.append(f"  {f['id']}. {pre}{f['text']}")
         parts.append("")
     return "\n".join(parts)
 
@@ -1109,9 +1202,14 @@ def enrich_user_stops_in_text(
             log(f"[LOCAL-862] material {w['title']}: specifics={mat['specifics']} "
                 f"facts={kinds} calls={mat['calls']}")
 
-    rich = [w for w in work if not w.get("landmark")
-            and w["mat"]["specifics"] >= _MIN_SPECIFICS]
-    batch = [{"id": i, "name": w["title"], "facts": w["mat"]["facts"][:16]}
+    # [LOCAL-862B / D760] narrate whenever ANY layer has a specific (venue fact,
+    # connected context, or legend); the short deterministic stop is the last
+    # resort, only when all three layers are empty of specifics.
+    def _narratable(m):
+        lc = m.get("layers") or {}
+        return (m["specifics"] + lc.get("2", 0) + lc.get("3", 0)) >= 1
+    rich = [w for w in work if not w.get("landmark") and _narratable(w["mat"])]
+    batch = [{"id": i, "name": w["title"], "facts": select_facts(w["mat"])}
              for i, w in enumerate(rich)]
     if api_key is None:
         api_key = os.environ.get("OPENAI_API_KEY")
@@ -1146,11 +1244,12 @@ def enrich_user_stops_in_text(
         end = headers[h_idx + 1][0] if h_idx + 1 < len(headers) else len(lines)
         mat = w["mat"]
         c = mat["calls"]
-        serper = c["places"] * _pq + (c["review_search"] + c["story_search"]) * _sq
+        serper = c["places"] * _pq + (c["review_search"] + c["story_search"]
+                                      + c.get("ctx_serp", 0)) * _sq
         entry = {"stop": title, "kind": "business", "specifics": mat["specifics"],
-                 "calls": c, "serper_cost_usd": round(serper, 6),
+                 "layers": mat.get("layers"), "calls": c, "serper_cost_usd": round(serper, 6),
                  "sources": sorted({f["source"] for f in mat["facts"]}),
-                 "facts": [(f["id"], f["kind"], f["text"], f["source"])
+                 "facts": [(f["id"], f["kind"], f["text"], f["source"], f.get("layer", 1))
                            for f in mat["facts"]]}
         end += _set_sourced_fields(lines, start, end, sourced_kind(title, mat),
                                    sourced_examples(mat))
