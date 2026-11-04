@@ -1,0 +1,399 @@
+{
+  "ran": true,
+  "model": "gpt-4.1-mini",
+  "stops": [
+    {
+      "stop": "The Crazy street",
+      "kind": "business",
+      "specifics": 4,
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [
+        "https://saigonadventure.com/bui-vien-walking-street-guide?srsltid=AYCX9vL8jaEP81mF3pxtfJxVIDJjQ9OKByNjlN89zgh12wQu_rkHPEcu",
+        "https://vinpearl.com/en/bui-vien-street-saigon-nightlife-hot-spot",
+        "https://www.facebook.com/visitistanbulofficial/posts/bui-vien-walking-street-never-sleepsneon-lights-loud-music-endless-laughter-and-/1223391363251215/",
+        "serper_places",
+        "serper_places:cid=17419937820716483494"
+      ],
+      "facts": [
+        [
+          "F1",
+          "category",
+          "Google Maps lists The Crazy street as: Tourist attraction.",
+          "serper_places:cid=17419937820716483494"
+        ],
+        [
+          "F2",
+          "rating",
+          "Google reviewers give it 4.4 out of 5 from about 28,000 reviews.",
+          "serper_places"
+        ],
+        [
+          "F3",
+          "story",
+          "This travel vlog showcases Bùi Viện Walking Street in Ho Chi Minh City, Vietnam, labeling it as the 'craziest street in Vietnam.' The video ...",
+          "https://www.facebook.com/visitistanbulofficial/posts/bui-vien-walking-street-never-sleepsneon-lights-loud-music-endless-laughter-and-/1223391363251215/"
+        ],
+        [
+          "F4",
+          "story",
+          "Bui Vien walking street is 850 meters long. It is a backpacker ... A brief of Bui Vien street history. It was hard to imagine Bui Vien ...",
+          "https://vinpearl.com/en/bui-vien-street-saigon-nightlife-hot-spot"
+        ],
+        [
+          "F5",
+          "story",
+          "Bui Vien Walking Street is one of the most famous nightlife destinations in Ho Chi Minh City, known for its neon-lit bars, live music, ...",
+          "https://saigonadventure.com/bui-vien-walking-street-guide?srsltid=AYCX9vL8jaEP81mF3pxtfJxVIDJjQ9OKByNjlN89zgh12wQu_rkHPEcu"
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000316,
+      "narration": "The Crazy street is a tourist attraction known as Bùi Viện Walking Street in Ho Chi Minh City. This street is about 850 meters long and is famous as a nightlife destination filled with neon-lit bars and live music. Google reviewers give it a rating of 4.4 out of 5 from around 28,000 reviews. It is often called the 'craziest street in Vietnam' by travel sources, making it a notable spot for visitors looking to experience vibrant city life.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5"
+      ],
+      "total_cost_usd": 0.004316
+    },
+    {
+      "stop": "Thi Bar Saigon",
+      "kind": "business",
+      "specifics": 4,
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [
+        "https://www.facebook.com/thibarsaigon/posts/a-hony-storyrecap-drag-show-dragshow-vietnamdragshow-dragvietnam-thibarsaigon/1593721539462272/",
+        "https://www.instagram.com/thibarsaigon/?hl=en",
+        "https://www.tripadvisor.com/ShowUserReviews-g293925-d8432743-r566577648-Thi_Bar-Ho_Chi_Minh_City.html",
+        "serper_places",
+        "serper_places:cid=14207409389953159742"
+      ],
+      "facts": [
+        [
+          "F1",
+          "category",
+          "Google Maps lists Thi Bar Saigon as: Gay bar.",
+          "serper_places:cid=14207409389953159742"
+        ],
+        [
+          "F2",
+          "address",
+          "Its address is 224 Đề Thám.",
+          "serper_places:cid=14207409389953159742"
+        ],
+        [
+          "F3",
+          "rating",
+          "Google reviewers give it 4.4 out of 5 from about 1,200 reviews.",
+          "serper_places"
+        ],
+        [
+          "F4",
+          "story",
+          "FREAK SHOW: FREAK & PROUD THỊ Bar Saigon Friday, June 26th 🎟️ FREE ENTRANCE Be loud. Be fabulous. Be proud. #thibar #PrideMonth #thibarsaigon ...",
+          "https://www.instagram.com/thibarsaigon/?hl=en"
+        ],
+        [
+          "F5",
+          "story",
+          "Reviewed October 8, 2017 via mobile. SUNDAY NIGHT. THI BAR SAIGON is the best live music Bar whish is located at 224 De Tham Street. District 1. Hochiminh city.",
+          "https://www.tripadvisor.com/ShowUserReviews-g293925-d8432743-r566577648-Thi_Bar-Ho_Chi_Minh_City.html"
+        ],
+        [
+          "F6",
+          "story",
+          "... #thibarsaigon. Relevant locations. Thi Bar, saigon, vietnam. Ho Chi Minh City. Ho Chi Minh. Vietnam. Recent posts. Việt Nam News. 8y · Public ...",
+          "https://www.facebook.com/thibarsaigon/posts/a-hony-storyrecap-drag-show-dragshow-vietnamdragshow-dragvietnam-thibarsaigon/1593721539462272/"
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000316,
+      "narration": "Thi Bar Saigon is a gay bar located at 224 Đề Thám in Ho Chi Minh City. This bar is known for its live music and lively atmosphere, especially on Sunday nights. Google reviewers rate it 4.4 out of 5 from about 1,200 reviews. Events like the FREAK SHOW celebrate pride and encourage patrons to be loud and proud, adding to its distinctive character.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5"
+      ],
+      "total_cost_usd": 0.004316
+    },
+    {
+      "stop": "Rambutan",
+      "kind": "business",
+      "specifics": 0,
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [],
+      "facts": [],
+      "mode": "thin_deterministic",
+      "llm_cost_usd": 0.0,
+      "total_cost_usd": 0.004
+    },
+    {
+      "stop": "A Star is Born",
+      "kind": "business",
+      "specifics": 0,
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [],
+      "facts": [],
+      "mode": "thin_deterministic",
+      "llm_cost_usd": 0.0,
+      "total_cost_usd": 0.004
+    },
+    {
+      "stop": "Longan",
+      "kind": "business",
+      "specifics": 0,
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [],
+      "facts": [],
+      "mode": "thin_deterministic",
+      "llm_cost_usd": 0.0,
+      "total_cost_usd": 0.004
+    },
+    {
+      "stop": "An Spa",
+      "kind": "business",
+      "specifics": 8,
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 2
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [
+        "https://an-spa.vn/",
+        "https://www.instagram.com/popular/an-spa-2/",
+        "serper_places:cid=15403763612159419680 (brand: own domain an-spa.vn, branch 796 m from pin)"
+      ],
+      "facts": [
+        [
+          "F1",
+          "category",
+          "Google Maps lists An Spa as: Massage spa.",
+          "serper_places:cid=15403763612159419680 (brand: own domain an-spa.vn, branch 796 m from pin)"
+        ],
+        [
+          "F2",
+          "site",
+          "Where Health & Happiness Return",
+          "https://an-spa.vn/"
+        ],
+        [
+          "F3",
+          "site",
+          "Vietnamese Traditional Spa & Skincare",
+          "https://an-spa.vn/"
+        ],
+        [
+          "F4",
+          "site",
+          "Discover our signature wellness treatments",
+          "https://an-spa.vn/"
+        ],
+        [
+          "F5",
+          "site",
+          "FACIAL LYMPHATIC DRAINAGE MASSAGE FOR PURIFICATION",
+          "https://an-spa.vn/"
+        ],
+        [
+          "F6",
+          "site",
+          "Makeup removal and cleansing | Lymph node activation | Facial lymphatic drainage massage | Head massage | Relaxing massage for neck-shoulder-nape | Facial steaming, fresh oxygen spray, and serum application (For 90-minute session) | Mask application | Moisturizing | Sunscreen application.",
+          "https://an-spa.vn/"
+        ],
+        [
+          "F7",
+          "site",
+          "Makeup Removal | Exfoliation | Facial Cleansing | Steaming & Sebum Extraction | Lifting Massage & Facial Acupressure | Fresh Oxygen Spray and Essence Infusion (When using 90' service) | Mask Application & Neck and Shoulder Relaxation Massage | Moisturizing | Sunscreen Application",
+          "https://an-spa.vn/"
+        ],
+        [
+          "F8",
+          "site",
+          "Press and relax to soften the muscles | Oil swipe | Relaxing massage | Back - neck - shoulder acupressure | Compressing hot stone & Himalayan salt bags | Compressing herbal pillow | Massage & acupressure for hands - legs | Massage & acupressure for head.",
+          "https://an-spa.vn/"
+        ],
+        [
+          "F9",
+          "story",
+          "AN SPA 2 in Ho Chi Minh City offers facial and wellness treatments with a focus on relaxation and professional service. A May 2025 review noted a collagen ...",
+          "https://www.instagram.com/popular/an-spa-2/"
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000316,
+      "narration": "An Spa is a massage spa in Ho Chi Minh City offering Vietnamese traditional spa and skincare treatments. The spa focuses on wellness and relaxation with signature treatments such as facial lymphatic drainage massage, makeup removal, and cleansing. Services include head, neck, and shoulder massages, as well as herbal compresses and acupressure. A recent review highlighted its professional service and emphasis on health and happiness.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F8",
+        "F9"
+      ],
+      "total_cost_usd": 0.004316
+    },
+    {
+      "stop": "Acoustic Bar",
+      "kind": "business",
+      "specifics": 5,
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [
+        "https://hivelife.com/acoustic-bar-hits-all-the-right-notes-in-saigon/",
+        "https://www.facebook.com/acousticbarhotungmau/videos/boom-boom-acousticbarhotungmau-acousticbar-nhachaymoingay-fyp-viral/4609435469325147/",
+        "https://www.instagram.com/reel/DO8gg9vCYFb/",
+        "serper_places",
+        "serper_places:cid=8955316489872957300",
+        "serper_search:reviews"
+      ],
+      "facts": [
+        [
+          "F1",
+          "category",
+          "Google Maps lists Acoustic Bar as: Live music bar.",
+          "serper_places:cid=8955316489872957300"
+        ],
+        [
+          "F2",
+          "address",
+          "Its address is Ngô Thời Nhiệm/6E Võ Thị Sáu.",
+          "serper_places:cid=8955316489872957300"
+        ],
+        [
+          "F3",
+          "rating",
+          "Google reviewers give it 4.5 out of 5 from about 3,200 reviews.",
+          "serper_places"
+        ],
+        [
+          "F4",
+          "since",
+          "Review sources say it has been open since 2007.",
+          "serper_search:reviews"
+        ],
+        [
+          "F5",
+          "story",
+          "Acoustic Bar Hồ Tùng Mậu, HCMC @acousticbarhotungmau have 5 locations dotted around Ho Chi Minh City, so DON'T miss this place when you're ...",
+          "https://www.instagram.com/reel/DO8gg9vCYFb/"
+        ],
+        [
+          "F6",
+          "story",
+          "Live Music at Acoustic Bar Ngo Thoi Nhiem in Ho Chi Minh City. A female singer, Saiyana Lee, delivers a soulful acoustic performance on a small stage. She is ...",
+          "https://www.facebook.com/acousticbarhotungmau/videos/boom-boom-acousticbarhotungmau-acousticbar-nhachaymoingay-fyp-viral/4609435469325147/"
+        ],
+        [
+          "F7",
+          "story",
+          "Minh, a former musician himself, created Acoustic Bar because he, “wanted to feel the joy of seeing the physical development” of his own passion ...",
+          "https://hivelife.com/acoustic-bar-hits-all-the-right-notes-in-saigon/"
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000316,
+      "narration": "Acoustic Bar is a live music bar located at Ngô Thời Nhiệm and 6E Võ Thị Sáu in Ho Chi Minh City. Open since 2007, it has about 3,200 Google reviews with a 4.5 rating. The bar features soulful acoustic performances, including singers like Saiyana Lee on a small stage. It was created by Minh, a former musician, who wanted to share the joy of music and see his passion grow physically through the venue.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F6",
+        "F7"
+      ],
+      "total_cost_usd": 0.004316
+    }
+  ],
+  "input_tokens": 1217,
+  "output_tokens": 486,
+  "llm_cost_usd": 0.001264,
+  "serper_cost_usd": 0.028,
+  "total_cost_usd": 0.029264,
+  "material_by_title": {
+    "Acoustic Bar": [
+      "Google Maps lists Acoustic Bar as: Live music bar.",
+      "Its address is Ngô Thời Nhiệm/6E Võ Thị Sáu.",
+      "Google reviewers give it 4.5 out of 5 from about 3,200 reviews.",
+      "Review sources say it has been open since 2007.",
+      "Acoustic Bar Hồ Tùng Mậu, HCMC @acousticbarhotungmau have 5 locations dotted around Ho Chi Minh City, so DON'T miss this place when you're ...",
+      "Live Music at Acoustic Bar Ngo Thoi Nhiem in Ho Chi Minh City. A female singer, Saiyana Lee, delivers a soulful acoustic performance on a small stage. She is ...",
+      "Minh, a former musician himself, created Acoustic Bar because he, “wanted to feel the joy of seeing the physical development” of his own passion ..."
+    ],
+    "An Spa": [
+      "Google Maps lists An Spa as: Massage spa.",
+      "Where Health & Happiness Return",
+      "Vietnamese Traditional Spa & Skincare",
+      "Discover our signature wellness treatments",
+      "FACIAL LYMPHATIC DRAINAGE MASSAGE FOR PURIFICATION",
+      "Makeup removal and cleansing | Lymph node activation | Facial lymphatic drainage massage | Head massage | Relaxing massage for neck-shoulder-nape | Facial steaming, fresh oxygen spray, and serum application (For 90-minute session) | Mask application | Moisturizing | Sunscreen application.",
+      "Makeup Removal | Exfoliation | Facial Cleansing | Steaming & Sebum Extraction | Lifting Massage & Facial Acupressure | Fresh Oxygen Spray and Essence Infusion (When using 90' service) | Mask Application & Neck and Shoulder Relaxation Massage | Moisturizing | Sunscreen Application",
+      "Press and relax to soften the muscles | Oil swipe | Relaxing massage | Back - neck - shoulder acupressure | Compressing hot stone & Himalayan salt bags | Compressing herbal pillow | Massage & acupressure for hands - legs | Massage & acupressure for head.",
+      "AN SPA 2 in Ho Chi Minh City offers facial and wellness treatments with a focus on relaxation and professional service. A May 2025 review noted a collagen ..."
+    ],
+    "Thi Bar Saigon": [
+      "Google Maps lists Thi Bar Saigon as: Gay bar.",
+      "Its address is 224 Đề Thám.",
+      "Google reviewers give it 4.4 out of 5 from about 1,200 reviews.",
+      "FREAK SHOW: FREAK & PROUD THỊ Bar Saigon Friday, June 26th 🎟️ FREE ENTRANCE Be loud. Be fabulous. Be proud. #thibar #PrideMonth #thibarsaigon ...",
+      "Reviewed October 8, 2017 via mobile. SUNDAY NIGHT. THI BAR SAIGON is the best live music Bar whish is located at 224 De Tham Street. District 1. Hochiminh city.",
+      "... #thibarsaigon. Relevant locations. Thi Bar, saigon, vietnam. Ho Chi Minh City. Ho Chi Minh. Vietnam. Recent posts. Việt Nam News. 8y · Public ..."
+    ],
+    "The Crazy street": [
+      "Google Maps lists The Crazy street as: Tourist attraction.",
+      "Google reviewers give it 4.4 out of 5 from about 28,000 reviews.",
+      "This travel vlog showcases Bùi Viện Walking Street in Ho Chi Minh City, Vietnam, labeling it as the 'craziest street in Vietnam.' The video ...",
+      "Bui Vien walking street is 850 meters long. It is a backpacker ... A brief of Bui Vien street history. It was hard to imagine Bui Vien ...",
+      "Bui Vien Walking Street is one of the most famous nightlife destinations in Ho Chi Minh City, known for its neon-lit bars, live music, ..."
+    ]
+  },
+  "precomposed": [
+    "Longan",
+    "A Star is Born",
+    "Rambutan"
+  ],
+  "specifics_ge2": 4
+}

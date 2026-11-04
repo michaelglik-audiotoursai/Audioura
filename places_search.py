@@ -347,6 +347,8 @@ def _normalize_serper_place(p: Dict) -> Optional[Dict]:
         "_serper_rating_count": p.get("ratingCount") or p.get("reviewsCount"),
         "_serper_price_level": p.get("priceLevel"),
         "_serper_website": p.get("website"),
+        # [LOCAL-862] Opening hours, when Serper supplies them (absent otherwise).
+        "_serper_hours": p.get("openingHours") or p.get("hours"),
         # [LOCAL-786] Carry the raw formatted address so the town-mismatch guard can
         # read the town Serper gave ("…, Norwood, MA 02062") even when the structured
         # address parse left `city` blank.

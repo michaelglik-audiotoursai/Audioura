@@ -345,6 +345,10 @@ _SYSTEM = (
     "UNSUPPORTED. A sentence that refers back to a person, group, event or past "
     "that no SUPPORTED sentence of the same stop introduces ('His playing…', "
     "'those earlier networks', 'that mythic past') is UNSUPPORTED.\n\n"
+    "IMPORTANT: every UNSUPPORTED category above applies ONLY when the fact sheet "
+    "does NOT state it. A date, founding year, person, event, address, rating or "
+    "item that a fact-sheet line or listed source states IS SUPPORTED — e.g. "
+    "'Founded in 2007' is SUPPORTED when a source says 'Founded in 2007'.\n"
     "Judge meaning, not wording. When in doubt between SENSORY and UNSUPPORTED, "
     "choose UNSUPPORTED. Return ONLY JSON of the exact shape:\n"
     '{"stops":[{"id":<int>,"labels":[{"i":<int>,"label":"SUPPORTED|SENSORY|'
@@ -366,7 +370,7 @@ def _build_user_message(batch: List[dict]) -> str:
 
 
 def _call_openai(system: str, user: str, api_key: str, model: str,
-                 timeout: int = 40) -> Tuple[Optional[dict], int, int]:
+                 timeout: int = 40, max_tokens: int = 1500) -> Tuple[Optional[dict], int, int]:
     """One JSON call. Returns (parsed_or_None, input_tokens, output_tokens)."""
     if requests is None or not api_key:
         return None, 0, 0
@@ -381,7 +385,7 @@ def _call_openai(system: str, user: str, api_key: str, model: str,
                              {"role": "user", "content": user}],
                 "temperature": 0.0,
                 "seed": 7,
-                "max_tokens": 1500,
+                "max_tokens": int(max_tokens),
                 "response_format": {"type": "json_object"},
             }),
             timeout=timeout,
@@ -442,6 +446,8 @@ def verify_user_stops_in_text(
         api_key: str = None, model: str = None, log=None,
         outdoor_facts_by_title: Optional[Dict[str, list]] = None,
         serp_fn=None, retrieve: bool = True,
+        material_by_title: Optional[Dict[str, list]] = None,
+        precomposed_titles: Optional[List[str]] = None,
         ) -> Tuple[str, dict]:
     """Fact-sheet verify every USER stop in an assembled tour text with ONE cheap
     batched gpt-4.1-mini call, after ONE Serper retrieval per user stop (D759).
@@ -520,13 +526,42 @@ def verify_user_stops_in_text(
                     break
         facts = build_fact_sheet(poi, location, odf)
 
+        # [LOCAL-862] A stop the enrichment pass already finished deterministically
+        # (thin: Places data only) is final — no second retrieval, no rewrite.
+        if precomposed_titles and any(_fold(title) == _fold(t)
+                                      for t in precomposed_titles):
+            if log:
+                log(f"[LOCAL-862] verify {title} skipped (precomposed thin stop)")
+            continue
+        # [LOCAL-862] A stop narrated from gathered material is verified against
+        # THAT material (Places record, customer voice, own site, story search):
+        # it is the fact sheet, so no extra Serper query is made.
+        _mat = None
+        if material_by_title:
+            for _k, _v in material_by_title.items():
+                if _fold(_k) == _fold(title):
+                    _mat = _v
+                    break
+        if _mat:
+            facts["retrieved_sources"] = [str(x)[:400] for x in _mat][:16]
+            odf = list(_mat)
+
         # [LOCAL-855D] A documented monument/institution (cathedral, basilica,
         # palace, museum, …) is SOURCED — skip it so its dates survive
         # (Notre-Dame "built 1863–1880"). The 855B scrub already does not
         # date-gate these kinds; the verifier must match that, or it would
         # over-scrub the exact case the ticket's run B protects.
         _kind_fold = _fold(poi.get("type_specialty") or "")
-        if set(_kind_fold.split()) & _DOCUMENTED_KINDS:
+        # [LOCAL-862 item 4] Landmark detection must not hang on the generator's
+        # Type label ("Historical Landmark" one run, "Historical Site" the next —
+        # Independence Palace was gutted to a grounded body when it read "Site").
+        # Use the shared name+type classifier as well.
+        try:
+            from user_stop_enrichment import classify_stop_kind as _csk862
+            _is_landmark862 = _csk862(title, poi.get("type_specialty") or "") == "landmark"
+        except Exception:
+            _is_landmark862 = False
+        if (set(_kind_fold.split()) & _DOCUMENTED_KINDS) or _is_landmark862:
             if log:
                 log(f"[LOCAL-855D] verify {title} skipped (documented monument "
                     f"kind — sourced dates kept)")
@@ -709,6 +744,7 @@ def verify_user_stops_in_text(
 
         # Rewrite each body paragraph keeping only its non-UNSUPPORTED sentences.
         _apply_drops(lines, meta, keep_flags)
+        _lift_into_empty_orientation(lines, meta)
         # [LOCAL-855E item 3] Every user stop must NAME its venue. If dropping the
         # orientation left the surviving text without the venue name (it can read
         # as "This place…" / "this venue…"), prepend the deterministic
@@ -729,10 +765,17 @@ def verify_user_stops_in_text(
                         f"the venue — prepended deterministic orientation")
         report["stops"].append({"stop": name, "kept": kept_n,
                                 "dropped": dropped_n, "grounded": False,
-                                "snippets": 1})
+                                "snippets": 1,
+                                "dropped_sentences": [
+                                    s for s, f in zip(sentences, keep_flags) if not f],
+                                "labels": {str(i): lab.get(i, "") for i in
+                                           range(len(sentences))}})
         report["dropped_total"] += dropped_n
         if log:
             log(f"[LOCAL-855D] verify {name} kept {kept_n} dropped {dropped_n}")
+            for s, f in zip(sentences, keep_flags):
+                if not f:
+                    log(f"[LOCAL-855D]   dropped: {s[:160]}")
 
     return "\n".join(lines), report
 
@@ -792,6 +835,24 @@ def _apply_drops(lines: List[str], meta: dict, keep_flags: List[bool]):
             lines[abs_idx] = f"{label}: {new_val}" if new_val else f"{label}:"
         else:
             lines[abs_idx] = new_val
+
+
+def _lift_into_empty_orientation(lines: List[str], meta: dict) -> None:
+    """[LOCAL-862] If drops emptied the Orientation line while a later body
+    paragraph survives, move that paragraph's text up (never ship 'Orientation:'
+    with nothing after it)."""
+    keys = sorted(meta["para_sent_counts"].keys())
+    or_idx = next((k for k in keys if meta["para_sent_counts"][k][0]), None)
+    if or_idx is None:
+        return
+    label, _, val = lines[or_idx].partition(":")
+    if val.strip():
+        return
+    for k in keys:
+        if k != or_idx and lines[k].strip():
+            lines[or_idx] = f"{label}: {lines[k].strip()}"
+            lines[k] = ""
+            return
 
 
 def _rebuild_paragraph(ss: List[str], flags: List[bool]) -> str:
