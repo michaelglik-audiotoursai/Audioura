@@ -13,6 +13,8 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 27 — 2026-11-04 ~01:20 EST (wdvrdazc93) — DEPLOYED then ROLLED BACK. 7ab51728 as gen 00033-6pf / orch 00015-mfj / modernized 00007-rxn; Sophia (534) failed: bbox fell back to 'Vietnam', pin-snap HCMC centre ≈ Hanoi, LLM coords kept as "user pins", 6/7, 🌈 still in text. 527/535/536/537 PASS. Live again: gen 00032-r8x, orch 00014-glv, modernized 00006-9hq. Proofs 527,534–537 hidden (backup AudiouraBackups\wave27_proof_hide_20261104). polly not deployed (no Subscribed polly-tts). Wave 25 approval was only RELAYED by LEAD; holding for Michael's own "yes 854".
+
 # ▶️ WAVE 26b — 2026-11-03 ~19:45 EST — LIVE gen **00032-r8x** (298b1a8a, LOCAL-858). Hanoi P625 pins OK (533); HCMC pins still ~centroid (532) -> LEAD. Proofs hidden.
 
 # ▶️ WAVE 26 — 2026-11-03 ~19:30 EST (wdvrdazc6c) — LIVE gen **00031-hp4** (5712c485). Sophia v2 = tour **529**, 7/7, share **ti3ekwyQ**, VISIBLE. ❌ share.google links no longer resolve (302 → google.com/share.google?q=…), so 5/7 pins wrong; not this wave's code, kept live, LEAD told. Still on hold for Michael: wave 25 tile proxy ("yes 854") and D758.
