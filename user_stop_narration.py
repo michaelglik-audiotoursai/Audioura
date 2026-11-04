@@ -42,6 +42,8 @@ import re
 import unicodedata
 from typing import Dict, Optional
 
+from text_polish import apply_orphan_rule, city_from_scope  # [LOCAL-860]
+
 __all__ = [
     "is_user_stop",
     "has_sourced_material",
@@ -172,7 +174,7 @@ def grounded_user_stop_body(poi: Dict, location: str = "") -> str:
             sentences.append(
                 f"{name} is {_article(kind)} {kind.lower()} here in {district}.")
         else:
-            where = location.split(",")[0].strip() if location else ""
+            where = city_from_scope(location) if location else ""
             if where:
                 sentences.append(
                     f"{name} is {_article(kind)} {kind.lower()} in {where}.")
@@ -183,7 +185,7 @@ def grounded_user_stop_body(poi: Dict, location: str = "") -> str:
             sentences.append(
                 f"{name} is one of the places you chose, here in {district}.")
         else:
-            where = location.split(",")[0].strip() if location else ""
+            where = city_from_scope(location) if location else ""
             if where:
                 sentences.append(
                     f"{name} is one of the places you chose, here in {where}.")
@@ -617,6 +619,7 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
             anchors.add(w)
 
     kept, dropped = [], []
+    _flags860 = []
     for sent in _split_sentences(text):
         sfold = _fold(sent)
         stoks = set(sfold.split())
@@ -670,11 +673,23 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
 
         if drop_reason:
             dropped.append(sent)
+            _flags860.append(False)
             if log:
                 log(f"[LOCAL-855B] dropped ({drop_reason}) from {name!r}: "
                     f"{' '.join(sent.split()[:9])}…")
         else:
             kept.append(sent)
+            _flags860.append(True)
+    # [LOCAL-860 item 3] orphaned back-reference after a drop goes too.
+    if dropped and kept:
+        _all860 = _split_sentences(text)
+        _nf860, _orph860 = apply_orphan_rule(_all860, _flags860)
+        if _orph860:
+            kept = [x for x, f in zip(_all860, _nf860) if f]
+            dropped = dropped + [_all860[i] for i in _orph860]
+            if log:
+                log(f"[LOCAL-860] dropped {len(_orph860)} orphaned back-reference "
+                    f"sentence(s) from {name!r}")
     if not kept:
         # [LOCAL-855B bounce] Every sentence was fabrication (a dragon legend end
         # to end, an invented discovery anecdote, a wrong-place description). The
@@ -828,6 +843,7 @@ def scrub_offpin_landmarks(text, poi: Dict, location: str = "", log=None,
     name_toks = {w for w in name_fold.split() if len(w) >= 3 and w not in _gen}
 
     kept, dropped = [], []
+    _flags860 = []
     for sent in _split_sentences(text):
         sfold = _fold(sent)
         off = None
@@ -851,12 +867,21 @@ def scrub_offpin_landmarks(text, poi: Dict, location: str = "", log=None,
                 break
         if off:
             dropped.append(sent)
+            _flags860.append(False)
             if log:
                 log(f"[LOCAL-855B] off-pin landmark dropped from {name!r} "
                     f"({off[0]!r} ~{off[1]:.0f} m from pin): "
                     f"{' '.join(sent.split()[:9])}…")
         else:
             kept.append(sent)
+            _flags860.append(True)
+    # [LOCAL-860 item 3] orphaned back-reference after a drop goes too.
+    if dropped and kept:
+        _all860 = _split_sentences(text)
+        _nf860, _orph860 = apply_orphan_rule(_all860, _flags860)
+        if _orph860:
+            kept = [x for x, f in zip(_all860, _nf860) if f]
+            dropped = dropped + [_all860[i] for i in _orph860]
     if not kept or not dropped:
         return text, []
     return " ".join(kept).strip(), dropped

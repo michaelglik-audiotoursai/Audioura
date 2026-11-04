@@ -40,6 +40,8 @@ import os
 import re
 from typing import Dict, List, Optional, Tuple
 
+from text_polish import apply_orphan_rule, city_from_scope  # [LOCAL-860]
+
 try:
     import requests
 except Exception:  # pragma: no cover
@@ -123,7 +125,7 @@ def build_fact_sheet(poi: Dict, location: str = "",
         "address": addr,
         "district": district,
         "examples": examples,            # what the listener said to expect
-        "city": (location or "").split(",")[0].strip(),
+        "city": city_from_scope(location),
     }
     # Any retrieved material that NAMES the venue (research/lore/customer voice)
     # is grounded too — list it so a sourced claim is judged SUPPORTED.
@@ -248,7 +250,10 @@ def _build_stop_query(name: str, poi: dict, location: str) -> str:
             if re.search(r"(?i)\b(?:district|qu[ậa]n)\b", p):
                 district = p
                 break
-    where = district or (location or "").split(",")[0].strip()
+    # [LOCAL-860 item 6] `location` is the whole tour title for a user-stops
+    # tour ("Sophia's biking tour in Ho Chi Minh City"); the query context must be
+    # the city/district, never the title.
+    where = district or city_from_scope(location)
     name = (name or "").strip()
     return f'"{name}" {where}'.strip()
 
@@ -669,6 +674,13 @@ def verify_user_stops_in_text(
         # only removes what it positively calls UNSUPPORTED).
         keep_flags = [lab.get(i, "SUPPORTED") != "UNSUPPORTED"
                       for i in range(len(sentences))]
+        # [LOCAL-860 item 3] A kept sentence that opens with a back-reference
+        # (This/These/It/Its/…/The contrast) right after a dropped one has lost its
+        # antecedent (An Spa: "This juxtaposition…"). Drop it too; never empties.
+        keep_flags, _orph = apply_orphan_rule(sentences, keep_flags)
+        if _orph and log:
+            log(f"[LOCAL-860] verify {name}: dropped {len(_orph)} orphaned "
+                f"back-reference sentence(s)")
         kept_n = sum(1 for f in keep_flags if f)
         dropped_n = len(sentences) - kept_n
 
@@ -758,7 +770,7 @@ def _deterministic_orientation(poi: Dict, location: str = "") -> str:
     if addr:
         return f"Look for {name} at {addr}."
     # [LEAD 855E review] a city is a place you are IN, not AT.
-    city = (location or "").split(",")[0].strip()
+    city = city_from_scope(location)
     if city:
         return f"Look for {name} in {city}."
     return f"Look for {name}."

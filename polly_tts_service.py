@@ -8,6 +8,14 @@ from flask import Flask, request, jsonify, send_file as _send_file
 import inspect as _inspect
 import tempfile
 import logging
+
+try:
+    from text_polish import strip_emoji_for_tts as _strip_emoji_for_tts  # [LOCAL-860]
+except Exception as _tp_err:  # pragma: no cover - never lose audio over a helper
+    logging.warning(f"[LOCAL-860] text_polish unavailable, emoji not stripped: {_tp_err}")
+
+    def _strip_emoji_for_tts(text):
+        return text
 from botocore.exceptions import ClientError, BotoCoreError
 
 # [LOCAL-673] Daily paid-API spend STOP. Polly runs through boto3 (its own HTTP
@@ -312,6 +320,11 @@ def synthesize_speech():
             
         data = request.get_json()
         text = data.get('text', '')
+        # [LOCAL-860 item 4] Emoji / pictographs are never spoken ("rainbow" read
+        # aloud for "🌈Thi Bar Saigon"). One choke point for every TTS-bound string
+        # (narration, spoken stop titles, directions); the stored/display text is
+        # untouched because only this request's copy is cleaned.
+        text = _strip_emoji_for_tts(text)
         voice_id = data.get('voice_id', 'Joanna')  # Default female voice
         output_format = data.get('output_format', 'mp3')
         # [LOCAL-323] Optional metering fields — callers pass these for attribution

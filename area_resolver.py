@@ -901,7 +901,18 @@ def extract_named_places_from_clause(location_string: str) -> List[str]:
     """
     m = _NAMED_PLACE_CLAUSE_RE.search(location_string or "")
     if not m:
-        return []
+        # [LOCAL-860 items 5+7] No "including X" clause: the SUBJECT itself may
+        # name the places — "Boston Common and Old North Church walk, Boston",
+        # "Hoan Kiem Lake and Temple of Literature walk, Hanoi". The intent
+        # extractor skips these (its named_places is defined for restaurants/
+        # venues and excludes areas), so before this the walking path never
+        # protected them and the discovery pool replaced them with the State House
+        # / Paul Revere House (Boston) and dropped the Temple of Literature (Hanoi).
+        try:
+            from text_polish import named_places_from_subject as _subj860
+            return _subj860(location_string or "")
+        except Exception:
+            return []
     tail = m.group(1).strip().rstrip('.').strip()
     if not tail:
         return []

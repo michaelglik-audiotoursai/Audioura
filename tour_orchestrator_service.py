@@ -558,8 +558,12 @@ def sanitize_input(input_text):
     # Replace filesystem-dangerous characters with underscores
     sanitized = re.sub(r'[<>:"/\\|?*]', '_', sanitized)
     
-    # Remove script injection characters
-    sanitized = re.sub(r'[<>"\']', '', sanitized)
+    # Remove script injection characters. [LOCAL-860 item 1] Possessive
+    # apostrophes (straight ' and curly \u2019) are legitimate text — "Sophia's
+    # biking tour" must not become "Sophias". Every DB write is parameterised and
+    # filenames are re-slugged separately, so the apostrophe carries no injection
+    # risk; only the angle brackets and double quote are stripped.
+    sanitized = re.sub(r'[<>"]', '', sanitized)
     
     # Normalize whitespace
     sanitized = re.sub(r'\s+', ' ', sanitized).strip()
@@ -2525,7 +2529,10 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         
         # Derive tour_name from the generated content's title (uses effective category, not raw tour_type)
         # Parse the " - <X> Tour" suffix from the content's first line, fall back to raw tour_type
-        _effective_tour_suffix = f"{tour_type} Tour"
+        # [LOCAL-860 item 2] Display label from the transport mode ("biking" ->
+        # "Cycling Tour"), never the raw tour_type ("biking Tour").
+        from text_polish import tour_type_display_label as _tt_label860
+        _effective_tour_suffix = _tt_label860(tour_type)
         if tour_content_raw := ACTIVE_JOBS[job_id].get("tour_content", ""):
             _first_line = tour_content_raw.split('\n')[0] if tour_content_raw else ""
             if ' - ' in _first_line and _first_line.endswith(' Tour'):
