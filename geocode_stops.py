@@ -204,6 +204,104 @@ def geocode(query):
     return None
 
 
+# [LOCAL-858B] Nominatim address-ranks (addresstype) and OSM place classes that
+# are a COUNTRY, a sovereign-state-sized region, or a whole first-level
+# subdivision — NEVER a walkable tour centre. A free-text query that fails to
+# match a place ("Ben Thanh Market and Saigon Opera House walk") routinely
+# resolves to the enclosing COUNTRY centroid (Vietnam → 15.93,107.97), and that
+# centroid was being trusted as the pin-snap / landmark centre, which both
+# disabled every scope guard and skipped the 858 landmark lookup. A result at one
+# of these ranks is rejected as a city centre.
+_NON_CITY_ADDRESSTYPES = {
+    "country", "continent", "ocean", "sea",
+    "state", "province", "region", "county", "state_district",
+}
+_NON_CITY_PLACE_TYPES = {
+    "country", "continent", "state", "province", "region", "county",
+}
+
+
+def geocode_detailed(query):
+    """[LOCAL-858B] Like ``geocode`` but return the first hit's metadata so a
+    caller can tell a CITY/neighbourhood/landmark from a COUNTRY or state-level
+    centroid.
+
+    Returns ``{"lat", "lng", "type", "class", "addresstype", "display_name"}``
+    for the first resolving variant, or None. ``type``/``class``/``addresstype``
+    are Nominatim's own classification (e.g. a country comes back
+    ``addresstype='country'``, ``class='boundary'``, ``type='administrative'``),
+    which is what ``is_city_like`` uses to reject a country centroid. Best-effort;
+    returns None on any failure.
+    """
+    for _cand in _geocode_variants(query):
+        _hit = _geocode_once_detailed(_cand)
+        if _hit:
+            return _hit
+    return None
+
+
+def _geocode_once_detailed(query):
+    """One detailed Nominatim lookup → dict (see ``geocode_detailed``) or None."""
+    global _last_request_at
+    if not query or not query.strip():
+        return None
+    elapsed = time.time() - _last_request_at
+    if elapsed < _MIN_INTERVAL_S:
+        time.sleep(_MIN_INTERVAL_S - elapsed)
+    url = NOMINATIM_URL + "?" + urllib.parse.urlencode({
+        "q": query, "format": "jsonv2", "limit": 1, "addressdetails": 0,
+    })
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+            payload = json.load(resp)
+        _last_request_at = time.time()
+        if not payload:
+            return None
+        row = payload[0]
+        return {
+            "lat": float(row["lat"]),
+            "lng": float(row["lon"]),
+            "type": str(row.get("type") or ""),
+            "class": str(row.get("category") or row.get("class") or ""),
+            "addresstype": str(row.get("addresstype") or ""),
+            "display_name": str(row.get("display_name") or ""),
+        }
+    except Exception as e:
+        _last_request_at = time.time()
+        logging.warning("[GEOCODE] detailed lookup failed for %r: %s", query, e)
+        return None
+
+
+def is_city_like(detail):
+    """[LOCAL-858B] True when a ``geocode_detailed`` result is a plausible tour
+    CENTRE — a city/town/suburb/neighbourhood/landmark — and NOT a country, a
+    sovereign-state-sized region, or a first-level subdivision.
+
+    A pure, offline predicate over the metadata dict (no network). A None/empty
+    detail is not city-like. The rejection is by Nominatim's ``addresstype`` /
+    ``class`` / ``type`` (country → addresstype='country'), so it generalises
+    across every country without a per-country centroid table."""
+    if not isinstance(detail, dict):
+        return False
+    at = (detail.get("addresstype") or "").strip().lower()
+    cls = (detail.get("class") or "").strip().lower()
+    typ = (detail.get("type") or "").strip().lower()
+    # No classification at all → cannot confirm it is a city (an empty dict is not
+    # a trustworthy city centre). A real Nominatim jsonv2 hit always carries these.
+    if not (at or cls or typ):
+        return False
+    if at in _NON_CITY_ADDRESSTYPES:
+        return False
+    # boundary/administrative at a country/state rank is the enclosing-country
+    # centroid a failed free-text query falls back to.
+    if cls == "boundary" and typ in _NON_CITY_PLACE_TYPES:
+        return False
+    if typ in _NON_CITY_PLACE_TYPES:
+        return False
+    return True
+
+
 def _geocode_once(query):
     """Resolve a free-text place to (lat, lng), or None.
 

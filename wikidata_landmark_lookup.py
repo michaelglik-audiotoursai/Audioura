@@ -173,6 +173,15 @@ def _default_fetch(action: str, params: Dict) -> Optional[Dict]:
     if str(os.environ.get("LANDMARK_LIVE_LOOKUP", "")).strip().lower() \
             not in ("1", "true", "yes", "on"):
         return None
+    # [LOCAL-858B] WIKIDATA-BLOCKED simulation. Cloud Run egress to Wikidata can be
+    # blocked, or a 429 may never clear. The live acceptance run sets
+    # ``LANDMARK_WIKIDATA_BLOCKED=1`` to force this hard-failure path WITHOUT
+    # touching Wikidata, so the SECOND authority (Serper /places → Nominatim) is
+    # exercised exactly as it would be when Wikidata is unreachable. Returns None
+    # (a hard failure), never raises — identical to an exhausted-retry 429.
+    if str(os.environ.get("LANDMARK_WIKIDATA_BLOCKED", "")).strip().lower() \
+            in ("1", "true", "yes", "on"):
+        return None
     try:
         import requests  # noqa: F401
         from venue_resolver import _request_with_backoff, _USER_AGENT

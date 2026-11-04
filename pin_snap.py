@@ -84,6 +84,18 @@ def _haversine_m(a, b) -> float:
 # for a shared centroid.
 _SHARED_FALLBACK_M = 30.0
 
+# [LOCAL-858B] CLUSTER-COLLAPSE radius. The cloud tour-532 pins were NOT ≤30 m
+# apart (so the equality test above missed them) yet all three stops sat within
+# ~150 m of one another and ~700 m from the area_resolver centre — a city-centre
+# guess the model spread across the stops, just not to the metre. Two or more
+# UNSNAPPED stops with DIFFERENT, non-same-building names whose shipped pins all
+# fall inside this radius is a COLLAPSE: distinct named places cannot genuinely
+# occupy one 250 m disc with no reference. They are cleared + announced, exactly
+# like the ≤30 m case. Genuinely adjacent same-building stops (two stalls in Ben
+# Thanh Market) are exempt via same_building, and user pins are exempt entirely.
+_CLUSTER_COLLAPSE_M = float(__import__("os").environ.get(
+    "PIN_CLUSTER_COLLAPSE_M", "250.0"))
+
 
 def _coord_is_marked_fallback(poi: Dict) -> bool:
     """[LOCAL-858] True when the pipeline already STAMPED this coordinate as a
@@ -190,8 +202,23 @@ def _landmark_reference(name: str,
             return (float(hit[0]), float(hit[1]), str(hit[2]))
     except Exception:
         # Any failure in the live path must not drop the stop — fall through to
-        # the offline table below.
+        # the second authority / offline table below.
         pass
+    # 1b) [LOCAL-858B] SECOND AUTHORITY. Wikidata returned nothing (unreachable
+    # from Cloud Run egress, a 429 that never cleared, or no in-scope P625). Ask
+    # Serper /places by name inside the city box, then Nominatim — name-matched
+    # and in-scope, cached like P625. An INJECTED landmark_fn (unit tests / offline
+    # replays) is a vouched-for authority and takes precedence, so the live second
+    # authority is skipped for it.
+    if landmark_fn is None:
+        try:
+            from landmark_second_authority import lookup_second_authority as _2nd
+            hit2 = _2nd(name, scope=scope, scope_center=scope_center,
+                        scope_bbox=list(scope_bbox) if scope_bbox else None)
+            if hit2:
+                return (float(hit2[0]), float(hit2[1]), str(hit2[2]))
+        except Exception:
+            pass
     # 2) Offline table fallback (the original six HCMC landmarks).
     try:
         from landmark_reference import lookup as _lm_lookup
@@ -652,12 +679,67 @@ def snap_poi_coordinates(poi_list: List[Dict],
     _unsnapped = [i for i, p in enumerate(poi_list)
                   if not (_row_for(i).get("snapped") and _row_for(i).get("new_coordinate"))]
 
+    def _same_building_pair(ia: int, ib: int) -> bool:
+        """[LOCAL-858B] Same-building exemption for the collapse pass, by EXPLICIT
+        IDENTITY only — a shared Wikidata QID, an alias of one naming the other, or
+        one located-in the other. The coords-based branch of
+        local802_relevance_gate.same_building is deliberately NOT used here: two
+        city-centroid guesses sit at the same point and often share a generic token
+        ("Stop A"/"Stop B"), which that branch would read as one building and
+        wrongly exempt from the collapse. Genuinely adjacent same-building stops
+        (two stalls in one market) carry the explicit identity this checks."""
+        a, b = poi_list[ia], poi_list[ib]
+        if not isinstance(a, dict) or not isinstance(b, dict):
+            return False
+        qa = str(a.get("wikidata_qid") or a.get("qid") or "").strip()
+        qb = str(b.get("wikidata_qid") or b.get("qid") or "").strip()
+        if qa and qb and qa == qb:
+            return True
+
+        def _aliases(s):
+            out = set()
+            for v in (s.get("aliases") or []):
+                if isinstance(v, str) and v.strip():
+                    out.add(v.strip().lower())
+            nm = (s.get("name") or s.get("title") or "").strip().lower()
+            if nm:
+                out.add(nm)
+            return out
+
+        aa, ab = _aliases(a), _aliases(b)
+        na = (a.get("name") or a.get("title") or "").strip().lower()
+        nb = (b.get("name") or b.get("title") or "").strip().lower()
+        if (aa & ab) and (na != nb):
+            # Alias overlap that is NOT just the two identical names.
+            return True
+        if na and na in ab and na != nb:
+            return True
+        if nb and nb in aa and nb != na:
+            return True
+
+        def _located(s):
+            out = set()
+            for key in ("located_in", "located_in_qid", "part_of", "part_of_qid"):
+                v = s.get(key)
+                if isinstance(v, str) and v.strip():
+                    out.add(v.strip())
+                elif isinstance(v, (list, tuple, set)):
+                    out |= {str(x).strip() for x in v if x}
+            return out
+
+        if qb and qb in _located(a):
+            return True
+        if qa and qa in _located(b):
+            return True
+        return False
+
     # The SHARED-point test uses the ORIGINAL shipped coordinates (``coords_all``,
     # snapshotted at entry), NOT the post-snap positions: the collapse signal is
     # that the model stamped the SAME point on several stops, and that is true of
     # the SHIPPED pins even when some of those stops later snapped away to their
     # real place. A stop whose shipped pin coincided with ANY other stop's shipped
-    # pin is a centroid guess.
+    # pin is a centroid guess — UNLESS that neighbour is the SAME BUILDING (two
+    # stalls in one market legitimately share a point) [LOCAL-858B].
     def _shipped_shared(idx: int) -> bool:
         a = coords_all[idx]
         if not a:
@@ -667,6 +749,59 @@ def snap_poi_coordinates(poi_list: List[Dict],
                 continue
             b = coords_all[j]
             if b and _haversine_m(a, b) <= _SHARED_FALLBACK_M:
+                # Same-building neighbours (two stalls in one market) legitimately
+                # share a point and are NOT a centroid collapse. [LOCAL-858B]
+                if _same_building_pair(idx, j):
+                    continue
+                return True
+        return False
+
+    # [LOCAL-858B] CLUSTER-COLLAPSE detection (not equality). Two or more UNSNAPPED
+    # stops whose shipped pins all fall inside ``_CLUSTER_COLLAPSE_M`` (250 m) of
+    # each other, and whose names are DIFFERENT and NOT the same building, is a
+    # collapse — distinct named places cannot really share one 250 m disc with no
+    # reference (cloud tour 532: Ben Thanh and the Opera House ~150 m apart, ~700 m
+    # off, neither snapped). A stop is cluster-collapsed when it has ≥1 OTHER
+    # unsnapped, non-same-building, differently-named neighbour inside the radius.
+    # Same-building neighbours (two stalls in one market) and user pins are NOT a
+    # collapse. Uses the ORIGINAL shipped positions so the signal is read before
+    # any stop moved. For the CLUSTER test we require NO reference at all: a stop
+    # that WAS within threshold of a real reference (snapped False only because it
+    # was already close enough) is well-placed and must never be cleared — only
+    # reference-less stops are collapse candidates.
+    _noref_set = {i for i in _unsnapped
+                  if _row_for(i).get("reference") is None}
+
+    def _diff_names(ia: int, ib: int) -> bool:
+        na = _name_distinctive_tokens(poi_list[ia].get("name", ""))
+        nb = _name_distinctive_tokens(poi_list[ib].get("name", ""))
+        # Different when neither distinctive core is a subset of the other. When
+        # one has NO distinctive token (all generic class words), treat equal
+        # folded names as same and anything else as different.
+        if na and nb:
+            return not (na <= nb or nb <= na)
+        import re as _re2
+        fa = " ".join(sorted(_re2.findall(r"\w+",
+                      (poi_list[ia].get("name", "") or "").lower())))
+        fb = " ".join(sorted(_re2.findall(r"\w+",
+                      (poi_list[ib].get("name", "") or "").lower())))
+        return fa != fb
+
+    def _clustered(idx: int) -> bool:
+        a = coords_all[idx]
+        if not a or idx not in _noref_set:
+            return False
+        for j in _noref_set:
+            if j == idx:
+                continue
+            b = coords_all[j]
+            if not b:
+                continue
+            if _haversine_m(a, b) > _CLUSTER_COLLAPSE_M:
+                continue
+            if _same_building_pair(idx, j):
+                continue
+            if _diff_names(idx, j):
                 return True
         return False
 
@@ -680,9 +815,18 @@ def snap_poi_coordinates(poi_list: List[Dict],
             poi["_no_coordinate"] = True
             emit(f"[LOCAL-858] no coordinate {title}")
             continue
+        # [LOCAL-858B] A stop that resolved to a real IN-SCOPE reference this pass
+        # is corroborated — it was only left unsnapped because its shipped pin was
+        # already within the threshold of that reference. It is a genuine place,
+        # never a centroid: skip the collapse entirely (so a well-placed stop next
+        # to an unplaceable neighbour is not swept up by the shared/cluster tests).
+        if _row_for(i).get("reference") is not None:
+            continue
+        _cluster_hit = _clustered(i)
         _collapsed = (
             _coord_is_marked_fallback(poi)
             or _shipped_shared(i)
+            or _cluster_hit
             or (city_centroid is not None
                 and _haversine_m(pt, city_centroid) <= _SHARED_FALLBACK_M))
         if _collapsed:
@@ -697,6 +841,12 @@ def snap_poi_coordinates(poi_list: List[Dict],
             _r = _row_for(i)
             if isinstance(_r, dict):
                 _r["centroid_cleared"] = True
+                if _cluster_hit:
+                    _r["cluster_collapsed"] = True
+            if _cluster_hit:
+                emit(f"[LOCAL-858B] cluster collapse {title} — within "
+                     f"{_CLUSTER_COLLAPSE_M:.0f} m of another unsnapped stop with "
+                     f"a different name and no reference; pin cleared")
             emit(f"[LOCAL-858] no coordinate {title}")
 
     return poi_list, rows
