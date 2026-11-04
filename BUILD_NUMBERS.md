@@ -55,7 +55,7 @@ top of +21 on either system."*
 | 88 | iOS | 2.4.40 | `526fee34` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-10-30 14:2x by LEAD (D729): LOCAL-841 pending generations resume on launch/resume (tour finished while backgrounded reaches Listen) | 2026-10-30 |
 | 89 | Android | 2.4.41 | `2532fc1c` (subscribed; APP_TRACK=subscribed) | **built + signed** 2026-10-30 15:40 by GCloud_Storied on the laptop (`C:\adev-wt\aab89\audioura-subscribed-2.4.41+89.aab`, 51.3 MB, sha256 2670bc8f…, upload key B3:AB:E5…3A:64, flutter 3.41.6): LOCAL-841 pending generations resume on launch/resume, LOCAL-830 double-tap guard, plus everything since 86. Play API upload still blocked (play-publisher 403) → Michael uploads by hand to Internal testing, INSTEAD of 86 | 2026-10-30 |
 | 90 | iOS | 2.4.42 | `24671e41` (subscribed; APP_TRACK=subscribed) | **uploaded to TestFlight** 2026-11-03 by LEAD (D729): LOCAL-853 resilient map tiles (disk cache, retry, fallback hosts), iOS notifications Darwin init, my_tours mounted guards | 2026-11-03 |
-| 91 | — | — | — | **NEXT** (reserved for Android 2.4.42 by GCloud_Storied) | — |
+| 91 | Android | 2.4.42 | `24671e41` (subscribed; APP_TRACK=subscribed) | **built + signed** 2026-11-03 08:40 EST by GCloud_Storied on the laptop (`C:\adev-wt\aab91\audioura-subscribed-2.4.42+91.aab`); Play API upload 403 → Michael uploads by hand to Internal | 2026-11-03 | — |
 
 ## Why 20 and 21 differ across platforms
 
@@ -93,3 +93,4 @@ identifiers. Revoke a key at App Store Connect → Users and Access → Integrat
 **Standing warning from Apple, first seen on build 24 (90068):** `MinimumOSVersion` is **13.0**.
 **From Spring 2027 Apple rejects any upload below 15.0.** Raising it drops iPhone 6s/7 and the
 first-gen SE. Not urgent, but it is a hard deadline, not a suggestion.
+| 92 | iOS | 2.4.43 | `4de01c1c` (subscribed; APP_TRACK=subscribed; MAP_TILE_URL=tile-proxy-subscribed run.app) | **uploaded to TestFlight** 2026-11-04 04:40 EST by Storied_Tours on the Mac Mini: map tiles through our own cache server (LOCAL-854/D757) + OSM attribution; everything since 90 | 2026-11-04 |
