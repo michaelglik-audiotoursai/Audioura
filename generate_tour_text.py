@@ -1144,7 +1144,7 @@ def _parse_coords(s):
 
 
 def _city_center_for_request(location, scope="", intent=None):
-    """[LOCAL-858] Geocode a RELIABLE city centre for a walking request.
+    """[LOCAL-858/858B] Geocode a RELIABLE city centre for a walking request.
 
     The scope-sanity / identity guards (pin_snap off-scope bound, the Wikidata
     landmark lookup's metro-radius test) need a city centre. The obvious strings
@@ -1155,42 +1155,98 @@ def _city_center_for_request(location, scope="", intent=None):
     the live Hanoi run snapped "St. Joseph's Cathedral" to the cathedral in
     BAGHDAD (6,144 km away). The fix: fall back to the CITY component.
 
-    Tries, in order: the resolved scope, the location hint, the full location,
-    the declared geographic_scope, then — crucially — each COMMA-separated tail
-    component of the request/scope ("…, Ho Chi Minh City", "…, Hanoi",
-    "…, Boston"), longest first. Returns (lat, lng) or None. Best-effort,
-    never raises.
+    [LOCAL-858B] NEVER accept a COUNTRY centroid. The cloud tour-532 failure:
+    the LLM's ``geographic_scope`` was "Ben Thanh Market and Saigon Opera House
+    walk" — the city was LOST — so the FIRST candidate (the scope) geocoded to
+    Vietnam's COUNTRY centroid (15.93,107.97), and that was returned and trusted
+    as the centre (area_resolver logged "Could not resolve city"; the centroid
+    guard cleared 0 pins; the 858 landmark lookup was skipped silently). Each
+    candidate is now geocoded with ``geocode_detailed`` and REJECTED when it is a
+    country / state / region centroid (``is_city_like``). The ORIGINAL request's
+    comma tail ("…, Ho Chi Minh City") is tried BEFORE the city-less scope, so the
+    real city is found even when the scope dropped it.
+
+    Tries, in order: the ORIGINAL request's comma tails (city-first), the resolved
+    scope, the location hint, the full location, the declared geographic_scope,
+    then the scope's own comma tails — each rejected if it resolves to a country/
+    state centroid. Returns (lat, lng) or None. Best-effort, never raises.
     """
     try:
-        from geocode_stops import geocode as _gc, location_hint as _lh
+        from geocode_stops import (geocode as _gc, location_hint as _lh,
+                                    geocode_detailed as _gcd,
+                                    is_city_like as _city_like)
     except Exception:
         return None
+
+    def _comma_tails(src):
+        """City-first comma tails of ``src``: the trailing component (the city)
+        first, then progressively longer tails, plus a '…walk/tour'-stripped
+        variant. The LAST comma component of a request is the city."""
+        out = []
+        if not src:
+            return out
+        parts = [p.strip() for p in str(src).split(",") if p.strip()]
+        if not parts:
+            return out
+        # The city is the LAST component — try it first.
+        for k in range(len(parts) - 1, -1, -1):
+            tail = ", ".join(parts[k:]).strip()
+            tail2 = re.sub(r'^.*\b(walk|tour)\b[\s,]*', '', tail,
+                           flags=re.IGNORECASE).strip(" ,")
+            for t in (parts[k], tail, tail2):
+                if t and t not in out:
+                    out.append(t)
+        return out
+
+    # ORDER MATTERS. The original request's city tail comes FIRST, so a scope that
+    # lost the city (tour 532) never shadows the real city.
     cands = []
+    for c in _comma_tails(location):
+        if c not in cands:
+            cands.append(c)
     for c in (scope, _lh(location) if _lh else None, location,
               (intent.get('geographic_scope') if isinstance(intent, dict) else None)):
         if c and c not in cands:
             cands.append(c)
-    # Comma tails of the request and scope — the city is the trailing component.
-    for src in (location, scope):
-        if not src:
+    for c in _comma_tails(scope):
+        if c not in cands:
+            cands.append(c)
+
+    # First pass: accept only a CITY-LIKE detailed hit (rejects country/state
+    # centroids). This is the identity guard the whole fix hinges on.
+    _fallback_any = None
+    for c in cands:
+        try:
+            det = _gcd(c)
+        except Exception:
+            det = None
+        if not det:
             continue
-        parts = [p.strip() for p in str(src).split(",") if p.strip()]
-        # Prefer the LAST component (the city), then progressively longer tails.
-        for k in range(len(parts)):
-            tail = ", ".join(parts[k:]).strip()
-            # Drop a leading "… walk"/"… tour" qualifier that defeats Nominatim.
-            tail2 = re.sub(r'^.*\b(walk|tour)\b[\s,]*', '', tail,
-                           flags=re.IGNORECASE).strip(" ,")
-            for t in (parts[-1], tail, tail2):
-                if t and t not in cands:
-                    cands.append(t)
+        pt = (det["lat"], det["lng"])
+        if _city_like(det):
+            return pt
+        # Remember the first non-city hit ONLY to decide nothing — we must never
+        # return a country centroid, so it is deliberately not used as a result.
+        if _fallback_any is None:
+            _fallback_any = det
+
+    # Second pass: the plain geocoder (no metadata) for any candidate the detailed
+    # call could not classify — but STILL reject a result that lands on a known
+    # country centroid via a final detailed re-check.
     for c in cands:
         try:
             pt = _gc(c)
         except Exception:
             pt = None
-        if pt:
-            return pt
+        if not pt:
+            continue
+        try:
+            det = _gcd(c)
+        except Exception:
+            det = None
+        if det is not None and not _city_like(det):
+            continue
+        return pt
     return None
 
 
@@ -1226,9 +1282,17 @@ def _establish_landmark_coordinates(poi_list, scope, scope_center=None,
     try:
         from wikidata_landmark_lookup import lookup as _wd_lookup
     except Exception as _imp:
-        emit(f"  [LOCAL-858] landmark lookup unavailable ({_imp}) — "
-             f"coordinates left to the normal geocode path")
+        emit(f"  [LOCAL-858B] landmark lookup skipped: module unavailable "
+             f"({_imp}) — coordinates left to the normal geocode path")
         return 0
+    # [LOCAL-858B] A missing scope CENTRE is the cloud-532 failure mode: with no
+    # centre the lookup's in-scope identity guard cannot run and a same-name place
+    # in another city/country could be trusted. Announce it, loudly, once — but
+    # still RUN (the lookup also honours scope_bbox and its own metro-radius guard
+    # once a bbox is present). Never silent.
+    if scope_center is None and not scope_bbox:
+        emit(f"  [LOCAL-858B] landmark lookup degraded: no scope centre or bbox "
+             f"for scope {scope!r} — resolving by name only (identity guard weak)")
 
     # A stop's current coordinate is a centroid guess when it is missing, marked a
     # fallback, equal to the city centroid, or shared with another stop. Compute
@@ -1283,8 +1347,25 @@ def _establish_landmark_coordinates(poi_list, scope, scope_center=None,
                 name, scope=scope or "", scope_center=scope_center,
                 scope_bbox=list(scope_bbox) if scope_bbox else None,
                 tour_language=tour_language or "en")
-        except Exception:
+        except Exception as _wd_err:
             hit = None
+            emit(f"  [LOCAL-858B] landmark lookup error for {name!r}: {_wd_err}")
+        _src_label = "wikidata_p625"
+        # [LOCAL-858B] SECOND AUTHORITY when Wikidata came back empty (unreachable
+        # from Cloud Run, a 429 that never cleared, or no in-scope P625): Serper
+        # /places by name in the city box, then Nominatim. Never leaves the stop on
+        # its centroid silently — a skip is logged below with its reason.
+        if not hit:
+            try:
+                from landmark_second_authority import lookup_second_authority as _2nd
+                h2 = _2nd(name, scope=scope or "", scope_center=scope_center,
+                          scope_bbox=list(scope_bbox) if scope_bbox else None)
+                if h2:
+                    hit = (h2[0], h2[1], h2[2])
+                    _src_label = h2[2]
+            except Exception as _2nd_err:
+                emit(f"  [LOCAL-858B] second-authority error for {name!r}: "
+                     f"{_2nd_err}")
         if hit:
             lat, lng = float(hit[0]), float(hit[1])
             poi['coordinates'] = f"{lat:.6f}, {lng:.6f}"
@@ -1292,14 +1373,23 @@ def _establish_landmark_coordinates(poi_list, scope, scope_center=None,
                 poi['latitude'] = lat
                 poi['longitude'] = lng
             poi['_landmark_coord'] = True
-            poi['_coord_source'] = hit[2] if len(hit) > 2 else 'wikidata_p625'
+            poi['_coord_source'] = hit[2] if len(hit) > 2 else _src_label
             pts[i] = (lat, lng)
             n_fixed += 1
             emit(f"  [LOCAL-858] landmark pin {name} → {lat:.6f},{lng:.6f} "
                  f"({poi['_coord_source']})")
+        else:
+            # [LOCAL-858B] NEVER skip silently. The stop keeps its (centroid) pin
+            # for now; pin_snap's centroid-collapse guard clears it at packing.
+            emit(f"  [LOCAL-858B] landmark lookup skipped: no in-scope authority "
+                 f"for {name!r} (Wikidata + Serper/Nominatim all empty) — left to "
+                 f"the geocode/pin-snap path")
     if n_fixed:
         emit(f"  [LOCAL-858] established {n_fixed} real landmark coordinate(s) "
              f"before route ordering")
+    else:
+        emit(f"  [LOCAL-858B] established 0 landmark coordinate(s) before route "
+             f"ordering ({len(_to_fix)} centroid/missing stop(s) examined)")
     return n_fixed
 
 
@@ -10216,7 +10306,18 @@ def _user_pin_merge_fields(entry, orig):
         or orig.get('coord_source') in ('user_share_link', 'user_name_lookup')
         or _is_user_stop_title(name))
     coord_kept = bool(is_user_pin and orig_coords)
+    # [LOCAL-858B] A coordinate the early landmark pass ESTABLISHED from an
+    # authority (Wikidata P625 / the second authority) is marked ``_landmark_coord``
+    # on ``orig``. The PHASE-3B model re-guesses a coordinate for every stop and,
+    # for a landmark it cannot place, returns the city centroid again — so taking
+    # the model's value FIRST silently overwrote the real pin the early pass just
+    # set (cloud tour 532: Ben Thanh fell back to ~the HCMC centroid after 3B).
+    # Keep the established authority coordinate verbatim, exactly like a user pin.
+    _landmark_kept = bool(not is_user_pin and orig_coords
+                          and orig.get('_landmark_coord'))
     if coord_kept:
+        coordinates = orig_coords
+    elif _landmark_kept:
         coordinates = orig_coords
     else:
         coordinates = (entry.get('coordinates') or orig_coords or '').strip()
@@ -10225,7 +10326,8 @@ def _user_pin_merge_fields(entry, orig):
     else:
         address = entry.get('address') or orig.get('address') or ''
     return {"is_user_pin": is_user_pin, "coordinates": coordinates,
-            "address": address, "coord_kept": coord_kept}
+            "address": address, "coord_kept": coord_kept,
+            "landmark_kept": _landmark_kept}
 
 
 def _set_current_affairs_context(*, wanted: bool, request: str, tour_category: str):
@@ -18674,6 +18776,15 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             merged['coord_confidence'] = 'resolved'
                             print(f"  [LOCAL-855E] user pin kept {entry['name']!r} "
                                   f"{merged['coordinates']}")
+                    # [LOCAL-858B] Carry the established-landmark provenance so the
+                    # authority pin the early pass set survives the rebuild and
+                    # later steps treat it as resolved, not a model guess.
+                    if _upm.get("landmark_kept") and orig:
+                        merged['_landmark_coord'] = True
+                        if orig.get('_coord_source'):
+                            merged['_coord_source'] = orig.get('_coord_source')
+                        print(f"  [LOCAL-858B] landmark pin kept {entry['name']!r} "
+                              f"{merged['coordinates']} (established before 3B)")
                     # [LOCAL-27] For museum tours: never populate type_specialty,
                     # specific_examples, or operational_details from GPT output.
                     # These will be sourced from corpus data downstream or omitted.
@@ -18718,7 +18829,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             # route through identical points. Best-effort, non-fatal.
             try:
                 import os as _os858
-                _os858.environ.setdefault("LANDMARK_LIVE_LOOKUP", "1")
+                # [LOCAL-858B] setdefault is a NO-OP when the var is present-but-
+                # EMPTY (an inherited ``LANDMARK_LIVE_LOOKUP=`` from the env left it
+                # "" and the live Wikidata lookup stayed OFF on the cloud — the
+                # silent skip this ticket is about). Enable it whenever it is unset
+                # OR empty/falsey, so the early landmark pass actually queries.
+                if str(_os858.environ.get("LANDMARK_LIVE_LOOKUP", "")).strip().lower() \
+                        not in ("1", "true", "yes", "on"):
+                    _os858.environ["LANDMARK_LIVE_LOOKUP"] = "1"
+                    print("  [LOCAL-858B] LANDMARK_LIVE_LOOKUP was unset/empty — "
+                          "enabled for the early landmark pass")
                 _scope_858 = ""
                 try:
                     _scope_858 = _scope_from_request(location, intent) or location
@@ -29225,7 +29345,12 @@ REWRITE RULES (all mandatory):
         # (identity guard). Best-effort: a failure leaves bbox None and the lookup
         # falls back to the metro-radius test around the scope centre.
         import os as _os803
-        _os803.environ.setdefault("LANDMARK_LIVE_LOOKUP", "1")
+        # [LOCAL-858B] As above: enable when unset OR empty/falsey, so an inherited
+        # empty env var cannot leave the LIVE Wikidata + second-authority lookup off
+        # at pin-snap time.
+        if str(_os803.environ.get("LANDMARK_LIVE_LOOKUP", "")).strip().lower() \
+                not in ("1", "true", "yes", "on"):
+            _os803.environ["LANDMARK_LIVE_LOOKUP"] = "1"
         _pin_bbox_803 = None
         try:
             from stop_existence_gate import _geocode_scope_bbox as _gsb803
