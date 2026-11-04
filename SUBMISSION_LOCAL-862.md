@@ -99,3 +99,89 @@ The 855E inputs for Rambutan, Longan and A Star is Born are constructed `/maps/p
 * The narrator sometimes still lists 4 items despite the ≤ 3 rule (An Spa).
 * Results vary run to run: the story search returns different snippets each run, so a stop's specifics move between runs. The floor (Places record) is stable.
 * `Specific Examples` is removed for enriched stops unless reviewers name items. The non-user-stop paths are unchanged.
+
+---
+
+# 862B — D760 layers: connected context + disclosed legend/speculation, never empty
+
+Base `subscribed` 7ab51728, branch `LOCAL-862-user-stop-stories`. `origin/subscribed` merged: already contained, no-op.
+
+## 862B.1 What changed
+* **`user_stop_context.py` (new).** Layer 2, true connected context, from Wikipedia and Serper, each fact tied to something the venue has:
+  * the **name's meaning** when the name is a word: Wikipedia Etymology plus the "hence the name" or "illusion of an eye" sentence (Longan: Chinese lóngyǎn, "dragon eye", Vietnamese *nhãn*; Rambutan: Malay *rambut*, "hair");
+  * a name that is a **work's title** (A Star Is Born: the 1937 film and its remakes);
+  * the **street's** documented story (Wikipedia: Bùi Viện Street, the Backpacker Quarter) and the **district's**, when the address names one;
+  * the **tradition** behind what the venue offers (Vietnamese massage, karaoke, live music), whole sentences out of search snippets, never titles.
+  There is deliberately **no city-level fallback**: a first run padded stops with the city's GDP and airport, which is exactly the unrelated regional history D759 forbids.
+* **Layer 3, disclosed.** A legend from the word's Wikipedia "In culture" section or a snippet that actually tells a story, or an unverified claim ("We couldn't confirm this, but…"): a specific claim (year, "first", legend) resting on one third-party snippet that names the venue, or "the venue may have taken its name from that title".
+* **One definition of "disclosed"**: `has_disclosure()`. The narrator is told the marker is required; `ensure_disclosure()` then adds `A folk tale tells that…` or `We couldn't confirm this, but…` to any layer-3 sentence it left bare, before verification.
+* **Narrator** (`user_stop_enrichment.py`): facts are handed over in three labelled layers; 4–7 sentences, layer 1 → 2 → 3; every layer-2 sentence must contain the venue's name or "the name / the street it sits on / the tradition it belongs to"; never "the venue is a fruit". With no sourced kind the orientation is the deterministic "X is one of the stops you chose". A stop is narrated whenever ANY layer has a specific; the short deterministic stop is now only for all-three-empty.
+* **Verifier** (`user_stop_verify.py`): the prompt knows the layers, and a deterministic `layer_gate()` runs after the model's labels:
+  * a layer-3 sentence **without** a marker is dropped; a marker **without** a layer-3 source line is dropped (a marker never licenses an invention);
+  * a year, "first" or geography that no source line contains is dropped **whether or not it is marked**.
+* **855B scrub** (`user_stop_narration.py`): the always-drop legend and anecdote tiers now exempt a sentence that carries a disclosure marker, or that explains the word in the name. Dates, firsts and geography still drop.
+
+## 862B.2 Tests (offline, `tests/test_local862b_layers.py`, 34 tests)
+Required four:
+* disclosed legend **kept**, the same legend undisclosed **dropped** (scrub tier and gate);
+* name-meaning context **kept**;
+* an invented date for the venue **dropped**, also when the sentence carries a marker.
+
+Plus: a marker without a layer-3 source is dropped; the marker repair; the Longan, Rambutan, street, district and film-title contexts; a context-only stop is narrated, not thin; truncated-snippet trimming.
+`tests/test_local862b_layers.py` + 862 + 855* + 860*: **214 pass**.
+
+## 862B.3 Live — Sophia 7-stop tour, `TASK_BUDGET_ID=LOCAL-862B TASK_BUDGET_USD=0.50`
+Own meter dir (`_local862b_meterlogs`), own process; no live DB, no shared containers (the cost-meter DB write fails to resolve `postgres-2` locally, as designed).
+
+**How it was run, and the limit on it.** One full generation run (`run_local862b_live.py`) cost $0.265 on the ledger. That left $0.235, not enough for a second full run, so the fixes after it were verified by **replaying the enrichment + verification stage** (`run_local862b_replay.py`, ~$0.04 each) on that same generated tour. Generation is unchanged by this work, and enrichment/verification is the only stage that writes user-stop text, so the replay is the same code path, but it is **not** a second end-to-end generation. Spend: ledger $0.265 + replays and probes $0.19 (paid-API log $0.249 total) = **≈ $0.455 of $0.50**.
+
+The first full run (before the fixes below) failed the 4-sentence gate (4 stops at 1–3 sentences) and showed three defects, all fixed:
+* the gate called plain venue sentences "undisclosed legend" (token overlap with a layer-3 line; now counts only words unique to layer 3);
+* the city-fallback padding (removed);
+* a vague "legend of 'Rambutan' involving a kind figure" from a truncated Facebook title (now snippet text only, cut to a whole clause, and it must tell something).
+
+### Final result (`submission_artifacts/local862b/final_tour_7stops.txt`)
+| Stop | Sentences | Layers used |
+|---|---|---|
+| The Crazy street | 5 | venue (Places, snippets), street (Wikipedia Bùi Viện) |
+| Thi Bar Saigon | 6 | venue, street/quarter, scene |
+| Rambutan | 6 | name meaning (Malay *rambut*), "hence the name… hairy", **layer 3 folk tale** |
+| A Star is Born | 4 | name is a film title (1937, remakes), **layer 3 speculation** |
+| Longan | 6 | name meaning (*lóngyǎn*, *nhãn*, eye illusion), **layer 3 legend** |
+| An Spa | 7 | venue (own site), Vietnamese massage tradition |
+| Acoustic Bar | 7 | venue (Places, reviews), live-music scene |
+
+**PASS 1 — no stop under 4 sentences: MET** (min 4, the offline report counts conservatively: it merges two sentences where the splitter does not break after a closing quote).
+
+**PASS 2 — every legend/speculation sentence carries a disclosure: MET.** Every layer-3 sentence, with its marker:
+| Stop | Marker | Sentence |
+|---|---|---|
+| Rambutan | `A folk tale tells` | A folk tale tells that in the Philippines, a man saved a deer from a tiger; the deer turned into a fairy named Rodona who granted him a wish and revealed the tiger was a witch named Matesa. (Wikipedia, Rambutan › In culture) |
+| Rambutan | `A folk tale tells` | A folk tale tells that he chose a child, a girl named Rabona. (same source; the narrator split the tale in two) |
+| A Star is Born | `We couldn't confirm` | We couldn't confirm this, but the venue may have taken its name from that title. |
+| Longan | `A legend tells` | A legend tells of a young highly-skilled man named Longan. (snippet: hanting.delivery "the legend behind longan fruit") |
+
+**PASS 3 — zero undisclosed invented venue facts: MET on the offline check, with caveats.**
+* Every year or "first" in the delivered prose appears in a gathered fact for that stop (0 hits, `truth_report`).
+* No undisclosed legend vocabulary.
+* The 855B always-drop phrase lists on the delivered text: no hit.
+* The verifier dropped 1 sentence (a city nightlife-ranking line on The Crazy street).
+* I read all 7 stops against their fact lists. What I did **not** do is independently re-check each Wikipedia/Serper sentence against its web page.
+
+**Weak spots, honestly:**
+* **Longan's layer-3 line is thin and odd** ("a young highly-skilled man named Longan"). The better Longan tale (a hero who slew a dragon) came back in earlier runs, but the search results vary run to run. The tale shipped is disclosed and sourced; it is not a good story.
+* **Rambutan's tale is Philippine.** Disclosed as such, but the listener may find it far from a Saigon bar. The narrator rule says to say "Vietnamese" only if the source does.
+* **A Star is Born** has no layer 1 at all (Places finds no record at the pin, as in 862). Its four sentences are the film-title context plus one speculation, which is honest but not about the bar.
+* **Thi Bar**: one sentence is garbled ("Along with Phạm Ngũ Lão and Đề Thám Streets, the street it sits on became known as…", the Wikipedia sentence names Đề Thám itself). True in substance, clumsy.
+* Layer 3 appears at only 3 of 7 stops. Four have none because no legend or unconfirmed-claim snippet qualified; they are not padded.
+
+### Rubric (reference only, the truth checks are the gate)
+`tour_rubric_scorer.py --n 7`: 855E **39.29** → 852 **81.7** (as quoted) → 862 **50.00** → 862B **57.14** (base 60.71, structural −3.57).
+
+## 862B.4 Cost
+Per tour added over 862: context gathering costs 1–2 Serper queries per stop (about $0.008 for 7 stops: tradition, legend) plus free Wikipedia calls; narration is one batched call. Enrichment in the replay: $0.038–0.041, verify $0.002 per tour.
+
+## 862B.5 Not done / follow-ups
+* No second full end-to-end generation (budget, above).
+* Ward/district from the pin alone (Nominatim returns post-reform wards such as "Bến Thành", no district). The district story applies only when the address names one, so Acoustic Bar's Ngô Thời Nhiệm is not covered.
+* Legend search is one query per stop; its results vary run to run.

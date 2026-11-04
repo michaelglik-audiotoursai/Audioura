@@ -1,0 +1,877 @@
+{
+  "ran": true,
+  "model": "gpt-4.1-mini",
+  "stops": [
+    {
+      "stop": "The Crazy street",
+      "kind": "business",
+      "specifics": 4,
+      "layers": {
+        "1": 4,
+        "2": 7,
+        "3": 0
+      },
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0,
+        "ctx_serp": 1,
+        "wiki": 4
+      },
+      "serper_cost_usd": 0.005,
+      "sources": [
+        "https://en.wikipedia.org/wiki/B%C3%B9i_Vi%E1%BB%87n_Street",
+        "https://holidaytribe.ai/blog/ho-chi-minh-city-nightlife-guide",
+        "https://us.trip.com/moments/poi-bui-vien-walking-street-129757640/",
+        "https://www.facebook.com/61578316041235/videos/-bui-vien-walking-street-ho-chi-minh-citythis-is-the-most-famous-nightlife-stree/3049299381932011/",
+        "https://www.facebook.com/visitistanbulofficial/posts/bui-vien-walking-street-never-sleepsneon-lights-loud-music-endless-laughter-and-/1223391363251215/",
+        "https://www.klook.com/en-US/destination/p50189611-bui-vien-walking-street/",
+        "https://www.reddit.com/r/VietNam/comments/188v27k/is_there_something_im_missing_about_ho_chi_minh/",
+        "serper_places",
+        "serper_places:cid=17419937820716483494"
+      ],
+      "facts": [
+        [
+          "F1",
+          "category",
+          "Google Maps lists The Crazy street as: Tourist attraction.",
+          "serper_places:cid=17419937820716483494",
+          1
+        ],
+        [
+          "F2",
+          "rating",
+          "Google reviewers give it 4.4 out of 5 from about 28,000 reviews.",
+          "serper_places",
+          1
+        ],
+        [
+          "F3",
+          "story",
+          "A different taste of vietnam. The Bui Vien walking street in Ho Chi Minh City was a very different experience. ... Founded in 2014, they opened their first ...",
+          "https://us.trip.com/moments/poi-bui-vien-walking-street-129757640/",
+          1
+        ],
+        [
+          "F4",
+          "story",
+          "Immerse yourself in the vibrant and bustling atmosphere of Bui Vien Walking Street in Ho Chi Minh City, known as the 'Western Street' and 'Backpacker ...",
+          "https://www.klook.com/en-US/destination/p50189611-bui-vien-walking-street/",
+          1
+        ],
+        [
+          "F5",
+          "story",
+          "This travel vlog showcases Bùi Viện Walking Street in Ho Chi Minh City, Vietnam, labeling it as the 'craziest street in Vietnam.' The video ...",
+          "https://www.facebook.com/visitistanbulofficial/posts/bui-vien-walking-street-never-sleepsneon-lights-loud-music-endless-laughter-and-/1223391363251215/",
+          1
+        ],
+        [
+          "F6",
+          "street",
+          "Bùi Viện Street is a small street in Bến Thành, Ho Chi Minh City.",
+          "https://en.wikipedia.org/wiki/B%C3%B9i_Vi%E1%BB%87n_Street",
+          2
+        ],
+        [
+          "F7",
+          "street",
+          "This is the city's famous nightlife street with many small bars and beer gardens, specializing in affordable tourist goods and services.",
+          "https://en.wikipedia.org/wiki/B%C3%B9i_Vi%E1%BB%87n_Street",
+          2
+        ],
+        [
+          "F8",
+          "street",
+          "Before 1949, this was the trail of Tân Hòa village.",
+          "https://en.wikipedia.org/wiki/B%C3%B9i_Vi%E1%BB%87n_Street",
+          2
+        ],
+        [
+          "F9",
+          "street",
+          "In 1950, the State of Vietnam named it as Bảo Hộ Thoại Street.",
+          "https://en.wikipedia.org/wiki/B%C3%B9i_Vi%E1%BB%87n_Street",
+          2
+        ],
+        [
+          "F10",
+          "tradition",
+          "This video provides a travel guide to the nightlife scene on Bui Vien Walking Street in Ho Chi Minh City, Vietnam.",
+          "https://www.facebook.com/61578316041235/videos/-bui-vien-walking-street-ho-chi-minh-citythis-is-the-most-famous-nightlife-stree/3049299381932011/",
+          2
+        ],
+        [
+          "F11",
+          "tradition",
+          "Discover Ho Chi Minh City nightlife with Bui Vien and Nguyen Hue Walking Street, rooftop bars, clubs, river cruises.",
+          "https://holidaytribe.ai/blog/ho-chi-minh-city-nightlife-guide",
+          2
+        ],
+        [
+          "F12",
+          "tradition",
+          "HCMC has nightlife that almost rivals Bangkok, how it's the second biggest party spot in SEA, it all started to die down at midnight.",
+          "https://www.reddit.com/r/VietNam/comments/188v27k/is_there_something_im_missing_about_ho_chi_minh/",
+          2
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000446,
+      "narration": "The Crazy street is a tourist attraction in Ho Chi Minh City known as Bui Vien Walking Street. The Crazy street is listed as a tourist attraction with a 4.4 out of 5 rating from about 28,000 Google reviews. It offers a different taste of Vietnam and is known for its vibrant and bustling atmosphere. The street is also called the 'Western Street' and 'Backpacker Street.' Bui Vien Street is a small street in Bến Thành, Ho Chi Minh City, famous for its nightlife with many small bars and beer gardens specializing in affordable tourist goods and services. Before 1949, the street was the trail of Tân Hòa village, and in 1950 it was named Bảo Hộ Thoại Street. Ho Chi Minh City's nightlife, including Bui Vien Walking Street, almost rivals Bangkok and is the second biggest party spot in Southeast Asia, though it tends to quiet down after midnight.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F6",
+        "F7",
+        "F8",
+        "F9",
+        "F12"
+      ],
+      "total_cost_usd": 0.005446
+    },
+    {
+      "stop": "Thi Bar Saigon",
+      "kind": "business",
+      "specifics": 4,
+      "layers": {
+        "1": 4,
+        "2": 5,
+        "3": 0
+      },
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0,
+        "ctx_serp": 2,
+        "wiki": 2
+      },
+      "serper_cost_usd": 0.006,
+      "sources": [
+        "https://fr.travelgay.com/editorial/a-gay-guide-to-ho-chi-minh-city",
+        "https://nomadicboys.com/gay-saigon/",
+        "https://wanderlog.com/place/details/1082505/thi-bar-saigon",
+        "https://www.agoda.com/chez-mimosa-corner-h64089339/hotel/ho-chi-minh-city-vn.html",
+        "https://www.facebook.com/pridedrives/videos/gay-bars-in-vietnamhanoisaigon-ho-chi-minh-citybook-our-saigon-gay-spa-and-bar-t/1011770606767274/",
+        "https://www.facebook.com/saigonstylehostel/posts/-the-story-behind-saigons-famous-bui-vien-streettoday-b%C3%B9i-vi%E1%BB%87n-is-famous-for-its/1048201678292329/",
+        "https://www.instagram.com/thibarsaigon/?hl=en",
+        "https://www.tripadvisor.com/ShowUserReviews-g293925-d8432743-r566577648-Thi_Bar-Ho_Chi_Minh_City.html",
+        "serper_places",
+        "serper_places:cid=14207409389953159742"
+      ],
+      "facts": [
+        [
+          "F1",
+          "category",
+          "Google Maps lists Thi Bar Saigon as: Gay bar.",
+          "serper_places:cid=14207409389953159742",
+          1
+        ],
+        [
+          "F2",
+          "address",
+          "Its address is 224 Đề Thám.",
+          "serper_places:cid=14207409389953159742",
+          1
+        ],
+        [
+          "F3",
+          "rating",
+          "Google reviewers give it 4.4 out of 5 from about 1,200 reviews.",
+          "serper_places",
+          1
+        ],
+        [
+          "F4",
+          "story",
+          "FREAK SHOW: FREAK & PROUD THỊ Bar Saigon Friday, June 26th 🎟️ FREE ENTRANCE Be loud. Be fabulous. Be proud. #thibar #PrideMonth #thibarsaigon ...",
+          "https://www.instagram.com/thibarsaigon/?hl=en",
+          1
+        ],
+        [
+          "F5",
+          "story",
+          "Reviewed October 8, 2017 via mobile. SUNDAY NIGHT. THI BAR SAIGON is the best live music Bar whish is located at 224 De Tham Street. District 1. Hochiminh city.",
+          "https://www.tripadvisor.com/ShowUserReviews-g293925-d8432743-r566577648-Thi_Bar-Ho_Chi_Minh_City.html",
+          1
+        ],
+        [
+          "F6",
+          "story",
+          "Thi Bar Saigon is a popular live music venue in Ho Chi Minh City, known for its excellent bands and friendly atmosphere. Visitors praise the quality of the ...",
+          "https://wanderlog.com/place/details/1082505/thi-bar-saigon",
+          1
+        ],
+        [
+          "F7",
+          "street",
+          "Along with Phạm Ngũ Lão and Đề Thám Streets, it soon became known as Saigon's Backpacker District.",
+          "https://www.facebook.com/saigonstylehostel/posts/-the-story-behind-saigons-famous-bui-vien-streettoday-b%C3%B9i-vi%E1%BB%87n-is-famous-for-its/1048201678292329/",
+          2
+        ],
+        [
+          "F8",
+          "street",
+          "90 Đường Đề Thám, District 1, Ho Chi Minh City, Ho Chi Minh, Vietnam, 700000 ; Double Room with Balcony.",
+          "https://www.agoda.com/chez-mimosa-corner-h64089339/hotel/ho-chi-minh-city-vn.html",
+          2
+        ],
+        [
+          "F9",
+          "tradition",
+          "The gay scene of Saigon is constantly changing and evolving; bars/clubs open and close all the time, which we've kept up to date in this guide.",
+          "https://nomadicboys.com/gay-saigon/",
+          2
+        ],
+        [
+          "F10",
+          "tradition",
+          "The gay scene in Ho Chi Minh City is small with only a few venues identifying as strictly LGBT+ spaces, however, the bars and clubs that do are fun.",
+          "https://fr.travelgay.com/editorial/a-gay-guide-to-ho-chi-minh-city",
+          2
+        ],
+        [
+          "F11",
+          "tradition",
+          "Ho Chi Minh City is far superior, highlighting its vibrant and diverse LGBTQ+ friendly nightlife with multiple gay bars, drag shows.",
+          "https://www.facebook.com/pridedrives/videos/gay-bars-in-vietnamhanoisaigon-ho-chi-minh-citybook-our-saigon-gay-spa-and-bar-t/1011770606767274/",
+          2
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000446,
+      "narration": "Thi Bar Saigon is a gay bar located at 224 Đề Thám Street in Ho Chi Minh City. Thi Bar Saigon is listed as a gay bar with a 4.4 out of 5 rating from about 1,200 Google reviews. It is known as a popular live music venue with excellent bands and a friendly atmosphere. The bar is located on Đề Thám Street, which along with Phạm Ngũ Lão and Đề Thám Streets, forms Saigon's Backpacker District. The gay scene in Ho Chi Minh City is small but vibrant, with only a few venues strictly identifying as LGBT+ spaces. The city is recognized for its diverse LGBTQ+ friendly nightlife, including multiple gay bars and drag shows.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F6",
+        "F7",
+        "F9",
+        "F10",
+        "F11"
+      ],
+      "total_cost_usd": 0.006446
+    },
+    {
+      "stop": "Rambutan",
+      "kind": "business",
+      "specifics": 0,
+      "layers": {
+        "1": 0,
+        "2": 3,
+        "3": 1
+      },
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0,
+        "ctx_serp": 0,
+        "wiki": 1
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [
+        "https://en.wikipedia.org/wiki/Rambutan"
+      ],
+      "facts": [
+        [
+          "F1",
+          "name_meaning",
+          "The name rambutan is derived from the Malay word rambut meaning 'hair', for hairy protuberances on the fruits, with the noun-building suffix -an.",
+          "https://en.wikipedia.org/wiki/Rambutan",
+          2
+        ],
+        [
+          "F2",
+          "name_meaning",
+          "As a plain word, \"rambutan\" also names a plant. Rambutan is a medium-sized tropical tree in the family Sapindaceae, and the edible fruit of this tree.",
+          "https://en.wikipedia.org/wiki/Rambutan",
+          2
+        ],
+        [
+          "F3",
+          "name_meaning",
+          "The leathery skin is reddish (rarely orange or yellow) and covered with fleshy pliable spines, hence the name, which means 'hairy'.",
+          "https://en.wikipedia.org/wiki/Rambutan",
+          2
+        ],
+        [
+          "F4",
+          "legend",
+          "In the Philippines, a legend tells how a man saves a deer from a tiger. The deer turns into a fairy, Rodona, who offers him one wish, and tells him the tiger was the witch Matesa. He chooses a child: it is a girl named Rabona.",
+          "https://en.wikipedia.org/wiki/Rambutan",
+          3
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000446,
+      "narration": "Rambutan is a name derived from the Malay word for hair, referring to the fruit's appearance. The name rambutan comes from the Malay word rambut meaning 'hair', referring to the hairy protuberances on the fruit, with the suffix -an. Rambutan also names a medium-sized tropical tree in the Sapindaceae family, as well as its edible fruit. The leathery skin of the fruit is reddish and covered with fleshy pliable spines, which is why the name means 'hairy'. A folk tale tells that in the Philippines, a man saved a deer from a tiger; the deer turned into a fairy named Rodona who granted him a wish and revealed the tiger was a witch named Matesa. He chose a child, a girl named Rabona.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F4"
+      ],
+      "total_cost_usd": 0.004446
+    },
+    {
+      "stop": "A Star is Born",
+      "kind": "business",
+      "specifics": 0,
+      "layers": {
+        "1": 0,
+        "2": 2,
+        "3": 1
+      },
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0,
+        "ctx_serp": 0,
+        "wiki": 1
+      },
+      "serper_cost_usd": 0.004,
+      "sources": [
+        "https://en.wikipedia.org/wiki/A_Star_Is_Born"
+      ],
+      "facts": [
+        [
+          "F1",
+          "name_meaning",
+          "The words \"A Star is Born\" are also the title of a film, first made in 1937 and remade several times, most recently in 2018.",
+          "https://en.wikipedia.org/wiki/A_Star_Is_Born",
+          2
+        ],
+        [
+          "F2",
+          "name_meaning",
+          "The remakes starred Judy Garland in 1954, Barbra Streisand in 1976, and Lady Gaga in 2018.",
+          "https://en.wikipedia.org/wiki/A_Star_Is_Born",
+          2
+        ],
+        [
+          "F3",
+          "unconfirmed",
+          "The venue may have taken its name from that title, but no source we found says so.",
+          "https://en.wikipedia.org/wiki/A_Star_Is_Born",
+          3
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000446,
+      "narration": "A Star is Born is a name associated with a famous film title, not a venue type or location. The words \"A Star is Born\" are also the title of a film first made in 1937 and remade several times, most recently in 2018. The remakes starred Judy Garland in 1954, Barbra Streisand in 1976, and Lady Gaga in 2018. We couldn't confirm this, but the venue may have taken its name from that title.",
+      "used": [
+        "F1",
+        "F2",
+        "F3"
+      ],
+      "total_cost_usd": 0.004446
+    },
+    {
+      "stop": "Longan",
+      "kind": "business",
+      "specifics": 0,
+      "layers": {
+        "1": 0,
+        "2": 5,
+        "3": 1
+      },
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0,
+        "ctx_serp": 1,
+        "wiki": 1
+      },
+      "serper_cost_usd": 0.005,
+      "sources": [
+        "https://en.wikipedia.org/wiki/Longan",
+        "https://hanting.delivery/2020/09/the-legend-behind-longan-fruit/"
+      ],
+      "facts": [
+        [
+          "F1",
+          "name_meaning",
+          "The Chinese characters together literally mean \"dragon eye\".",
+          "https://en.wikipedia.org/wiki/Longan",
+          2
+        ],
+        [
+          "F2",
+          "name_meaning",
+          "It is named this way as the black seed within the fruit is said to resemble the eyeball of a Loong.",
+          "https://en.wikipedia.org/wiki/Longan",
+          2
+        ],
+        [
+          "F3",
+          "name_meaning",
+          "In Vietnamese, it is often called nhãn, which is a Sino-Vietnamese word derived from the Chinese character (“eye”), but typically dropping the Loong (\"dragon\") part in everyday usage.",
+          "https://en.wikipedia.org/wiki/Longan",
+          2
+        ],
+        [
+          "F4",
+          "name_meaning",
+          "As a plain word, \"longan\" also names a plant. Longan, also called lungan or dragon's eye, is a tropical tree species that produces edible fruit.",
+          "https://en.wikipedia.org/wiki/Longan",
+          2
+        ],
+        [
+          "F5",
+          "name_meaning",
+          "The flesh is translucent, and the seed is large and black with a circular white spot at the base. This gives the illusion of an eye.",
+          "https://en.wikipedia.org/wiki/Longan",
+          2
+        ],
+        [
+          "F6",
+          "legend",
+          "there was a young highly-skilled man, named – you guessed it – Longan.",
+          "https://hanting.delivery/2020/09/the-legend-behind-longan-fruit/",
+          3
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000446,
+      "narration": "Longan is a name referring to a tropical fruit and tree, not a venue type or location. The Chinese characters for Longan literally mean \"dragon eye.\" The name comes from the black seed inside the fruit, which is said to resemble the eyeball of a Loong, or dragon. In Vietnamese, the fruit is often called nhãn, a Sino-Vietnamese word derived from the Chinese character for \"eye,\" typically dropping the dragon part in everyday use. Longan also names a tropical tree species that produces edible fruit. The flesh of the fruit is translucent, and the seed is large and black with a circular white spot at the base, giving the illusion of an eye. A legend tells of a young highly-skilled man named Longan.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6"
+      ],
+      "total_cost_usd": 0.005446
+    },
+    {
+      "stop": "An Spa",
+      "kind": "business",
+      "specifics": 7,
+      "layers": {
+        "1": 7,
+        "2": 3,
+        "3": 0
+      },
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 2,
+        "ctx_serp": 2,
+        "wiki": 1
+      },
+      "serper_cost_usd": 0.006,
+      "sources": [
+        "https://an-spa.vn/",
+        "https://vietnamdiscovery.com/vietnamese-massage/",
+        "https://www.juliusspa.com/blog/the-ancient-art-of-vietnamese-massage-history-and-benefits/",
+        "https://www.mrlinhadventure.com/en/vietnam/travel-blog/mrlinh-adventures/1358-vietnamese-massage-a-thousandyearold-tradition-of-wellbeing.aspx",
+        "serper_places:cid=15403763612159419680 (brand: own domain an-spa.vn, branch 796 m from pin)"
+      ],
+      "facts": [
+        [
+          "F1",
+          "category",
+          "Google Maps lists An Spa as: Massage spa.",
+          "serper_places:cid=15403763612159419680 (brand: own domain an-spa.vn, branch 796 m from pin)",
+          1
+        ],
+        [
+          "F2",
+          "site",
+          "Where Health & Happiness Return",
+          "https://an-spa.vn/",
+          1
+        ],
+        [
+          "F3",
+          "site",
+          "Vietnamese Traditional Spa & Skincare",
+          "https://an-spa.vn/",
+          1
+        ],
+        [
+          "F4",
+          "site",
+          "Discover our signature wellness treatments",
+          "https://an-spa.vn/",
+          1
+        ],
+        [
+          "F5",
+          "site",
+          "FACIAL LYMPHATIC DRAINAGE MASSAGE FOR PURIFICATION",
+          "https://an-spa.vn/",
+          1
+        ],
+        [
+          "F6",
+          "site",
+          "Makeup removal and cleansing | Lymph node activation | Facial lymphatic drainage massage | Head massage | Relaxing massage for neck-shoulder-nape | Facial steaming, fresh oxygen spray, and serum application (For 90-minute session) | Mask application | Moisturizing | Sunscreen application.",
+          "https://an-spa.vn/",
+          1
+        ],
+        [
+          "F7",
+          "site",
+          "Makeup Removal | Exfoliation | Facial Cleansing | Steaming & Sebum Extraction | Lifting Massage & Facial Acupressure | Fresh Oxygen Spray and Essence Infusion (When using 90' service) | Mask Application & Neck and Shoulder Relaxation Massage | Moisturizing | Sunscreen Application",
+          "https://an-spa.vn/",
+          1
+        ],
+        [
+          "F8",
+          "site",
+          "Press and relax to soften the muscles | Oil swipe | Relaxing massage | Back - neck - shoulder acupressure | Compressing hot stone & Himalayan salt bags | Compressing herbal pillow | Massage & acupressure for hands - legs | Massage & acupressure for head.",
+          "https://an-spa.vn/",
+          1
+        ],
+        [
+          "F9",
+          "tradition",
+          "The practice dates back over 2000 years, when Buddhist monks introduced massage techniques to Vietnam.",
+          "https://www.mrlinhadventure.com/en/vietnam/travel-blog/mrlinh-adventures/1358-vietnamese-massage-a-thousandyearold-tradition-of-wellbeing.aspx",
+          2
+        ],
+        [
+          "F10",
+          "tradition",
+          "Vietnamese massage techniques have been refined over thousands of years, combining elements of Chinese medicine, Thai massage.",
+          "https://www.juliusspa.com/blog/the-ancient-art-of-vietnamese-massage-history-and-benefits/",
+          2
+        ],
+        [
+          "F11",
+          "tradition",
+          "“Tam quat”, the traditional Vietnamese massage, was once mainly performed by the blind.",
+          "https://vietnamdiscovery.com/vietnamese-massage/",
+          2
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000446,
+      "narration": "An Spa is a massage spa in Ho Chi Minh City offering traditional Vietnamese treatments. An Spa is listed as a massage spa promoting health and happiness with Vietnamese traditional spa and skincare treatments. Their signature wellness treatments include facial lymphatic drainage massage for purification, makeup removal and cleansing, lymph node activation, head massage, and relaxing massage for neck, shoulder, and nape. The spa also offers exfoliation, facial cleansing, steaming, sebum extraction, lifting massage, facial acupressure, and moisturizing with sunscreen application. Vietnamese massage techniques have been refined over thousands of years, combining elements of Chinese medicine and Thai massage. The practice dates back over 2000 years when Buddhist monks introduced massage techniques to Vietnam. The traditional Vietnamese massage, called “Tam quat,” was once mainly performed by the blind.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F5",
+        "F6",
+        "F7",
+        "F9",
+        "F10",
+        "F11"
+      ],
+      "total_cost_usd": 0.006446
+    },
+    {
+      "stop": "Acoustic Bar",
+      "kind": "business",
+      "specifics": 4,
+      "layers": {
+        "1": 4,
+        "2": 3,
+        "3": 0
+      },
+      "calls": {
+        "places": 1,
+        "review_search": 1,
+        "story_search": 1,
+        "pages": 0,
+        "ctx_serp": 1,
+        "wiki": 1
+      },
+      "serper_cost_usd": 0.005,
+      "sources": [
+        "https://hivelife.com/acoustic-bar-hits-all-the-right-notes-in-saigon/",
+        "https://signal-chain-2.ghost.io/an-expats-guide-to-the-live-music-scene-in-ho-chi-minh-city/",
+        "https://www.ommmixology.com/post/the-best-bars-with-live-music-in-ho-chi-minh-city-2026",
+        "https://www.tripadvisor.com/Attraction_Review-g293925-d5894992-Reviews-Acoustic-Ho_Chi_Minh_City.html",
+        "https://www.youtube.com/watch?v=rOlctKx3xco",
+        "serper_places",
+        "serper_places:cid=8955316489872957300",
+        "serper_search:reviews"
+      ],
+      "facts": [
+        [
+          "F1",
+          "category",
+          "Google Maps lists Acoustic Bar as: Live music bar.",
+          "serper_places:cid=8955316489872957300",
+          1
+        ],
+        [
+          "F2",
+          "rating",
+          "Google reviewers give it 4.5 out of 5 from about 3,200 reviews.",
+          "serper_places",
+          1
+        ],
+        [
+          "F3",
+          "since",
+          "Review sources say it has been open since 2007.",
+          "serper_search:reviews",
+          1
+        ],
+        [
+          "F4",
+          "story",
+          "Minh, a former musician himself, created Acoustic Bar because he, “wanted to feel the joy of seeing the physical development” of his own passion ...",
+          "https://hivelife.com/acoustic-bar-hits-all-the-right-notes-in-saigon/",
+          1
+        ],
+        [
+          "F5",
+          "story",
+          "Live performance at Acoustic Bar, Ho Chi Minh City, Vietnam. @ScenicViewHKNo ... Guitar Shop Owner Challenged Carlos Santana — What Happened Next Left Everyone ...",
+          "https://www.youtube.com/watch?v=rOlctKx3xco",
+          1
+        ],
+        [
+          "F6",
+          "tradition",
+          "This is one of the legendary spots in Ho Chi Minh City for live music.",
+          "https://signal-chain-2.ghost.io/an-expats-guide-to-the-live-music-scene-in-ho-chi-minh-city/",
+          2
+        ],
+        [
+          "F7",
+          "tradition",
+          "This is a must if you want to hear live music and see how younger Vietnamese spend their evenings.",
+          "https://www.tripadvisor.com/Attraction_Review-g293925-d5894992-Reviews-Acoustic-Ho_Chi_Minh_City.html",
+          2
+        ],
+        [
+          "F8",
+          "tradition",
+          "Ho Chi Minh City's live music bar scene in 2026 offers a diverse range of experiences.",
+          "https://www.ommmixology.com/post/the-best-bars-with-live-music-in-ho-chi-minh-city-2026",
+          2
+        ]
+      ],
+      "mode": "narrated",
+      "llm_cost_usd": 0.000446,
+      "narration": "Acoustic Bar is a live music bar in Ho Chi Minh City. Acoustic Bar is listed as a live music bar with a 4.5 out of 5 rating from about 3,200 Google reviews. It has been open since 2007. The bar was created by Minh, a former musician, who wanted to share the joy of his passion. Acoustic Bar is one of the legendary spots in Ho Chi Minh City for live music. It is a must-visit for those wanting to hear live music and see how younger Vietnamese spend their evenings. The live music bar scene in Ho Chi Minh City offers a diverse range of experiences.",
+      "used": [
+        "F1",
+        "F2",
+        "F3",
+        "F4",
+        "F6",
+        "F7",
+        "F8"
+      ],
+      "total_cost_usd": 0.005446
+    }
+  ],
+  "input_tokens": 2744,
+  "output_tokens": 1264,
+  "llm_cost_usd": 0.00312,
+  "serper_cost_usd": 0.035,
+  "total_cost_usd": 0.03812,
+  "material_by_title": {
+    "Acoustic Bar": [
+      "Google Maps lists Acoustic Bar as: Live music bar.",
+      "Google reviewers give it 4.5 out of 5 from about 3,200 reviews.",
+      "Review sources say it has been open since 2007.",
+      "Minh, a former musician himself, created Acoustic Bar because he, “wanted to feel the joy of seeing the physical development” of his own passion ...",
+      "Live performance at Acoustic Bar, Ho Chi Minh City, Vietnam. @ScenicViewHKNo ... Guitar Shop Owner Challenged Carlos Santana — What Happened Next Left Everyone ...",
+      "[context] This is one of the legendary spots in Ho Chi Minh City for live music.",
+      "[context] This is a must if you want to hear live music and see how younger Vietnamese spend their evenings.",
+      "[context] Ho Chi Minh City's live music bar scene in 2026 offers a diverse range of experiences."
+    ],
+    "An Spa": [
+      "Google Maps lists An Spa as: Massage spa.",
+      "Where Health & Happiness Return",
+      "Vietnamese Traditional Spa & Skincare",
+      "Discover our signature wellness treatments",
+      "FACIAL LYMPHATIC DRAINAGE MASSAGE FOR PURIFICATION",
+      "Makeup removal and cleansing | Lymph node activation | Facial lymphatic drainage massage | Head massage | Relaxing massage for neck-shoulder-nape | Facial steaming, fresh oxygen spray, and serum application (For 90-minute session) | Mask application | Moisturizing | Sunscreen application.",
+      "Makeup Removal | Exfoliation | Facial Cleansing | Steaming & Sebum Extraction | Lifting Massage & Facial Acupressure | Fresh Oxygen Spray and Essence Infusion (When using 90' service) | Mask Application & Neck and Shoulder Relaxation Massage | Moisturizing | Sunscreen Application",
+      "Press and relax to soften the muscles | Oil swipe | Relaxing massage | Back - neck - shoulder acupressure | Compressing hot stone & Himalayan salt bags | Compressing herbal pillow | Massage & acupressure for hands - legs | Massage & acupressure for head.",
+      "[context] The practice dates back over 2000 years, when Buddhist monks introduced massage techniques to Vietnam.",
+      "[context] Vietnamese massage techniques have been refined over thousands of years, combining elements of Chinese medicine, Thai massage.",
+      "[context] “Tam quat”, the traditional Vietnamese massage, was once mainly performed by the blind."
+    ],
+    "Longan": [
+      "[context] The Chinese characters together literally mean \"dragon eye\".",
+      "[context] It is named this way as the black seed within the fruit is said to resemble the eyeball of a Loong.",
+      "[context] In Vietnamese, it is often called nhãn, which is a Sino-Vietnamese word derived from the Chinese character (“eye”), but typically dropping the Loong (\"dragon\") part in everyday usage.",
+      "[context] As a plain word, \"longan\" also names a plant. Longan, also called lungan or dragon's eye, is a tropical tree species that produces edible fruit.",
+      "[context] The flesh is translucent, and the seed is large and black with a circular white spot at the base. This gives the illusion of an eye.",
+      "[legend] there was a young highly-skilled man, named – you guessed it – Longan."
+    ],
+    "A Star is Born": [
+      "[context] The words \"A Star is Born\" are also the title of a film, first made in 1937 and remade several times, most recently in 2018.",
+      "[context] The remakes starred Judy Garland in 1954, Barbra Streisand in 1976, and Lady Gaga in 2018.",
+      "[unconfirmed] The venue may have taken its name from that title, but no source we found says so."
+    ],
+    "Rambutan": [
+      "[context] The name rambutan is derived from the Malay word rambut meaning 'hair', for hairy protuberances on the fruits, with the noun-building suffix -an.",
+      "[context] As a plain word, \"rambutan\" also names a plant. Rambutan is a medium-sized tropical tree in the family Sapindaceae, and the edible fruit of this tree.",
+      "[context] The leathery skin is reddish (rarely orange or yellow) and covered with fleshy pliable spines, hence the name, which means 'hairy'.",
+      "[legend] In the Philippines, a legend tells how a man saves a deer from a tiger. The deer turns into a fairy, Rodona, who offers him one wish, and tells him the tiger was the witch Matesa. He chooses a child: it is a girl named Rabona."
+    ],
+    "Thi Bar Saigon": [
+      "Google Maps lists Thi Bar Saigon as: Gay bar.",
+      "Its address is 224 Đề Thám.",
+      "Google reviewers give it 4.4 out of 5 from about 1,200 reviews.",
+      "FREAK SHOW: FREAK & PROUD THỊ Bar Saigon Friday, June 26th 🎟️ FREE ENTRANCE Be loud. Be fabulous. Be proud. #thibar #PrideMonth #thibarsaigon ...",
+      "Reviewed October 8, 2017 via mobile. SUNDAY NIGHT. THI BAR SAIGON is the best live music Bar whish is located at 224 De Tham Street. District 1. Hochiminh city.",
+      "Thi Bar Saigon is a popular live music venue in Ho Chi Minh City, known for its excellent bands and friendly atmosphere. Visitors praise the quality of the ...",
+      "[context] Along with Phạm Ngũ Lão and Đề Thám Streets, it soon became known as Saigon's Backpacker District.",
+      "[context] 90 Đường Đề Thám, District 1, Ho Chi Minh City, Ho Chi Minh, Vietnam, 700000 ; Double Room with Balcony.",
+      "[context] The gay scene of Saigon is constantly changing and evolving; bars/clubs open and close all the time, which we've kept up to date in this guide.",
+      "[context] The gay scene in Ho Chi Minh City is small with only a few venues identifying as strictly LGBT+ spaces, however, the bars and clubs that do are fun.",
+      "[context] Ho Chi Minh City is far superior, highlighting its vibrant and diverse LGBTQ+ friendly nightlife with multiple gay bars, drag shows."
+    ],
+    "The Crazy street": [
+      "Google Maps lists The Crazy street as: Tourist attraction.",
+      "Google reviewers give it 4.4 out of 5 from about 28,000 reviews.",
+      "A different taste of vietnam. The Bui Vien walking street in Ho Chi Minh City was a very different experience. ... Founded in 2014, they opened their first ...",
+      "Immerse yourself in the vibrant and bustling atmosphere of Bui Vien Walking Street in Ho Chi Minh City, known as the 'Western Street' and 'Backpacker ...",
+      "This travel vlog showcases Bùi Viện Walking Street in Ho Chi Minh City, Vietnam, labeling it as the 'craziest street in Vietnam.' The video ...",
+      "[context] Bùi Viện Street is a small street in Bến Thành, Ho Chi Minh City.",
+      "[context] This is the city's famous nightlife street with many small bars and beer gardens, specializing in affordable tourist goods and services.",
+      "[context] Before 1949, this was the trail of Tân Hòa village.",
+      "[context] In 1950, the State of Vietnam named it as Bảo Hộ Thoại Street.",
+      "[context] This video provides a travel guide to the nightlife scene on Bui Vien Walking Street in Ho Chi Minh City, Vietnam.",
+      "[context] Discover Ho Chi Minh City nightlife with Bui Vien and Nguyen Hue Walking Street, rooftop bars, clubs, river cruises.",
+      "[context] HCMC has nightlife that almost rivals Bangkok, how it's the second biggest party spot in SEA, it all started to die down at midnight."
+    ]
+  },
+  "precomposed": [],
+  "specifics_ge2": 7,
+  "verify": {
+    "ran": true,
+    "dropped_total": 1,
+    "cost_usd": 0.0023,
+    "stops": [
+      {
+        "stop": "The Crazy street",
+        "kept": 5,
+        "dropped": 1,
+        "grounded": false,
+        "snippets": 1,
+        "dropped_sentences": [
+          "Ho Chi Minh City's nightlife, including Bui Vien Walking Street, almost rivals Bangkok and is the second biggest party spot in Southeast Asia, though it tends to quiet down after midnight."
+        ],
+        "labels": {
+          "0": "SUPPORTED",
+          "1": "SUPPORTED",
+          "2": "SUPPORTED",
+          "3": "SUPPORTED",
+          "4": "SUPPORTED",
+          "5": "UNSUPPORTED"
+        }
+      },
+      {
+        "stop": "Thi Bar Saigon",
+        "kept": 6,
+        "dropped": 0,
+        "grounded": false,
+        "snippets": 1,
+        "dropped_sentences": [],
+        "labels": {
+          "0": "SUPPORTED",
+          "1": "SUPPORTED",
+          "2": "SUPPORTED",
+          "3": "SUPPORTED",
+          "4": "SUPPORTED",
+          "5": "SUPPORTED"
+        }
+      },
+      {
+        "stop": "Rambutan",
+        "kept": 6,
+        "dropped": 0,
+        "grounded": false,
+        "snippets": 1,
+        "dropped_sentences": [],
+        "labels": {
+          "0": "SUPPORTED",
+          "1": "SUPPORTED",
+          "2": "SUPPORTED",
+          "3": "SUPPORTED",
+          "4": "SUPPORTED",
+          "5": "SUPPORTED"
+        }
+      },
+      {
+        "stop": "A Star is Born",
+        "kept": 4,
+        "dropped": 0,
+        "grounded": false,
+        "snippets": 1,
+        "dropped_sentences": [],
+        "labels": {
+          "0": "SUPPORTED",
+          "1": "SUPPORTED",
+          "2": "SUPPORTED",
+          "3": "SUPPORTED"
+        }
+      },
+      {
+        "stop": "Longan",
+        "kept": 6,
+        "dropped": 0,
+        "grounded": false,
+        "snippets": 1,
+        "dropped_sentences": [],
+        "labels": {
+          "0": "SUPPORTED",
+          "1": "SUPPORTED",
+          "2": "SUPPORTED",
+          "3": "SUPPORTED",
+          "4": "SUPPORTED",
+          "5": "SUPPORTED"
+        }
+      },
+      {
+        "stop": "An Spa",
+        "kept": 7,
+        "dropped": 0,
+        "grounded": false,
+        "snippets": 1,
+        "dropped_sentences": [],
+        "labels": {
+          "0": "SUPPORTED",
+          "1": "SUPPORTED",
+          "2": "SUPPORTED",
+          "3": "SUPPORTED",
+          "4": "SUPPORTED",
+          "5": "SUPPORTED",
+          "6": "SUPPORTED"
+        }
+      },
+      {
+        "stop": "Acoustic Bar",
+        "kept": 7,
+        "dropped": 0,
+        "grounded": false,
+        "snippets": 1,
+        "dropped_sentences": [],
+        "labels": {
+          "0": "SUPPORTED",
+          "1": "SUPPORTED",
+          "2": "SUPPORTED",
+          "3": "SUPPORTED",
+          "4": "SUPPORTED",
+          "5": "SUPPORTED",
+          "6": "SENSORY"
+        }
+      }
+    ],
+    "serper_queries": 0
+  }
+}
