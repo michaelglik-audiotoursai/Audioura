@@ -76,3 +76,33 @@ def test_conclusion_never_names_absent_artist():
     llm = lambda prompt, key: "Across these Buddhas you encountered the Head of a Buddha, which marked Miró's shift to abstract visual language."
     out = tc.build_conclusion(tour, venue_name="Asian Art Museum", use_llm=True, llm_fn=llm, api_key="x")
     assert "Mir" not in out
+
+
+def test_flagged_person_surname_and_recognition_and_medium_dropped():
+    rec = g.parse_label_block(CROWNED_HTML, "Crowned and bejeweled Buddha image (and throne)")
+    body = ("The medium is a combination of painted panel and embedded ornamental elements. "
+            "The State’s recognition of the statue’s cultural value underscores its importance. "
+            "The museum secured it thanks to Lee’s donation. "
+            "The crown is heavy with jewels.")
+    new, rem, _ = g.filter_stop_body(body, [], [], ["Moon Lee commissioned the"], rec,
+                                     "Crowned and bejeweled Buddha image (and throne)",
+                                     venue_name="Asian Art Museum", stop_snippets=[])
+    assert "medium" not in new and "State" not in new and "Lee" not in new
+    assert "crown is heavy" in new
+
+
+def test_flagged_span_paraphrase_matches():
+    assert g._span_hit("expanded mission since October 2011 Asian American artist",
+                       "The Asian American artist programs reflect the museum's expanded mission, which since October 2011 has grown.")
+
+
+def test_dropped_orientation_replaced_and_leak_identities_dropped():
+    body = ("Address: 200 Larkin St\n\nOrientation: Stand beside the blue stone Amitabha.\n\n"
+            "The crown echoes the Amida Buddha of the Byodo-in temple. The Ly court promoted Buddhism. "
+            "A donor gave it in the 1990s.")
+    new, rem, _ = g.filter_stop_body(body, [], ["Seated crowned and bejeweled Buddha"], [], None,
+                                     "Seated crowned and bejeweled Buddha", venue_name="Asian Art Museum",
+                                     stop_snippets=[])
+    assert "Orientation:" in new
+    for bad in ("blue stone", "Amida", "Byodo", "Ly court"):
+        assert bad not in new

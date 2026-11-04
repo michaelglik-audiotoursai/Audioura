@@ -44,7 +44,7 @@ __all__ = [
     "is_disclosed", "unsourced_sentences", "filter_stop_body",
     "filter_tour_text_claims", "register_rejected_match", "rejected_matches_for",
     "clear_rejected_matches", "foreign_record_snippet", "parse_label_block",
-    "catalog_urls_from_snippets", "catalog_urls_by_search", "lexicon_artists", "scrub_artists_tour", "record_names_stop", "makers_from_venue_works", "maker_bound_to_stop", "foreign_makers", "catalog_statement",
+    "catalog_urls_from_snippets", "catalog_urls_by_search", "lexicon_artists", "scrub_artists_tour", "filter_tour_text_claims_keep_tail", "record_names_stop", "makers_from_venue_works", "maker_bound_to_stop", "foreign_makers", "catalog_statement",
 ]
 
 _STOP_HEADER_RE = re.compile(r"(?mi)^(Stop\s+\d+\s*[:\-][^\n]*)$")
@@ -453,6 +453,9 @@ _NATIONAL_TREASURE_RE = re.compile(r"national\s+treasure", re.I)
 _STONE_CLAIM_RE = re.compile(
     r"\bblue stone\b|\b(?:solid|single|polished|grey|gray|green|white|dark|pale)\s+stone\b|"
     r"\b(?:carved|cut|hewn)\s+(?:in|from|out of)\s+(?:\w+\s+){0,2}stone\b")
+_MEDIUM_STMT_RE = re.compile(
+    r"\b(?:the )?(?:medium|material|materials)\s+(?:is|was|here is)\b|\bmade (?:of|from|with|entirely)\b|"
+    r"\bcrafted (?:of|from|in|with)\b|\bfashioned (?:of|from|in)\b|\bconstructed (?:of|from)\b")
 _MATERIAL_FAMILIES = {
     "stone": ("stone", "sandstone", "limestone", "marble", "schist", "granite", "basalt"),
     "metal": ("bronze", "gilt", "gilded", "gilding", "copper", "brass", "iron"),
@@ -529,6 +532,13 @@ def sentence_contradicts_catalog(sentence: str, catalog: Dict, stop_title: str =
         if said and not (said & cat_c):
             return f"century {sorted(said)} contradicts catalog {sorted(cat_c)}"
     cat_mat = _fold(str(catalog.get("material") or catalog.get("medium") or ""))
+    if cat_mat and _MEDIUM_STMT_RE.search(low):
+        ctoks = {w for w in re.findall(r"[a-z]{4,}", cat_mat)} - {"with", "from", "and"}
+        stoks = set(re.findall(r"[a-z]{4,}", low))
+        # synonyms of a gilt/bronze record
+        if ctoks and not (ctoks & stoks) and not (
+                ("gilding" in ctoks or "gilt" in ctoks) and ({"gilt", "gilded", "gilding", "gold"} & stoks)):
+            return f"material statement shares nothing with catalog '{cat_mat[:40]}'"
     if cat_mat and "stone" not in cat_mat and _STONE_CLAIM_RE.search(low):
         return f"material 'stone' contradicts catalog '{cat_mat[:40]}'"
     if re.search(r"\b(amitabha|amida)\b", low) and not re.search(r"\b(amitabha|amida)\b", blob + " " + _fold(stop_title)):
@@ -639,7 +649,7 @@ _MAKER_RE = re.compile(
 # A different object located at a different named place.
 _ELSEWHERE_RE = re.compile(
     r"\b(?:statue|sculpture|image|painting|figure|work|scroll|screen|stele)\s+"
-    r"(?:\w+\s+){0,3}(?:at|in|of)\s+the\s+(" + _NAME_TOK + r"(?:[\s\-]+" + _NAME_TOK +
+    r"(?:\w+\s+){0,3}(?:at|in|of|from)\s+the\s+(" + _NAME_TOK + r"(?:[\s\-]+" + _NAME_TOK +
     r")*)\s+(?:temple|museum|monastery|shrine|cathedral|church|gallery|palace|collection)\b")
 
 
@@ -821,6 +831,14 @@ _INSTITUTIONAL_CUE_RE = re.compile(
     r"(?:museum|institution)['’]s (?:new|expanded|current)|launched|inaugurat\w+)\b")
 
 
+# identities that leaked across stops in the live Asian Art runs (the Vietnamese
+# Phat Tich Amitabha, the Byodo-in comparison)
+_LEAK_RE = re.compile(r"\bbyodo[\s\-]?in\b|\bphat tich\b|\bly (?:court|dynasty|kings?|rulers?|emperors?|period)\b|\bvietnamese state\b")
+_RECOGNITION_RE = re.compile(
+    r"(?i)\b(?:state|government|ministry|nation)['’]?s?\s+(?:recogni|designat|declar)|"
+    r"\brecogni[sz]\w*\s+(?:of|as)\b[^.]{0,40}\b(?:cultural|national|heritage|treasure)\b")
+
+
 def _span_hit(span: str, sentence: str) -> bool:
     """A flagged claim span is (nearly) in the sentence: contained, or most of
     its content words are (the verifier quotes a paraphrase)."""
@@ -860,12 +878,15 @@ def unsourced_sentences(sentences: Sequence[str], evidence: Iterable[str],
 
     # entities the upstream verifier flagged UNSOURCED -> every sentence naming them
     flagged_names: List[str] = []
+    flagged_surnames: List[str] = []
     flagged_spans = [f for f in flagged if f and f.strip()]
     for f in flagged_spans:
         for m in _NAME_RE.finditer(f):
             toks = [t for t in m.group(1).split() if t not in _NOT_PERSON]
             if len(toks) >= 2 and not _name_sourced(" ".join(toks), blob, known):
                 flagged_names.append(" ".join(toks))
+                if len(_fold(toks[-1])) >= 3:
+                    flagged_surnames.append(_fold(toks[-1]))
     foreign_l = [_fold(x) for x in foreign
                  if x and len(x) > 3 and distinctive_tokens(x)
                  and not (_venue_host_tokens(venue_name) and
@@ -901,6 +922,21 @@ def unsourced_sentences(sentences: Sequence[str], evidence: Iterable[str],
                     foreign_l.append(" ".join(sorted(dt, key=lambda w: _fold(tm.group(0)).find(w))))
                     foreign_l.extend(w for w in dt if len(w) >= 6)
             continue
+        # identity of THIS object (dynasty, which Buddha): only this venue's own
+        # record / the stop title may say it -- a search hit about another
+        # museum's work (the Vietnamese Phat Tich Amitabha) does not.
+        dm = _DYN_RE.search(s)
+        if dm and _fold(dm.group(0)) not in own and _fold(dm.group(1) + " dynasty") not in own \
+                and re.search(r"(?i)\b(this|the|its|statue|sculpture|image|buddha|work)\b", s):
+            drop[i] = f"'{dm.group(0)}' is not in this venue's record for the stop"
+            continue
+        lk = _LEAK_RE.search(low)
+        if lk and lk.group(0) not in own:
+            drop[i] = f"'{lk.group(0)}' is another work's identity, not in this venue's record for the stop"
+            continue
+        if re.search(r"\b(amitabha|amida)\b", low) and not re.search(r"\b(amitabha|amida)\b", own):
+            drop[i] = "names Amitabha/Amida; this venue's record for the stop does not"
+            continue
         if "blue stone" in low and "blue stone" not in own:
             # the Vietnamese Phat Tich Amitabha leaking across stops: only this
             # venue's own record may say a work is blue stone
@@ -935,6 +971,13 @@ def unsourced_sentences(sentences: Sequence[str], evidence: Iterable[str],
         hit = next((n for n in flagged_names if _fold(n) in low), None)
         if hit:
             drop[i] = f"names '{hit}', flagged UNSOURCED"
+            continue
+        hit = next((n for n in flagged_surnames if re.search(r"\b" + re.escape(n) + r"\b", low)), None)
+        if hit:
+            drop[i] = f"names '{hit}' (surname of a person flagged UNSOURCED)"
+            continue
+        if _RECOGNITION_RE.search(s) and not re.search(r"recogni|designat|treasure", blob):
+            drop[i] = "official recognition claim appears in no source for this stop"
             continue
         hit = next((x for x in foreign_l if x in low), None)
         if hit:
@@ -1002,9 +1045,10 @@ def filter_stop_body(body: str, evidence: Iterable[str], known: Iterable[str] = 
                         or "not this venue" in r or "another museum" in r)
                        for r in drops.values())
     if _foreign_hit:
-        own_toks = distinctive_tokens(stop_title) | set(
+        _t_np = re.sub(r"\s*\([^)]*\)", "", stop_title)
+        own_toks = distinctive_tokens(_t_np) | set(
             re.findall(r"[a-z]{5,}", _fold(_catalog_blob(catalog or {}))))
-        own_toks -= {"museum", "collection", "work", "image"}
+        own_toks -= {"museum", "collection", "work", "image", "asian"} | _venue_host_tokens(venue_name)
         # a generic-only title ("Head of a Buddha") is named by any of its words
         _all_generic = {w for w in _norm_title(stop_title).split()
                         if len(w) >= 4 and w not in _STOPWORDS} if not distinctive_tokens(stop_title) else set()
@@ -1050,6 +1094,16 @@ def filter_stop_body(body: str, evidence: Iterable[str], known: Iterable[str] = 
         else:
             out.append(seg)
     new_body = re.sub(r"(\n\s*\n){2,}", "\n\n", "".join(out))
+    # an Orientation that was wholly dropped is replaced by a minimal true one
+    if re.search(r"(?m)^\s*Orientation\s*:", body) and new_body.strip() and \
+            not re.search(r"(?m)^\s*Orientation\s*:", new_body) and stop_title.strip():
+        _bare = re.sub(r"\s*\([^)]*\)", "", stop_title).strip()
+        paras3 = re.split(r"(\n\s*\n)", new_body)
+        for k, seg in enumerate(paras3):
+            if seg.strip() and not re.match(r"\s*(Address|Coordinates|Type|Specific Examples)\s*:", seg):
+                paras3[k] = f"Orientation: Look for {_bare}.\n\n" + seg.lstrip()
+                break
+        new_body = "".join(paras3)
     injected = False
     if catalog and (catalog.get("culture") or catalog.get("date") or catalog.get("period")) \
             and new_body.strip() and not _states_catalog_facts(new_body, catalog):
@@ -1065,6 +1119,17 @@ def filter_stop_body(body: str, evidence: Iterable[str], known: Iterable[str] = 
             new_body = "".join(paras2)
             injected = True
     return new_body, removed, injected
+
+
+def filter_tour_text_claims_keep_tail(tour_text: str, **kw) -> Tuple[str, Dict]:
+    """Run the claim gate on everything BEFORE the trailing conclusion / sources
+    and re-append the tail untouched (used after the conclusion is rebuilt)."""
+    cut = _tail_cut(tour_text)
+    head, tail = tour_text[:cut], tour_text[cut:]
+    new_head, rep = filter_tour_text_claims(head, **kw)
+    if not tail:
+        return new_head, rep
+    return new_head.rstrip("\n") + "\n\n" + tail.lstrip("\n"), rep
 
 
 def filter_tour_text_claims(tour_text: str,

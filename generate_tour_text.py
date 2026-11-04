@@ -32314,6 +32314,12 @@ RULES:
                                   for k in _mc_titles}
             _ctx_864b['snips'] = dict(_mc_snips)
             _ctx_864b['titles'] = dict(_mc_titles)
+            _ctx_864b['kw'] = dict(
+                stop_evidence=_mc_ev, stop_known=_mc_known,
+                stop_flagged=_mc_flag, stop_catalogs=_mc_cat, stop_titles=_mc_titles,
+                stop_own_evidence=_mc_own, stop_artists=_mc_art, stop_makers=_mc_makers,
+                stop_snippets=_mc_snips,
+                venue_name=_museum_venue_name or (location or '').split(',')[0].strip())
             complete_tour, _mc_rep = _mcg2.filter_tour_text_claims(
                 complete_tour, stop_evidence=_mc_ev, stop_known=_mc_known,
                 stop_flagged=_mc_flag, stop_catalogs=_mc_cat, stop_titles=_mc_titles,
@@ -33233,6 +33239,18 @@ RULES:
     if tour_category == 'museum':
         try:
             import museum_claim_gate as _mcg3
+            # The final per-stop editor (LLM copy-edit) and the conclusion rebuild ran
+            # AFTER the claim gate: they dropped the injected catalog statement and
+            # let a blocked sentence back. Re-apply the gate (deterministic, offline)
+            # to the stop bodies, tail untouched.
+            if _ctx_864b.get('kw'):
+                complete_tour, _g2_rep = _mcg3.filter_tour_text_claims_keep_tail(
+                    complete_tour, **_ctx_864b['kw'])
+                print(f"  [LOCAL-864B] post-editor claim gate: dropped {_g2_rep['dropped']} "
+                      f"sentence(s), stated catalog facts on {_g2_rep['injected']} stop(s)")
+                for _r in _g2_rep['removed']:
+                    print(f"    [LOCAL-864B] stop {_r['stop']} DROPPED ({_r['reason']}): "
+                          f"\"{_r['sentence'][:110]}\"")
             complete_tour, _sc_rep = _mcg3.scrub_artists_tour(
                 complete_tour, stop_allow=_ctx_864b.get('allow'),
                 stop_snippets=_ctx_864b.get('snips'), stop_titles=_ctx_864b.get('titles'),
