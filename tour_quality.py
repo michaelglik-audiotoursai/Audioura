@@ -1029,6 +1029,20 @@ _OWN_DEICTIC = re.compile(
     re.I)
 
 
+# [LOCAL-866] A length in metres/feet is a HEIGHT only when nothing in its sentence
+# says it is a TRAVEL DISTANCE. A cycling/walking tour states a distance in every
+# Directions line ("Cycle north for about 1000 meters ...") and again in prose ("It is
+# roughly 100 meters away"). Those are different legs between different pairs of
+# places, not one measured quantity stated twice. The sentinel false positive:
+# LOCAL-862C's Sophia run, Stop 7 -- height_m "100 meters away" vs "1000 meters" ->
+# LOCAL-540 gated, rewrote the stop block and the Coordinates/Type lines were lost.
+_DISTANCE_FRAME = re.compile(
+    r'\b(away|walk(?:ing|ed)?|cycl(?:e|ing|ed)|rid(?:e|ing)|head(?:ing)?|'
+    r'drive|driving|stroll(?:ing)?|distance|reach|continue|follow|turn|'
+    r'from\s+here|from\s+there|Directions)\b', re.I)
+_LENGTH_CLASSES = ('height_m', 'height_ft')
+
+
 def _venue_tokens(text):
     """Meaningful lowercase tokens of the tour's own venue name (from the title)."""
     m = _TOUR_TITLE.search(text or '')
@@ -1135,6 +1149,9 @@ def _find_numeric_conflict(text):
                 continue
             # Event-scoped counts are per-occasion, not a venue total — skip.
             if _EVENT_FRAME.search(sent):
+                continue
+            # [LOCAL-866] a travel distance is not a height.
+            if cls in _LENGTH_CLASSES and _DISTANCE_FRAME.search(sent):
                 continue
             val = float(m.group('num').replace(',', ''))
             scale = (m.group('scale') or '').lower()

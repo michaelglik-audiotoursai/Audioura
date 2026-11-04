@@ -256,7 +256,7 @@ def apply_regenerated_section(text, span, new_section):
 # ── orchestration ────────────────────────────────────────────────────────────
 def score_and_retry(text, requested_stops=None, is_building_tour=False,
                     anchor=None, geocoder=None, verify_attribution=None,
-                    regenerate_section=None, log=print):
+                    regenerate_section=None, log=print, repair_text=None):
     """Score the tour, retry ONCE on a REQUIRED_CLEAN defect, re-score, and return
     a record.
 
@@ -271,6 +271,10 @@ def score_and_retry(text, requested_stops=None, is_building_tour=False,
         ``target`` is one entry from :func:`plan_regeneration`. ``cost`` is a dict
         with at least ``{'total_cost': float, 'total_tokens': int}`` describing what
         that one rewrite cost. If None, no retry is attempted (score-only).
+    repair_text : callable or None
+        ``repair_text(text) -> text``, applied to the spliced tour before the
+        re-score. [LOCAL-866] The caller passes the structural-header restorer so a
+        rewritten stop block cannot lose its Coordinates/Type lines.
     log : callable
         Where to write the log lines the acceptance requires. Defaults to print.
 
@@ -342,6 +346,12 @@ def score_and_retry(text, requested_stops=None, is_building_tour=False,
             if isinstance(cost, dict):
                 retry_cost['total_cost'] += float(cost.get('total_cost', 0.0) or 0.0)
                 retry_cost['total_tokens'] += int(cost.get('total_tokens', 0) or 0)
+
+    if retried and callable(repair_text):
+        try:
+            new_text = repair_text(new_text)
+        except Exception as e:
+            log(f"  [LOCAL-866] header repair failed (non-fatal): {type(e).__name__}: {e}")
 
     after = tq.score_tour(new_text, requested_stops, is_building_tour,
                           anchor, geocoder, verify_attribution)
