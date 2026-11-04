@@ -199,7 +199,7 @@ Continued on `LOCAL-864-museum-claim-gate`, after merging `origin/subscribed` (8
 |---|---|---|---|
 | No "blue stone" / Amitabha / Ly on stops 1–2 | PASS | PASS | **PASS** |
 | No Corot, Miró, Catalan anywhere | PASS | PASS | **PASS** (all three Miró and Corot stops became one honest line) |
-| Both Buddhas carry catalog culture + date | stop 1 PASS, stop 2 date only | **FAIL**: stop 1 had neither (the LLM editor removed the injected statement) | stop 1: "Burmese … approximately 1860 to 1880 … wood and iron, lacquer, gilding, mirrored glass"; stop 2: "dated … 338 … produced in China" — **PASS** |
+| Both Buddhas carry catalog culture + date | PASS (stop 1: Myanmar, 1860–1880; stop 2: China, 338) | **FAIL**: stop 1 had neither (the LLM editor removed the injected statement) | stop 1: "Burmese … approximately 1860 to 1880 … wood and iron, lacquer, gilding, mirrored glass"; stop 2: "dated … 338 … produced in China" — **PASS** |
 | Zero undisclosed UNSOURCED | checker not run | PASS (`check_unsourced_vs_text.py`) | **PASS** — "4 UNSOURCED claims in log; undisclosed in delivered text: 0" |
 
 **What I could NOT do.** The budget was $1.00 and the three Asian runs cost $0.317 + $0.334 + $0.325 = **$0.9765**
