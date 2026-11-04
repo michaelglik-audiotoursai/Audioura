@@ -36,6 +36,7 @@ __all__ = ["lookup_second_authority", "name_matches"]
 _METRO_RADIUS_KM = float(os.environ.get("LANDMARK_METRO_RADIUS_KM", "35.0"))
 # Pad a razor-tight geocoder bbox before the in-scope test (≈2 km), mirroring
 # wikidata_landmark_lookup._BBOX_PAD_DEG.
+_CITY_RADIUS_KM = float(os.environ.get("LANDMARK_CITY_RADIUS_KM", "15.0"))
 _BBOX_PAD_DEG = float(os.environ.get("LANDMARK_BBOX_PAD_DEG", "0.02"))
 
 # A dedicated language tag for second-authority cache rows so they never collide
@@ -98,6 +99,12 @@ def _in_scope(pt: Tuple[float, float],
     """In-scope identity test: inside the (padded) bbox, else within the metro
     radius of the centre. With neither signal, accept (the caller's own pin_snap
     centroid / scope-sanity bounds still apply)."""
+    # [LEAD 858B review] The centre radius ALWAYS applies when a centre is known:
+    # HCMC's administrative bbox spans ~350 km, so "inside the bbox" alone let a
+    # same-name temple 25 km away through (test_local791e Thien Hau). With no
+    # centre and no bbox there is no identity signal at all -> refuse.
+    if scope_center and _haversine_km(pt, scope_center) > _CITY_RADIUS_KM:
+        return False
     if scope_bbox and len(scope_bbox) >= 4:
         try:
             south, north, west, east = (float(scope_bbox[0]), float(scope_bbox[1]),
@@ -107,12 +114,8 @@ def _in_scope(pt: Tuple[float, float],
                 return True
         except (TypeError, ValueError):
             pass
-        if scope_center:
-            return _haversine_km(pt, scope_center) <= _METRO_RADIUS_KM
-        return False
-    if scope_center:
-        return _haversine_km(pt, scope_center) <= _METRO_RADIUS_KM
-    return True
+        return bool(scope_center)
+    return bool(scope_center)
 
 
 def _default_places_fn(name: str, scope: str,

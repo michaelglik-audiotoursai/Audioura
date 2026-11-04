@@ -204,7 +204,16 @@ def _landmark_reference(name: str,
         # Any failure in the live path must not drop the stop — fall through to
         # the second authority / offline table below.
         pass
-    # 1b) [LOCAL-858B] SECOND AUTHORITY. Wikidata returned nothing (unreachable
+    # 1b) Offline curated table (the original HCMC landmarks) — [LEAD 858B review]
+    # consulted BEFORE the live second authority: a curated pin beats a name search.
+    try:
+        from landmark_reference import lookup as _lm_lookup
+        tbl = _lm_lookup(name)
+        if tbl:
+            return (float(tbl[0]), float(tbl[1]), str(tbl[2]))
+    except Exception:
+        pass
+    # 2) [LOCAL-858B] SECOND AUTHORITY. Wikidata returned nothing (unreachable
     # from Cloud Run egress, a 429 that never cleared, or no in-scope P625). Ask
     # Serper /places by name inside the city box, then Nominatim — name-matched
     # and in-scope, cached like P625. An INJECTED landmark_fn (unit tests / offline
@@ -219,14 +228,6 @@ def _landmark_reference(name: str,
                 return (float(hit2[0]), float(hit2[1]), str(hit2[2]))
         except Exception:
             pass
-    # 2) Offline table fallback (the original six HCMC landmarks).
-    try:
-        from landmark_reference import lookup as _lm_lookup
-        tbl = _lm_lookup(name)
-        if tbl:
-            return (float(tbl[0]), float(tbl[1]), str(tbl[2]))
-    except Exception:
-        return None
     return None
 
 
