@@ -15947,6 +15947,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     f"DO NOT include the name of the exhibition/collection itself.\n"
                     f"Each must be a real, named, individual artwork (painting, mosaic, sculpture, stained glass).\n"
                 )
+                # [LOCAL-865] A palace-museum's signature collection is often NOT
+                # paintings (Palais Lascaris: ~500 musical instruments). Asking only
+                # for paintings/sculpture made all 27 candidates miss the instrument
+                # canon. Widen the ask to the objects the venue's own canon names.
+                try:
+                    from palace_museum_stops import is_palace_museum as _ipm865
+                    if _ipm865(_museum_venue_name or '',
+                               (_story_corpus_result or {}).get('combined_text', '')):
+                        _r4_prompt = _r4_prompt.replace(
+                            "Each must be a real, named, individual artwork (painting, mosaic, sculpture, stained glass).\n",
+                            "Each must be a real, named, individual OBJECT on display at THIS venue "
+                            "(artwork, musical instrument, tapestry, piece of period furniture) — "
+                            "never a work from another venue.\n")
+                except Exception:
+                    pass
                 # Add hints from discovered canonical titles (helps GPT propose correct works)
                 if _story_corpus_result and _story_corpus_result.get('canonical_titles'):
                     _hint_titles = sorted(_story_corpus_result['canonical_titles'] - _r4_all_tried_names)[:10]
@@ -16254,6 +16269,41 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                               f"+{len(_fb_stops)}, total now {len(poi_list)}/{total_stops}")
                 except Exception as _fb_err:
                     print(f"  [LOCAL-667 FALLBACK] skipped ({_fb_err})")
+
+            # -------- [LOCAL-865] Palace-museum ROOMS + FEATURES (before any padding) --------
+            # Palais Lascaris: Wikidata holds 1 work, the canon 10 titles, tier is
+            # 'exhibit_museum' -> the thin-only blocks above never ran, R4's 27
+            # candidates all missed the canon and the tour shipped 1/6. A palace
+            # whose collection is thin on Wikidata still has documented ROOMS and
+            # FEATURES (instrument collection, frescoed ceilings, grand staircase,
+            # apothecary, ...). Each ships ONLY when the venue's own site/Wikipedia
+            # pages name it (D756: never another venue's works).
+            if (tour_category == 'museum' and _verification_tier in ('thin', 'exhibit_museum')
+                    and len(poi_list) < total_stops and _story_corpus_result):
+                try:
+                    from palace_museum_stops import detect_feature_stops as _dfs865
+                    _pf_pages = _story_corpus_result.get('pages', []) or []
+                    _pf_combined = _story_corpus_result.get('combined_text', '') or ''
+                    _pf_stops = _dfs865(
+                        _museum_venue_name or location, _pf_pages, _pf_combined,
+                        needed=total_stops - len(poi_list),
+                        exclude_names=[p.get('name', '') for p in poi_list])
+                    for _pf in _pf_stops:
+                        _d1_evidence_log[_pf['name']] = {
+                            "status": "VERIFIED",
+                            "canonical_title": _pf['name'],
+                            "snippet": (_pf.get('_feature_facts') or [''])[0],
+                            "method": "palace_feature",
+                            "sources": _pf.get('_feature_sources', []),
+                        }
+                        poi_list.append(_pf)
+                        print(f"  [LOCAL-865] FEATURE stop '{_pf['name']}' "
+                              f"({', '.join(sorted({s['origin'] for s in _pf['_feature_sources']}))})")
+                    if _pf_stops:
+                        print(f"  [LOCAL-865] palace rooms/features: +{len(_pf_stops)}, "
+                              f"total now {len(poi_list)}/{total_stops}")
+                except Exception as _pf_err:
+                    print(f"  [LOCAL-865] palace features skipped ({_pf_err})")
 
             # -------- [UNIFIED-FILL] Runs AFTER R4 (unverified last-resort padding) --------
             # [LOCAL-19] Moved here from before R4. Now R4 has already had its chance
@@ -19877,11 +19927,38 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         
         # [D4] Museum tours: use single venue coordinate for all interior stops
         if tour_category == 'museum' and _museum_venue_name:
-            _venue_coord = _geocoded_coord if _geocoded_coord else first_poi_coordinates
+            # [LOCAL-865] The venue's OWN Wikidata P625 pin outranks a regex hit in
+            # the corpus and Stop 1's model coordinate (Palais Lascaris: tour lat/lng
+            # 43.7073,7.3054 = Stop 1's offset point, 2.5 km from the 43.6977,7.2773 pin).
+            _resolver_pin_865 = (None, None)
+            try:
+                from venue_resolver import resolve_venue as _rv865
+                _city865 = ''
+                try:
+                    from venue_resolver import city_hint_from_location as _ch865
+                    _city865 = _ch865(location) or ''
+                except Exception:
+                    _city865 = ''
+                if not _city865 and ',' in location:
+                    _city865 = location.split(',')[1].strip()
+                _ent865 = _rv865(_museum_venue_name, _city865)
+                if _ent865 is not None and getattr(_ent865, 'qid', ''):
+                    _resolver_pin_865 = (getattr(_ent865, 'lat', None), getattr(_ent865, 'lng', None))
+            except Exception as _rp_err:
+                print(f"  [LOCAL-865] venue pin resolver skipped ({_rp_err})")
+            from palace_museum_stops import pick_venue_pin as _pvp865
+            _is_known865 = any(k in (_museum_venue_name or '').lower() for k in _KNOWN_VENUE_COORDS)
+            _venue_coord, _pin_src_865 = _pvp865(
+                known=_geocoded_coord if _is_known865 else None,
+                resolver=_resolver_pin_865,
+                corpus=None if _is_known865 else _geocoded_coord,
+                first_stop=first_poi_coordinates)
             if _venue_coord and _venue_coord != (None, None):
                 for p in poi_list:
                     p['coordinates'] = f"{_venue_coord[0]}, {_venue_coord[1]}"
-                _source = "geocoded" if _geocoded_coord else "model (fallback)"
+                # [LOCAL-865] The returned tour-level lat/lng must equal the pin too.
+                first_poi_coordinates = (_venue_coord[0], _venue_coord[1])
+                _source = _pin_src_865
                 print(f"  [D4] Museum single-coordinate: all stops set to {_venue_coord} (source: {_source})")
 
         # [LOCAL-632] Replacement-until-N for a documented museum. A famous museum
@@ -24073,6 +24150,16 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                                   f"leads with verified work '{_lead_name}'{_by}")
                     except Exception as _lw_err:
                         print(f"  [LOCAL-668] lead-work instruction skipped: {_lw_err}")
+
+                    # [LOCAL-865] Palace ROOM / FEATURE stops narrate ONLY their sourced facts.
+                    try:
+                        if isinstance(poi, dict) and poi.get('_feature_facts'):
+                            from palace_museum_stops import feature_narration_instruction as _fni865
+                            description_prompt += _fni865(poi)
+                            print(f"  [LOCAL-865] Stop {stop_num} ({poi.get('_feature_id','')}) "
+                                  f"narrates {len(poi['_feature_facts'])} sourced fact(s) only")
+                    except Exception as _fn_err:
+                        print(f"  [LOCAL-865] feature narration instruction skipped: {_fn_err}")
 
         # [B6] Scored story elements → generation wiring (per-status phrasing)
         # Reads ranked elements from work_stories cache and injects them with
