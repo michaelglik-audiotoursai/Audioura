@@ -1,0 +1,106 @@
+{
+  "venue_from_text": "Isabella Stewart Gardner Museum, Boston, MA",
+  "stops_delivered": 6,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "The Rape of Europa",
+      "d511_story": "y",
+      "story_quote": "Years later, in 1917, the sculptor Paul Manship...sent her a bronze relief of Europa, directly referencing the painting",
+      "sourced_specifics": 4,
+      "specifics_traced": [
+        "Titian, signature TITIANVS.P. (documented)",
+        "acquired with help of Bernard Berenson (documented)",
+        "Manship 1917 bronze relief gift (confirmed)",
+        "purchase price £20,000 via Berenson, 1896 (confirmed, Sartle/Gardner Museum)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 2,
+      "title": "Chez Tortoni",
+      "d511_story": "y",
+      "story_quote": "On the night of March 18, 1990, two thieves disguised as police officers entered the museum and stole thirteen works",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "1990 theft, 13 works, largest private property theft in history, $500M+ value (confirmed)",
+        "$10M reward (confirmed)",
+        "Manet, late-career café scene (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 3,
+      "title": "The Story of Lucretia",
+      "d511_story": "n",
+      "story_quote": "When this painting was purchased, it set a precedent. American museums...began to pursue masterpieces that had long seemed out of reach",
+      "sourced_specifics": 1,
+      "specifics_traced": [
+        "Botticelli, c.1500, tempera/oil on panel, Lucretia legend (documented)"
+      ],
+      "fabrications": [
+        {
+          "claim": "the purchase of this specific painting 'set a precedent' causing American museums broadly to pursue masterpieces",
+          "why": "sweeping unsourced causal claim with no traceable basis"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 4,
+      "title": "A Lady and Gentleman in Black",
+      "d511_story": "y",
+      "story_quote": "X-ray analysis revealed that Rembrandt originally painted a child leaning on the lady's leg, but the child was later painted out",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "X-ray reveals painted-out child (confirmed, Wikipedia)",
+        "acquired via Berenson (documented)",
+        "stolen 1990, not recovered (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 5,
+      "title": "The Concert",
+      "d511_story": "n",
+      "story_quote": "Gardner designed the museum herself to showcase her collection...specified that the galleries should remain unchanged",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Gardner's will required the galleries to remain unchanged (documented)",
+        "Vermeer, c.1664-65, one of 34 known works (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 6,
+      "title": "Landscape with Obelisk",
+      "d511_story": "n",
+      "story_quote": "For many years, it was believed to be a work by Rembrandt himself, and only later was Flinck correctly recognized",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Flinck, 1638, studied under Rembrandt (documented)",
+        "long misattributed to Rembrandt, later reattributed in the 1980s (confirmed, ARTnews)",
+        "54.5x71cm oil on wood (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 3,
+    "fabrication_count": 1,
+    "wrong_venue_count": 0,
+    "sourced_specifics_total": 16
+  },
+  "defects": [
+    "Unsupported sweeping claim about American museums (stop 3)"
+  ],
+  "overall_0_10": 8.0,
+  "one_line_verdict": "Strong, accurate storytelling; one remaining unsourced sweeping claim (stop 3 'set a precedent').",
+  "id": "t9171"
+}

@@ -1,0 +1,112 @@
+{
+  "venue_from_text": "Rijksmuseum, Amsterdam, Netherlands",
+  "stops_delivered": 6,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "Winterlandschap met ijsvermaak",
+      "d511_story": "n",
+      "story_quote": "Avercamp, ambitious and young, looked to the example set by southern Netherlandish artists",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Hendrick Avercamp, c.1608, oil on panel (documented)",
+        "early 20s when painted (roughly consistent with Avercamp's birth year 1585)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 2,
+      "title": "Gezicht op huizen in Delft ('The Little Street')",
+      "d511_story": "y",
+      "story_quote": "Vermeer first painted the door to the house closed, then chose to open it, allowing a shaft of light",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Vermeer, c.1658, oil on canvas (documented)",
+        "underpainting shows the door originally closed (documented technical finding)",
+        "included property of his aunt van der Minne (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 3,
+      "title": "De bedreigde zwaan (The Threatened Swan)",
+      "d511_story": "y",
+      "story_quote": "The decision by the Nationale Kunst-Galerij's founders to select this as their inaugural purchase set the tone",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Jan Asselijn, c.1650, oil on canvas, 144x171cm (documented)",
+        "first purchase of the Nationale Kunst-Galerij, forerunner of the Rijksmuseum (confirmed)",
+        "later read as political allegory re: Johan de Witt (confirmed)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 4,
+      "title": "Het melkmeisje (The Milkmaid)",
+      "d511_story": "n",
+      "story_quote": "By making The Milkmaid a centerpiece of the exhibition, Dibbits underscored how this modest canvas continues to shape the museum's view",
+      "sourced_specifics": 1,
+      "specifics_traced": [
+        "Taco Dibbits is the Rijksmuseum's real director (plausible, true person) though the specific exhibition claim is thin"
+      ],
+      "fabrications": [
+        {
+          "claim": "Dibbits 'made The Milkmaid a centerpiece of the exhibition' as a specific documented act",
+          "why": "vague, unsourced curatorial claim attached to a real name without a traceable event"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 5,
+      "title": "De grote golf bij Kanagawa (The Great Wave)",
+      "d511_story": "y",
+      "story_quote": "Its composition is said to have inspired works like Debussy's La Mer and Rilke's Der Berg",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Hokusai, c.1831, Thirty-six Views of Mount Fuji (documented)",
+        "publisher Nishimuraya Yohachi (documented)",
+        "woodblock printing process with carver/printer collaboration (documented)"
+      ],
+      "fabrications": [
+        {
+          "claim": "'inspired works like Debussy's La Mer and Rilke's Der Berg'",
+          "why": "the Great Wave's influence on Debussy is a widely repeated but disputed/unverified claim, and the Rilke poem connection is not established — stated as settled fact"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 6,
+      "title": "A Militiaman Holding a Berkemeyer ('Merry Drinker')",
+      "d511_story": "n",
+      "story_quote": "Hals, painting in the late 1620s, chose to present the sitter not in stiff formality but alive in the company of others",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Frans Hals, c.1628-1630, oil on canvas 81x66.5cm (documented)",
+        "known as 'Merry Drinker' (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 3,
+    "fabrication_count": 2,
+    "wrong_venue_count": 0,
+    "sourced_specifics_total": 14
+  },
+  "defects": [
+    "Stray sentence about a militiaman opens Stop 1 before the Orientation (misplaced from Stop 6)",
+    "Stop 5 contains a truncated sentence ('This work w.')",
+    "Stop 4 has no concrete body specifics, only a Dibbits name-drop",
+    "Two unverifiable embellishments (Dibbits exhibition claim, Debussy/Rilke influence) stated as fact"
+  ],
+  "overall_0_10": 7.0,
+  "one_line_verdict": "Real, well-documented works and strong story content at 3/6 stops; two unverifiable 'inspired later artists' flourishes.",
+  "id": "t7154"
+}

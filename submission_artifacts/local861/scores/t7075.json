@@ -1,0 +1,105 @@
+{
+  "venue_from_text": "Isabella Stewart Gardner Museum, Boston, MA",
+  "stops_delivered": 6,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "The Rape of Europa",
+      "d511_story": "y",
+      "story_quote": "In 1917, the sculptor Paul Manship sent Gardner a bronze relief inspired by The Rape of Europa",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Titian, oil on canvas, signature TITIANVS.P. (documented)",
+        "Manship 1917 bronze relief gift (confirmed true, Gardner Museum blog/collection page)",
+        "Jupiter as a white bull abducting Europa (documented myth/painting subject)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 2,
+      "title": "Chez Tortoni",
+      "d511_story": "y",
+      "story_quote": "Louis Kronberg purchased Chez Tortoni at auction in Paris in 1922...his acquisition brought this work into the collection",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Kronberg purchased it at the Kélékian auction, 1922, through American artist Louis Kronberg (confirmed, Gardner Museum)",
+        "stolen 1990, never recovered, $10M reward (documented)"
+      ],
+      "fabrications": [
+        {
+          "claim": "Kronberg purchased Chez Tortoni 'at auction in Paris in 1922'",
+          "why": "Gardner Museum provenance: bought at the American Art Association (Kélékian sale), New York, Jan 1922, through Louis Kronberg — not Paris"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 3,
+      "title": "The Story of Lucretia",
+      "d511_story": "y",
+      "story_quote": "a moment that traditionally symbolizes the end of tyranny and the birth of the Roman Republic",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Botticelli, tempera and oil on panel, c.1500 (documented)",
+        "Lucretia legend tied to founding of the Roman Republic (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 4,
+      "title": "A Lady and Gentleman in Black",
+      "d511_story": "y",
+      "story_quote": "On March 18, 1990, an unknown thief entered...and cut A Lady and Gentleman in Black from its stretcher",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Bernard Berenson acquired it for Gardner (documented)",
+        "1990 theft, cut from the stretcher (documented)",
+        "never resurfaced (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 5,
+      "title": "The Concert",
+      "d511_story": "n",
+      "story_quote": "The void recalls the absence of other masterpieces taken during the same heist, such as...The Storm on the Sea of Galilee",
+      "sourced_specifics": 2,
+      "specifics_traced": [
+        "Vermeer, c.1664, one of 34 known works (documented)",
+        "Storm on the Sea of Galilee also stolen in 1990 (documented)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 6,
+      "title": "Landscape with Obelisk",
+      "d511_story": "n",
+      "story_quote": "This painting was once attributed to Rembrandt, reflecting the close stylistic ties and shared workshop",
+      "sourced_specifics": 3,
+      "specifics_traced": [
+        "Govert Flinck, 1638, oil on panel 54.5x71cm (confirmed, Wikipedia/FBI art file)",
+        "long attributed to Rembrandt, later reattributed (confirmed)",
+        "stolen 1990 (confirmed)"
+      ],
+      "fabrications": [],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 4,
+    "fabrication_count": 1,
+    "wrong_venue_count": 0,
+    "sourced_specifics_total": 15
+  },
+  "defects": [
+    "Wrong auction city (Paris vs New York) at stop 2"
+  ],
+  "overall_0_10": 8.0,
+  "one_line_verdict": "Clean, well-sourced, all real works at this venue; one wrong city in a provenance line; strong story content.",
+  "id": "t7075"
+}

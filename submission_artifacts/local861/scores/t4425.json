@@ -1,0 +1,139 @@
+{
+  "venue_from_text": "Asian Art Museum, San Francisco, CA",
+  "stops_delivered": 6,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "Crowned and bejeweled Buddha image",
+      "d511_story": "n",
+      "story_quote": "Ly Dynasty sculptors in the 11th century developed this figure using a refined stone-carving technique",
+      "sourced_specifics": 0,
+      "specifics_traced": [],
+      "fabrications": [
+        {
+          "claim": "the work is a Ly Dynasty (Vietnamese) blue-stone sculpture",
+          "why": "the museum's own catalog describes this object as 19th-century Burmese lacquer/gilt work evoking Burmese temple interiors, not Vietnamese Ly Dynasty stone"
+        },
+        {
+          "claim": "'Art historian Michael Freeman highlighted this statue's role...'",
+          "why": "no such attribution found; appears invented"
+        },
+        {
+          "claim": "'recognized by the Vietnamese State as a national treasure in 2013...following advocacy of scholar Nguyen Van Thuan'",
+          "why": "unverifiable, no source found; looks fabricated, built on a wrong country/dynasty premise"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 2,
+      "title": "Buddha dated 338",
+      "d511_story": "n",
+      "story_quote": "Boris Fridman...donated this statue to the Asian Art Museum",
+      "sourced_specifics": 0,
+      "specifics_traced": [],
+      "fabrications": [
+        {
+          "claim": "the work is blue stone, Ly Dynasty, with a square protrusion that held a halo",
+          "why": "museum catalog: this is the earliest dated Chinese bronze Buddha (338 CE), not Vietnamese Ly Dynasty stone — wrong country, wrong dynasty, wrong material"
+        },
+        {
+          "claim": "Boris Fridman donated it; national treasure since 2013",
+          "why": "unverifiable, inconsistent with the real (Chinese bronze) object; fabricated"
+        },
+        {
+          "claim": "'Louis Broder commissioned limited editions of Buddhist prints...donated alongside sculptures like the Buddha dated 338'",
+          "why": "Broder is a mid-20th-c. Parisian print publisher (Miró, Braque); this entire connection to a 4th-century Chinese Buddha is invented"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 3,
+      "title": "Head of a Buddha",
+      "d511_story": "n",
+      "story_quote": "The Head of a Catalan Peasant, created between 1924 and 1925, is a series...by Joan Miró",
+      "sourced_specifics": 0,
+      "specifics_traced": [],
+      "fabrications": [
+        {
+          "claim": "stop titled 'Head of a Buddha' switches mid-paragraph into describing Miró's 'Head of a Catalan Peasant' as if it were the same stop",
+          "why": "A6 violation: two disjoint, unrelated works (a Gandhara/Buddhist stone head and a 20th-c. Miró painting) are merged into a single stop"
+        }
+      ],
+      "wrong_venue_works": [
+        {
+          "work": "Head of a Catalan Peasant (Miró)",
+          "actually_at": "not a museum object described anywhere as being at the Asian Art Museum; the stop conflates it with a Buddha head"
+        }
+      ]
+    },
+    {
+      "n": 4,
+      "title": "Landscape of the four seasons, one of a pair",
+      "d511_story": "n",
+      "story_quote": "The collector H.O. contributed to increased scholarly appreciation of Corot",
+      "sourced_specifics": 0,
+      "specifics_traced": [],
+      "fabrications": [
+        {
+          "claim": "stop titled as an Asian landscape pair, but the body describes a nude woman 'immersed in the landscape' and namechecks Corot",
+          "why": "content does not match the stop title at all; appears to be bleed from an unrelated Corot work (the other text for this venue names it explicitly as 'Bacchante in a Landscape') — fabricated/garbled identity"
+        }
+      ],
+      "wrong_venue_works": [
+        {
+          "work": "a Corot-attributed Western landscape/nude",
+          "actually_at": "not an Asian Art Museum object; contradicts the stop's own Asian-art title"
+        }
+      ]
+    },
+    {
+      "n": 5,
+      "title": "Seated crowned and bejeweled Buddha",
+      "d511_story": "n",
+      "story_quote": "The Byodo-in's gold-leaf-covered Amida Buddha influenced artistic and devotional practices far beyond Japan",
+      "sourced_specifics": 0,
+      "specifics_traced": [],
+      "fabrications": [
+        {
+          "claim": "'the State formally declared it a national treasure in 2013'",
+          "why": "same unverifiable Vietnamese-national-treasure claim reused from stops 1-2, inconsistent and unsourced"
+        }
+      ],
+      "wrong_venue_works": []
+    },
+    {
+      "n": 6,
+      "title": "Fragment of a Manichaen Mandala",
+      "d511_story": "n",
+      "story_quote": "Scholar Taima published a detailed iconographic analysis of this fragment",
+      "sourced_specifics": 1,
+      "specifics_traced": [
+        "mandala, 1300-1400, mineral/organic pigment on silk (plausible museum-style description)"
+      ],
+      "fabrications": [
+        {
+          "claim": "'Scholar Taima published a detailed iconographic analysis...'",
+          "why": "no such scholar/publication found; looks invented"
+        }
+      ],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 0,
+    "fabrication_count": 10,
+    "wrong_venue_count": 2,
+    "sourced_specifics_total": 1
+  },
+  "defects": [
+    "Systemic dynasty/country fabrication across 3 Buddhist-sculpture stops",
+    "two stops bleed in unrelated Western works (Miró, Corot) under Asian-art titles",
+    "zero D511 stories"
+  ],
+  "overall_0_10": 1.5,
+  "one_line_verdict": "Heavily fabricated: wrong country/dynasty on the core sculptures, invented scholars, and two stops literally describe different artworks than their own titles.",
+  "id": "t4425"
+}

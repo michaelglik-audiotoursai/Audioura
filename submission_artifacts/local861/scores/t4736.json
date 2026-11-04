@@ -1,0 +1,40 @@
+{
+  "venue_from_text": "Palais Lascaris, Nice, France",
+  "stops_delivered": 1,
+  "stops_requested": 6,
+  "stops": [
+    {
+      "n": 1,
+      "title": "Raquel (panneau, fin du XVIe siècle)",
+      "d511_story": "n",
+      "story_quote": "The Vintimille-Lascaris family commissioned the grandeur of their Palais...attached their name and prestige...to the evolving art of their day",
+      "sourced_specifics": 1,
+      "specifics_traced": [
+        "Vintimille-Lascaris family built the palace in the 17th century (documented)"
+      ],
+      "fabrications": [
+        {
+          "claim": "'tempera laid beneath delicate early oil glazes' as the panel's specific technique",
+          "why": "unverifiable technical claim for an object whose own museum documentation says materials/artist are unrecorded (per the other text for this venue and the log)"
+        },
+        {
+          "claim": "'Raquel' described with a specific inner psychology ('self-possession touched with expectancy') as if documented",
+          "why": "invented interior reading presented with confident specificity for an unidentified/undocumented sitter"
+        }
+      ],
+      "wrong_venue_works": []
+    }
+  ],
+  "totals": {
+    "stories": 0,
+    "fabrication_count": 2,
+    "wrong_venue_count": 0,
+    "sourced_specifics_total": 1
+  },
+  "defects": [
+    "Only 1/6 stops (same shortfall as the other text for this venue)"
+  ],
+  "overall_0_10": 3.0,
+  "one_line_verdict": "Same 1/6 shortfall as the other Lascaris text; marginally better prose, still invents specifics for an undocumented work.",
+  "id": "t4736"
+}
