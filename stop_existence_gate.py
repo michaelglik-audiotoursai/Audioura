@@ -3039,32 +3039,8 @@ def _geocode_scope_center(scope: str):
     the next comma segment (the enclosing town/ward/city), so an over-specific or
     unknown leading segment ("Mui Ne beach area, Vietnam") resolves to its town
     ("Mui Ne, Vietnam") instead of returning None → refusal."""
-    _scope = (scope or "").strip()
-    if not _scope:
-        return None
-    for _cand in _scope_fallback_candidates(_scope):
-        params = {
-            "q": _cand,
-            "format": "jsonv2",
-            "limit": "1",
-            "accept-language": "en",
-        }
-        try:
-            resp = _nominatim_request(params, context=f"scope:{_cand}")
-            results = resp.json() or []
-        except RuntimeError:
-            return None
-        if not results:
-            continue
-        try:
-            center = (float(results[0]["lat"]), float(results[0]["lon"]))
-        except (KeyError, ValueError, IndexError, TypeError):
-            continue
-        if _cand != _scope:
-            print(f"  [LOCAL-847] scope centre fallback: {_scope!r} did not "
-                  f"geocode; using enclosing segment {_cand!r}")
-        return center
-    return None
+    hit = _resolve_scope_area(scope, want="center")
+    return hit
 
 
 def _geocode_scope_bbox(scope: str):
@@ -3079,10 +3055,52 @@ def _geocode_scope_bbox(scope: str):
     [LOCAL-847] COMMA-SEGMENT FALLBACK: when the full scope does not geocode, try
     the next comma segment (the enclosing town/ward/city) so the tour still gets a
     true bbox for its area instead of refusing."""
+    return _resolve_scope_area(scope, want="bbox")
+
+
+def _resolve_scope_area(scope: str, want: str):
+    """[LOCAL-863] Shared scope resolver for ``_geocode_scope_center`` (want=
+    'center' → (lat, lng)) and ``_geocode_scope_bbox`` (want='bbox' → Nominatim
+    list [s, n, w, e]).
+
+    Order:
+      1. the scope's most-specific segment IS a curated tour city
+         ("Ho Chi Minh City, Vietnam") → the curated city (offline, exact);
+      2. Nominatim on the full scope, then its comma tails, but NEVER a bare
+         country tail ("Vietnam"), never a country/state-level row, never a row
+         outside the requested country, and, when the candidate is just a city
+         name, never an attraction row (mausoleum/statue/trail);
+      3. a curated city named anywhere in the scope ("Mui Ne beach area,
+         Vietnam" → Mui Ne);
+      4. None, never the whole country (wave 27: bbox = all of Vietnam).
+    Raises nothing."""
+    from city_scope import (curated_is_most_specific, find_curated_city,
+                            is_country_name, is_country_level_hit,
+                            is_attraction_hit, requested_country,
+                            row_ok_for_country, bbox_as_nominatim,
+                            center_is_sane)
     _scope = (scope or "").strip()
     if not _scope:
         return None
+
+    def _out(cur):
+        if want == "center":
+            return (float(cur["lat"]), float(cur["lng"]))
+        return bbox_as_nominatim(cur["bbox"])
+
+    cur = curated_is_most_specific(_scope)
+    if cur:
+        print(f"  [LOCAL-863] scope {_scope!r} → curated city {cur['name']!r} "
+              f"center=({cur['lat']:.4f}, {cur['lng']:.4f})")
+        return _out(cur)
+
+    cc = requested_country(_scope)
+    tag = "scope" if want == "center" else "scope-bbox"
     for _cand in _scope_fallback_candidates(_scope):
+        if is_country_name(_cand):
+            print(f"  [LOCAL-863] scope {want} fallback refused bare country "
+                  f"{_cand!r} for {_scope!r}")
+            continue
         params = {
             "q": _cand,
             "format": "jsonv2",
@@ -3090,19 +3108,55 @@ def _geocode_scope_bbox(scope: str):
             "accept-language": "en",
         }
         try:
-            resp = _nominatim_request(params, context=f"scope-bbox:{_cand}")
+            resp = _nominatim_request(params, context=f"{tag}:{_cand}")
             results = resp.json() or []
         except RuntimeError:
-            return None
-        if not results:
+            results = []
+            break
+        if not results or not isinstance(results[0], dict):
             continue
-        bbox = results[0].get("boundingbox") if isinstance(results[0], dict) else None
-        if not bbox or len(bbox) < 4:
+        row = results[0]
+        if is_country_level_hit(row):
             continue
+        if "lat" in row and "lon" in row and not row_ok_for_country(row, cc):
+            print(f"  [LOCAL-863] scope {want} {_cand!r} rejected: "
+                  f"({row.get('lat')}, {row.get('lon')}) outside {cc!r}")
+            continue
+        # [LOCAL-863] When the scope names a curated tour city, any hit must be
+        # IN that city (≤25 km). Wave 27: a Hồ Chí Minh–named feature near Hanoi
+        # is inside Vietnam, so a country check alone accepts it.
+        if "lat" in row and "lon" in row and not center_is_sane(
+                row.get("lat"), row.get("lon"), _scope):
+            print(f"  [LOCAL-863] scope {want} {_cand!r} rejected: "
+                  f"({row.get('lat')}, {row.get('lon')}) is not in the named city")
+            continue
+        _lead = [p for p in _cand.split(",") if p.strip()]
+        _city_only = len(_lead) == 1 or (len(_lead) == 2
+                                         and is_country_name(_lead[1]))
+        if _city_only and is_attraction_hit(row):
+            print(f"  [LOCAL-863] scope {want} {_cand!r} rejected: attraction "
+                  f"({row.get('category') or row.get('class')}/"
+                  f"{row.get('type')}) is not a city")
+            continue
+        if want == "center":
+            try:
+                val = (float(row["lat"]), float(row["lon"]))
+            except (KeyError, ValueError, TypeError):
+                continue
+        else:
+            val = row.get("boundingbox")
+            if not val or len(val) < 4:
+                continue
         if _cand != _scope:
-            print(f"  [LOCAL-847] scope bbox fallback: {_scope!r} did not "
+            print(f"  [LOCAL-847] scope {want} fallback: {_scope!r} did not "
                   f"geocode; using enclosing segment {_cand!r}")
-        return bbox
+        return val
+
+    cur = find_curated_city(_scope)
+    if cur:
+        print(f"  [LOCAL-863] scope {_scope!r} did not geocode; using curated "
+              f"city {cur['name']!r} (never the whole country)")
+        return _out(cur)
     return None
 
 

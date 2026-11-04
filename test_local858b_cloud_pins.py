@@ -159,8 +159,14 @@ class TestCityCenterNeverCountryCentroid(unittest.TestCase):
                     "type": "administrative", "class": "boundary",
                     "addresstype": "country", "display_name": "Vietnam"}
         center = self._run(_only_country)
-        self.assertIsNone(
-            center, "a country centroid must never be returned as a city centre")
+        # [LOCAL-863] REQ_532 names "Ho Chi Minh City", so the curated city table
+        # now answers offline with the REAL HCMC centre. The invariant this test
+        # guards is unchanged: a COUNTRY centroid is never returned.
+        if center is not None:
+            self.assertGreater(
+                _hav_m(center, VIETNAM_COUNTRY_CENTROID), 100000.0,
+                "a country centroid must never be returned as a city centre")
+            self.assertLessEqual(_hav_m(center, HCMC_CENTER), 5000.0)
 
 
 # ══════════════════════════════ item 3 ══════════════════════════════════════

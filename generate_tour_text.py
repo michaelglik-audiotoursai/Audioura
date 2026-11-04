@@ -1174,9 +1174,35 @@ def _city_center_for_request(location, scope="", intent=None):
     try:
         from geocode_stops import (geocode as _gc, location_hint as _lh,
                                     geocode_detailed as _gcd,
-                                    is_city_like as _city_like)
+                                    is_city_like as _city_like0)
     except Exception:
         return None
+    # [LOCAL-863] The curated tour-city table answers first, offline. Wave 27:
+    # "…Ho Chi Minh City, Vietnam" free-text geocoded to a Hồ Chí Minh–named
+    # feature near HANOI (20.9103, 105.5750).
+    _gs = (intent.get('geographic_scope') if isinstance(intent, dict) else None)
+    try:
+        from city_scope import (find_curated_city as _fcc,
+                                is_attraction_hit as _attr,
+                                center_is_sane as _sane)
+        _cur = _fcc(location, scope, _gs)
+        if _cur:
+            print(f"  [LOCAL-863] city centre {_cur['name']!r} = "
+                  f"({_cur['lat']:.4f}, {_cur['lng']:.4f}) (curated)")
+            return (_cur['lat'], _cur['lng'])
+    except Exception:
+        _attr = lambda _d: False          # noqa: E731
+        _sane = lambda _la, _ln, *_t: True  # noqa: E731
+
+    def _city_like(det):
+        """[LOCAL-863] city-like AND not an attraction AND inside the requested
+        country."""
+        if not _city_like0(det):
+            return False
+        if _attr({"category": det.get("class"), "type": det.get("type"),
+                  "addresstype": det.get("addresstype")}):
+            return False
+        return _sane(det.get("lat"), det.get("lng"), location, scope, _gs)
 
     def _comma_tails(src):
         """City-first comma tails of ``src``: the trailing component (the city)
@@ -1245,6 +1271,8 @@ def _city_center_for_request(location, scope="", intent=None):
         except Exception:
             det = None
         if det is not None and not _city_like(det):
+            continue
+        if det is None and not _sane(pt[0], pt[1], location, scope, _gs):
             continue
         return pt
     return None
@@ -10278,6 +10306,21 @@ def _clean_user_stop_address(address: str) -> str:
     return s
 
 
+_REAL_USER_COORD_SOURCES = ('user_share_link', 'user_share_link_kg',
+                            'user_name_lookup')
+
+
+def _has_real_user_coord(poi) -> bool:
+    """[LOCAL-863] True only when the poi's COORDINATE came from a real user
+    source (share link, share link via KG, or user name lookup). A user stop
+    whose coordinate the model guessed is NOT a user pin; user_explicit /
+    _anchor / a user-stop title say the STOP is the listener's, not that its
+    coordinate is."""
+    if not isinstance(poi, dict):
+        return False
+    return str(poi.get('coord_source') or '').strip().lower() in _REAL_USER_COORD_SOURCES
+
+
 def _user_pin_merge_fields(entry, orig):
     """[LOCAL-855E items 1+2] Decide a user stop's authoritative coordinate and
     address for the PHASE-3B merge, keeping the LISTENER'S own pin and discarding
@@ -10306,12 +10349,16 @@ def _user_pin_merge_fields(entry, orig):
     orig = orig or {}
     orig_coords = (orig.get('coordinates', '') or '').strip()
     name = entry.get('name') or orig.get('name') or ''
-    is_user_pin = bool(
+    # [LOCAL-863] A user STOP (user_explicit / _anchor / user title) is not a
+    # user PIN unless its coordinate came from a real user source. Address
+    # handling below still keys on "is a user stop"; the coordinate is kept
+    # verbatim only for a real user-sourced pin.
+    is_user_stop = bool(
         orig.get('user_explicit') or orig.get('_anchor')
-        or orig.get('coord_source') in ('user_share_link', 'user_share_link_kg',
-                                         'user_name_lookup')
+        or _has_real_user_coord(orig)
         or _is_user_stop_title(name))
-    coord_kept = bool(is_user_pin and orig_coords)
+    is_user_pin = is_user_stop
+    coord_kept = bool(_has_real_user_coord(orig) and orig_coords)
     # [LOCAL-858B] A coordinate the early landmark pass ESTABLISHED from an
     # authority (Wikidata P625 / the second authority) is marked ``_landmark_coord``
     # on ``orig``. The PHASE-3B model re-guesses a coordinate for every stop and,
@@ -18886,10 +18933,23 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         merged['user_explicit'] = True
                         merged['_anchor'] = True
                         if _user_pin_kept:
-                            merged['coord_source'] = 'user_share_link'
+                            # [LOCAL-863] keep the REAL user source (share link,
+                            # KG, or name lookup) rather than relabelling.
+                            merged['coord_source'] = (
+                                str((orig or {}).get('coord_source') or '').strip().lower()
+                                or 'user_share_link')
                             merged['coord_confidence'] = 'resolved'
                             print(f"  [LOCAL-855E] user pin kept {entry['name']!r} "
-                                  f"{merged['coordinates']}")
+                                  f"{merged['coordinates']} "
+                                  f"(source={merged['coord_source']})")
+                        elif merged.get('coordinates'):
+                            # [LOCAL-863] user STOP, model coordinate: not a pin.
+                            # Tagged so pin-snap / lookup treat it as movable and,
+                            # failing a real match, clear + announce it.
+                            merged['coord_source'] = 'model'
+                            print(f"  [LOCAL-863] user stop {entry['name']!r} has a "
+                                  f"MODEL coordinate {merged['coordinates']} — not a "
+                                  f"user pin; will be snapped/looked up")
                     # [LOCAL-858B] Carry the established-landmark provenance so the
                     # authority pin the early pass set survives the rebuild and
                     # later steps treat it as resolved, not a model guess.
@@ -19484,9 +19544,10 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # own @lat,lng is authoritative even if it happens to coincide
                     # with another stop's coordinate; a real cluster of model
                     # guesses is the only thing this refetch exists to fix.
-                    if (p.get('coord_source') == 'user_share_link'
-                            or ((p.get('user_explicit') or p.get('_anchor'))
-                                and _is_user_stop_title(p.get('name')))):
+                    # [LOCAL-863] only a coordinate from a real user source is
+                    # exempt; a model-guessed coordinate on a user stop is
+                    # cleared and refetched like any other.
+                    if _has_real_user_coord(p):
                         print(f"  [LOCAL-855E] user pin kept {p.get('name')!r} "
                               f"{p.get('coordinates')} (not cleared by cluster refetch)")
                         continue
@@ -20529,9 +20590,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         print(f"  [LOCAL-470] reversal check error (non-fatal): {_rev_err}")
                     _gp_anchor = None
                     try:
-                        _gp_anchor = geocode(location_hint(location) or location)
+                        # [LOCAL-863] guarded city centre, not free text.
+                        _gp_anchor = _city_center_for_request(
+                            location, scope=location, intent=intent)
                     except Exception:
-                        pass
+                        _gp_anchor = None
+                    if _gp_anchor is None:
+                        try:
+                            _gpa = geocode(location_hint(location) or location)
+                            from city_scope import center_is_sane as _cis863b
+                            if _gpa and _cis863b(_gpa[0], _gpa[1], location):
+                                _gp_anchor = _gpa
+                        except Exception:
+                            pass
                     _gp_hi = 0
                     # [LOCAL-855E item 1] A user stop's coordinate is the
                     # listener's own @lat,lng — authoritative. resolve_poi may
@@ -20541,10 +20612,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # scattered/collapsed). Skip user pins entirely in the D559
                     # pass; they are already placed by the listener.
                     def _gp_is_user_pin(_p):
-                        return bool(
-                            _p.get('coord_source') == 'user_share_link'
-                            or ((_p.get('user_explicit') or _p.get('_anchor'))
-                                and _is_user_stop_title(_p.get('name'))))
+                        # [LOCAL-863] real user coordinate source only.
+                        return _has_real_user_coord(_p)
                     for _p in poi_list:
                         if _gp_is_user_pin(_p) and _p.get('coordinates'):
                             print(f"  [LOCAL-855E] user pin kept {_p.get('name')!r} "
@@ -29402,10 +29471,26 @@ REWRITE RULES (all mandatory):
         try:
             from geocode_stops import resolve_poi as _sweep_resolve, geocode as _sweep_geocode, \
                 location_hint as _sweep_hint
+            # [LOCAL-863] The anchor (also the pin-snap centre) is the CITY,
+            # resolved by the guarded resolver, not a free-text geocode of the
+            # request. That free-text geocode put HCMC near Hanoi in wave 27.
             try:
-                _sweep_anchor = _sweep_geocode(_sweep_hint(location) or location)
+                _sweep_anchor = _city_center_for_request(
+                    location, scope=_scope_from_request(location, intent) or location,
+                    intent=intent)
             except Exception:
                 _sweep_anchor = None
+            if _sweep_anchor is None:
+                try:
+                    _sa = _sweep_geocode(_sweep_hint(location) or location)
+                    from city_scope import center_is_sane as _cis863
+                    if _sa and _cis863(_sa[0], _sa[1], location):
+                        _sweep_anchor = _sa
+                    elif _sa:
+                        print(f"  [LOCAL-863] sweep anchor {_sa} rejected "
+                              f"(outside the requested country/city)")
+                except Exception:
+                    _sweep_anchor = None
         except ImportError as _sw_imp:
             _import_logger.error(f"[LOCAL-591] geocode_stops unavailable for the "
                                  f"coordinate sweep ({_sw_imp}); using the LLM fetch alone")
@@ -30914,6 +30999,33 @@ RULES:
                 _l292_is_failure = True
                 print(f"  [LOCAL-295] Gate rejected '{_l292_poi['name']}': placeholder ({_l292_detail})")
         if _l292_is_failure:
+            # [LOCAL-863] The empty-stop gate must NEVER remove a stop the
+            # listener chose. Wave 27 dropped "Crazy street" (6/7 delivered).
+            # A user stop with no narration gets the D760 short deterministic
+            # form (name, kind, district, what to notice) and is kept.
+            _l292_is_user = False
+            try:
+                import user_stop_narration as _usn863
+                _l292_is_user = bool(_usn863.is_user_stop(_l292_poi)
+                                     or _is_user_stop_title(_l292_poi.get('name')))
+            except Exception:
+                _l292_is_user = bool(_l292_poi.get('user_explicit')
+                                     or _l292_poi.get('_anchor'))
+            if _l292_is_user:
+                _l292_short = ''
+                try:
+                    _l292_short = _usn863.grounded_user_stop_body(_l292_poi, location)
+                except Exception:
+                    _l292_short = ''
+                if not _l292_short:
+                    _l292_short = (f"{_l292_poi.get('name', 'This stop')} is one of "
+                                   f"the places you chose.")
+                _l292_poi['description'] = _l292_short
+                _l292_poi['_user_stop_short_form'] = True
+                print(f"  [LOCAL-863] user stop KEPT with D760 short form "
+                      f"(no material): {_l292_poi.get('name')!r}")
+                _l292_survivors.append(_l292_poi)
+                continue
             _l292_failed_stops.append(_l292_poi['name'])
         else:
             _l292_survivors.append(_l292_poi)

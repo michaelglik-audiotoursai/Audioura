@@ -63,18 +63,42 @@ _NAV_LABEL_RE = re.compile(
     re.IGNORECASE | re.MULTILINE
 )
 
+_EMOJI_FALLBACK_RE_863 = re.compile(
+    "[\U0001F000-\U0001FAFF\U0001F1E6-\U0001F1FF\u2600-\u27BF\u2B00-\u2BFF"
+    "\u2300-\u23FF\u200D\uFE0E\uFE0F\u20E3\U000E0020-\U000E007F]+")
+
+
+def _tts_strip_emoji(text, where):
+    """[LOCAL-863] Strip emoji from a TTS-bound string, logging when anything is
+    removed. Uses text_polish when importable, else an inline fallback regex,
+    so the strip never silently skips."""
+    if not text:
+        return text
+    try:
+        from text_polish import strip_emoji_for_tts_logged as _sel
+        return _sel(text, where, log=print)
+    except Exception as _imp_err:
+        n = len(_EMOJI_FALLBACK_RE_863.findall(text))
+        if not n:
+            return text
+        print(f"[LOCAL-863] TTS emoji strip at {where} (fallback regex; "
+              f"text_polish unavailable: {_imp_err}): removed {n} emoji run(s)")
+        out = _EMOJI_FALLBACK_RE_863.sub(" ", text)
+        return re.sub(r"[ \t]{2,}", " ", out)
+
+
 def _strip_nav_fields_for_tts(text):
     """Remove structured metadata lines before sending to Polly.
     Keeps: stop name, Orientation, and all narrative paragraphs.
     Strips: Museum Information, Address, Coordinates, Type/Specialty, Specific
     Examples, Operational Details.
     The .txt files are written from the original text and remain unchanged."""
-    # [LOCAL-860 item 4] No emoji/pictographs in anything sent to TTS.
-    try:
-        from text_polish import strip_emoji_for_tts as _se860
-        text = _se860(text)
-    except Exception:
-        pass
+    # [LOCAL-860 item 4 / LOCAL-863] No emoji/pictographs in anything sent to
+    # TTS. LOCAL-863: this is the egress the cloud Subscribed path actually uses
+    # (Subscribed has no polly-tts of its own, so the server-side LOCAL-860 strip
+    # cannot be relied on). Logged, and FAIL-CLOSED: if text_polish cannot be
+    # imported, an inline pictograph regex still strips. It never silently skips.
+    text = _tts_strip_emoji(text, "tour-modernized")
     lines = text.split('\n')
     kept = [l for l in lines if not _NAV_LABEL_RE.match(l)]
     # [LEAD 2026-10-08 / LOCAL-633] "Museum Information:" is now dropped WHOLE above

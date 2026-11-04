@@ -151,6 +151,27 @@ def strip_emoji_for_tts(text: str) -> str:
     return out.strip(" \t")
 
 
+def strip_emoji_for_tts_logged(text: str, where: str, log=print) -> str:
+    """[LOCAL-863] ``strip_emoji_for_tts`` at a TTS egress, with a log line when
+    anything was removed: ``[LOCAL-863] TTS emoji strip at <where>: removed N``.
+
+    Wave 27: 🌈 still reached TTS on the cloud Subscribed path, and the
+    modernized service logged no strip line. Subscribed has no polly-tts of its
+    own, so it calls another line's polly-tts, which may predate the LOCAL-860
+    server-side strip. The CALLER must therefore strip, and say so."""
+    if not text:
+        return text
+    n = len(_EMOJI_RE.findall(text))
+    if not n:
+        return text
+    out = strip_emoji_for_tts(text)
+    try:
+        log(f"[LOCAL-863] TTS emoji strip at {where}: removed {n} emoji run(s)")
+    except Exception:
+        pass
+    return out
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Items 5 + 7 — "A and B walk, City" names two places
 # ─────────────────────────────────────────────────────────────────────────────

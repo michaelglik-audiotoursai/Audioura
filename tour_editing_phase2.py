@@ -98,9 +98,36 @@ def _strip_nav_fields_for_tts(text):
     """Remove structured metadata lines before sending to Polly.
     Keeps: stop name, Orientation, and all narrative paragraphs.
     Strips: Address, Coordinates, Type/Specialty, Specific Examples, Operational Details.
-    The .txt files are written from the original text and remain unchanged."""
+    The .txt files are written from the original text and remain unchanged.
+
+    [LOCAL-863] Also strips emoji/pictographs (logged, fail-closed). The editing
+    service re-voices stops for the cloud Subscribed path, and the polly-tts it
+    calls may predate the LOCAL-860 server-side strip."""
+    text = _tts_strip_emoji(text or "", "tour-editing")
     lines = text.split('\n')
     return '\n'.join(l for l in lines if not _NAV_LABEL_RE.match(l))
+
+
+_EMOJI_FALLBACK_RE_863 = re.compile(
+    "[\U0001F000-\U0001FAFF\U0001F1E6-\U0001F1FF\u2600-\u27BF\u2B00-\u2BFF"
+    "\u2300-\u23FF\u200D\uFE0E\uFE0F\u20E3\U000E0020-\U000E007F]+")
+
+
+def _tts_strip_emoji(text, where):
+    """[LOCAL-863] Logged, fail-closed emoji strip for a TTS-bound string."""
+    if not text:
+        return text
+    try:
+        from text_polish import strip_emoji_for_tts_logged as _sel
+        return _sel(text, where, log=print)
+    except Exception as _imp_err:
+        n = len(_EMOJI_FALLBACK_RE_863.findall(text))
+        if not n:
+            return text
+        print(f"[LOCAL-863] TTS emoji strip at {where} (fallback regex; "
+              f"text_polish unavailable: {_imp_err}): removed {n} emoji run(s)")
+        out = _EMOJI_FALLBACK_RE_863.sub(" ", text)
+        return re.sub(r"[ \t]{2,}", " ", out)
 
 
 # ---------------------------------------------------------------------------
