@@ -1,0 +1,19 @@
+stop 1 'Crowned and bejeweled Buddha image': catalog bound <- 2006.27.17 https://collections.asianart.org/collection/crowned-and-bejeweled-buddha-image/
+stop 2 'Buddha dated 338': catalog bound <- B60B1034 https://collections.asianart.org/collection/buddha-dated-338/
+stop 3 'Head of a Buddha': catalog miss: no record page for 'Head of a Buddha' on asianart.org (12 lookups)
+stop 4 'Landscape of the four seasons, one of a ': catalog miss: no record page for 'Landscape of the four seasons, one of a pair' on asianart.org (20 lookups)
+stop 5 'Seated crowned and bejeweled Buddha': catalog miss: no record page for 'Seated crowned and bejeweled Buddha' on asianart.org (12 lookups)
+ - gate stop 5 'byodo-in' is another work's identity, not in this venue's record for  | The crown and jewels adorning the Buddha signify his enlightened status and royal dignity; these ele
+ - gate stop 5 'ly court' is another work's identity, not in this venue's record for  | The artist who shaped this figure worked within a flourishing era art, likely responding to the spir
+'blue stone': False
+'Amitabha': False
+'Amida': False
+'Ly Dynasty': False
+'Corot': False
+'Miró': False
+'Miro': False
+'Catalan': False
+'Burmese': True
+'1860': True
+'Chinese': True
+'338': True

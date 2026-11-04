@@ -225,8 +225,9 @@ Same two events; the causal link is the whole difference. Every stop already has
 a sequence of facts. Your job is the link between them.
 
 "X was a Catalan artist who worked in Paris" is not a story — it is a label.
-"Broder published the book and had Mourlot pull every sheet by hand, SO the
-artist and the printer worked in the same room" is one: something was done, and
+"[PUBLISHER] published the book and had [PRINTER] pull every sheet by hand, SO
+the artist and the printer worked in the same room" is one (bracketed slots are
+filled only from the material — never a name that is not in it): something was done, and
 something followed BECAUSE of it.
 
 IS IT WORTH TELLING? Before you write, check the change you have found:
