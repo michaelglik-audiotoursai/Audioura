@@ -32908,6 +32908,7 @@ RULES:
     # above and never reaches here — a cached tour is neither re-scored nor
     # re-generated, and still costs $0.00.
     _score_record = None
+    from stop_headers import restore_stop_headers as _restore_stop_headers_866
     try:
         import scorer_retry as _scorer_retry
         # is_building_tour matches the reference caller run_round9.py, which passes
@@ -33006,6 +33007,8 @@ RULES:
             requested_stops=total_stops,
             is_building_tour=_is_building_tour,
             regenerate_section=_local540_regenerate_section,
+            # [LOCAL-866] a rewritten stop block must keep its structural lines.
+            repair_text=lambda _t: _restore_stop_headers_866(_t, poi_list, log=print, clean_address=_clean_user_stop_address),
         )
         # Adopt the (possibly) repaired text so the cache store, file write and
         # everything downstream see the retried tour.
@@ -33081,6 +33084,13 @@ RULES:
     except Exception as _editor_err:
         print(f"  [LOCAL-628] editor pass skipped (non-fatal): "
               f"{type(_editor_err).__name__}: {_editor_err}")
+
+    # [LOCAL-866] Structural stop lines (Address/Coordinates/Type/Specific Examples)
+    # survive the editor pass too.
+    try:
+        complete_tour = _restore_stop_headers_866(complete_tour, poi_list, log=print, clean_address=_clean_user_stop_address)
+    except Exception as _sh_err:
+        print(f"  [LOCAL-866] header restore skipped (non-fatal): {_sh_err}")
 
     # ── [LOCAL-619] THE ONE CONCLUSION, built from the FINAL delivered text ────
     # The critic's #1 blocker on 440/441/442 was the trailing recap STUB
@@ -33505,6 +33515,13 @@ RULES:
         except Exception as _l831_e:
             print(f"  [LOCAL-831] final delivery repair skipped (non-fatal): {_l831_e}",
                   flush=True)
+
+    # [LOCAL-866] Last look before the file is written: every stop still carries
+    # its structural header lines, equal to the poi dict (the map pin).
+    try:
+        complete_tour = _restore_stop_headers_866(complete_tour, poi_list, log=print, clean_address=_clean_user_stop_address)
+    except Exception as _sh_err:
+        print(f"  [LOCAL-866] header restore skipped (non-fatal): {_sh_err}")
 
     # Save to file if output_file is provided
     if not output_file:
