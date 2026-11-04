@@ -1271,6 +1271,7 @@ def _establish_landmark_coordinates(poi_list, scope, scope_center=None,
     _to_fix = [i for i, p in enumerate(poi_list)
                if (p.get('name') or '').strip()
                and p.get('coord_source') not in ('user_share_link',
+                                                  'user_share_link_kg',
                                                   'user_name_lookup')
                and _is_centroid_guess(i, p)]
 
@@ -10213,7 +10214,8 @@ def _user_pin_merge_fields(entry, orig):
     name = entry.get('name') or orig.get('name') or ''
     is_user_pin = bool(
         orig.get('user_explicit') or orig.get('_anchor')
-        or orig.get('coord_source') in ('user_share_link', 'user_name_lookup')
+        or orig.get('coord_source') in ('user_share_link', 'user_share_link_kg',
+                                         'user_name_lookup')
         or _is_user_stop_title(name))
     coord_kept = bool(is_user_pin and orig_coords)
     if coord_kept:
@@ -13711,24 +13713,69 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 _nm = (_poi.get("name") or "").strip()
                 if not _nm:
                     continue
-                try:
-                    _hit = _usi.name_lookup_in_bbox(
-                        _nm, _nl_city, bbox=_nl_bbox, center=_nl_center,
-                        log=print)
-                except Exception as _nl_err:
-                    print(f"  [LOCAL-859] name lookup error for {_nm!r} "
-                          f"(non-fatal): {_nl_err}")
-                    _hit = None
-                if _hit:
-                    _poi["coordinates"] = f"{_hit[0]:.6f}, {_hit[1]:.6f}"
-                    _poi["coord_source"] = "user_name_lookup"
-                    _poi["coord_confidence"] = "name_lookup"
-                    print(f"  [LOCAL-859] user stop {_nm!r} pinned by NAME lookup "
-                          f"at {_poi['coordinates']} (source {_hit[2]}, match "
-                          f"{_hit[3]!r}) — weaker than a share link, never centroid")
-                else:
-                    # No in-box match: leave the stop WITHOUT a coordinate so it is
-                    # announced. Never the centroid.
+                _ps859b = (_us_parsed[_i_poi]
+                           if _us_parsed and _i_poi < len(_us_parsed) else {})
+                _kg_conf = (_ps859b or {}).get("kg_confidence")
+                _kg_q = ((_ps859b or {}).get("kg_q") or "").strip()
+
+                # ── [LOCAL-859B] HIGH confidence: a /g/ Knowledge-Graph id with a
+                # ``loc`` source is a specific LOCAL PLACE. Trust Google's own
+                # place name ``q`` (it usually carries the address/city) and look
+                # THAT up — not the typed name. A hit is treated like a user pin:
+                # coord_source='user_share_link_kg'. Same bbox + 25 km guard as
+                # LOCAL-859, so it can never land in another city.
+                _hit = None
+                _kg_used = False
+                if _kg_conf == "high" and _kg_q:
+                    _kg_lookup = _kg_q
+                    if _nl_city and _nl_city.lower() not in _kg_q.lower():
+                        _kg_lookup = f"{_kg_q}, {_nl_city}"
+                    try:
+                        _hit = _usi.name_lookup_in_bbox(
+                            _kg_lookup, _nl_city, bbox=_nl_bbox,
+                            center=_nl_center, log=print)
+                    except Exception as _nl_err:
+                        print(f"  [LOCAL-859B] KG q-lookup error for {_kg_q!r} "
+                              f"(non-fatal): {_nl_err}")
+                        _hit = None
+                    if _hit:
+                        _kg_used = True
+                        _poi["coordinates"] = f"{_hit[0]:.6f}, {_hit[1]:.6f}"
+                        _poi["coord_source"] = "user_share_link_kg"
+                        _poi["coord_confidence"] = "kg_place"
+                        print(f"  [LOCAL-859B] user stop {_nm!r} pinned from KG "
+                              f"place q={_kg_q!r} at {_poi['coordinates']} "
+                              f"(source {_hit[2]}, match {_hit[3]!r}, kgmid "
+                              f"{(_ps859b or {}).get('kgmid')}) — treated like a "
+                              f"user pin, never centroid")
+                    else:
+                        print(f"  [LOCAL-859B] KG q={_kg_q!r} had no in-box "
+                              f"match — falling back to typed name {_nm!r}")
+
+                # ── LOW confidence (/m/ or kp), or HIGH that found no in-box
+                # match: ignore ``q`` (it may be a TOPIC, e.g. the FRUIT for
+                # "Rambutan") and look up the stop NAME the listener typed.
+                if _hit is None:
+                    try:
+                        _hit = _usi.name_lookup_in_bbox(
+                            _nm, _nl_city, bbox=_nl_bbox, center=_nl_center,
+                            log=print)
+                    except Exception as _nl_err:
+                        print(f"  [LOCAL-859] name lookup error for {_nm!r} "
+                              f"(non-fatal): {_nl_err}")
+                        _hit = None
+                    if _hit:
+                        _poi["coordinates"] = f"{_hit[0]:.6f}, {_hit[1]:.6f}"
+                        _poi["coord_source"] = "user_name_lookup"
+                        _poi["coord_confidence"] = "name_lookup"
+                        print(f"  [LOCAL-859] user stop {_nm!r} pinned by NAME "
+                              f"lookup at {_poi['coordinates']} (source "
+                              f"{_hit[2]}, match {_hit[3]!r}) — weaker than a "
+                              f"share link, never centroid")
+
+                if _hit is None:
+                    # No in-box match: leave the stop WITHOUT a coordinate so it
+                    # is announced. Never the centroid.
                     print(f"  [LOCAL-859] user stop {_nm!r} has no in-box name "
                           f"match — announced with NO coordinate (never centroid)")
         # Override total_stops to match the forced list length
