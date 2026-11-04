@@ -208,10 +208,44 @@ def _sections(text: str) -> List[Tuple[str, str]]:
     return [(h, b) for h, b in parts if b]
 
 
+_CJK_RE = re.compile(r"[\u3000-\u9fff\uf900-\ufaff]")
+
+
 def _clean_sentence(s: str) -> str:
     s = re.sub(r"\s*\((?:[^()]*;[^()]*|\s*)\)", "", s)          # "(; Dimocarpus …)" stubs
+    if _CJK_RE.search(s):
+        # a sentence that spells Chinese characters cannot be spoken as is; keep
+        # only the gloss ("... literally means "dragon eye"") when there is one
+        m = re.search(r'literally\s+means?\s+("[^"]+")', s)
+        if m:
+            return f"The Chinese characters together literally mean {m.group(1)}."
+        s = re.sub(r"(?:simplified|traditional)\s+Chinese:\s*[^;.]*;?\s*", "", s)
+        s = _CJK_RE.sub("", s)
+        s = re.sub(r"\s*;\s*;", ";", s)
+        if re.search(r"(?i)\b(character|means?)\b", s):
+            return ""
+    if re.search(r"[A-Za-z]\d\b", s):          # tone-number romanisation: lung4 ngaan5
+        return ""
     s = " ".join(s.split())
     return s.strip()
+
+
+_ELLIPSIS_RE = re.compile(r"\s*(?:\.\.\.|…)\s*$")
+
+
+def _trim_truncated(s: str) -> str:
+    """A search snippet that ends in an ellipsis is cut back to its last whole
+    clause ('..., and from his spirit grew the ...' -> '...'), so a sentence is
+    never read out half-finished.  Returns '' when too little is left."""
+    s = " ".join((s or "").split())
+    if not _ELLIPSIS_RE.search(s):
+        return s
+    s = _ELLIPSIS_RE.sub("", s)
+    cut = max(s.rfind(", "), s.rfind("; "), s.rfind(". "))
+    if cut < 40:
+        return ""
+    s = s[:cut].rstrip(" ,;")
+    return s if s.endswith((".", "!", "?")) else s + "."
 
 
 def _good_sentence(s: str, lo: int = 30, hi: int = 330) -> bool:
@@ -273,16 +307,10 @@ def _name_meaning_facts(word: str, wiki_fn, calls: Dict) -> Tuple[List[Dict], Li
     leg: List[Dict] = []
     src = page["url"]
     ety_sents = [_clean_sentence(s) for b in ety for s in _split_sentences(b)]
-    ety_sents = [s for s in ety_sents if _good_sentence(s)]
-    # the lead's first sentence says what the word denotes; only worth stating
-    # when an etymology exists (otherwise this is just a dictionary entry)
+    ety_sents = [s for s in ety_sents if s and _good_sentence(s)]
+    # no etymology section -> this is just a dictionary entry, not a name story
     if not ety_sents:
         return [], []
-    for s in _split_sentences(lead)[:1]:
-        s = _clean_sentence(s)
-        if _good_sentence(s):
-            ctx.append({"kind": "name_meaning", "layer": 2, "text": s,
-                        "source": src, "specific": True})
     for s in ety_sents[:3]:
         d = {"kind": "name_meaning", "layer": 2, "text": s, "source": src,
              "specific": True}
@@ -291,24 +319,59 @@ def _name_meaning_facts(word: str, wiki_fn, calls: Dict) -> Tuple[List[Dict], Li
             leg.append(d)
         else:
             ctx.append(d)
-    return ctx[:4], leg[:2]
+    # what the word denotes - framed so it can never read as "the venue IS a tree"
+    for s in _split_sentences(lead)[:1]:
+        s = _clean_sentence(s)
+        if s and _good_sentence(s):
+            ctx.append({"kind": "name_meaning", "layer": 2, "specific": True,
+                        "text": f'As a plain word, "{word}" also names a plant. {s}',
+                        "source": src})
+    # the first sentence of a Description section often explains the word (hair)
+    desc = next((b for h, b in secs if re.search(r"(?i)^(?:description|fruit)$", h or "")), "")
+    for s in _split_sentences(desc)[:3]:
+        s = _clean_sentence(s)
+        if s and _good_sentence(s) and re.search(
+                r"(?i)\b(hair\w*|spin\w*|spik\w*|eye\w*|dragon|skin|shell|seed)\b", s):
+            ctx.append({"kind": "name_meaning", "layer": 2, "text": s,
+                        "source": src, "specific": True})
+            break
+    return ctx[:5], leg[:2]
+
+
+_NARRATIVE_VERB_RE = re.compile(
+    r"(?i)\b(gave|given|grew|grow|killed|slew|slain|slayed|turned|became|received|saw|found|"
+    r"lived|came|ate|fell|died|rescued|saved|wished|rolled|laid|hatched|fought|"
+    r"transformed|sprang|planted|buried|dropped|wept|fled|protected|defeated|"
+    r"stabbed|witnessing|terroriz\w+|connects|is\s+about|tells\s+of)\b")
+_ANNOUNCE_RE = re.compile(
+    r"(?i)(tells\s+the\s+(?:story|tale)\s+of|the\s+legend\s+of\b|discover\b|enchanting|"
+    r"how\s+to\b|recipe|benefits|buy\b|follow\s+\w+\s+through|distinguishing|"
+    r"\bpdf\b|\bonce\s+upon\s+a\s+time\s+in\s+the\s+kingdom\b)")
 
 
 def _legend_facts(word: str, serp_fn, calls: Dict, log=None) -> List[Dict]:
-    q = f'"{word}" legend OR "folk tale" OR myth Vietnam'
+    """A folk tale tied to the name.  Snippet text only (never a page title), cut
+    back to a whole clause, and it must actually TELL something (a narrative verb),
+    not announce a legend ('Discover the legend of ...')."""
+    q = f'{word} legend folk tale origin of the name'
     out: List[Dict] = []
     for r in _serp(q, serp_fn, calls, log):
-        text = f"{r.get('title') or ''}. {r.get('snippet') or ''}"
-        for s in _split_sentences(text):
+        snippet = _trim_truncated(r.get("snippet") or "")
+        for s in _split_sentences(snippet):
             s = _clean_sentence(s)
-            if not _good_sentence(s, lo=40):
+            if not _good_sentence(s, lo=60):
                 continue
             f = _ffold(s)
-            if word in f.split() and _LEGEND_CUE_RE.search(s):
-                if all(_ffold(o["text"]) != f for o in out):
-                    out.append({"kind": "legend", "layer": 3, "text": s,
-                                "source": r.get("link") or r.get("url") or "serper_search:legend",
-                                "specific": True})
+            if word not in f.split() and not (word == "longan" and "dragon" in f):
+                continue
+            if not _NARRATIVE_VERB_RE.search(s) or _ANNOUNCE_RE.search(s):
+                continue
+            if not (_LEGEND_CUE_RE.search(s) or "name" in f.split()):
+                continue
+            if all(_ffold(o["text"]) != f for o in out):
+                out.append({"kind": "legend", "layer": 3, "text": s,
+                            "source": r.get("link") or r.get("url") or "serper_search:legend",
+                            "specific": True})
                 break
         if len(out) >= 2:
             break
@@ -396,13 +459,18 @@ def _street_wiki_facts(street: str, city: str, wiki_fn, wiki_search_fn,
 
 def _snippet_sentences(results, must_words: List[str], cue_re, locality_re,
                        max_n: int, kind: str, layer: int, default_src: str) -> List[Dict]:
+    """Whole sentences out of search SNIPPETS (never titles - a title is a headline,
+    not a fact), cut back to a complete clause, no questions or link-bait."""
     out: List[Dict] = []
     for r in results:
-        text = f"{r.get('title') or ''}. {r.get('snippet') or ''}"
+        snippet = _trim_truncated(r.get("snippet") or "")
         picked = 0
-        for s in _split_sentences(text):
+        for s in _split_sentences(snippet):
             s = _clean_sentence(s)
-            if not _good_sentence(s, lo=40):
+            if not _good_sentence(s, lo=50) or s.endswith("?"):
+                continue
+            if re.search(r"(?i)\b(click|book now|tour|ticket|price from|read more|"
+                         r"subscribe|top\s+\d+|best\s+\w+\s+in\b)\b", s):
                 continue
             f = _ffold(s)
             toks = set(f.split())
@@ -417,7 +485,7 @@ def _snippet_sentences(results, must_words: List[str], cue_re, locality_re,
                             "source": r.get("link") or r.get("url") or default_src,
                             "specific": True})
                 picked += 1
-            if picked >= 1 or len(out) >= max_n:
+            if picked >= 2 or len(out) >= max_n:
                 break
         if len(out) >= max_n:
             break
@@ -440,16 +508,69 @@ def _street_serp_facts(street: str, city: str, serp_fn, calls: Dict, log=None) -
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# layer 2d - the district (from the stop's address) or, failing that, the city
+# ─────────────────────────────────────────────────────────────────────────────
+
+_DISTRICT_RE = re.compile(r"(?i)\b(?:district|qu[ậa]n)\s+(\d{1,2})\b")
+_NUMERIC_SENT_RE = re.compile(r"(?i)\b(km2|sq\s*mi|population|inhabitants|density)\b|\d{1,3}(?:,\d{3})+")
+
+
+def _lead_story_sentences(page: Dict, max_n: int) -> List[str]:
+    secs = _sections(page["text"])
+    lead = next((b for h, b in secs if not h), "")
+    out = []
+    for s in _split_sentences(lead):
+        s = _clean_sentence(s)
+        if s and _good_sentence(s) and not _NUMERIC_SENT_RE.search(s):
+            out.append(s)
+        if len(out) >= max_n:
+            break
+    return out
+
+
+def _place_story_facts(poi: Dict, place: Optional[Dict], city: str, wiki_fn,
+                       wiki_search_fn, calls: Dict) -> List[Dict]:
+    """The district's documented story when the stop's address names one, else the
+    city's.  Text is Wikipedia's own; population/area figures are skipped."""
+    addr = " , ".join(a for a in ((place or {}).get("_serper_address"), poi.get("address")) if a)
+    m = _DISTRICT_RE.search(addr or "")
+    facts: List[Dict] = []
+    if m and city:
+        n = m.group(1)
+        calls["wiki"] = calls.get("wiki", 0) + 1
+        for t in (wiki_search_fn(f"District {n} {city}") or [])[:3]:
+            ft = _ffold(t)
+            if f"district {n}" in ft and _ffold(city).split()[0] in ft:
+                page = wiki_fn(t)
+                calls["wiki"] += 1
+                if page and not page.get("disambiguation"):
+                    for s in _lead_story_sentences(page, 2):
+                        facts.append({"kind": "district", "layer": 2, "text": s,
+                                      "source": page["url"], "specific": True})
+                    break
+        if facts:
+            return facts
+    if city:
+        calls["wiki"] = calls.get("wiki", 0) + 1
+        page = wiki_fn(city)
+        if page and not page.get("disambiguation") and _ffold(page["title"]).split()[0] == _ffold(city).split()[0]:
+            for s in _lead_story_sentences(page, 3):
+                facts.append({"kind": "city", "layer": 2, "text": s,
+                              "source": page["url"], "specific": True})
+    return facts
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # layer 2c — the tradition behind what the venue offers
 # ─────────────────────────────────────────────────────────────────────────────
 
 # (kind words that select it, topic word the snippet must mention, query template)
 _TRADITIONS = (
-    ({"karaoke"}, r"karaoke", "karaoke culture {country} history popular"),
+    ({"karaoke"}, r"karaoke", "karaoke Vietnam culture popular"),
     ({"massage", "spa", "wellness"}, r"massage|spa|acupressure|herbal",
      "traditional Vietnamese massage history"),
     ({"acoustic", "live"}, r"acoustic|live\s+music|singer|songwriter|unplugged",
-     "live acoustic music cafes {city} scene"),
+     "live acoustic music cafes {city} scene history"),
     ({"cafe", "café", "coffee"}, r"coffee|cafe|café", "Vietnamese cafe coffee culture {city} history"),
     ({"gay", "lgbt", "lgbtq", "drag"}, r"gay|lgbt|drag", "{city} gay nightlife scene history"),
     ({"bar", "pub", "club", "lounge", "nightlife", "street"}, r"bars?|nightlife|pubs?|beer|clubs?",
@@ -477,7 +598,7 @@ def _tradition_facts(kind_tokens: set, location: str, serp_fn, calls: Dict, log=
     res = _serp(q, serp_fn, calls, log)
     return _snippet_sentences(res, [], re.compile(r"(?i)\b(?:" + topic + r")"),
                               _LOCAL_RE if _LOCAL_RE.search(location or "") else None,
-                              2, "tradition", 2, "serper_search:tradition")
+                              3, "tradition", 2, "serper_search:tradition")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -539,6 +660,13 @@ def gather_context(poi: Dict, location: str, *, place: Optional[Dict] = None,
     except Exception as e:  # pragma: no cover
         if log:
             log(f"[LOCAL-862B] street context failed for {name!r}: {e}")
+
+    # 2d — the district named by the address, else the city
+    try:
+        facts.extend(_place_story_facts(poi, place, city, wiki_fn, wiki_search_fn, calls))
+    except Exception as e:  # pragma: no cover
+        if log:
+            log(f"[LOCAL-862B] place context failed for {name!r}: {e}")
 
     # 2c — the tradition behind what it offers
     try:
@@ -630,15 +758,17 @@ def layer_gate(sentence: str, name: str, source_lines: List[str]) -> Optional[st
     disclosed = has_disclosure(sentence)
 
     if disclosed:
-        sent_t = _content_tokens(sentence)
-        best = max((len(sent_t & _content_tokens(x)) for x in l3), default=0)
+        base_t = _content_tokens(" ".join(plain) + " " + name)
+        sent_t = _content_tokens(sentence) - base_t
+        best = max((len(sent_t & (_content_tokens(x) - base_t)) for x in l3), default=0)
         if best < 2:
             return "disclosure marker without a layer-3 source"
     else:
         # retelling a layer-3 line (>= 3 shared content words) without a marker
         if l3 and not is_name_meaning_sentence(sentence, name):
-            sent_t = _content_tokens(sentence)
-            if max((len(sent_t & _content_tokens(x)) for x in l3), default=0) >= 3:
+            base_t = _content_tokens(" ".join(plain) + " " + name)
+            sent_t = _content_tokens(sentence) - base_t
+            if max((len(sent_t & (_content_tokens(x) - base_t)) for x in l3), default=0) >= 2:
                 return "undisclosed legend (layer-3 content without a marker)"
         for m in _LEGEND_VOCAB_RE.finditer(sentence):
             w = _ffold(m.group(1)).split()[0]

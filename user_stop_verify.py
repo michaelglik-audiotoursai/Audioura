@@ -817,7 +817,7 @@ def verify_user_stops_in_text(
                 if not f:
                     log(f"[LOCAL-855D]   dropped: {s[:160]}")
 
-    return "\n".join(lines), report
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)), report
 
 
 def _prepend_orientation(lines: List[str], meta: dict, orientation: str):

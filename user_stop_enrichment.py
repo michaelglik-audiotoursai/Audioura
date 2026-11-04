@@ -754,15 +754,24 @@ def gather_material(poi: Dict, location: str, *, places_fn=None,
         calls["story_search"] = nq
         own_host = (urlparse(website if "//" in (website or "") else f"https://{website}")
                     .hostname or "").lower().replace("www.", "") if website else ""
+        names_ = [n for n in (name, alias) if n]
         for sn in snips:
             url = sn.get("url") or "serper_search:story"
             host = (urlparse(url).hostname or "").lower().replace("www.", "")
             third_party = not (own_host and host and own_host == host)
-            # [LOCAL-862B / D760] a specific claim (a year, a "first", an owner, a
-            # legend) that rests on ONE third-party web snippet is unconfirmed:
-            # layer 3, to be told with "We couldn't confirm this, but …".
-            if third_party and _SPECIFIC_CLAIM_RE.search(sn["text"]):
-                add("unconfirmed", sn["text"], url, layer=3)
+            # [LOCAL-862B / D760] a specific claim (a year, a "first", a legend) that
+            # rests on ONE third-party web snippet, in a sentence that names the
+            # venue, is unconfirmed: layer 3, told with "We couldn't confirm this,
+            # but ...".  Anything else stays an ordinary story fact.
+            claim = None
+            if third_party:
+                for sent in _split_sentences(sn["text"]):
+                    if _SPECIFIC_CLAIM_RE.search(sent) and any(
+                            _phrase_in(_fold(n), _fold(sent)) for n in names_):
+                        claim = sent.strip()
+                        break
+            if claim and len(claim) >= 40 and not claim.endswith(("...", "…")):
+                add("unconfirmed", claim, url, layer=3)
             else:
                 add("story", sn["text"], url)
 
@@ -774,10 +783,21 @@ def gather_material(poi: Dict, location: str, *, places_fn=None,
         try:
             import user_stop_context as _usc
             kt = set(_fold(category).split()) | set(_fold(name).split())
+            listed = ""
+            if not category:
+                ts = (poi.get("type_specialty") or "").strip()
+                tt = set(_fold(ts).split())
+                if _usc._tradition_for(tt & _BUSINESS_KINDS) and not _usc._tradition_for(kt):
+                    kt |= tt
+                    listed = ts
             ctx = _usc.gather_context(poi, location, place=rec, alias=alias,
                                       kind_tokens=kt, serp_fn=serp_fn, log=log,
                                       wiki_fn=wiki_fn, wiki_search_fn=wiki_search_fn)
             ctx_calls = ctx["calls"]
+            if listed and any(f["kind"] == "tradition" for f in ctx["facts"]):
+                add("listed_as", f"Your tour lists {name} as: {listed.lower()}.",
+                    "tour stop list (the listener's request, not independently confirmed)",
+                    specific=False, layer=2)
             for cf in ctx["facts"]:
                 add(cf["kind"], cf["text"], cf["source"], layer=cf["layer"])
         except Exception as e:
@@ -825,7 +845,7 @@ def count_specifics(facts: List[Dict]) -> int:
     return n
 
 
-def select_facts(material: Dict, caps=(12, 6, 3)) -> List[Dict]:
+def select_facts(material: Dict, caps=(12, 8, 3)) -> List[Dict]:
     """The facts handed to the narrator and the verifier: layer 1 (venue), then
     layer 2 (context), then layer 3 (legend/unconfirmed), each capped."""
     out: List[Dict] = []
@@ -835,7 +855,7 @@ def select_facts(material: Dict, caps=(12, 6, 3)) -> List[Dict]:
     return out
 
 
-def material_lines(material: Dict, limit: int = 21) -> List[str]:
+def material_lines(material: Dict, limit: int = 23) -> List[str]:
     """Fact-sheet lines for the verifier. Layer-2/3 lines carry a [context] /
     [legend] / [unconfirmed] tag so the verifier knows which sentences need a
     disclosure marker."""
@@ -966,7 +986,9 @@ _NARR_SYSTEM = (
     "layer-2 sentence must visibly tie back to the venue: name the venue or say 'the "
     "bar's name', 'the street it sits on', 'the tradition it belongs to'. Never "
     "suggest a context fact is part of the venue's own history, owner or menu "
-    "(a fruit's story is the story of the WORD in the name, not of what is sold).\n"
+    "(a fruit's story is the story of the WORD in the name, not of what is sold), "
+    "and NEVER say the venue itself is a tree, a fruit, a street or a person: say "
+    "'the name Rambutan comes from ...', 'the bar shares its name with ...'.\n"
     "  LAYER 3 - LEGEND OR UNCONFIRMED (facts tagged [legend] or [unconfirmed]). "
     "EVERY layer-3 sentence MUST carry a disclosure: for a [legend] fact open with "
     "'A folk tale tells that ...' (say 'Vietnamese' only if the fact does) or "
@@ -1256,8 +1278,14 @@ def enrich_user_stops_in_text(
         nar = (narrated.get(id_of.get(title, -1)) or {}) if title in id_of else {}
         text = nar.get("text")
         if title in id_of and text and len(_split_sentences(text)) >= 2:
-            _rewrite_block(lines, start, end, text, nar.get("orientation"),
-                           nar.get("body"))
+            ori = nar.get("orientation")
+            # [LOCAL-862B] with no sourced kind the venue is only "a stop you
+            # chose"; a model orientation would guess a kind (or call it a fruit).
+            if not sourced_kind(title, mat):
+                city_ = city_from_scope(location)
+                ori = (f"{title} is one of the stops you chose" +
+                       (f", here in {city_}." if city_ else "."))
+            _rewrite_block(lines, start, end, text, ori, nar.get("body"))
             entry.update(mode="narrated", llm_cost_usd=round(per_stop_llm, 6),
                          narration=text, used=nar.get("used"))
             report["material_by_title"][title] = material_lines(mat)

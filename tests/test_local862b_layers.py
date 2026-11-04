@@ -133,8 +133,9 @@ class Gate(unittest.TestCase):
         self.assertIn("2014", self.gate("Longan opened in 2014."))
 
     def test_invented_first_and_geography_dropped(self):
-        self.assertIn("first", self.gate(
+        self.assertIsNotNone(self.gate(
             "Legend says the dragon's eye was the first longan the bar served."))
+        self.assertIn("first", self.gate("The bar was the first in the city to open late."))
         self.assertIn("geography", self.gate("Longan stands beside the river."))
 
     def test_year_in_source_is_kept(self):
@@ -146,6 +147,34 @@ class Gate(unittest.TestCase):
         self.assertIsNone(usc.layer_gate(
             "We couldn't confirm this, but the bar is rumoured to occupy a former French pharmacy.",
             "Longan", src))
+
+
+class Cleaning(unittest.TestCase):
+    def test_truncated_snippet_cut_to_whole_clause(self):
+        t = ("The name dragon eye fruit comes from a well-known legend in china: a hero who "
+             "slayed a dragon to save his village, and from his spirit grew the ...")
+        out = usc._trim_truncated(t)
+        self.assertTrue(out.endswith("village."), out)
+        self.assertEqual(usc._trim_truncated("Too short, and ..."), "")
+
+    def test_cjk_sentence_keeps_only_the_gloss(self):
+        s = ('The character 龙 means "dragon" while 眼 means "eye", so together 龙眼 '
+             'literally means "dragon eye".')
+        self.assertEqual(usc._clean_sentence(s),
+                         'The Chinese characters together literally mean "dragon eye".')
+
+    def test_legend_must_tell_something(self):
+        def serp(q):
+            return ([{"title": "x", "link": "http://a",
+                      "snippet": "An ancient Philippine legend tells the story of how rambutan "
+                                 "came to be. One day, a man came across a ..."},
+                     {"title": "y", "link": "http://b",
+                      "snippet": "The name dragon eye fruit comes from a well-known legend in "
+                                 "china: a hero who slayed a dragon to save his village, and "
+                                 "from his spirit grew the ..."}], 0)
+        out = usc._legend_facts("longan", serp, {})
+        self.assertEqual(len(out), 1)
+        self.assertIn("slayed a dragon", out[0]["text"])
 
 
 class Context(unittest.TestCase):
@@ -195,6 +224,27 @@ class Context(unittest.TestCase):
                                  wiki_search_fn=lambda q: [], serp_fn=serp)
         l3 = [f for f in ctx["facts"] if f["layer"] == 3]
         self.assertTrue(l3 and "dragon" in l3[0]["text"])
+
+    def test_district_story_from_address_else_city(self):
+        d1 = {"title": "District 1, Ho Chi Minh City", "disambiguation": False,
+              "url": "https://en.wikipedia.org/wiki/District_1",
+              "text": ("District 1 was the central urban district of Ho Chi Minh City. It is the "
+                       "historical birthplace of the city, where the Citadel of Gia Định was built. "
+                       "The district had a population of 204,899 people in 2010.\n")}
+        hcm = {"title": "Ho Chi Minh City", "disambiguation": False,
+               "url": "https://en.wikipedia.org/wiki/Ho_Chi_Minh_City",
+               "text": "Ho Chi Minh City, formerly Saigon, is the largest city in Vietnam.\n"}
+        wf = lambda t: {"District 1, Ho Chi Minh City": d1, "Ho Chi Minh City": hcm}.get(t)
+        ws = lambda q: ["District 1, Ho Chi Minh City"]
+        poi = {"name": "X", "address": "15 Lê Thánh Tôn, Quận 1"}
+        ctx = usc.gather_context(poi, LOC, wiki_fn=wf, wiki_search_fn=ws,
+                                 serp_fn=lambda q: ([], 0))
+        dist = [f["text"] for f in ctx["facts"] if f["kind"] == "district"]
+        self.assertEqual(len(dist), 2)
+        self.assertTrue(all("204,899" not in t for t in dist))      # population skipped
+        ctx = usc.gather_context({"name": "Y"}, LOC, wiki_fn=wf, wiki_search_fn=ws,
+                                 serp_fn=lambda q: ([], 0))
+        self.assertTrue(any(f["kind"] == "city" for f in ctx["facts"]))
 
     def test_no_search_no_facts(self):
         self.assertEqual(usc.gather_context(POI, LOC, allow_search=False)["facts"], [])
