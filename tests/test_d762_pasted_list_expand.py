@@ -33,3 +33,28 @@ class T(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TResolve(unittest.TestCase):
+    def test_resolve_carries_preview_pins(self):
+        import itinerary_import as ii
+        orig = ii.preview_stops
+        try:
+            ii.preview_stops = lambda text, city, **k: {"ok": True, "stops": [
+                {"name": "Cathedral", "lat": 10.779722, "lng": 106.699167},
+                {"name": "Post Office", "lat": 10.7799, "lng": 106.7000}]}
+            out, n = ii.expand_pasted_lists(["Cathedral → Post Office"], "Ho Chi Minh City", resolve=True)
+            self.assertEqual(n, 1)
+            self.assertIn("10.779722", out[0])
+        finally:
+            ii.preview_stops = orig
+
+    def test_resolve_failure_falls_back_to_names(self):
+        import itinerary_import as ii
+        orig = ii.preview_stops
+        try:
+            ii.preview_stops = lambda *a, **k: {"ok": False}
+            out, _ = ii.expand_pasted_lists(["A Place → B Place"], "Hanoi", resolve=True)
+            self.assertEqual(out, ["A Place", "B Place"])
+        finally:
+            ii.preview_stops = orig

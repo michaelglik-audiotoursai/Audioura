@@ -804,7 +804,7 @@ def stops_for_generation(items) -> Tuple[List[str], int]:
 _LIST_MARKERS = ("→", "⇒", "➜", "->", "=>", "\n", ";", "|")
 
 
-def expand_pasted_lists(raw_stops, city_hint: str = ""):
+def expand_pasted_lists(raw_stops, city_hint: str = "", resolve: bool = False):
     """[LEAD, D762 quick path] The app's own-stop fields are free text. A listener
     who pastes a whole itinerary ("Cathedral → Post Office → …") into ONE field
     should get every place as its own stop, in order, before any app update.
@@ -824,6 +824,19 @@ def expand_pasted_lists(raw_stops, city_hint: str = ""):
                 parsed = parse_itinerary(item, city_hint)
                 if len(parsed) >= 2:
                     n += 1
+                    # [LEAD wave-29 finding A] Resolve the pins exactly as the
+                    # free /preview-stops does (no LLM, ≈$0.004/10 stops), so each
+                    # stop carries a reviewed-quality pin as a user pin instead of
+                    # falling to a model guess downstream.
+                    if resolve and city_hint:
+                        try:
+                            pv = preview_stops(item, city_hint)
+                            if pv.get("ok") and len(pv.get("stops") or []) == len(parsed):
+                                strs, _pins = stops_for_generation(pv["stops"])
+                                out.extend(x for x in strs if x)
+                                continue
+                        except Exception:
+                            pass
                     for p in parsed:
                         name = (p.get("name") or "").strip()
                         if not name:

@@ -3825,7 +3825,7 @@ def generate_complete_tour():
         from user_stops_flag import user_stops_enabled as _us_on_exp
         if _us_on_exp() and isinstance(_raw_stops, list):
             from itinerary_import import expand_pasted_lists as _exp_lists
-            _raw_stops, _exp_n = _exp_lists(_raw_stops, data.get('location') or '')
+            _raw_stops, _exp_n = _exp_lists(_raw_stops, data.get('location') or '', resolve=True)
             if _exp_n:
                 print(f"[D762] expanded {_exp_n} pasted list(s) into "
                       f"{len(_raw_stops)} stops, order kept")
