@@ -94,3 +94,6 @@ identifiers. Revoke a key at App Store Connect → Users and Access → Integrat
 **From Spring 2027 Apple rejects any upload below 15.0.** Raising it drops iPhone 6s/7 and the
 first-gen SE. Not urgent, but it is a hard deadline, not a suggestion.
 | 92 | iOS | 2.4.43 | `4de01c1c` (subscribed; APP_TRACK=subscribed; MAP_TILE_URL=tile-proxy-subscribed run.app) | **uploaded to TestFlight** 2026-11-04 04:40 EST by Storied_Tours on the Mac Mini: map tiles through our own cache server (LOCAL-854/D757) + OSM attribution; everything since 90 | 2026-11-04 |
+| 93 | Android | 2.4.44 | `0fd325e6` (subscribed; APP_TRACK=subscribed; MAP_TILE_URL=tile-proxy-subscribed run.app) | **built + signed** 2026-11-05 by GCloud_Storied on the laptop (`C:dev-wtab93udioura-subscribed-2.4.44+93.aab`, sha256 62757f4c…6200); not uploaded — Michael uploads to Play Internal/closed. Supersedes 91. | 2026-11-05 |
+| 94 | — | — | — | **reserved: iOS** (LOCAL-868 paste box + map preview), Storied_Tours on the Mac | — |
+| 95 | — | — | — | **reserved: Android** (LOCAL-868), GCloud_Storied | — |
