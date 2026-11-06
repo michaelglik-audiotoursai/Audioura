@@ -28,7 +28,7 @@ local only, on the Mac Mini. It goes to Preview on GCloud, then to the first pub
 | Subscriptions + Day pass (D734/D735) | iap_service `restoreSubscriptions()` (real `restorePurchases`); 4 Apple products READY_TO_SUBMIT | ✅ code; Google products not created (Play API permission) |
 | Tile proxy for maps, iOS 92 | D757 | ✅ |
 
-**Pricing rule (corrected 22:0x, D764):** D688 stands (Michael, Oct 21): every download of a paid tour is paid; a lost or replaced phone restores free with the recovery code. LEAD's earlier "D763" was wrong and is withdrawn. **Open, and Michael's call:** App Review risk of per-download consumables (two lawyer reviews flagged Guideline 3.1.1). LEAD presents the options; it does not decide. No code blocker remains on the LEAD side.
+**Pricing rule (corrected 22:0x, D764):** D688 stands (Michael, Oct 21): every download of a paid tour is paid; a lost or replaced phone restores free with the recovery code. LEAD's earlier "D763" was wrong and is withdrawn. **Decided (D765, Michael Nov 5):** submit Nov 13 as is; if Apple rejects under 3.1.1, build the parked LOCAL-869 fallback and resubmit (several days accepted). No code blocker remains on the LEAD side.
 
 **GCloud_Storied (laptop), in this order (agreed)**
 1. Android build with `MAP_TILE_URL` → Play **closed testing**.
