@@ -105,6 +105,50 @@ _GENERIC_WORDS = {
 }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-870 item 5] a PERSON's name or a street ADDRESS is not a word with a meaning
+# ─────────────────────────────────────────────────────────────────────────────
+# Wave 28: Book Street ("Nguyễn Văn Bình") and Café Apartments 42 (at 42 Nguyễn
+# Huệ) both said 'probably takes its name from the word "Nguyen"' plus a surname
+# etymology. A surname is not a word to explain, and a number + street is an
+# address. Detect the person-name span so no word-etymology is offered for it.
+_STRONG_SURNAMES = {"nguyen", "tran", "pham", "hoang", "huynh", "phan", "vo", "vu",
+                    "dang", "bui", "ngo", "duong"}
+_WEAK_SURNAMES = {"le", "ho", "do", "ly"}           # also ordinary words/names
+_PERSON_MIDDLE = {"van", "thi"}
+
+
+def person_name_span(name: str) -> Tuple[str, set]:
+    """(person name as written, folded tokens) when ``name`` contains a Vietnamese
+    person name (surname + given/middle names, e.g. 'Nguyễn Văn Bình',
+    'Nguyễn Huệ'), else ('', set()). A weak surname (Lê, Hồ, Đỗ, Lý) counts only
+    when followed by Văn/Thị. Deterministic; never raises."""
+    toks = re.findall(r"[^\W\d_][\w'\u2019-]*", name or "")
+    folded = [_ffold(t) for t in toks]
+    for i, f in enumerate(folded):
+        if i + 1 >= len(toks) or not toks[i][:1].isupper():
+            continue
+        nxt = folded[i + 1]
+        if not (f in _STRONG_SURNAMES or (f in _WEAK_SURNAMES and nxt in _PERSON_MIDDLE)):
+            continue
+        j = i + 1
+        while j < len(toks) and j <= i + 3 and toks[j][:1].isupper():
+            j += 1
+        if j == i + 1:
+            continue
+        return " ".join(toks[i:j]), set(folded[i:j])
+    return "", set()
+
+
+def name_is_address(name: str, span: str) -> bool:
+    """True when the person-name span is the street part of an address in the name
+    (a house number right before it: '42 Nguyễn Huệ')."""
+    if not span:
+        return False
+    return bool(re.search(r"\b\d+[A-Za-z]?\s*[,\-–]?\s*" + re.escape(span.split()[0]), name or ""))
+
+
+
 def name_words(name: str) -> List[str]:
     """Distinctive single words of a venue name that could be a WORD with a
     meaning/origin (Longan, Rambutan).  Short or generic tokens are skipped."""
@@ -709,7 +753,11 @@ def gather_context(poi: Dict, location: str, *, place: Optional[Dict] = None,
     # 2a — the name as a word
     words_with_page: List[str] = []
     try:
+        _span870, _span_toks870 = person_name_span(name)
         for w in name_words(name):
+            if w in _span_toks870:
+                # [LOCAL-870 item 5] a surname / given name: no word-etymology.
+                continue
             ctx, leg = _name_meaning_facts(w, wiki_fn, calls)
             if ctx or leg:
                 words_with_page.append(w)
@@ -926,6 +974,14 @@ def bridge_sentence(name: str, kind: str, facts: List[Dict]) -> Optional[str]:
     if not any(f.get("kind") in _NAME_KINDS for f in facts or []):
         return None
     folded = _ffold(name)
+    # [LOCAL-870 item 5] a person's name or an address is never a word-etymology.
+    span, span_toks = person_name_span(name)
+    if span:
+        if name_is_address(name, span):
+            return f"The {(kind or 'place').strip().lower()} takes its name from its address on {span}."
+        if _ffold(name) == _ffold(span):
+            return f"It is named after {span}."
+        return None
     word = next((w for w in name_words(name)
                  if any(w in _ffold(f["text"]).split() for f in facts
                         if f.get("kind") in _NAME_KINDS)), "")

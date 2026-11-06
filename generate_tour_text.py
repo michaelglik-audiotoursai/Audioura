@@ -29734,6 +29734,9 @@ REWRITE RULES (all mandatory):
             scope_bbox=_pin_bbox_803, tour_language="en",
             venue_fallback_coordinate=_pin_venue_fallback_813,
             city_centroid=_pin_center_791c,
+            is_user_stop_fn=lambda _p: bool(
+                _p.get('user_explicit') or _p.get('_anchor')
+                or _is_user_stop_title(_p.get('name'))),
             log=print)
         _n_snapped_791c = sum(1 for r in _snap_rows_791c if r.get("snapped"))
         _n_noref_791c = sum(1 for r in _snap_rows_791c if r.get("reference") is None)

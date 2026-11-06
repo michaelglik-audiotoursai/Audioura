@@ -76,15 +76,29 @@ def _tts_strip_emoji(text, where):
         return text
     try:
         from text_polish import strip_emoji_for_tts_logged as _sel
-        return _sel(text, where, log=print)
+        return _sel(text, where, log=lambda m: print(m, flush=True))
     except Exception as _imp_err:
         n = len(_EMOJI_FALLBACK_RE_863.findall(text))
         if not n:
             return text
         print(f"[LOCAL-863] TTS emoji strip at {where} (fallback regex; "
-              f"text_polish unavailable: {_imp_err}): removed {n} emoji run(s)")
+              f"text_polish unavailable: {_imp_err}): removed {n} emoji run(s)",
+              flush=True)
         out = _EMOJI_FALLBACK_RE_863.sub(" ", text)
         return re.sub(r"[ \t]{2,}", " ", out)
+
+
+def _strip_emoji_from_stop_texts(texts, where):
+    """[LOCAL-870 item 2] Strip emoji from the per-stop texts that become
+    audio_N.txt (the app's text view AND the source translation re-voices from)
+    and the TTS payload. Wave 28: a rainbow emoji reached audio_4/5.txt, and Beta's
+    shared polly-tts (which we cannot redeploy) cannot be relied on to strip it, so
+    the strip is OURS, on the Subscribed path, logged with the stop number."""
+    out = []
+    for i, t in enumerate(texts or [], 1):
+        out.append(_tts_strip_emoji(t, f"{where} audio_{i}.txt")
+                   if isinstance(t, str) else t)
+    return out
 
 
 def _strip_nav_fields_for_tts(text):
@@ -179,7 +193,9 @@ def create_modernized_tour_zip(tour_data, job_id):
             zipf.writestr(f'audio_{stop_number}.mp3', audio_bytes)
         
         # Add text files for editing
-        for stop_number, text_content in enumerate(tour_data.get('text_content', []), 1):
+        # [LOCAL-870 item 2] No emoji in audio_N.txt (also covers /create-modernized-tour).
+        for stop_number, text_content in enumerate(
+                _strip_emoji_from_stop_texts(tour_data.get('text_content', []), "zip"), 1):
             zipf.writestr(f'audio_{stop_number}.txt', text_content.encode('utf-8'))
         
         # Add PWA files
@@ -336,6 +352,11 @@ def generate_modernized_tour_async(job_id, tour_file_path, user_id=None, orchest
                 print(f"[GEOCODE] corrected {corrected} of {len(geo_records)} stop coordinates")
         except Exception as e:
             print(f"[GEOCODE] validation skipped ({e}); keeping model coordinates")
+
+        # [LOCAL-870 item 2] Strip emoji from the stop texts BEFORE TTS and before
+        # audio_N.txt is written, so neither carries it (logged per stop).
+        modernized_data["text_content"] = _strip_emoji_from_stop_texts(
+            modernized_data["text_content"], "tour-modernized")
 
         # Generate audio using TTS service
         ACTIVE_JOBS.update(job_id, progress="Generating audio files...")

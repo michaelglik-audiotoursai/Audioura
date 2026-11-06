@@ -79,6 +79,15 @@ _BUSINESS_KINDS = {
     "teahouse", "izakaya", "tavern", "speakeasy", "hotel", "hostel", "venue",
     "street", "nightlife", "walking", "cocktail", "music", "live", "food",
 }
+# [LOCAL-870 item 4] Institutional name words that make a stop a famous
+# monument/institution, and the business words that are too weak to override them.
+_STRONG_INSTITUTION_WORDS = {
+    "opera", "cathedral", "basilica", "palace", "museum", "temple", "pagoda",
+    "mausoleum", "citadel", "shrine", "mosque", "synagogue", "castle",
+    "memorial", "monument",
+}
+_WEAK_BUSINESS_KINDS = {"venue", "music", "live", "nightlife", "walking",
+                        "food", "street", "studio", "gallery", "market"}
 _MIN_SPECIFICS = 2
 _MAX_PAGES = 2
 _UA = "Mozilla/5.0 (compatible; AudiouraTourBot/1.0; +https://audioura.app)"
@@ -104,6 +113,25 @@ def classify_stop_kind(name: str, type_specialty: str = "",
     stays a business."""
     type_toks = set(_fold(f"{type_specialty} {category}").split())
     name_toks = set(_fold(name).split())
+    # [LOCAL-870 item 4] A FAMOUS landmark takes the landmark/story path even when
+    # the generator's Type label is a business-ish word ("Live music venue",
+    # "Performing arts venue"): wave 28 sent "Saigon Opera House" to business
+    # enrichment (3 generic sentences). Two signals, both requiring that the NAME
+    # carries no business word of its own (so "Palace Bar" stays a bar):
+    #   (a) the offline Wikidata-P625 landmark table knows it;
+    #   (b) the name has a clear institutional word AND the Type holds only WEAK
+    #       business words (venue/music/live/...), never a hard one (bar, cafe,
+    #       hotel, spa, shop...).
+    if not (name_toks & _BUSINESS_KINDS):
+        try:
+            from landmark_reference import lookup as _lm_lookup870
+            if _lm_lookup870(name):
+                return "landmark"
+        except Exception:
+            pass
+        if (name_toks & _STRONG_INSTITUTION_WORDS
+                and not (type_toks & (_BUSINESS_KINDS - _WEAK_BUSINESS_KINDS))):
+            return "landmark"
     if type_toks & _BUSINESS_KINDS and not (type_toks & _DOCUMENTED_KINDS):
         return "business"
     if type_toks & _DOCUMENTED_KINDS:
