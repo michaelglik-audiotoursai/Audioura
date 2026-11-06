@@ -148,3 +148,8 @@ def test_generate_tour_text_is_wired_for_wikipedia_evidence():
     src = open(os.path.join(os.path.dirname(__file__), "..", "generate_tour_text.py"),
                encoding="utf-8").read()
     assert "landmark_wikipedia_evidence" in src and "LOCAL-872B" in src
+
+
+def test_disclosure_lowercases_only_function_words():
+    assert lg.disclose("Another chapter arrived in 1959.").startswith("It is sometimes said that another chapter")
+    assert lg.disclose("Bishop Colombert laid the stone.").startswith("It is sometimes said that Bishop")

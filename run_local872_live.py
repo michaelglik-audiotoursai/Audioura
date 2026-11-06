@@ -54,8 +54,9 @@ def _load_dotenv():
 
 _load_dotenv()
 
-if os.environ.get("TASK_BUDGET_ID") != "LOCAL-872":
-    sys.exit("refusing to run: launch with TASK_BUDGET_ID=LOCAL-872 (see docstring)")
+if os.environ.get("TASK_BUDGET_ID") not in ("LOCAL-872", "LOCAL-872B"):
+    sys.exit("refusing to run: launch with TASK_BUDGET_ID=LOCAL-872B (see docstring)")
+_TASK_ID = os.environ["TASK_BUDGET_ID"]
 HARD_CAP_USD = float(os.environ.get("TASK_BUDGET_USD", "0.40") or "0.40")
 os.environ.setdefault("TEST_GEMINI_MAX_USD", str(HARD_CAP_USD))
 os.environ.setdefault("COST_HARD_LIMIT_USD", str(HARD_CAP_USD))
@@ -80,7 +81,7 @@ os.environ.setdefault("STORIED_MODE", "true")
 os.environ.setdefault("STOP_EXISTENCE_GATE_MODE", "log_only")
 os.environ["USER_STOPS_ENABLED"] = "true"
 
-_METER_DIR = os.path.join(_HERE, "_local872_meterlogs")
+_METER_DIR = os.path.join(_HERE, "_local872b_meterlogs" if os.environ.get("TASK_BUDGET_ID") == "LOCAL-872B" else "_local872_meterlogs")
 os.makedirs(_METER_DIR, exist_ok=True)
 METER_LOG = os.environ.get("PAID_API_LOG") or os.path.join(_METER_DIR, "paid_api_calls.jsonl")
 PREVIEW_JSON = os.path.join(_HERE, "submission_artifacts", "local867", "preview_michael_hcmc.json")
@@ -283,7 +284,7 @@ def phase_import10(only=None):
     print(f"\n[IMPORT10] {len(stops)} stops from the saved LOCAL-867 preview", flush=True)
     from live_run_meter import LiveRunMeter
     os.environ["TEST_GEMINI_MAX_USD"] = f"{HARD_CAP_USD - before:.4f}"
-    _lrm = LiveRunMeter("LOCAL-872", cap_usd=HARD_CAP_USD - before)
+    _lrm = LiveRunMeter(_TASK_ID, cap_usd=HARD_CAP_USD - before)
     import importlib
     import tour_orchestrator_service as orch
     importlib.reload(orch)
@@ -312,7 +313,7 @@ def phase_import10(only=None):
                              "user_stops": stops}))
     import generate_tour_text_service as svc
     forced, err = svc.validate_stops(cap.get("stops") or [])
-    _tag = "import10" if not only else "opera"
+    _tag = "import10" if not only else re.sub(r"\W+", "", only.lower())
     _install_evidence_tap(_tag)
     text, log = _generate("Ho Chi Minh City, Vietnam", "walking", forced, len(forced), _tag)
     blocks = _blocks(text)
@@ -326,6 +327,25 @@ def phase_import10(only=None):
     ok &= _check("zero undisclosed UNSOURCED claims (log vs text)", n_bad == 0, n_bad)
     ok &= _recheck(_tag, text, "Ho Chi Minh City, Vietnam")
 
+    # 872B: the famous true facts must survive (sourced from Wikipedia, or disclosed)
+    for key, facts in (("notre", ("1863", "1880")), ("independence", ("Thụ", "Thu"))):
+        b = next((b for b in blocks if key in b[1].lower()), None)
+        if b is None:
+            print(f"   (no '{key}' stop in this run)", flush=True)
+            continue
+        low = b[2]
+        got = [f for f in facts if f in low]
+        pre = open(os.path.join(_METER_DIR, f"{_tag}_pregate_tour.txt"), encoding="utf-8").read()
+        pb = next((x for x in _blocks(pre) if key in x[1].lower()), None)
+        was = [f for f in facts if pb and f in pb[2]]
+        if was:     # the gate's job: a fact the narrator wrote must survive
+            ok &= _check(f"{key}: famous fact written by the narrator survives the gate ({'/'.join(facts)})",
+                         bool(got), got or "DROPPED")
+        else:
+            print(f"   [INFO] {key}: the narrator did not write {'/'.join(facts)} this run "
+                  f"(pre-gate text lacks it; the gate dropped nothing)", flush=True)
+        for m in re.finditer(r"[^.\n]*(?:%s)[^.\n]*\." % "|".join(facts), low):
+            print("       " + m.group(0).strip()[:220], flush=True)
     op = next((b for b in blocks if "opera" in b[1].lower()), None)
     if op is None:
         ok &= _check("Saigon Opera House delivered", False, "missing")
@@ -339,9 +359,14 @@ def phase_import10(only=None):
         titles = json.load(open(os.path.join(_METER_DIR, f"{_tag}_titles.json")))
         k = next((k for k, t in titles.items() if "opera" in t.lower()), None)
         evtxt = " ".join(ev.get(k, [])).lower() if k else ""
+        _pre = open(os.path.join(_METER_DIR, f"{_tag}_pregate_tour.txt"), encoding="utf-8").read()
+        _pb = next((x for x in _blocks(_pre) if "opera" in x[1].lower()), None)
         for fact in ("1900", "ferret"):
-            if fact in evtxt:
-                ok &= _check(f"sourced fact '{fact}' kept", fact in prose.lower(), "in text" if fact in prose.lower() else "MISSING")
+            if _pb and fact in _pb[2].lower():
+                ok &= _check(f"sourced fact '{fact}' written by the narrator survives the gate",
+                             fact in prose.lower(), "in text" if fact in prose.lower() else "DROPPED")
+            elif fact in evtxt:
+                print(f"   [INFO] '{fact}' is in the evidence but the narrator did not write it", flush=True)
             else:
                 print(f"   (fact '{fact}' is not in this run's Opera House research; not required)", flush=True)
     try:
@@ -361,7 +386,7 @@ def phase_hanoi():
         return False
     from live_run_meter import LiveRunMeter
     os.environ["TEST_GEMINI_MAX_USD"] = f"{HARD_CAP_USD - before:.4f}"
-    _lrm = LiveRunMeter("LOCAL-872", cap_usd=HARD_CAP_USD - before)
+    _lrm = LiveRunMeter(_TASK_ID, cap_usd=HARD_CAP_USD - before)
     _install_evidence_tap("hanoi")
     text, log = _generate("Old Quarter walk, Hanoi", "walking", [], 4, "hanoi")
     blocks = _blocks(text)
@@ -385,6 +410,8 @@ def phase_hanoi():
 
 
 if __name__ == "__main__":
+    if "--only" in sys.argv:
+        sys.exit(0 if phase_import10(only=sys.argv[sys.argv.index("--only") + 1]) else 1)
     if "--opera" in sys.argv:
         sys.exit(0 if phase_import10(only="opera") else 1)
     if "--import10" in sys.argv:

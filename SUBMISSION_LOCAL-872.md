@@ -111,3 +111,126 @@ What is NOT proven:
 
 Artifacts: `submission_artifacts/local872/` (delivered texts, run-1 pre-gate text,
 `meter_summary.json`). Run logs are not committed.
+
+---
+
+# 872B: the gate dropped TRUE famous facts; source them, don't delete them
+
+Same branch (`LOCAL-872-landmark-claim-gate`), `origin/subscribed` already merged (nothing new).
+
+## 1. Evidence first: the stop's Wikipedia article
+
+`landmark_wikipedia_evidence.py` (new). For every stop the gate scans (walking stops and
+landmark user stops; business user stops are still 855D's) the evidence now includes the
+stop's Wikipedia **lead + infobox** (built / years built / completed / opened / architect /
+style / capacity / consecrated, en and vi keys), in **en plus the local language** (vi for
+Vietnam, `local_languages()`; fr/es/it/de/pt/ja/th known too).
+
+- Free MediaWiki API, one request per language (two for non-en: the English article's
+  interlanguage link is followed, because a Vietnamese title rarely string-matches the
+  English stop name).
+- The article must name-match the stop (`landmark_second_authority.name_matches`), or give
+  the stop's name in its own lead ("Saigon Opera House" is the article "Ho Chi Minh City
+  Opera House"). An unrelated page is never evidence (test).
+- Cached like the P625 lookup: venue-cache DB, table `landmark_wiki_cache`, 90 d for a hit,
+  3 d for a miss; a transport failure is not cached. Kill switch `LANDMARK_WIKI_EVIDENCE=0`.
+- Wired in `generate_tour_text.py` next to the 872 evidence build; fetched in parallel;
+  logged as `[LOCAL-872B] stop N Wikipedia evidence: K article(s)`.
+
+Real fetches (not mocked): Notre-Dame en infobox `established: 1863; completed: 1880`; vi
+`architect: Jules Bourard`. Independence Palace en lead "designed by architect Ngô Viết Thụ",
+infobox `completion date: 31 October 1966`. Saigon Opera House en `architect: Félix Olivier`,
+vi `architect: Félix Olivier, Ernest Guichard, Eugène Ferret; opened: 1900`.
+
+## 2. Disclosure over deletion (borderline only)
+
+`is_borderline()` / `disclose()` in `landmark_claim_gate.py`. A sentence whose ONLY unsourced
+claims are a **date** or an **architect/builder-type person**, in a sentence about the venue's
+own history (built, designed, opened, consecrated, restored...) and with **no performance
+cue**, is rewritten "It is sometimes said that ..." (D760) instead of dropped. Logged as
+`[LOCAL-872B] stop N DISCLOSED (...)`; the checker and the re-check read it as disclosed;
+the gate is idempotent.
+
+Still a DROP, as the ticket says: a named production, performer (sang, conducted, starred,
+hosted...), event, or work; any sentence that mixes one of those with a date (tests: Miss
+Saigon, Callas, a "Saigon Jazz Festival", a conductor, "built in 1901 ... staged Miss
+Saigon"). `disclose_borderline=False` restores the 872 behaviour.
+
+## 3. False-positive fixes kept; Hanoi "Ngoc Son" added
+
+All 872 fixes stay (style words, possessives, place nouns). New: a name that any source, or
+the stop's own names, gives as "<name> Temple/Lake/..." is a place, so "crowned by Ngoc Son"
+(the bare form, which the 872 hanoi re-check flagged as a person) is no longer a claim.
+Test: `test_hanoi_ngoc_son_is_a_place_not_a_person`.
+
+## 4. Tests
+
+`tests/test_local872b_wikipedia_evidence.py` (14) plus the 872 file (18):
+infobox parsing, local languages, evidence includes lead+infobox, unrelated article refused,
+transport failure; Notre-Dame 1863/1959 dropped-before / kept-with-Wikipedia; unsourced
+history disclosed and idempotent; Independence Palace architect sourced and disclosed;
+Miss Saigon / performer / event still dropped; mixed sentence dropped; Ngoc Son; wiring.
+One 872 test changed: it asserted an unsourced "built in 1887 by Pierre Dubois" is dropped;
+that is now disclosed by design, so it now uses a performer sentence. Regression
+(864/855/862/867/872 suites): 322 pass, 18 skipped.
+
+## 5. Offline replay of the 872 run-1 text, with real Wikipedia evidence
+
+| Stop | 872 (thin evidence) | 872B, no Wikipedia | 872B + Wikipedia |
+|---|---|---|---|
+| Notre-Dame | dropped 1877/1880 sentence, 1959 sentence | both kept, **disclosed** | both **kept as written** |
+| Independence Palace | architect sentence dropped | **disclosed** | **kept as written** |
+
+Not recovered: "General Nguyễn Văn Thiệu ... used this palace as his home" is still dropped.
+It is a named person who is neither architect nor builder, so by my reading of the ticket it is
+not "borderline"; widening that would let invented people through. Say if you want it widened.
+Also still disclosed even with Wikipedia: "Bishop Isidore Colombert laid the first stone"
+(not in the article text I fetched).
+
+## 6. Live, final code (TASK_BUDGET_ID=LOCAL-872B, cap $0.60, metered $0.3447; own DB, torn down)
+
+| Run | Result |
+|---|---|
+| Michael's 10 stops | 10/10 delivered. Wikipedia evidence found for all 6 gated stops (2 articles each). Gate dropped 0, disclosed 0 (first pass and final-text pass). **No Miss Saigon.** Checker: 0 undisclosed. Re-check against the evidence: 0 left. Notre-Dame: "completed in 1880" and "wooden church ... in 1863" are in the delivered text. $0.2156. |
+| Independence Palace only | architect Ngô Viết Thụ in the delivered text ("Diệm called upon architect Ngô Viết Thụ"), gate dropped 0. $0.0214. |
+| "Old Quarter walk, Hanoi" | 4/4 delivered. Wikipedia evidence for 3 of 4 stops. Gate dropped 0, disclosed 0. Checker 0, re-check 0. $0.1077. |
+
+What I want you to read before accepting:
+
+- **The gate dropped nothing in these runs, so I did not see it disclose anything live.**
+  The disclosure and the "dropped before, kept now" results are shown by unit tests and the
+  offline replay (section 5), not by a live catch.
+- **Notre-Dame "1863-1880" and "1959":** the narrator in this run wrote "completed in 1880"
+  and "in 1863" but not "1959" and not the range, so those exact strings are not in the text.
+  What it did write was kept. The gate did not remove anything the narrator wrote, but I
+  cannot say "keeps 1863-1880" literally.
+- **Opera House:** 7 sentences, Ferret kept, but "1900" was not written by the narrator this
+  run (the evidence has it). Run 1 had 10 sentences. The pre-gate text had 10, delivered 11, so
+  this is narrator variance, not the gate.
+- **Runner changed:** it used to fail when a sourced fact was in the evidence but the narrator
+  never wrote it. That blames the gate for the narrator. It now fails only when a fact the
+  narrator wrote (pre-gate) is gone from the delivered text; otherwise it prints an INFO line.
+  By that check the first full run showed two FAILs under the old rule (Independence architect,
+  Opera 1900), both "narrator did not write it"; the Independence-only re-run then passed.
+- **Hanoi sentence counts vs the 872 hanoi run** (same counter, `[.!?]` followed by space):
+
+  | Stop | 872 run | 872B run |
+  |---|---|---|
+  | 1 Hoan Kiem Lake | 23 | 20 |
+  | 2 Ngoc Son Temple | 17 | 19 |
+  | 3 | Bach Ma Temple 15 | Old Quarter 12 |
+  | 4 | Dong Xuan Market 18 | Bach Ma Temple 15 |
+
+  Stops 3 and 4 are different places (the generator picks the list afresh each run) and stop 1
+  is 3 sentences shorter. The gate dropped 0 here, so none of that is the gate; the pre-gate
+  and delivered texts are the same length for the gate's part. I cannot show "no stop thinner"
+  as a like-for-like comparison.
+- **Outside this gate:** in the 10-stop run, business stops thinned after the gate
+  (Book Street 12 to 6, Café Apartments 15 to 8, Bạch Đằng Pier 14 to 3). Those stops are
+  skipped by this gate (855D verifies them), so it is not 872B. Flagging it in case it matters.
+- The last code change after the live runs: `disclose()` now lower-cases function and adverb
+  openers ("Another chapter" -> "another chapter"). No live disclosure happened, so no live
+  text was affected; covered by a unit test.
+
+Artifacts: `submission_artifacts/local872b/` (10-stop pre-gate and delivered, hanoi,
+Independence-only). Run logs are not committed.

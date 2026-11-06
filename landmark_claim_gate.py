@@ -435,7 +435,10 @@ _PERFORMER_RE = re.compile(
     r"attended|visited|toured|appeared|concert|recital|staged|screened|speech|spoke|"
     r"addressed|signed|met|stayed|lived|died|born|killed|arrested|escaped|fled)\b")
 _LOWER_OK = frozenset("the a an it its this that these those built inside outside "
-                      "today now from after before during since in on at as by".split())
+                      "today now from after before during since in on at as by another later then soon "
+                      "eventually originally finally first next over with when while once "
+                      "although though despite because there here some many most each every "
+                      "several after-wards afterwards meanwhile initially later".split())
 
 
 def is_borderline(sentence: str, claims: Sequence[Tuple[str, str]]) -> bool:
