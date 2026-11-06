@@ -1431,6 +1431,14 @@ def _compute_route_order(poi_list):
     
     Graceful no-op: returns input unchanged if <3 stops have coordinates.
     """
+    # [LOCAL-867] A user-chosen stop list keeps the listener's order.
+    try:
+        if _J._KEEP_GIVEN_ORDER:
+            print(f"  [LOCAL-867] ROUTE-ORDER skipped: user-chosen stops keep the "
+                  f"given order ({len(poi_list)} stops)")
+            return list(poi_list)
+    except Exception:
+        pass
     # Extract coordinates for each stop
     coords = []
     for i, poi in enumerate(poi_list):
@@ -6363,6 +6371,11 @@ _J = _jss.attach_to_module(__name__, {
     # URL} per JOB ("The Crazy street" -> "Bui Vien Walking Street"), so the
     # user-stop enrichment can look the venue up under its real name.
     "_USER_STOP_ALIASES": dict,
+    # [LOCAL-867] True while generating a user-chosen (forced) stop list: the
+    # listener's order IS the route ("exactly those stops, in order",
+    # LOCAL-357/525), so _compute_route_order must not re-sequence it. Set (and
+    # reset) per job at the forced-stops block.
+    "_KEEP_GIVEN_ORDER": lambda: False,
     # [LOCAL-644] The LAST generation's structured records (Stop/Opening/Closing),
     # serialized to JSON-safe dicts, so the STOP-POOL orchestrator can carry the
     # generator's OWN records through the pool delivery instead of re-parsing the
@@ -13786,8 +13799,21 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     # enrichment, composition, QA gates) runs unchanged.
     # THIS IS A VERIFICATION HARNESS — NOT A PRODUCT FEATURE.
     _forced_stops_active = False
+    try:
+        _J._KEEP_GIVEN_ORDER = False
+    except Exception:
+        pass
     if forced_stops is not None and len(forced_stops) > 0:
         _forced_stops_active = True
+        # [LOCAL-867] The listener's order is the route. Every _compute_route_order
+        # call in this job (initial LOCAL-7 pass, GEO-CHECK / D558 / LOCAL-662B
+        # leg checks) keeps it, so a walking tour of an imported itinerary is
+        # delivered in the order pasted, and the leg limits are measured on the
+        # route the listener will actually walk.
+        try:
+            _J._KEEP_GIVEN_ORDER = True
+        except Exception:
+            pass
         # [LOCAL-852] A listener pastes stops as "Name + URL" (a Google share link
         # or a plain website). Parse each raw item: strip the URL (incl. the
         # "https___" underscore-mangled form) from the display NAME, resolve a

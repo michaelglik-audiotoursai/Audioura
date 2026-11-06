@@ -3818,6 +3818,25 @@ def generate_complete_tour():
         _raw_stops = data.get('user_stops')
         if _raw_stops is not None:
             _stops_field_present = 'user_stops'
+    # [LOCAL-867] A REVIEWED itinerary preview (POST /preview-stops on the
+    # generator) arrives as user_stops entries that are objects
+    # {name|stop_name, lat, lng, ...} in the listener's order. Fold each into the
+    # existing user-stops string form ("<name> <Maps @lat,lng link>") so the
+    # reviewed pin is read as a user pin by the LOCAL-852/859 parser and every
+    # 855E / 859B / 862 / D760 rule applies unchanged. Plain strings pass through.
+    # A malformed object is a 400 below, never a silent drop.
+    _imp_n = 0
+    from user_stops_flag import user_stops_enabled as _us_on867
+    if (_us_on867() and isinstance(_raw_stops, list)
+            and any(isinstance(_i, dict) for _i in _raw_stops)):
+        try:
+            from itinerary_import import stops_for_generation as _sfg867
+            _raw_stops, _imp_pins = _sfg867(_raw_stops)
+            _imp_n = len(_raw_stops)
+            print(f"[LOCAL-867] imported {_imp_n} stops "
+                  f"({_imp_pins} with a reviewed pin carried, order kept)")
+        except Exception as _imp_err:
+            return jsonify({"error": f"'user_stops' entry is not valid: {_imp_err}"}), 400
     # [GCS-KS1] Kill switch (D591). When USER_STOPS_ENABLED is not 'true', the
     # user-chosen stops are dropped here — the request then behaves exactly as if
     # the app had sent no stops at all, and validate_stops(None) yields (None, None)
