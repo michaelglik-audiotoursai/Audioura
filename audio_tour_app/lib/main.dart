@@ -18,6 +18,7 @@ import 'services/foreground_community_messages.dart';
 import 'services/saved_tours_refresh.dart';
 import 'services/tour_download_service.dart';
 import 'services/deep_link_service.dart';
+import 'services/shared_text_service.dart';
 import 'services/failure_reporter.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -179,6 +180,9 @@ void main() async {
   // PendingShareSearch; MainScreen switches to Home and Home runs the search
   // through the same path a pasted code takes. Never blocks startup.
   unawaited(DeepLinkService.instance.init());
+
+  // [LOCAL-868] Android Share → Audioura: text/plain handed over by MainActivity.
+  unawaited(SharedTextService.instance.init());
 
   // [iOS IAP] StoreKit 2 must be enabled before InAppPurchase is first used,
   // and the purchase listener must run from launch. Bounded inside.

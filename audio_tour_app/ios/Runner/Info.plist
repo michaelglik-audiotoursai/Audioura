@@ -2,6 +2,26 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- [LOCAL-868 / D762] audioura://paste?text=... — the Share extension (AudiouraShare)
+	     hands text shared from Musa.AI / Notes / ChatGPT to the app this way; the
+	     app opens the "Paste a list of places" box pre-filled. -->
+	<!-- app_links (not the Flutter engine) reads incoming URLs; without this the engine
+	     also pushes audioura://paste?... onto the Navigator as an unknown route. -->
+	<key>FlutterDeepLinkingEnabled</key>
+	<false/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>com.audioura.audiotours.paste</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>audioura</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

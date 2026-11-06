@@ -41,6 +41,10 @@ import '../utils/generation_completion_message.dart';
 import '../utils/plan_left_summary.dart';
 import '../utils/user_stops.dart';
 import 'user_stops_screen.dart';
+import 'paste_list_screen.dart';
+import '../utils/pasted_list.dart';
+import '../services/shared_text_service.dart';
+import '../services/preview_stops_service.dart';
 import 'main_screen.dart';
 import 'plan_screen.dart';
 import 'plans_screen.dart';
@@ -51,7 +55,17 @@ class TourGeneratorScreen extends StatefulWidget {
       {super.key,
       this.initialEntitlements,
       this.initialCommunityId,
-      this.initialOwnedCommunities});
+      this.initialOwnedCommunities,
+      this.pastePreviewPost,
+      this.pasteLocateCity,
+      this.pasteShowTiles = true});
+
+  /// [LOCAL-868] Test seams for the paste box: the /preview-stops poster, the
+  /// current-location city lookup, and whether to draw map tiles. Production
+  /// leaves all three at their defaults.
+  final PreviewPoster? pastePreviewPost;
+  final CityLocator? pasteLocateCity;
+  final bool pasteShowTiles;
 
   /// [LOCAL-733 / D703] Test seam only: when provided, the screen uses this
   /// snapshot for the "tours left" line instead of loading it from the
@@ -160,6 +174,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     _loadAppMode();
     _loadOwnedCommunities();  // [LOCAL-701] populate the "For:" selector (organisers only)
     _loadEntitlements();      // [LOCAL-733] populate the "tours left" line
+    // [LOCAL-868] Share → Audioura: text parked by the share sheet opens the
+    // paste box pre-filled. Also acts on text already waiting at launch.
+    PendingSharedText.instance.text.addListener(_onSharedTextArrived);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onSharedTextArrived());
     
     // Check for stalled tours immediately
     BackgroundTourMonitor.checkStalledTours();
@@ -215,12 +233,15 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
   
   Future<void> _loadAppMode() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _appMode = prefs.getString('app_mode') ?? 'Tours';
       if (_appMode == 'Audio') {
         _stopCountController.text = '0'; // Default for Audio mode (major points)
       }
     });
+    // [LOCAL-868] Shared text that arrived before the mode was known.
+    _onSharedTextArrived();
   }
 
   // [LOCAL-733 / D703] Load the entitlement snapshot for the "tours left" line.
@@ -577,6 +598,57 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         .trim();
   }
 
+  bool _pasteOpen = false;
+
+  /// [LOCAL-868] Text shared from another app is waiting: open the paste box
+  /// with it. Tours mode only (Audio mode has no stops), once at a time.
+  void _onSharedTextArrived() {
+    final shared = PendingSharedText.instance.text.value;
+    if (shared == null || !mounted || _pasteOpen || _isGenerating) return;
+    if (_appMode != 'Tours') return;
+    PendingSharedText.instance.consume();
+    unawaited(_openPasteList(initialText: shared));
+  }
+
+  /// [LOCAL-868] "Paste a list of places": paste → free preview → reviewed
+  /// stops. The result lands in `_userStops` (the same list the "I will name
+  /// the stops" loop edits), so the existing review and generate flow is reused.
+  Future<void> _openPasteList({String? initialText}) async {
+    if (_pasteOpen) return;
+    _pasteOpen = true;
+    try {
+      final result = await Navigator.push<PastedListResult>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PasteListScreen(
+            initialText: initialText ?? _pastedText,
+            initialCity: _pastedCity ?? cityFromRequestText(_tourRequestController.text),
+            previewPost: widget.pastePreviewPost,
+            locateCity: widget.pasteLocateCity,
+            showTiles: widget.pasteShowTiles,
+          ),
+        ),
+      );
+      if (result == null || !mounted) return;
+      setState(() {
+        _userStops = previewStopsToUserStops(result.stops);
+        _stopMode = 'name';
+        _pastedCity = result.city;
+        _pastedText = result.text;
+        // The generate request needs a location; default it to the city.
+        if (_tourRequestController.text.trim().isEmpty && result.city.isNotEmpty) {
+          _tourRequestController.text = 'walking tour for ${result.city}';
+        }
+      });
+    } finally {
+      _pasteOpen = false;
+    }
+  }
+
+  // [LOCAL-868] Last pasted text/city, so re-opening the box resumes.
+  String? _pastedText;
+  String? _pastedCity;
+
   /// LOCAL-523 — open the "name your stops" loop and keep whatever the user
   /// builds. Passing the current `_userStops` back in lets them resume editing
   /// a list they already started. A `null` result (Cancel) leaves the stored
@@ -695,7 +767,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // tour is built from their selection. Only present when they opted in;
       // the default request body is otherwise unchanged (AC #1, #2).
       if (_stopMode == 'name') {
-        tourData['user_stops'] = stopTitlesForGeneration(_userStops);
+        tourData['user_stops'] = userStopsForGeneration(_userStops);
       }
       // Include user_id — required by cloud gateway for auth
       final prefs = await SharedPreferences.getInstance();
@@ -1928,6 +2000,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // not a named-stop list).
       _stopMode = 'suggest';
       _userStops = [];
+      _pastedText = null;
     });
     await _generateTour();
   }
@@ -2228,7 +2301,17 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
                         setState(() => _stopMode = selection.first);
                       },
               ),
-              const SizedBox(height: 16),
+              // [LOCAL-868] Paste a whole list of places; preview them free.
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const Key('paste_list_entry'),
+                  onPressed: _isGenerating ? null : () => _openPasteList(),
+                  icon: const Icon(Icons.content_paste_go),
+                  label: const Text('Paste a list of places'),
+                ),
+              ),
+              const SizedBox(height: 8),
             ],
 
             // Stop selection detail depends on the chosen mode.
@@ -2515,7 +2598,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       tourData['total_stops'] = stopCount; // Add custom stop count
       // LOCAL-523: forward the user's own ordered stops when they opted in.
       if (_stopMode == 'name') {
-        tourData['user_stops'] = stopTitlesForGeneration(_userStops);
+        tourData['user_stops'] = userStopsForGeneration(_userStops);
       }
       // Include user_id — required by cloud gateway for auth
       final prefs = await SharedPreferences.getInstance();
@@ -3394,6 +3477,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
 
   @override
   void dispose() {
+    PendingSharedText.instance.text.removeListener(_onSharedTextArrived);
     _refreshTimer?.cancel();
     _tourRequestController.dispose();
     _stopCountController.dispose();
