@@ -1,3 +1,5 @@
+import 'dart:io' show Directory;
+
 import 'package:flutter/material.dart';
 import '../services/saved_tours_refresh.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
@@ -23,6 +25,9 @@ import '../services/translate_download_manager.dart';
 import '../widgets/pass_expiry_warning_dialog.dart';
 import '../widgets/translate_download_progress_banner.dart';
 import 'community_page_screen.dart';
+import 'tour_player_screen.dart';
+import '../services/player_session.dart';
+import '../widgets/persistent_player_bar.dart';
 
 /// [LOCAL-761 / D710 as amended] Keys on the persistent bottom bar and the
 /// animated wrapper that slides it away while the user scrolls content down.
@@ -103,6 +108,7 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     _visitedTabs.add(_selectedIndex);
     WidgetsBinding.instance.addObserver(this);
     _initializeNotifications();
+    _restorePlayerSession();
     BackgroundService.startBackgroundMonitoring();
     // LOCAL-598 D2: tell the server the app opened (records activity) and act
     // on the renewal state it returns. Runs on launch; also on each resume via
@@ -345,22 +351,89 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         _maybeWarnPassExpiry();
       }
       _lastPausedAt = null;
-      // Refresh Home, My Tours, or Treats when the app is resumed. Pre-761 this
-      // relied on a full rebuild; now we reset the tab's root to a fresh route
-      // so its initState runs again (re-reading app_mode and reloading data).
+      // Refresh Home, My Tours, or Treats when the app is resumed.
+      //
+      // [LOCAL-877] Sophia: reopening the app threw her out of the tour and
+      // stopped the audio. The old code reset the current tab's root on EVERY
+      // resume, which popped the tour/stop player off the Listen navigator and
+      // disposed it (and its audio). Now:
+      //   * a tab that is not at its root, or any live/started tour session,
+      //     is NEVER reset — the listener comes back to the same tour, stop and
+      //     position, audio untouched (no player re-init);
+      //   * the data is refreshed IN PLACE instead (Listen reloads its list via
+      //     SavedToursRefresh; MyToursScreen also reloads itself on resume);
+      //   * only a tab sitting at its root with no tour in progress is reset
+      //     (so Home / Listen / Treats still pick up app_mode and new data).
       if (_selectedIndex == kHomeTab ||
           _selectedIndex == kListenTab ||
           _selectedIndex == kTreatsTab) {
-        if (_selectedIndex == kListenTab) {
-          _listenTabVersion++; // NF10: force Listen reload on resume
+        if (_canResetTabOnResume(_selectedIndex)) {
+          if (_selectedIndex == kListenTab) {
+            _listenTabVersion++; // NF10: force Listen reload on resume
+          }
+          setState(() {
+            final v = _tabRootVersion[_selectedIndex];
+            if (v != null) _tabRootVersion[_selectedIndex] = v + 1;
+          });
+          _resetTabToRoot(_selectedIndex);
+        } else if (_selectedIndex == kListenTab) {
+          SavedToursRefresh.instance.bump(); // in place, route untouched.
         }
-        setState(() {
-          final v = _tabRootVersion[_selectedIndex];
-          if (v != null) _tabRootVersion[_selectedIndex] = v + 1;
-        });
-        _resetTabToRoot(_selectedIndex);
       }
     }
+  }
+
+  /// [LOCAL-877] True only when resetting [index]'s root cannot lose anything:
+  /// the tab is at its root route AND no tour is open or in progress.
+  bool _canResetTabOnResume(int index) {
+    final nav = _tabNavigatorKeys[index].currentState;
+    if (nav != null && nav.canPop()) return false; // a screen/tour is open.
+    final session = PlayerSession.instance;
+    if (session.hasLivePlayer || session.barVisible) return false;
+    return true;
+  }
+
+  /// [LOCAL-877] Cold start: if the app was killed mid-tour, bring back the
+  /// last tour + stop as a "Resume <tour>, stop N" bar.
+  Future<void> _restorePlayerSession() async {
+    await PlayerSession.instance.restore(
+      pathExists: (p) => Directory(p).existsSync(),
+    );
+  }
+
+  /// [LOCAL-877] Bar tapped (or Resume pressed): show the tour at its current
+  /// stop. A live player is brought forward in whichever tab holds it; with no
+  /// live player (cold start) it is re-opened on the Listen tab at the saved
+  /// stop and position.
+  void _openPlayerFromBar(PlayerSnapshot s) {
+    final cmds = PlayerSession.instance.commands;
+    if (s.live && cmds?.navigator != null) {
+      for (int i = 0; i < kTabCount; i++) {
+        if (identical(_tabNavigatorKeys[i].currentState, cmds!.navigator)) {
+          if (_selectedIndex != i) _switchToTab(i);
+          final route = cmds.route;
+          if (route != null && route.isActive) {
+            cmds.navigator!.popUntil((r) => identical(r, route));
+          }
+          return;
+        }
+      }
+    }
+    if (_selectedIndex != kListenTab) _switchToTab(kListenTab);
+    final nav = _tabNavigatorKeys[kListenTab].currentState;
+    if (nav == null) return;
+    nav.push(MaterialPageRoute(
+      builder: (_) => TourPlayerScreen(
+        tourPath: s.tourPath,
+        tourTitle: s.tourTitle,
+        tourId: s.tourId,
+        jobId: s.jobId,
+        serverTourId: s.serverTourId,
+        originalLanguage: s.originalLanguage,
+        initialStopIndex: s.stopIndex,
+        initialPositionSeconds: s.positionSeconds,
+      ),
+    ));
   }
 
   Future<void> _initializeNotifications() async {
@@ -613,7 +686,25 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
             ],
           ),
         ),
-        bottomNavigationBar: AnimatedSlide(
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // [LOCAL-877] Persistent player bar: on every screen, whenever a
+            // tour is playing or paused mid-stop. Sits in the bottom column so
+            // it never overlaps the page content or the thumbs row.
+            PersistentPlayerBar(
+              session: PlayerSession.instance,
+              onOpen: _openPlayerFromBar,
+            ),
+            _buildNavBar(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavBar() {
+    return AnimatedSlide(
           key: kMainBottomBarSlideKey,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
@@ -638,8 +729,6 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
               ],
             ),
           ),
-        ),
-      ),
-    );
+        );
   }
 }

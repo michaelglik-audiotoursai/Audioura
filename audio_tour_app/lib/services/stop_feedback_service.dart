@@ -95,6 +95,37 @@ class StopFeedbackService {
     return removed;
   }
 
+  /// [LOCAL-877] Change an earlier answer for a stop (thumb up -> down or back).
+  ///
+  /// Sends an UPDATE, not a duplicate: a still-unsent thumb for this stop is
+  /// replaced in the outbox, so only the final answer is ever sent. If the
+  /// earlier one already reached the server, the new answer is queued as the
+  /// latest event for the stop (the server contract — `thumb` items into
+  /// `user_stop_feedback` — is unchanged; the newest event is the answer).
+  /// Returns true when an unsent thumb was replaced (no duplicate queued).
+  Future<bool> changeSwipe({
+    required int stopIndex,
+    required int swipe,
+    required String tourId,
+    String? jobId,
+    Map<String, double>? stopMetrics,
+  }) async {
+    final replaced =
+        await _removeMatchingThumb(stopIndex: stopIndex, tourId: tourId);
+    await recordSwipe(
+      stopIndex: stopIndex,
+      swipe: swipe,
+      tourId: tourId,
+      jobId: jobId,
+      stopMetrics: stopMetrics,
+    );
+    await DebugLogHelper.addDebugLog(
+      'SWIPE: Changed stop $stopIndex to ${swipe == 1 ? "LIKE" : "DISLIKE"} '
+      '(${replaced ? "replaced unsent thumb" : "earlier one already sent"})',
+    );
+    return replaced;
+  }
+
   /// Current count of pending thumbs in the outbox (diagnostics / testing).
   Future<int> get queueLength async {
     final items = await OutboxService.instance.pendingItems();

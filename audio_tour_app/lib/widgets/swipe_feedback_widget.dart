@@ -69,6 +69,12 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
   int? _lastSwipe;
   Timer? _undoTimer;
 
+  /// [LOCAL-877] The listener closed the thumbs (x). Sticky for this player.
+  bool _dismissed = false;
+
+  /// [LOCAL-877] The collapsed "thanks · change" chip was opened to change.
+  bool _changing = false;
+
   /// Metrics cache (loaded once per tour).
   Map<int, Map<String, double>>? _stopMetrics;
 
@@ -76,6 +82,20 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
   void initState() {
     super.initState();
     _loadMetrics();
+  }
+
+  @override
+  void didUpdateWidget(covariant SwipeFeedbackWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // [LOCAL-877] A new stop is a fresh question; a confirmation or chip that
+    // belongs to the previous stop must not linger.
+    if (oldWidget.currentStopIndex != widget.currentStopIndex) {
+      _undoTimer?.cancel();
+      _changing = false;
+      _state = _swipedStops.containsKey(widget.currentStopIndex)
+          ? _FeedbackState.answered
+          : _FeedbackState.idle;
+    }
   }
 
   @override
@@ -97,11 +117,14 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
   Future<void> _handleSwipe(int swipe) async {
     final stopIndex = widget.currentStopIndex;
 
-    // Prevent double-swipe on same stop
-    if (_swipedStops.containsKey(stopIndex)) {
+    // [LOCAL-877] Same answer again: nothing to do. A DIFFERENT answer changes
+    // the earlier one (an update, never a second thumb).
+    final earlier = _swipedStops[stopIndex];
+    if (earlier == swipe) {
       await DebugLogHelper.addDebugLog(
-        'SWIPE: Stop $stopIndex already rated — ignoring duplicate',
+        'SWIPE: Stop $stopIndex already rated $swipe — ignoring duplicate',
       );
+      if (mounted) setState(() => _changing = false);
       return;
     }
 
@@ -112,27 +135,41 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
     // Get metrics for this stop (or null for defaults)
     final metrics = _stopMetrics?[stopIndex];
 
-    await _feedbackService.recordSwipe(
-      stopIndex: stopIndex,
-      swipe: swipe,
-      tourId: widget.tourId,
-      jobId: widget.jobId,
-      stopMetrics: metrics,
-    );
+    if (earlier != null) {
+      await _feedbackService.changeSwipe(
+        stopIndex: stopIndex,
+        swipe: swipe,
+        tourId: widget.tourId,
+        jobId: widget.jobId,
+        stopMetrics: metrics,
+      );
+    } else {
+      await _feedbackService.recordSwipe(
+        stopIndex: stopIndex,
+        swipe: swipe,
+        tourId: widget.tourId,
+        jobId: widget.jobId,
+        stopMetrics: metrics,
+      );
+    }
 
     // Notify parent (for haptic feedback, etc.)
     widget.onSwipe?.call(swipe);
 
     // Show confirmation + undo
     if (mounted) {
-      setState(() => _state = _FeedbackState.confirmed);
+      setState(() {
+        _state = _FeedbackState.confirmed;
+        _changing = false;
+      });
     }
 
-    // Auto-dismiss after 4 seconds
+    // [LOCAL-877] After 4 seconds collapse to the small "thanks · change" chip
+    // (it used to fall back to the big thumbs, which never went away).
     _undoTimer?.cancel();
     _undoTimer = Timer(const Duration(seconds: 4), () {
       if (mounted) {
-        setState(() => _state = _FeedbackState.idle);
+        setState(() => _state = _FeedbackState.answered);
       }
     });
   }
@@ -142,6 +179,7 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
     final stopIndex = widget.currentStopIndex;
     _undoTimer?.cancel();
 
+    final originalSwipe = _swipedStops[stopIndex] ?? 1;
     final removed = await _feedbackService.undoLastSwipe(
       stopIndex: stopIndex,
       tourId: widget.tourId,
@@ -161,7 +199,6 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
     // If the swipe was already sent, queue a reversal
     if (!removed) {
       // The original swipe was already flushed; queue opposite swipe
-      final originalSwipe = _swipedStops[stopIndex] ?? 1;
       await _feedbackService.recordSwipe(
         stopIndex: stopIndex,
         swipe: -originalSwipe,
@@ -181,6 +218,7 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
 
   @override
   Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink(key: ValueKey('feedback_dismissed'));
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
       child: _buildContent(),
@@ -191,6 +229,9 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
     switch (_state) {
       case _FeedbackState.idle:
         return _buildSwipeButtons();
+      case _FeedbackState.answered:
+        // The collapsed chip, or the thumbs again once "change" is tapped.
+        return _changing ? _buildSwipeButtons() : _buildAnsweredChip();
       case _FeedbackState.confirmed:
         return _buildConfirmation();
       case _FeedbackState.undone:
@@ -199,7 +240,8 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
   }
 
   Widget _buildSwipeButtons() {
-    final alreadySwiped = _swipedStops.containsKey(widget.currentStopIndex);
+    final answer = _swipedStops[widget.currentStopIndex];
+    final alreadySwiped = answer != null;
 
     return Container(
       key: const ValueKey('swipe_buttons'),
@@ -210,19 +252,29 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
           // [LOCAL-670] Make clear these thumbs rate THIS STOP, not the whole
           // tour (the tour has its own 1–10 rating). Show the stop name when we
           // have it so there is no ambiguity about what is being rated.
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              (widget.stopName != null && widget.stopName!.trim().isNotEmpty)
-                  ? 'This stop: ${widget.stopName}'
-                  : 'This stop:',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF7F8C8D),
+          Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 4, left: 32),
+                  child: Text(
+                    (widget.stopName != null &&
+                            widget.stopName!.trim().isNotEmpty)
+                        ? 'This stop: ${widget.stopName}'
+                        : 'This stop:',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF7F8C8D),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              _buildDismissButton(),
+            ],
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -234,7 +286,7 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
                 color: const Color(0xFFE74C3C),
                 label: 'Not for me',
                 isActive: alreadySwiped && _swipedStops[widget.currentStopIndex] == -1,
-                isDisabled: alreadySwiped,
+                isDisabled: false,
                 onTap: () => _handleSwipe(-1),
                 semanticLabel: 'Dislike this stop',
               ),
@@ -246,11 +298,76 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
                 color: const Color(0xFF27AE60),
                 label: 'More like this',
                 isActive: alreadySwiped && _swipedStops[widget.currentStopIndex] == 1,
-                isDisabled: alreadySwiped,
+                isDisabled: false,
                 onTap: () => _handleSwipe(1),
                 semanticLabel: 'Like this stop',
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDismissButton() {
+    return IconButton(
+      key: const ValueKey('feedback_dismiss'),
+      tooltip: 'Hide',
+      icon: const Icon(Icons.close, size: 18, color: Color(0xFF7F8C8D)),
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      padding: EdgeInsets.zero,
+      onPressed: () {
+        _undoTimer?.cancel();
+        setState(() => _dismissed = true);
+      },
+    );
+  }
+
+  /// [LOCAL-877] Small collapsed state after a choice: "✓ Thanks · change" and
+  /// a dismiss (x). Tapping "change" re-opens the thumbs so the other one can
+  /// be picked.
+  Widget _buildAnsweredChip() {
+    final isLike = _swipedStops[widget.currentStopIndex] == 1;
+    return Padding(
+      key: const ValueKey('answered_chip'),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.only(left: 12, right: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF3F5),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(isLike ? Icons.thumb_up : Icons.thumb_down,
+                    size: 14,
+                    color: isLike
+                        ? const Color(0xFF27AE60)
+                        : const Color(0xFFE74C3C)),
+                const SizedBox(width: 6),
+                const Text('✓ Thanks · ',
+                    style: TextStyle(fontSize: 13, color: Color(0xFF2c3e50))),
+                InkWell(
+                  key: const ValueKey('feedback_change'),
+                  onTap: () => setState(() => _changing = true),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 8),
+                    child: Text('change',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF3498DB),
+                        )),
+                  ),
+                ),
+                _buildDismissButton(),
+              ],
+            ),
           ),
         ],
       ),
@@ -333,7 +450,7 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
 }
 
 /// Internal state machine for the feedback widget.
-enum _FeedbackState { idle, confirmed, undone }
+enum _FeedbackState { idle, confirmed, undone, answered }
 
 /// A single like/dislike button with proper touch targets and semantics.
 class _FeedbackButton extends StatelessWidget {

@@ -17,6 +17,8 @@ import '../services/tour_pricing_service.dart';
 import '../services/downloaded_tour_meta.dart';
 import '../widgets/tour_buy_sheet.dart';
 import '../services/single_playback_controller.dart';
+import '../services/player_session.dart';
+import '../services/player_bar_js.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -43,6 +45,11 @@ class TourPlayerScreen extends StatefulWidget {
   /// the player header as "Original: <Language>" like the found-tour dialog.
   final String? originalLanguage;
 
+  /// [LOCAL-877] Open at this stop (0-based) and, if [initialPositionSeconds]
+  /// is given, at that position. Used by the bar's "Resume <tour>, stop N".
+  final int initialStopIndex;
+  final double initialPositionSeconds;
+
   const TourPlayerScreen({
     super.key,
     required this.tourPath,
@@ -53,6 +60,8 @@ class TourPlayerScreen extends StatefulWidget {
     this.buildNumber,
     this.serverTourId,
     this.originalLanguage,
+    this.initialStopIndex = 0,
+    this.initialPositionSeconds = 0,
   });
 
   @override
@@ -100,6 +109,54 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
 
   // [LOCAL-677B] How many opening stops play free as a preview on a locked tour.
   int _freePreviewStops = 1;
+
+  // [LOCAL-877] Identity of this player in the app-wide PlayerSession.
+  final Object _sessionOwner = Object();
+  bool _sessionAttached = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_sessionAttached) return;
+    _sessionAttached = true;
+    final nav = Navigator.maybeOf(context);
+    final route = ModalRoute.of(context);
+    // Deferred to after the frame: attach() notifies the bar's listener, which
+    // must not happen while the tree is building.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      PlayerSession.instance.attach(
+        owner: _sessionOwner,
+        initial: PlayerSnapshot(
+          tourPath: widget.tourPath,
+          tourTitle: widget.tourTitle,
+          tourId: widget.tourId,
+          jobId: widget.jobId,
+          serverTourId: widget.serverTourId,
+          originalLanguage: widget.originalLanguage,
+          stopIndex: widget.initialStopIndex,
+          positionSeconds: widget.initialPositionSeconds,
+        ),
+        commands: PlayerCommands(
+          play: () => _barJs('play()'),
+          pause: () => _barJs('pause()'),
+          next: () => _barJs('next()'),
+          previous: () => _barJs('previous()'),
+          navigator: nav,
+          route: route,
+        ),
+      );
+    });
+  }
+
+  Future<void> _barJs(String call) async {
+    try {
+      await _controller?.evaluateJavascript(
+          source: 'window.__audBar && window.__audBar.$call');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('TOUR_PLAYER: bar command $call failed: $e');
+    }
+  }
 
   @override
   void initState() {
@@ -329,6 +386,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
 
   @override
   void dispose() {
+    PlayerSession.instance.detach(_sessionOwner);
     disposeVoice();
     _consoleLogger.flush();
     super.dispose();
@@ -496,9 +554,16 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                       );
                       // [LOCAL-670] Fired by the WebView when the final stop's
                       // audio ends — offer the per-TOUR 1–10 rating once.
+                      // [LOCAL-877] Live state for the persistent player bar.
+                      // args: [stopIndex, playing, pos, dur, stopName, total].
+                      controller.addJavaScriptHandler(
+                        handlerName: 'onBarState',
+                        callback: (args) => _onBarState(args),
+                      );
                       controller.addJavaScriptHandler(
                         handlerName: 'onTourEnded',
                         callback: (args) {
+                          PlayerSession.instance.clear();
                           _maybePromptEndOfTourRating();
                         },
                       );
@@ -642,8 +707,20 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                       // stops played). Re-applied after a purchase lifts the lock.
                       await _applyLockToWebView();
 
+                      // [LOCAL-877] Install the bar bridge (state reports + commands).
+                      try {
+                        await controller.evaluateJavascript(source: kPlayerBarJs);
+                      } catch (e) {
+                        await DebugLogHelper.addDebugLog('TOUR_PLAYER: bar bridge install failed: $e');
+                      }
+
                       // Auto-start tour playback
                       await Future.delayed(Duration(milliseconds: 2000)); // Wait longer for page to fully load
+                      // [LOCAL-877] Resume at a saved stop/position instead.
+                      if (widget.initialStopIndex > 0 || widget.initialPositionSeconds > 0) {
+                        await _barJs('go(${widget.initialStopIndex}, ${widget.initialPositionSeconds})');
+                        return;
+                      }
                       try {
                         await controller.evaluateJavascript(source: """
                           console.log('Attempting auto-start...');
@@ -709,6 +786,36 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
       ),
     );
   }
+  /// [LOCAL-877] One state report from the page's audio elements.
+  void _onBarState(List<dynamic> args) {
+    if (args.length < 4) return;
+    int asInt(dynamic v) => v is num ? v.toInt() : int.tryParse('$v') ?? 0;
+    double asDbl(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
+    final idx = asInt(args[0]);
+    final playing = args[1] == true;
+    final name = (args.length > 4 && args[4] != null && '${args[4]}'.trim().isNotEmpty)
+        ? '${args[4]}'.trim()
+        : null;
+    final total = args.length > 5 ? asInt(args[5]) : 0;
+    PlayerSession.instance.update(
+      _sessionOwner,
+      stopIndex: idx,
+      totalStops: total > 0 ? total : null,
+      stopName: name,
+      playing: playing,
+      positionSeconds: asDbl(args[2]),
+      durationSeconds: asDbl(args[3]),
+    );
+    // Keep the per-stop thumbs on the stop that is actually playing.
+    if (mounted && (idx != _currentStopIndex || (name != null && name != _currentStopName))) {
+      setState(() {
+        _currentStopIndex = idx;
+        if (name != null) _currentStopName = name;
+        if (total > 0) _totalStops = total;
+      });
+    }
+  }
+
   /// Derive tour_id from the tour path (last segment of path).
   String _deriveTourId() {
     final segments = widget.tourPath.split('/');
