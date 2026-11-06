@@ -43,8 +43,10 @@ def test_sourced_built_1900_by_ferret_is_kept():
 
 
 def test_unsourced_year_or_architect_is_dropped():
+    # 872B: a plausible claim about the venue's OWN history is disclosed, not dropped
+    # (see tests/test_local872b_...); a performer/production is still dropped.
     new, removed = lg.filter_stop_body(
-        _body("It was built in 1887 by Pierre Dubois."), EVID, TITLE)
+        _body("The tenor Pierre Dubois sang here in 1887."), EVID, TITLE)
     assert "Dubois" not in new and removed
 
 

@@ -46,7 +46,7 @@ import museum_claim_gate as _mcg
 __all__ = [
     "venue_aliases", "production_claims", "named_person_claims", "named_event_claims",
     "named_work_claims", "dated_claims", "unsourced_claims", "filter_stop_body",
-    "filter_tour_text", "claim_span_lines",
+    "filter_tour_text", "claim_span_lines", "is_borderline", "disclose",
 ]
 
 _fold = _mcg._fold
@@ -283,6 +283,12 @@ def named_person_claims(sentence: str, blob: str, stop_title: str, location: str
     bad = []
     for n in _names_in(sentence, stop_tokens):
         sur = _fold(n.split()[-1])
+        # a name any source (or the stop's own names) gives as "<name> Temple/Lake/..."
+        # is a PLACE ("crowned by Ngoc Son" = Ngoc Son Temple), not a person
+        _pn = "|".join(x.lower() for x in _PLACE_NOUNS)
+        _nf = re.escape(_fold(n))
+        if re.search(r"\b" + _nf + r"\s+(?:" + _pn + r")\b", blob + " " + kn + " " + _fold(sentence)):
+            continue
         # accents folded; a surname in any source sources the person
         if re.search(r"\b" + re.escape(sur) + r"\b", blob) or re.search(r"\b" + re.escape(sur) + r"\b", kn):
             continue
@@ -414,6 +420,49 @@ def unsourced_claims(sentence: str, stop_title: str, evidence: Sequence[str],
     return out
 
 
+# ---- 872B: disclosure over deletion for borderline claims ---------------------
+# A plausible claim about the venue's OWN history (when it was built / opened /
+# consecrated, who designed it) that no source holds is DISCLOSED (D760) instead of
+# dropped.  A named production / performer / event / work stays a DROP: an invented
+# show is worse than none.
+_HISTORY_VERB_RE = re.compile(
+    r"(?i)\b(built|construct\w+|complet\w+|finished|opened|inaugurat\w+|founded|establish\w+|"
+    r"erected|designed|design|architect\w*|engineer\w*|consecrat\w+|dedicated|blessed|"
+    r"renovat\w+|restor\w+|rebuilt|expanded|commissioned|renamed|named|began|begun|"
+    r"started|unveiled|reopen\w*|destroyed|damaged)\b")
+_PERFORMER_RE = re.compile(
+    r"(?i)\b(perform\w*|sang|sing\w*|conduct\w*|starred|played|play|premier\w+|hosted|"
+    r"attended|visited|toured|appeared|concert|recital|staged|screened|speech|spoke|"
+    r"addressed|signed|met|stayed|lived|died|born|killed|arrested|escaped|fled)\b")
+_LOWER_OK = frozenset("the a an it its this that these those built inside outside "
+                      "today now from after before during since in on at as by".split())
+
+
+def is_borderline(sentence: str, claims: Sequence[Tuple[str, str]]) -> bool:
+    """True when every unsourced claim is a date or an architect/builder-type person
+    in a sentence about the venue's own history, with no performance cue."""
+    if not claims:
+        return False
+    if any(k not in ("date", "person") for k, _ in claims):
+        return False
+    if _PERFORMER_RE.search(sentence) or not _HISTORY_VERB_RE.search(sentence):
+        return False
+    for k, c in claims:
+        if k == "date" and not (1000 <= int(c) <= 2100):
+            return False
+    return True
+
+
+def disclose(sentence: str) -> str:
+    """'It is sometimes said that <sentence>' (D760).  Lower-cases the first letter only
+    for a function word; a proper noun keeps its capital."""
+    s = sentence.strip()
+    first = re.match(r"[A-Za-z]+", s)
+    if first and first.group(0).lower() in _LOWER_OK:
+        s = s[0].lower() + s[1:]
+    return "It is sometimes said that " + s
+
+
 def claim_span_lines(kind: str, claim: str, sentence: str) -> str:
     """The research-log form the LOCAL-864 checker reads: ``UNSOURCED: '<span>'``."""
     span = claim
@@ -425,7 +474,9 @@ def claim_span_lines(kind: str, claim: str, sentence: str) -> str:
 
 def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
                      known: Iterable[str] = (), location: str = "",
-                     aliases: Iterable[str] = (), flagged: Iterable[str] = ()
+                     aliases: Iterable[str] = (), flagged: Iterable[str] = (),
+                     disclose_borderline: bool = True,
+                     disclosures: Optional[List[Dict]] = None
                      ) -> Tuple[str, List[Dict]]:
     """Drop the sentences of one stop body that make an unsourced claim.
     Returns (new_body, [{'sentence','kind','claim','reason'}])."""
@@ -442,6 +493,7 @@ def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
     sents = [s for _, s in flat]
     flagged_l = [f for f in flagged if f and f.strip()]
     drop: Dict[int, Tuple[str, str]] = {}
+    soften: Dict[int, Tuple[str, str]] = {}
     for i, s in enumerate(sents):
         if is_disclosed(s) or _STRUCTURAL_RE.match(s):
             continue
@@ -450,9 +502,11 @@ def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
             continue
         cl = unsourced_claims(s, stop_title, evidence, known, location, aliases)
         if cl:
-            drop[i] = (cl[0][0], cl[0][1])
-            if len(cl) > 1:
-                drop[i] = (cl[0][0], "; ".join(c for _, c in cl))
+            span = "; ".join(c for _, c in cl)
+            if disclose_borderline and is_borderline(s, cl):
+                soften[i] = (cl[0][0], span)
+            else:
+                drop[i] = (cl[0][0], span)
     # dangling references left by a drop go with it
     for i in sorted(list(drop)):
         j = i + 1
@@ -461,7 +515,7 @@ def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
                     or _DANGLING_RE.match(sents[j]))):
             drop[j] = ("dangling", "refers back to a dropped unsourced sentence")
             j += 1
-    if not drop:
+    if not drop and not soften:
         return body, removed
     kill: Dict[int, List[str]] = {}
     for i, (kind, claim) in drop.items():
@@ -469,13 +523,24 @@ def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
         kill.setdefault(pi, []).append(s)
         removed.append({"sentence": s, "kind": kind, "claim": claim,
                         "reason": f"unsourced {kind} claim: {claim}"})
+    swap: Dict[int, List[Tuple[str, str]]] = {}
+    for i, (kind, claim) in soften.items():
+        pi, s = flat[i]
+        new_s = disclose(s)
+        swap.setdefault(pi, []).append((s, new_s))
+        if disclosures is not None:
+            disclosures.append({"sentence": s, "disclosed_as": new_s, "kind": kind,
+                                "claim": claim,
+                                "reason": f"unsourced {kind} claim about the venue's own history: {claim}"})
     out = []
     for pi, seg in enumerate(paras):
-        if pi not in kill:
+        if pi not in kill and pi not in swap:
             out.append(seg)
             continue
         new = seg
-        for s in kill[pi]:
+        for s0, s1 in swap.get(pi, []):
+            new = new.replace(s0, s1, 1)
+        for s in kill.get(pi, []):
             new = new.replace(s, "", 1)
         new = re.sub(r"[ \t]{2,}", " ", new)
         new = re.sub(r"[ \t]+\n", "\n", new)
@@ -491,11 +556,13 @@ def filter_tour_text(tour_text: str, stop_evidence: Optional[Dict[int, List[str]
                      stop_titles: Optional[Dict[int, str]] = None,
                      stop_flagged: Optional[Dict[int, List[str]]] = None,
                      stop_aliases: Optional[Dict[int, List[str]]] = None,
-                     skip_stops: Iterable[int] = (), location: str = ""
+                     skip_stops: Iterable[int] = (), location: str = "",
+                     disclose_borderline: bool = True
                      ) -> Tuple[str, Dict]:
     """Apply the gate to every ``Stop N:`` body.  ``skip_stops`` are stop numbers
     another verifier already covers (business user stops, LOCAL-855D)."""
-    report = {"stops": 0, "scanned": 0, "dropped": 0, "changed": False, "removed": []}
+    report = {"stops": 0, "scanned": 0, "dropped": 0, "changed": False, "removed": [],
+              "disclosed": []}
     if not tour_text or not tour_text.strip():
         return tour_text, report
     parts = _STOP_HEADER_RE.split(tour_text)
@@ -520,9 +587,14 @@ def filter_tour_text(tour_text: str, stop_evidence: Optional[Dict[int, List[str]
             if 0 <= cut < len(body):
                 main, tail = body[:cut], body[cut:]
         report["scanned"] += 1
+        disc: List[Dict] = []
         new_main, removed = filter_stop_body(
             main, (stop_evidence or {}).get(n, []), title, (stop_known or {}).get(n, []),
-            location, (stop_aliases or {}).get(n, []), (stop_flagged or {}).get(n, []))
+            location, (stop_aliases or {}).get(n, []), (stop_flagged or {}).get(n, []),
+            disclose_borderline=disclose_borderline, disclosures=disc)
+        for d in disc:
+            d["stop"] = n
+            report["disclosed"].append(d)
         report["dropped"] += len(removed)
         for r in removed:
             r = dict(r)
@@ -530,5 +602,5 @@ def filter_tour_text(tour_text: str, stop_evidence: Optional[Dict[int, List[str]
             report["removed"].append(r)
         out.extend([header, new_main + tail])
         i += 2
-    report["changed"] = bool(report["dropped"])
+    report["changed"] = bool(report["dropped"] or report["disclosed"])
     return "".join(out), report

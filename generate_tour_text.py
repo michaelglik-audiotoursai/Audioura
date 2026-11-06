@@ -32513,14 +32513,42 @@ RULES:
                             _lc_skip.add(_si)   # business user stop: LOCAL-855D verifies it
                     except Exception:
                         pass
+            # [LOCAL-872B] The stop's own Wikipedia article (lead + infobox: built,
+            # architect, opened, style, capacity), en + the local language, cached
+            # like the P625 lookup. Without it the gate dropped TRUE facts
+            # (Notre-Dame 1863-1880/1959, Independence Palace's architect).
+            if os.environ.get('LANDMARK_WIKI_EVIDENCE', '1').strip() != '0':
+                try:
+                    import landmark_wikipedia_evidence as _lwe872
+                    from concurrent.futures import ThreadPoolExecutor as _TPE872
+                    _wk_jobs = {_si: (_sp.get('name', '') or '', list(_lc_alias.get(_si) or []))
+                                for _si, _sp in enumerate(poi_list, 1) if _si not in _lc_skip}
+                    with _TPE872(max_workers=4) as _ex872:
+                        _futs = {_si: _ex872.submit(_lwe872.evidence_for, _n, location or '',
+                                                    None, None, True, _al)
+                                 for _si, (_n, _al) in _wk_jobs.items() if _n}
+                        for _si, _f in _futs.items():
+                            try:
+                                _wk = _f.result(timeout=60) or []
+                            except Exception:
+                                _wk = []
+                            _lc_ev[_si].extend(_wk)
+                            print(f"    [LOCAL-872B] stop {_si} Wikipedia evidence: {len(_wk)} article(s)"
+                                  + ''.join(f" [{len(x)} chars]" for x in _wk))
+                except Exception as _wk_err:
+                    print(f"  [LOCAL-872B] Wikipedia evidence error (non-fatal): {_wk_err}")
             _ctx_872['kw'] = dict(stop_evidence=_lc_ev, stop_known=_lc_known,
                                   stop_titles=_lc_titles, stop_flagged=_lc_flag,
                                   stop_aliases=_lc_alias, skip_stops=sorted(_lc_skip),
                                   location=location or '')
             complete_tour, _lc_rep = _lcg872.filter_tour_text(complete_tour, **_ctx_872['kw'])
-            print(f"  [LOCAL-872] Landmark claim gate: dropped {_lc_rep['dropped']} sentence(s) "
+            print(f"  [LOCAL-872] Landmark claim gate: dropped {_lc_rep['dropped']} sentence(s), "
+                  f"disclosed {len(_lc_rep.get('disclosed', []))} "
                   f"({_lc_rep['scanned']} of {_lc_rep['stops']} stops scanned; "
                   f"skipped business user stops {sorted(_lc_skip)})")
+            for _d in _lc_rep.get('disclosed', []):
+                print(f"    [LOCAL-872B] stop {_d['stop']} DISCLOSED ({_d['reason']}): "
+                      f"\"{_d['sentence'][:110]}\"")
             for _r in _lc_rep['removed']:
                 print(f"    [LOCAL-872] stop {_r['stop']} DROPPED ({_r['reason']}): "
                       f"\"{_r['sentence'][:110]}\"")
@@ -34056,11 +34084,14 @@ RULES:
             import landmark_claim_gate as _lcg872b
             complete_tour, _lc_rep2 = _lcg872b.filter_tour_text(complete_tour, **_ctx_872['kw'])
             print(f"  [LOCAL-872] final-text landmark claim gate: dropped {_lc_rep2['dropped']} sentence(s)")
+            for _d in _lc_rep2.get('disclosed', []):
+                print(f"    [LOCAL-872B] stop {_d['stop']} DISCLOSED ({_d['reason']}): "
+                      f"\"{_d['sentence'][:110]}\"")
             for _r in _lc_rep2['removed']:
                 print(f"    [LOCAL-872] stop {_r['stop']} DROPPED ({_r['reason']}): "
                       f"\"{_r['sentence'][:110]}\"")
                 print(f"    {_lcg872b.claim_span_lines(_r['kind'], _r['claim'], _r['sentence'])}")
-            if _lc_rep2['dropped'] and output_file:
+            if (_lc_rep2['dropped'] or _lc_rep2.get('disclosed')) and output_file:
                 try:
                     with open(output_file, "w", encoding="utf-8") as _lf:
                         _lf.write(complete_tour)
