@@ -28,17 +28,12 @@ local only, on the Mac Mini. It goes to Preview on GCloud, then to the first pub
 | Subscriptions + Day pass (D734/D735) | iap_service `restoreSubscriptions()` (real `restorePurchases`); 4 Apple products READY_TO_SUBMIT | ✅ code; Google products not created (Play API permission) |
 | Tile proxy for maps, iOS 92 | D757 | ✅ |
 
-**Code side: NOT done (blocking)**
-
-| item | status | owner |
-|---|---|---|
-| **D660 reversal (wdvrdaz2z0):** a tour purchase becomes a NON-CONSUMABLE licence, free re-download on the same store account, real Restore Purchases for tours | **Not started.** It is not a new decision: Michael's 2026-10-20 approval of Terms §2(a) promises free re-download, and that approval supersedes D660 (recorded as D763). Biggest App Review risk (Guideline 3.1.1). | LOCAL-869 (Kiro, queued after LOCAL-867). New Apple product IDs needed (the type cannot change after creation), created as drafts by LEAD via asc_api.py |
-| `wallet_screen.dart` `_restorePurchases()` stub | Part of LOCAL-869 (route to the real iap_service restore) | LOCAL-869 |
+**Pricing rule (corrected 22:0x, D764):** D688 stands (Michael, Oct 21): every download of a paid tour is paid; a lost or replaced phone restores free with the recovery code. LEAD's earlier "D763" was wrong and is withdrawn. **Open, and Michael's call:** App Review risk of per-download consumables (two lawyer reviews flagged Guideline 3.1.1). LEAD presents the options; it does not decide. No code blocker remains on the LEAD side.
 
 **GCloud_Storied (laptop), in this order (agreed)**
 1. Android build with `MAP_TILE_URL` → Play **closed testing**.
 2. Free seat cap (100) + daily paid limit verified on Preview.
-3. Purchase test matrix on Preview, everything except paid tours. The paid-tour rows (buy, delete, re-download free, Restore on a fresh install, other-language purchase) wait for LOCAL-869.
+3. Purchase test matrix on Preview, all rows, including paid tours under D688: buy, download, delete, buy again, recovery-code restore.
 
 **Michael**
 - Google Play permissions for the play-publisher service account (unblocks Play API uploads + Google products) — see MICHAEL_TODO.
