@@ -848,3 +848,47 @@ def expand_pasted_lists(raw_stops, city_hint: str = "", resolve: bool = False):
         return out, n
     except Exception:
         return raw_stops, 0
+
+
+def resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print):
+    """[LEAD wave-30 finding] Give every plain-name user stop a checked pin, with the
+    same free resolvers as /preview-stops (no LLM; Serper /places only for leftovers).
+    This covers the pasted list AND the app's already-split stops. Items that already
+    carry a link or a pin, and objects, are left alone. Returns ``(new_list,
+    n_pinned)``. Logs why when it cannot run. Never raises."""
+    if not isinstance(raw_stops, list) or not raw_stops:
+        return raw_stops, 0
+    if any(isinstance(s, dict) for s in raw_stops):
+        return raw_stops, 0  # a reviewed preview (LOCAL-867) already carries its pins
+    try:
+        idx = [i for i, s in enumerate(raw_stops)
+               if isinstance(s, str) and s.strip() and "http" not in s
+               and not any(m in s for m in _LIST_MARKERS)]
+        if not idx or not (city_hint or "").strip():
+            return raw_stops, 0
+        names = [raw_stops[i].strip() for i in idx]
+        pv = preview_stops("\n".join(names), city_hint, log=lambda *_a: None)
+        if not pv.get("ok"):
+            log(f"[D762] user-stop pin resolve skipped: {pv.get('error')}")
+            return raw_stops, 0
+        got = pv.get("stops") or []
+        if len(got) != len(names):
+            log(f"[D762] user-stop pin resolve skipped: parsed {len(got)} of {len(names)}")
+            return raw_stops, 0
+        out = list(raw_stops)
+        n = 0
+        for i, st in zip(idx, got):
+            if st.get("unresolved") or st.get("lat") is None:
+                continue
+            st = dict(st)
+            st["name"] = st["stop_name"] = raw_stops[i].strip()  # the listener's own title
+            s = stop_to_generation_string(st)
+            if "/@" in s:
+                out[i] = s
+                n += 1
+        log(f"[D762] user-stop pins resolved {n}/{len(names)} "
+            f"(city {pv.get('city', {}).get('name') if isinstance(pv.get('city'), dict) else city_hint})")
+        return out, n
+    except Exception as e:
+        log(f"[D762] user-stop pin resolve error: {e}")
+        return raw_stops, 0

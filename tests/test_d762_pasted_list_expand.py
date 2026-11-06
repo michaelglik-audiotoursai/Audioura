@@ -58,3 +58,36 @@ class TResolve(unittest.TestCase):
             self.assertEqual(out, ["A Place", "B Place"])
         finally:
             ii.preview_stops = orig
+
+
+class TResolvePins(unittest.TestCase):
+    def test_pins_for_app_split_names(self):
+        import itinerary_import as ii
+        orig = ii.preview_stops
+        try:
+            ii.preview_stops = lambda text, city, **k: {"ok": True, "city": {"name": "HCMC"}, "stops": [
+                {"name": "x", "lat": 10.779722, "lng": 106.699167},
+                {"name": "y", "unresolved": True, "lat": None, "lng": None}]}
+            out, n = ii.resolve_user_stop_pins(["Cathedral", "Mystery Bar"], "Ho Chi Minh City", log=lambda *a: None)
+            self.assertEqual(n, 1)
+            self.assertTrue(out[0].startswith("Cathedral "))
+            self.assertIn("10.779722", out[0])
+            self.assertEqual(out[1], "Mystery Bar")
+        finally:
+            ii.preview_stops = orig
+
+    def test_leaves_links_alone(self):
+        import itinerary_import as ii
+        s = ["Thi Bar https://share.google/abcd"]
+        self.assertEqual(ii.resolve_user_stop_pins(s, "Ho Chi Minh City", log=lambda *a: None), (s, 0))
+
+    def test_logs_reason_on_failure(self):
+        import itinerary_import as ii
+        orig = ii.preview_stops; msgs = []
+        try:
+            ii.preview_stops = lambda *a, **k: {"ok": False, "error": "no city"}
+            out, n = ii.resolve_user_stop_pins(["A"], "Nowhere", log=msgs.append)
+            self.assertEqual((out, n), (["A"], 0))
+            self.assertTrue(any("skipped" in m for m in msgs))
+        finally:
+            ii.preview_stops = orig
