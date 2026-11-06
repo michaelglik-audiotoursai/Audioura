@@ -23882,6 +23882,35 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         )
                 description_prompt += f"\nDOCUMENTED FACTS FOR THIS WORK (incorporate at least one):\n{_facts_text}\n"
 
+        # [LOCAL-872C] The stop's Wikipedia lead + infobox is the NARRATOR's primary source
+        # (wave 35: it fed the gate only, so the Opera House said just "French architects"
+        # and Independence Palace "built in 1885"). Landmark-kind stops only; the gate
+        # then verifies against the SAME memoised evidence.
+        if tour_category != 'museum' and os.environ.get('LANDMARK_WIKI_NARRATOR', '1').strip() != '0' \
+                and os.environ.get('LANDMARK_WIKI_EVIDENCE', '1').strip() != '0' and poi_name:
+            try:
+                import landmark_wikipedia_evidence as _lwe872c
+                _w_is_us = bool(poi.get('user_explicit') or poi.get('_anchor')
+                                or _is_user_stop_title(poi_name))
+                _w_ok = tour_category == 'walking'
+                if _w_is_us:
+                    from user_stop_enrichment import classify_stop_kind as _csk872c
+                    _w_ok = _csk872c(poi_name, poi.get('type_specialty') or '') == 'landmark'
+                if _w_ok:
+                    try:
+                        _w_al = _J._USER_STOP_ALIASES.get(poi_name)
+                    except Exception:
+                        _w_al = None
+                    _w_al = [_w_al] if isinstance(_w_al, str) else list(_w_al or [])
+                    _w_items = _lwe872c.cached_evidence(poi_name, location or '', _w_al)
+                    if _w_items:
+                        poi['_wiki_evidence'] = _w_items
+                        description_prompt += _lwe872c.narrator_block(poi_name, _w_items)
+                        print(f"  [LOCAL-872C] Stop {stop_num} '{poi_name[:40]}': Wikipedia evidence "
+                              f"({len(_w_items)} article(s)) fed to the narrator")
+            except Exception as _w_err:
+                print(f"  [LOCAL-872C] narrator evidence skipped (non-fatal): {_w_err}")
+
         # [LOCAL-402/403] Direct snippet injection — bypasses the extract/score pipeline.
         # When _DIRECT_SNIPPETS_PER_STOP has material for this stop, inject raw
         # search snippets as reference material with grounded-story instructions.
@@ -32517,6 +32546,17 @@ RULES:
             # architect, opened, style, capacity), en + the local language, cached
             # like the P625 lookup. Without it the gate dropped TRUE facts
             # (Notre-Dame 1863-1880/1959, Independence Palace's architect).
+            _lc_auth, _lc_fallback = {}, {}
+            for _si, _sp in enumerate(poi_list, 1):
+                # [LOCAL-872C] D759 grounded body (user stop) / minimal body, used only
+                # when a stop would otherwise ship with no sentence at all.
+                try:
+                    import user_stop_narration as _usn872c
+                    _fb = (_usn872c.grounded_user_stop_body(_sp, location or '')
+                           if _usn872c.is_user_stop(_sp) or _is_user_stop_title(_sp.get('name', '')) else '')
+                except Exception:
+                    _fb = ''
+                _lc_fallback[_si] = _fb
             if os.environ.get('LANDMARK_WIKI_EVIDENCE', '1').strip() != '0':
                 try:
                     import landmark_wikipedia_evidence as _lwe872
@@ -32524,8 +32564,7 @@ RULES:
                     _wk_jobs = {_si: (_sp.get('name', '') or '', list(_lc_alias.get(_si) or []))
                                 for _si, _sp in enumerate(poi_list, 1) if _si not in _lc_skip}
                     with _TPE872(max_workers=4) as _ex872:
-                        _futs = {_si: _ex872.submit(_lwe872.evidence_for, _n, location or '',
-                                                    None, None, True, _al)
+                        _futs = {_si: _ex872.submit(_lwe872.cached_evidence, _n, location or '', _al)
                                  for _si, (_n, _al) in _wk_jobs.items() if _n}
                         for _si, _f in _futs.items():
                             try:
@@ -32533,6 +32572,7 @@ RULES:
                             except Exception:
                                 _wk = []
                             _lc_ev[_si].extend(_wk)
+                            _lc_auth[_si] = list(_wk)
                             print(f"    [LOCAL-872B] stop {_si} Wikipedia evidence: {len(_wk)} article(s)"
                                   + ''.join(f" [{len(x)} chars]" for x in _wk))
                 except Exception as _wk_err:
@@ -32540,7 +32580,8 @@ RULES:
             _ctx_872['kw'] = dict(stop_evidence=_lc_ev, stop_known=_lc_known,
                                   stop_titles=_lc_titles, stop_flagged=_lc_flag,
                                   stop_aliases=_lc_alias, skip_stops=sorted(_lc_skip),
-                                  location=location or '')
+                                  location=location or '',
+                                  stop_authority=_lc_auth, stop_fallback=_lc_fallback)
             complete_tour, _lc_rep = _lcg872.filter_tour_text(complete_tour, **_ctx_872['kw'])
             print(f"  [LOCAL-872] Landmark claim gate: dropped {_lc_rep['dropped']} sentence(s), "
                   f"disclosed {len(_lc_rep.get('disclosed', []))} "
@@ -32549,6 +32590,8 @@ RULES:
             for _d in _lc_rep.get('disclosed', []):
                 print(f"    [LOCAL-872B] stop {_d['stop']} DISCLOSED ({_d['reason']}): "
                       f"\"{_d['sentence'][:110]}\"")
+            for _f in _lc_rep.get('filled', []):
+                print(f"    [LOCAL-872C] stop {_f['stop']} was EMPTY: filled with {_f['source']} short form")
             for _r in _lc_rep['removed']:
                 print(f"    [LOCAL-872] stop {_r['stop']} DROPPED ({_r['reason']}): "
                       f"\"{_r['sentence'][:110]}\"")
@@ -34212,6 +34255,29 @@ RULES:
                         pass
     except Exception as _usv_err:
         print(f"  [LOCAL-855D] fact-sheet verify skipped (non-fatal): {_usv_err}")
+
+    # [LOCAL-872C / D760] NEVER AN EMPTY STOP -- the very last pass. Wave 35/36: Bach
+    # Dang Pier (a business-kind user stop) shipped with an Orientation line and
+    # Directions only, after the 855B scrub / 862 thin path emptied it. Every stop with
+    # no narration sentence gets the Wikipedia short form, else the D759 grounded body.
+    try:
+        if _ctx_872.get('kw') and complete_tour:
+            import landmark_claim_gate as _lcg872c
+            _kw872c = _ctx_872['kw']
+            complete_tour, _filled872c = _lcg872c.fill_empty_stops(
+                complete_tour, _kw872c.get('stop_titles'), _kw872c.get('stop_authority'),
+                _kw872c.get('stop_fallback'), location or '')
+            for _f in _filled872c:
+                print(f"  [LOCAL-872C] stop {_f['stop']} had NO body: filled with "
+                      f"{_f['source']} short form: \"{_f['text'][:120]}\"")
+            if _filled872c and output_file:
+                try:
+                    with open(output_file, "w", encoding="utf-8") as _ff:
+                        _ff.write(complete_tour)
+                except Exception:
+                    pass
+    except Exception as _fe872c:
+        print(f"  [LOCAL-872C] empty-stop fill skipped (non-fatal): {_fe872c}")
 
     return complete_tour, output_file, first_poi_coordinates
 

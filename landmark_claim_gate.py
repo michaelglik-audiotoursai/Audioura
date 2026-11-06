@@ -47,6 +47,7 @@ __all__ = [
     "venue_aliases", "production_claims", "named_person_claims", "named_event_claims",
     "named_work_claims", "dated_claims", "unsourced_claims", "filter_stop_body",
     "filter_tour_text", "claim_span_lines", "is_borderline", "disclose",
+    "contradicts_evidence", "fill_empty_stops", "ensure_evidence_dates", "correct_build_range", "evidence_fact_for", "minimal_body",
 ]
 
 _fold = _mcg._fold
@@ -456,6 +457,143 @@ def is_borderline(sentence: str, claims: Sequence[Tuple[str, str]]) -> bool:
     return True
 
 
+# ---- 872C: a claim that CONTRADICTS the evidence is dropped, never disclosed ----
+# Wave 35: "built in 1885" (evidence: 1962-1966, architect Ngo Viet Thu) was softened to
+# "It is sometimes said ... 1885", laundering a false date.  Disclosure is only for what
+# the evidence neither supports nor contradicts.
+_CORE_BUILT_RE = re.compile(
+    r"(?i)\b(built|construct\w*|completed|finished|opened|inaugurat\w+|erected|founded|"
+    r"establish\w+)\b")
+_DESIGN_CUE_RE = re.compile(
+    r"(?i)\b(designed|design|architect\w*|plans?|blueprints?|drawn up|engineered|"
+    r"built by|constructed by|created by)\b")
+
+
+def contradicts_evidence(sentence: str, claims: Sequence[Tuple[str, str]],
+                         auth: Optional[Dict]) -> Optional[Tuple[str, str]]:
+    """(kind, claim) when an unsourced date / person in the sentence contradicts what the
+    stop's Wikipedia evidence itself says (a different construction year; a different
+    architect), else None.  ``auth`` is ``landmark_wikipedia_evidence.authority()``."""
+    if not auth or not claims:
+        return None
+    for kind, claim in claims:
+        if (kind == "date" and auth.get("years") and _CORE_BUILT_RE.search(sentence)
+                and claim not in auth["years"]):
+            return kind, claim
+        if (kind == "person" and auth.get("architects") and _DESIGN_CUE_RE.search(sentence)):
+            return kind, claim
+    return None
+
+
+_RANGE_RE = re.compile(
+    r"(?<![\d.,])(1[0-9]{3}|20[0-9]{2})(\s*(?:-|–|—|to|and)\s*)(1[0-9]{3}|20[0-9]{2})(?!\d)")
+
+
+def correct_build_range(sentence: str, auth: Optional[Dict]) -> Optional[str]:
+    """A construction sentence giving a year RANGE that overlaps, but is not, the range
+    the evidence states ("constructed between 1877 and 1880" vs Wikipedia 1863-1880)
+    gets the evidence's range.  None when nothing to correct."""
+    if not auth or not auth.get("range") or not _CORE_BUILT_RE.search(sentence):
+        return None
+    a0, b0 = auth["range"]
+    m = _RANGE_RE.search(sentence)
+    if not m or (m.group(1), m.group(3)) == (a0, b0):
+        return None
+    a1, b1 = int(m.group(1)), int(m.group(3))
+    if a1 > b1 or not (int(a0) <= a1 <= int(b0) and int(a0) <= b1 <= int(b0)):
+        return None
+    return sentence[:m.start()] + a0 + m.group(2) + b0 + sentence[m.end():]
+
+
+def evidence_fact_for(kind: str, auth: Dict, name: str = "") -> str:
+    """The evidence's own statement to put where a contradicted sentence stood."""
+    if kind == "date":
+        if auth.get("built_sentence"):
+            return auth["built_sentence"]
+        if auth.get("built_value"):
+            return f"According to Wikipedia, it was built {auth['built_value']}."
+    if kind == "person":
+        if auth.get("architect_sentence"):
+            return auth["architect_sentence"]
+        if auth.get("architect_value"):
+            return f"According to Wikipedia, its architect was {auth['architect_value']}."
+    return ""
+
+
+_NONBODY_RE = re.compile(r"(?i)^\s*(Orientation|Directions|Coordinates|Address|Type(?:/Specialty)?|"
+                         r"Specific Examples)\s*:")
+
+
+def _has_real_sentence(body: str) -> bool:
+    """True when the stop has at least one narration sentence of its own.  Orientation,
+    Directions and label lines are not narration (wave 35/36: Bach Dang Pier shipped
+    with an Orientation line and Directions only)."""
+    for ln in (body or "").split("\n"):
+        if _LABEL_RE.match(ln) or _NONBODY_RE.match(ln):
+            continue
+        for s in _sentences(ln):
+            if len(s.split()) >= 4 and not _STRUCTURAL_RE.match(s):
+                return True
+    return False
+
+
+def _insert_body(body: str, text: str) -> str:
+    """Put ``text`` as its own paragraph before the Directions: line (else at the end)."""
+    m = re.search(r"(?mi)^[ \t]*Directions\s*:", body)
+    if m:
+        return body[:m.start()].rstrip("\n") + "\n\n" + text + "\n\n" + body[m.start():]
+    return body.rstrip() + "\n\n" + text + "\n"
+
+
+def fill_empty_stops(tour_text: str, stop_titles: Optional[Dict[int, str]] = None,
+                     stop_authority: Optional[Dict[int, List[str]]] = None,
+                     stop_fallback: Optional[Dict[int, str]] = None,
+                     location: str = "") -> Tuple[str, List[Dict]]:
+    """D760 / LOCAL-872C: NO stop ships without a body, whichever pass emptied it.  Fill
+    with the evidence short form (2-4 sentences from the Wikipedia lead/infobox), else the
+    D759 grounded body, else a minimal name-and-place body.  Every stop, user stops
+    included.  Idempotent."""
+    filled: List[Dict] = []
+    if not tour_text:
+        return tour_text, filled
+    parts = _STOP_HEADER_RE.split(tour_text)
+    if len(parts) < 3:
+        return tour_text, filled
+    out = [parts[0]]
+    i, n = 1, 0
+    while i < len(parts):
+        header, body = parts[i], (parts[i + 1] if i + 1 < len(parts) else "")
+        n += 1
+        main, tail = body, ""
+        if i + 2 >= len(parts):
+            cut = _mcg._tail_cut(header + body) - len(header)
+            if 0 <= cut < len(body):
+                main, tail = body[:cut], body[cut:]
+        if not _has_real_sentence(main):
+            title = (stop_titles or {}).get(n) or re.sub(r"(?i)^\s*Stop\s+\d+\s*[:\-]\s*", "", header).strip()
+            short, src = "", "wikipedia"
+            try:
+                import landmark_wikipedia_evidence as _lwe
+                short = _lwe.short_form(title, (stop_authority or {}).get(n, []))
+            except Exception:
+                short = ""
+            if not short:
+                short, src = (stop_fallback or {}).get(n) or "", "grounded"
+            if not short:
+                short, src = minimal_body(title, location), "minimal"
+            main = _insert_body(main, short)
+            filled.append({"stop": n, "source": src, "text": short})
+        out.extend([header, main + tail])
+        i += 2
+    return "".join(out), filled
+
+
+def minimal_body(name: str, location: str = "") -> str:
+    where = (location or "").split(",")[0].strip()
+    first = f"{name} is one of the stops on this walk" + (f", in {where}." if where else ".")
+    return first + " Take a moment to look at it and get your bearings before you move on."
+
+
 def disclose(sentence: str) -> str:
     """'It is sometimes said that <sentence>' (D760).  Lower-cases the first letter only
     for a function word; a proper noun keeps its capital."""
@@ -475,11 +613,12 @@ def claim_span_lines(kind: str, claim: str, sentence: str) -> str:
     return f"UNSOURCED: '{span}'"
 
 
-def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
+def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str = "",
                      known: Iterable[str] = (), location: str = "",
                      aliases: Iterable[str] = (), flagged: Iterable[str] = (),
                      disclose_borderline: bool = True,
-                     disclosures: Optional[List[Dict]] = None
+                     disclosures: Optional[List[Dict]] = None,
+                     authority_items: Sequence[str] = ()
                      ) -> Tuple[str, List[Dict]]:
     """Drop the sentences of one stop body that make an unsourced claim.
     Returns (new_body, [{'sentence','kind','claim','reason'}])."""
@@ -497,21 +636,51 @@ def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
     flagged_l = [f for f in flagged if f and f.strip()]
     drop: Dict[int, Tuple[str, str]] = {}
     soften: Dict[int, Tuple[str, str]] = {}
+    replace: Dict[int, str] = {}
+    auth: Dict = {}
+    if authority_items:
+        try:
+            import landmark_wikipedia_evidence as _lwe
+            auth = _lwe.authority(authority_items)
+        except Exception:
+            auth = {}
+    used_facts: set = set()
     for i, s in enumerate(sents):
         if is_disclosed(s) or _STRUCTURAL_RE.match(s):
             continue
         if any(_mcg._span_hit(f, s) for f in flagged_l):
             drop[i] = ("flagged", "flagged UNSOURCED by the verifier")
             continue
+        fixed = correct_build_range(s, auth)
+        if fixed:
+            drop[i] = ("contradiction", f"construction range contradicts the Wikipedia evidence ({auth['range'][0]}-{auth['range'][1]})")
+            replace[i] = fixed
+            continue
         cl = unsourced_claims(s, stop_title, evidence, known, location, aliases)
         if cl:
             span = "; ".join(c for _, c in cl)
-            if disclose_borderline and is_borderline(s, cl):
+            con = contradicts_evidence(s, cl, auth)
+            if con:
+                drop[i] = ("contradiction", f"{con[1]} (contradicts the Wikipedia evidence)")
+                fact = evidence_fact_for(con[0], auth, stop_title)
+                # state the evidence fact once, unless the body already states it
+                already = (con[0] == "date" and any(
+                    re.search(r"(?<!\d)" + y + r"(?!\d)", " ".join(sents[:i] + sents[i + 1:]))
+                    for y in auth.get("years", ())))
+                if con[0] == "person":
+                    already = any(_fold(a.split()[-1]) in _fold(" ".join(sents[:i] + sents[i + 1:]))
+                                  for a in auth.get("architects", ()) if a.split())
+                if fact and not already and fact not in used_facts:
+                    used_facts.add(fact)
+                    replace[i] = fact
+            elif disclose_borderline and is_borderline(s, cl):
                 soften[i] = (cl[0][0], span)
             else:
                 drop[i] = (cl[0][0], span)
     # dangling references left by a drop go with it
     for i in sorted(list(drop)):
+        if i in replace:
+            continue   # the evidence fact stands where it stood: nothing dangles
         j = i + 1
         while (j < len(sents) and j not in drop and not is_disclosed(sents[j])
                and (_mcg._PRONOUN_OPEN_RE.match(sents[j]) or _mcg._BACKREF_ANY_RE.search(sents[j])
@@ -521,12 +690,15 @@ def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
     if not drop and not soften:
         return body, removed
     kill: Dict[int, List[str]] = {}
+    swap: Dict[int, List[Tuple[str, str]]] = {}
     for i, (kind, claim) in drop.items():
         pi, s = flat[i]
-        kill.setdefault(pi, []).append(s)
+        if i in replace:
+            swap.setdefault(pi, []).append((s, replace[i]))
+        else:
+            kill.setdefault(pi, []).append(s)
         removed.append({"sentence": s, "kind": kind, "claim": claim,
                         "reason": f"unsourced {kind} claim: {claim}"})
-    swap: Dict[int, List[Tuple[str, str]]] = {}
     for i, (kind, claim) in soften.items():
         pi, s = flat[i]
         new_s = disclose(s)
@@ -554,13 +726,86 @@ def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
     return text, removed
 
 
+_CLAUSE = {"established": "established in {y}", "founded": "founded in {y}",
+           "begun": "begun in {y}", "opened": "opened in {y}", "completed": "completed in {y}",
+           "built": "built in {y}"}
+
+
+def ensure_evidence_dates(body: str, auth: Optional[Dict]) -> Tuple[str, str]:
+    """The evidence's own establishment / start / opening / completion years the stop
+    never states are added once as 'According to Wikipedia, it was ...'.  Wave 36: the
+    narrator wrote Notre-Dame 'completed 1880' and dropped the infobox's 'established
+    1863'.  Returns (body, added_sentence or '')."""
+    if not auth or not auth.get("dated"):
+        return body, ""
+    dated, seen_y = [], set()
+    for k, y in auth["dated"]:
+        if y not in seen_y:
+            seen_y.add(y)
+            dated.append((k, y))
+    has = lambda y: re.search(r"(?<!\d)" + y + r"(?!\d)", body)
+    none_stated = not any(has(y) for _, y in dated)
+    missing = [(k, y) for k, y in dated if not has(y)
+               and (none_stated or k in ("established", "founded", "begun"))]
+    if not missing:
+        return body, ""
+    passive = [_CLAUSE[k].format(y=y) for k, y in missing if k != "begun"]
+    began = [y for k, y in missing if k == "begun"]
+    parts = []
+    if passive:
+        parts.append("According to Wikipedia, it was " + (" and ".join(passive) if len(passive) < 3
+                     else ", ".join(passive[:-1]) + " and " + passive[-1]) + ".")
+    if began:
+        parts.append(("Construction" if passive else "According to Wikipedia, construction")
+                     + f" began in {began[0]}.")
+    sent = " ".join(parts)
+    ys = set(auth.get("years") or ())
+    # after the first PROSE sentence stating an evidence year; else at the end of the last
+    # prose paragraph (before Directions:/labels); never inside a label line
+    pos, last_end = 0, -1
+    for ln in body.split("\n"):
+        start, pos = pos, pos + len(ln) + 1
+        st = ln.strip()
+        if not st or _LABEL_RE.match(ln) or re.match(r"(?i)^(Directions|Orientation)\s*:", st):
+            continue
+        last_end = start + len(ln.rstrip())
+        for m in re.finditer(r"[^.!?]+[.!?]", ln):
+            if any(re.search(r"(?<!\d)" + y + r"(?!\d)", m.group(0)) for y in ys):
+                at = start + m.end()
+                return body[:at] + " " + sent + body[at:], sent
+    if last_end >= 0:
+        return body[:last_end] + " " + sent + body[last_end:], sent
+    return body, ""
+
+
+def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
+                     known: Iterable[str] = (), location: str = "",
+                     aliases: Iterable[str] = (), flagged: Iterable[str] = (),
+                     disclose_borderline: bool = True,
+                     disclosures: Optional[List[Dict]] = None,
+                     authority_items: Sequence[str] = ()
+                     ) -> Tuple[str, List[Dict]]:
+    new, removed = _filter_stop_body_core(
+        body, evidence, stop_title, known, location, aliases, flagged,
+        disclose_borderline, disclosures, authority_items)
+    if authority_items and _has_real_sentence(new):
+        try:
+            import landmark_wikipedia_evidence as _lwe
+            new, _added = ensure_evidence_dates(new, _lwe.authority(authority_items))
+        except Exception:
+            pass
+    return new, removed
+
+
 def filter_tour_text(tour_text: str, stop_evidence: Optional[Dict[int, List[str]]] = None,
                      stop_known: Optional[Dict[int, List[str]]] = None,
                      stop_titles: Optional[Dict[int, str]] = None,
                      stop_flagged: Optional[Dict[int, List[str]]] = None,
                      stop_aliases: Optional[Dict[int, List[str]]] = None,
                      skip_stops: Iterable[int] = (), location: str = "",
-                     disclose_borderline: bool = True
+                     disclose_borderline: bool = True,
+                     stop_authority: Optional[Dict[int, List[str]]] = None,
+                     stop_fallback: Optional[Dict[int, str]] = None
                      ) -> Tuple[str, Dict]:
     """Apply the gate to every ``Stop N:`` body.  ``skip_stops`` are stop numbers
     another verifier already covers (business user stops, LOCAL-855D)."""
@@ -594,7 +839,16 @@ def filter_tour_text(tour_text: str, stop_evidence: Optional[Dict[int, List[str]
         new_main, removed = filter_stop_body(
             main, (stop_evidence or {}).get(n, []), title, (stop_known or {}).get(n, []),
             location, (stop_aliases or {}).get(n, []), (stop_flagged or {}).get(n, []),
-            disclose_borderline=disclose_borderline, disclosures=disc)
+            disclose_borderline=disclose_borderline, disclosures=disc,
+            authority_items=(stop_authority or {}).get(n, []))
+        # 872C / D760: a stop never ships empty (see fill_empty_stops)
+        if not _has_real_sentence(new_main):
+            _one, _f = fill_empty_stops("Stop 1: " + title + "\n" + new_main + "\nStop 2: x\n",
+                                        {1: title}, {1: (stop_authority or {}).get(n, [])},
+                                        {1: (stop_fallback or {}).get(n, "")}, location)
+            if _f:
+                new_main = _STOP_HEADER_RE.split(_one)[2]
+                report.setdefault("filled", []).append(dict(_f[0], stop=n))
         for d in disc:
             d["stop"] = n
             report["disclosed"].append(d)
@@ -605,5 +859,5 @@ def filter_tour_text(tour_text: str, stop_evidence: Optional[Dict[int, List[str]
             report["removed"].append(r)
         out.extend([header, new_main + tail])
         i += 2
-    report["changed"] = bool(report["dropped"] or report["disclosed"])
+    report["changed"] = bool(report["dropped"] or report["disclosed"] or report.get("filled"))
     return "".join(out), report

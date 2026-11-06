@@ -80,7 +80,7 @@ def has_sourced_material(poi: Dict, outdoor_facts=None) -> bool:
     if not isinstance(poi, dict):
         return False
     for key in ("_customer_voice", "_practicals", "_lore", "_research",
-                "retrieval_facts"):
+                "retrieval_facts", "_wiki_evidence"):
         if poi.get(key):
             return True
     return False
@@ -100,7 +100,7 @@ def has_dated_source(poi: Dict, outdoor_facts=None) -> bool:
         return True
     if not isinstance(poi, dict):
         return False
-    for key in ("_lore", "_research", "retrieval_facts"):
+    for key in ("_lore", "_research", "retrieval_facts", "_wiki_evidence"):
         if poi.get(key):
             return True
     return False

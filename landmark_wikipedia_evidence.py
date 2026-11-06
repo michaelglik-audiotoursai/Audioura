@@ -319,3 +319,193 @@ def evidence_for(name: str, location: str = "", langs: Optional[Sequence[str]] =
                 txt += f"\nInfobox: {art['infobox']}"
             out.append(txt)
     return out
+
+
+# ---- LOCAL-872C: the evidence feeds the NARRATOR, and is the authority ---------
+# Wave 35 (gen 00037-k2h): the Opera House said only "French architects" although its
+# Wikipedia evidence (Olivier, Guichard, Ferret; opened 1900) was fetched, because the
+# evidence fed the GATE only: the narrator wrote from memory and the gate could only
+# subtract.  Independence Palace shipped "built in 1885" (evidence: 1962-1966, architect
+# Ngo Viet Thu).  These helpers (a) memoise the fetch so narrator and gate share ONE
+# lookup, (b) render the evidence as the narrator's primary source, (c) extract the
+# AUTHORITY facts (built years, architects) the gate uses to tell a claim that is merely
+# unsourced from one that CONTRADICTS the evidence, (d) compose the evidence-based
+# short form used instead of an empty stop.
+import unicodedata as _ud
+
+_MEMO: Dict[tuple, List[str]] = {}
+_HEAD_RE = re.compile(r"^(?P<title>.*?) - Wikipedia \((?P<lang>[A-Za-z\-]+)\)\.\s*(?P<rest>.*)$", re.S)
+_BUILT_KEYS = ("built", "construction", "construction start", "construction end", "completed",
+               "completion date", "opened", "opening", "opening date", "open", "inaugurated",
+               "years built", "year built", "yearbuilt", "year completed", "start date",
+               "end date", "khởi công", "hoàn thành", "xây dựng", "khánh thành",
+               "ngày khởi công", "ngày hoàn thành", "ngày khánh thành", "năm xây dựng")
+_DATE_KEYS = _BUILT_KEYS + ("established", "founded", "dedicated", "consecrated", "thành lập")
+_ARCH_KEYS = ("architect", "architects", "designer", "kiến trúc sư", "thiết kế")
+_BUILT_CUE_RE = re.compile(
+    r"(?i)\b(built|construct\w*|completed|finished|opened|inaugurat\w+|erected|"
+    r"groundbreaking|ground was broken|foundation stone|began)\b")
+_YEAR_RE2 = re.compile(r"(?<![\d.,])(1[0-9]{3}|20[0-9]{2})(?!\d)")
+
+
+def _fold2(s: str) -> str:
+    s = _ud.normalize("NFKD", (s or "").replace("đ", "d").replace("Đ", "D"))
+    return "".join(c for c in s if not _ud.combining(c)).lower()
+
+
+def cached_evidence(name: str, location: str = "", aliases: Sequence[str] = ()) -> List[str]:
+    """``evidence_for`` memoised per process (the DB cache sits underneath), so the
+    narrator prompt and the claim gate read ONE lookup."""
+    key = (name or "", location or "", tuple(aliases or ()))
+    if key not in _MEMO:
+        try:
+            _MEMO[key] = list(evidence_for(name, location, None, None, True, list(aliases or ())) or [])
+        except Exception:
+            _MEMO[key] = []
+    return list(_MEMO[key])
+
+
+def split_item(item: str) -> Dict[str, str]:
+    m = _HEAD_RE.match(item or "")
+    title, lang, rest = (m.group("title"), m.group("lang"), m.group("rest")) if m else ("", "", item or "")
+    lead, _, box = rest.partition("\nInfobox:")
+    return {"title": title.strip(), "lang": lang, "lead": lead.strip(), "infobox": box.strip()}
+
+
+def _infobox_map(box: str) -> Dict[str, str]:
+    out: Dict[str, str] = {}
+    for part in re.split(r";\s+(?=[^;:]{2,40}:\s)", box or ""):
+        k, _, v = part.partition(":")
+        if k.strip() and v.strip():
+            out.setdefault(k.strip().lower(), v.strip())
+    return out
+
+
+def _years_in(text: str) -> set:
+    ys: set = set()
+    for m in re.finditer(r"(?<![\d.,])(1[0-9]{3}|20[0-9]{2})\s*(?:-|–|—|to|and)\s*(1[0-9]{3}|20[0-9]{2})(?!\d)", text):
+        a, b = int(m.group(1)), int(m.group(2))
+        if a <= b and b - a <= 60:
+            ys.update(str(y) for y in range(a, b + 1))
+    ys.update(_YEAR_RE2.findall(text))
+    return ys
+
+
+def _lead_sentences(lead: str) -> List[str]:
+    lead = re.sub(r"\s*\([^)]{0,200}\)", "", lead or "")
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+(?=[A-ZÀ-Ỹ\"“])", lead) if len(s.strip()) > 20]
+
+
+def authority(items: Sequence[str]) -> Dict:
+    """What the Wikipedia evidence itself says about construction and design.
+    {'years': set[str], 'built_value': str, 'architects': [str], 'architect_value': str,
+     'built_sentence': str, 'architect_sentence': str}.  Empty values when it is silent."""
+    years: set = set()
+    built_value = arch_value = built_sentence = arch_sentence = ""
+    architects: List[str] = []
+    date_facts: List[str] = []
+    dated: List[tuple] = []
+    for it in items or []:
+        p = split_item(it)
+        box = _infobox_map(p["infobox"])
+        for k, v in box.items():
+            kk = k.replace("_", " ")
+            if kk in _DATE_KEYS:
+                years |= _years_in(v)
+                date_facts.append(f"{kk}: {v}")
+                _ys = _YEAR_RE2.findall(v)
+                if _ys:
+                    _kind = ("established" if kk in ("established", "thành lập") else
+                             "founded" if kk == "founded" else
+                             "begun" if kk in ("construction start", "start date", "khởi công", "ngày khởi công") else
+                             "opened" if kk in ("opened", "opening", "opening date", "open", "inaugurated", "khánh thành", "ngày khánh thành") else
+                             "completed" if kk in ("completed", "completion date", "year completed", "end date", "construction end", "hoàn thành", "ngày hoàn thành") else
+                             "built")
+                    if (_kind, _ys[0]) not in dated:
+                        dated.append((_kind, _ys[0]))
+                    if _kind in ("built",) and len(_ys) > 1 and (_kind, _ys[-1]) not in dated:
+                        dated.append(("completed", _ys[-1]))
+                if kk in _BUILT_KEYS:
+                    built_value = built_value or v
+            elif kk in _ARCH_KEYS:
+                v2 = re.sub(r"\s*\([^)]*\)", "", v)
+                arch_value = arch_value or v2
+                for nm in re.split(r"\s*(?:,|;|/|&|\band\b|\bvà\b)\s*", v2):
+                    nm = nm.strip(" .")
+                    if len(nm) >= 4 and nm not in architects:
+                        architects.append(nm)
+        for s in _lead_sentences(p["lead"]):
+            if _BUILT_CUE_RE.search(s) and _years_in(s):
+                years |= _years_in(s)
+                built_sentence = built_sentence or s
+            if re.search(r"(?i)\b(designed by|architects?|plans? (?:by|of))\b", s) and not arch_sentence:
+                arch_sentence = s
+    rng = None
+    for src in (built_value, built_sentence):
+        m = re.search(r"(?<![\d.,])(1[0-9]{3}|20[0-9]{2})\s*(?:-|–|—|to|and)\s*(1[0-9]{3}|20[0-9]{2})(?!\d)", src or "")
+        if m and 2 <= int(m.group(2)) - int(m.group(1)) <= 60:
+            rng = (m.group(1), m.group(2))
+            break
+    if not built_value and date_facts:
+        built_value = date_facts[0].partition(": ")[2]
+    return {"dated": dated, "date_facts": date_facts, "range": rng, "years": years, "built_value": built_value, "architects": architects,
+            "architect_value": arch_value, "built_sentence": built_sentence,
+            "architect_sentence": arch_sentence}
+
+
+def narrator_block(name: str, items: Sequence[str]) -> str:
+    """The stop's Wikipedia lead + infobox as the narrator's PRIMARY source."""
+    items = [i for i in (items or []) if i and i.strip()]
+    if not items:
+        return ""
+    en = [i for i in items if "Wikipedia (en)" in i[:200]]
+    pick = (en + [i for i in items if i not in en])[:2]
+    body = "\n\n".join(i[:3200] for i in pick)
+    au = authority(items)
+    key = []
+    if au["date_facts"]:
+        key.append("dates: " + ", ".join(dict.fromkeys(au["date_facts"])))
+    elif au["built_value"]:
+        key.append(f"built/opened: {au['built_value']}")
+    if au["architect_value"]:
+        key.append(f"architect(s): {au['architect_value']}")
+    keyline = (f"KEY FACTS YOU MUST STATE in the first two paragraphs (exact wording of the years "
+               f"and names; say what each date marks, e.g. established / completed / opened): {'; '.join(key)}.\n") if key else ""
+    return (
+        f"\nPRIMARY SOURCE FOR \"{name}\" (Wikipedia, fetched for this stop; established fact):\n"
+        f"{body}\n{keyline}"
+        "INSTRUCTIONS FOR THIS SOURCE: State its construction / opening dates, its architect(s) "
+        "or designer(s) BY NAME, its style and its capacity, as plain statements, and attribute "
+        "them plainly (\"it was designed by ...\", \"according to Wikipedia, ...\"). Use the dates "
+        "and names EXACTLY as written there. NEVER put a different year or a different architect "
+        "from memory. Add NO built date, architect, performer, production or event that this "
+        "source or the other reference material does not give. This block overrides any earlier "
+        "note saying no sourced history is available for this stop.\n")
+
+
+def short_form(name: str, items: Sequence[str]) -> str:
+    """2-4 sentences from the lead / infobox, for a stop whose every sentence was
+    dropped.  '' when the evidence is empty."""
+    items = [i for i in (items or []) if i and i.strip()]
+    if not items:
+        return ""
+    en = [i for i in items if "Wikipedia (en)" in i[:200]]
+    p = split_item((en or items)[0])
+    sents = _lead_sentences(p["lead"])
+    chosen: List[str] = sents[:1]
+    for s in sents[1:]:
+        if len(chosen) >= 3:
+            break
+        if _years_in(s) or re.search(r"(?i)\b(designed|architect|style|capacity|seats?|built)\b", s):
+            chosen.append(s)
+    au = authority(items)
+    text = " ".join(chosen)
+    extra = []
+    if au["architect_value"] and _fold2(au["architect_value"].split(",")[0].split()[-1] if au["architect_value"].split() else "") not in _fold2(text):
+        extra.append(f"According to Wikipedia, its architect was {au['architect_value']}.")
+    if au["built_value"] and not (au["years"] & _years_in(text)):
+        extra.append(f"According to Wikipedia, it was built {au['built_value']}.")
+    out = chosen + extra
+    out = [s[:400].rstrip() for s in out][:4]
+    out = [s if s[-1] in ".!?" else s + "." for s in out if s]
+    return " ".join(out)
