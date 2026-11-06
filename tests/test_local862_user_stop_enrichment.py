@@ -89,7 +89,7 @@ class Kind(unittest.TestCase):
         self.assertEqual(use.classify_stop_kind("Longan", "Bar"), "business")
         self.assertEqual(use.classify_stop_kind("A Star is Born", "Karaoke Bar"), "business")
         self.assertEqual(use.classify_stop_kind("An Spa", "Spa and wellness center"), "business")
-        self.assertEqual(use.classify_stop_kind("The Crazy street", "Street with vibrant nightlife"), "business")
+        self.assertEqual(use.classify_stop_kind("The Crazy street", "Street with vibrant nightlife"), "street_area")  # LOCAL-874
         self.assertEqual(use.classify_stop_kind("Notre-Dame Cathedral Basilica of Saigon", "Cathedral"), "landmark")
         self.assertEqual(use.classify_stop_kind("Independence Palace", ""), "landmark")
         self.assertEqual(use.classify_stop_kind("Tao Dan Park", "Park"), "landmark")

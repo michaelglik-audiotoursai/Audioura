@@ -55,6 +55,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 from urllib import robotparser
 
+import place_kinds as _place_kinds
 from text_polish import city_from_scope
 from user_stop_narration import _fold, _split_sentences
 
@@ -104,46 +105,15 @@ _SKIP_SITE_HOSTS = (
 # ─────────────────────────────────────────────────────────────────────────────
 
 def classify_stop_kind(name: str, type_specialty: str = "",
-                       category: str = "") -> str:
-    """'landmark' for a documented monument/institution/park, else 'business'.
+                       category: str = "", wikidata_instance_of: str = "") -> str:
+    """[LOCAL-874 / D767] Thin wrapper over place_kinds.classify.
 
-    A landmark word in the TYPE decides (Type/Specialty or Places category).  The
-    NAME is consulted only for a clear institutional word ("Notre-Dame Cathedral
-    Basilica", "Independence Palace") so a bar called "Palace Bar" with a bar type
-    stays a business."""
-    type_toks = set(_fold(f"{type_specialty} {category}").split())
-    name_toks = set(_fold(name).split())
-    # [LOCAL-870 item 4] A FAMOUS landmark takes the landmark/story path even when
-    # the generator's Type label is a business-ish word ("Live music venue",
-    # "Performing arts venue"): wave 28 sent "Saigon Opera House" to business
-    # enrichment (3 generic sentences). Two signals, both requiring that the NAME
-    # carries no business word of its own (so "Palace Bar" stays a bar):
-    #   (a) the offline Wikidata-P625 landmark table knows it;
-    #   (b) the name has a clear institutional word AND the Type holds only WEAK
-    #       business words (venue/music/live/...), never a hard one (bar, cafe,
-    #       hotel, spa, shop...).
-    if not (name_toks & _BUSINESS_KINDS):
-        try:
-            from landmark_reference import lookup as _lm_lookup870
-            if _lm_lookup870(name):
-                return "landmark"
-        except Exception:
-            pass
-        if (name_toks & _STRONG_INSTITUTION_WORDS
-                and not (type_toks & (_BUSINESS_KINDS - _WEAK_BUSINESS_KINDS))):
-            return "landmark"
-    if type_toks & _BUSINESS_KINDS and not (type_toks & _DOCUMENTED_KINDS):
-        return "business"
-    if type_toks & _DOCUMENTED_KINDS:
-        # "Park" in "Pool and park bar"? business kind words win above only when no
-        # documented word is present; here a documented word is present.
-        return "landmark"
-    if name_toks & (_DOCUMENTED_KINDS - {"park", "square", "bridge", "tower",
-                                         "garden", "gardens", "theatre",
-                                         "theater", "library"}):
-        return "landmark" if not (name_toks & _BUSINESS_KINDS - {"market"}) \
-            else "business"
-    return "business"
+    Returns 'business' | 'landmark' | 'street_area' | 'both'.  Unknown names are
+    'landmark' (landmark_unknown), never 'business'.  'both' = a famous market or
+    gallery: landmark story AND business details."""
+    import place_kinds
+    return place_kinds.kind_for_path(place_kinds.classify(
+        name, type_specialty, category, wikidata_instance_of))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1237,12 +1207,20 @@ def enrich_user_stops_in_text(
         cm = _COORD_LINE_RE.search(block_text)
         if cm:
             poi["coordinates"] = f"{cm.group(1)}, {cm.group(2)}"
-        kind = classify_stop_kind(title, poi.get("type_specialty", ""))
-        if kind != "business":
+        _pk874 = _place_kinds.classify(title, poi.get("type_specialty", ""))
+        kind = _place_kinds.kind_for_path(_pk874)
+        if log:
+            log(f"[LOCAL-874] {title}: kind={kind} group={_pk874['group']} "
+                f"subtype={_pk874['subtype']} conf={_pk874['confidence']}")
+        if kind not in ("business", "both"):
             if log:
-                log(f"[LOCAL-862] {title}: landmark kind — existing story path kept")
-            report["stops"].append({"stop": title, "kind": "landmark"})
+                log(f"[LOCAL-862] {title}: {kind} kind — existing story path kept")
+            report["stops"].append({"stop": title, "kind": kind,
+                                    "group": _pk874["group"], "subtype": _pk874["subtype"],
+                                    "angles": _place_kinds.research_angles(_pk874)})
             continue
+        if kind == "both":
+            poi["_l874_both"] = True   # famous market/gallery: story AND business details
         alias = ""
         for k, v in (aliases_by_title or {}).items():
             if _fold(k) == _fold(title) and v and _fold(v) != _fold(title):
@@ -1260,7 +1238,7 @@ def enrich_user_stops_in_text(
         # a Places category can reveal that the "business" is really a landmark
         # (type missing from the block): keep the existing path for it.
         if mat["category"] and classify_stop_kind(
-                w["title"], w["poi"].get("type_specialty", ""), mat["category"]) != "business":
+                w["title"], w["poi"].get("type_specialty", ""), mat["category"]) not in ("business", "both"):
             w["landmark"] = True
         w["mat"] = mat
         if log:

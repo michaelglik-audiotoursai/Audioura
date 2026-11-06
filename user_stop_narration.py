@@ -1081,7 +1081,7 @@ def scrub_tour_text_user_stops(tour_text, user_titles, location="", log=None,
         if not _documented:
             try:
                 from user_stop_enrichment import classify_stop_kind as _csk862
-                _documented = _csk862(title, poi.get("type_specialty") or "") == "landmark"
+                _documented = _csk862(title, poi.get("type_specialty") or "") in ("landmark", "both")  # [LOCAL-874]
             except Exception:
                 pass
         _scrub_block(poi, start, end, source_gated=(not _documented))

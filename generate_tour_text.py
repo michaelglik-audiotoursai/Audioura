@@ -32538,7 +32538,7 @@ RULES:
                 if _is_us:
                     try:
                         from user_stop_enrichment import classify_stop_kind as _csk872
-                        if _csk872(_nm, _sp.get('type_specialty') or '') != 'landmark':
+                        if _csk872(_nm, _sp.get('type_specialty') or '') == 'business':   # [LOCAL-874] unknown/street_area/both are NOT skipped
                             _lc_skip.add(_si)   # business user stop: LOCAL-855D verifies it
                     except Exception:
                         pass
