@@ -32452,6 +32452,111 @@ RULES:
             print(f"  [LOCAL-864] Claim gate error (non-fatal): {_mc_err}")
     _l654ck("LOCAL-864 museum_claim_gate")
 
+    # -------- [LOCAL-872] Landmark / walking claim gate ----------------------
+    # Tour 544: the Saigon Opera House user stop (landmark story path since
+    # LOCAL-870) shipped "staged productions of Miss Saigon" -- no source says so.
+    # The LOCAL-855D verifier skips documented-kind stops and the LOCAL-864 gate
+    # is museum-only, so nothing checked the walking path. A sentence whose named
+    # production / person / event / work / dated claim no source for THAT stop
+    # holds is dropped unless disclosed (D760). Business user stops stay with
+    # LOCAL-855D (skipped here). Snapshot the evidence: the snippet store is
+    # reset before the end of the function and the gate runs again on the final
+    # text.
+    _ctx_872 = {}
+    if tour_category != 'museum' and os.environ.get('LANDMARK_CLAIM_GATE', '1').strip() != '0':
+        try:
+            import landmark_claim_gate as _lcg872
+            _lc_ev, _lc_known, _lc_titles, _lc_alias, _lc_skip, _lc_flag = {}, {}, {}, {}, set(), {}
+            try:
+                _lc_us_titles = set(_get_user_stop_titles())
+            except Exception:
+                _lc_us_titles = set()
+            try:
+                _lc_aliases = dict(_J._USER_STOP_ALIASES or {})
+            except Exception:
+                _lc_aliases = {}
+            for _si, _sp in enumerate(poi_list, 1):
+                _nm = _sp.get('name', '') or ''
+                _lc_titles[_si] = _nm
+                _sn = []
+                if _J._DIRECT_SNIPPETS_PER_STOP:
+                    _sn = (_J._DIRECT_SNIPPETS_PER_STOP.get(_nm, [])
+                           or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_si-1}__", []))
+                _lc_ev[_si] = [f"{x.get('title','')} {x.get('snippet','')}" for x in _sn
+                               if isinstance(x, dict)]
+                # The walking path's other research: the LOCAL-47 retrieval facts and
+                # the Wikipedia/historic context the narrator was given (the
+                # "[LOCAL-47] <stop>: tier=..., facts=N" log line).
+                try:
+                    _tcr872 = (_three_class_results or {}).get(_nm) or {}
+                    for _rf in (_tcr872.get('retrieval_facts') or []):
+                        _lc_ev[_si].append(_rf if isinstance(_rf, str) else
+                                           ' '.join(str(v) for v in (_rf.values() if isinstance(_rf, dict) else [_rf])))
+                    for _cv in (_tcr872.get('category_context') or {}).values():
+                        if isinstance(_cv, str) and _cv.strip():
+                            _lc_ev[_si].append(_cv)
+                    for _lf in (_sp.get('_lore') or []):
+                        _lc_ev[_si].append(_lf.get('fact', '') if isinstance(_lf, dict) else str(_lf))
+                except Exception:
+                    pass
+                _lc_known[_si] = [_nm] + [str(_sp.get(k, '') or '') for k in
+                                          ('address', 'type_specialty', 'specific_examples')]
+                _al = _lc_aliases.get(_nm)
+                _lc_alias[_si] = ([_al] if isinstance(_al, str) else list(_al or []))
+                _vr872 = _l423_verification_results.get(_nm) or {}
+                _lc_flag[_si] = [d.get('text', '') for d in _vr872.get('unsourced_details', [])]
+                _is_us = (_nm in _lc_us_titles) or _is_user_stop_title(_nm)
+                if _is_us:
+                    try:
+                        from user_stop_enrichment import classify_stop_kind as _csk872
+                        if _csk872(_nm, _sp.get('type_specialty') or '') != 'landmark':
+                            _lc_skip.add(_si)   # business user stop: LOCAL-855D verifies it
+                    except Exception:
+                        pass
+            # [LOCAL-872B] The stop's own Wikipedia article (lead + infobox: built,
+            # architect, opened, style, capacity), en + the local language, cached
+            # like the P625 lookup. Without it the gate dropped TRUE facts
+            # (Notre-Dame 1863-1880/1959, Independence Palace's architect).
+            if os.environ.get('LANDMARK_WIKI_EVIDENCE', '1').strip() != '0':
+                try:
+                    import landmark_wikipedia_evidence as _lwe872
+                    from concurrent.futures import ThreadPoolExecutor as _TPE872
+                    _wk_jobs = {_si: (_sp.get('name', '') or '', list(_lc_alias.get(_si) or []))
+                                for _si, _sp in enumerate(poi_list, 1) if _si not in _lc_skip}
+                    with _TPE872(max_workers=4) as _ex872:
+                        _futs = {_si: _ex872.submit(_lwe872.evidence_for, _n, location or '',
+                                                    None, None, True, _al)
+                                 for _si, (_n, _al) in _wk_jobs.items() if _n}
+                        for _si, _f in _futs.items():
+                            try:
+                                _wk = _f.result(timeout=60) or []
+                            except Exception:
+                                _wk = []
+                            _lc_ev[_si].extend(_wk)
+                            print(f"    [LOCAL-872B] stop {_si} Wikipedia evidence: {len(_wk)} article(s)"
+                                  + ''.join(f" [{len(x)} chars]" for x in _wk))
+                except Exception as _wk_err:
+                    print(f"  [LOCAL-872B] Wikipedia evidence error (non-fatal): {_wk_err}")
+            _ctx_872['kw'] = dict(stop_evidence=_lc_ev, stop_known=_lc_known,
+                                  stop_titles=_lc_titles, stop_flagged=_lc_flag,
+                                  stop_aliases=_lc_alias, skip_stops=sorted(_lc_skip),
+                                  location=location or '')
+            complete_tour, _lc_rep = _lcg872.filter_tour_text(complete_tour, **_ctx_872['kw'])
+            print(f"  [LOCAL-872] Landmark claim gate: dropped {_lc_rep['dropped']} sentence(s), "
+                  f"disclosed {len(_lc_rep.get('disclosed', []))} "
+                  f"({_lc_rep['scanned']} of {_lc_rep['stops']} stops scanned; "
+                  f"skipped business user stops {sorted(_lc_skip)})")
+            for _d in _lc_rep.get('disclosed', []):
+                print(f"    [LOCAL-872B] stop {_d['stop']} DISCLOSED ({_d['reason']}): "
+                      f"\"{_d['sentence'][:110]}\"")
+            for _r in _lc_rep['removed']:
+                print(f"    [LOCAL-872] stop {_r['stop']} DROPPED ({_r['reason']}): "
+                      f"\"{_r['sentence'][:110]}\"")
+                print(f"    {_lcg872.claim_span_lines(_r['kind'], _r['claim'], _r['sentence'])}")
+        except Exception as _lc_err:
+            print(f"  [LOCAL-872] Landmark claim gate error (non-fatal): {_lc_err}")
+    _l654ck("LOCAL-872 landmark_claim_gate")
+
     # -------- [LOCAL-617 item 5/6] Fresh-path shortfall reconciliation --------
     # When a LATE gate drops a stop AFTER the D616/D612 shortfall sentence was
     # composed (Granet delivered 2/3 while the sentence already said 3), the
@@ -33970,6 +34075,30 @@ RULES:
     _phase_timer.start('verification')  # End packing, start verification marker
     _phase_timer.end('verification')  # Immediately end (verification is interspersed above)
     _phase_timer.summary()
+
+    # [LOCAL-872] Re-apply the landmark claim gate to the FINAL text: scorer-retry,
+    # story-spine render and the delivery finalize all rewrite complete_tour after
+    # the first pass. Deterministic and offline, using the evidence snapshot.
+    try:
+        if _ctx_872.get('kw') and complete_tour:
+            import landmark_claim_gate as _lcg872b
+            complete_tour, _lc_rep2 = _lcg872b.filter_tour_text(complete_tour, **_ctx_872['kw'])
+            print(f"  [LOCAL-872] final-text landmark claim gate: dropped {_lc_rep2['dropped']} sentence(s)")
+            for _d in _lc_rep2.get('disclosed', []):
+                print(f"    [LOCAL-872B] stop {_d['stop']} DISCLOSED ({_d['reason']}): "
+                      f"\"{_d['sentence'][:110]}\"")
+            for _r in _lc_rep2['removed']:
+                print(f"    [LOCAL-872] stop {_r['stop']} DROPPED ({_r['reason']}): "
+                      f"\"{_r['sentence'][:110]}\"")
+                print(f"    {_lcg872b.claim_span_lines(_r['kind'], _r['claim'], _r['sentence'])}")
+            if (_lc_rep2['dropped'] or _lc_rep2.get('disclosed')) and output_file:
+                try:
+                    with open(output_file, "w", encoding="utf-8") as _lf:
+                        _lf.write(complete_tour)
+                except Exception:
+                    pass
+    except Exception as _lc_err2:
+        print(f"  [LOCAL-872] final-text landmark claim gate skipped (non-fatal): {_lc_err2}")
 
     # [LOCAL-855B] FINAL-TEXT user-stop scrub — THE LAST WORD on the delivered
     # text. The per-stop scrub runs inside the generation loop, but several later
