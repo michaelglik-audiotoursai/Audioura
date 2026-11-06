@@ -1,0 +1,9 @@
+{
+  "task_budget_id": "LOCAL-872",
+  "budget_usd": 0.4,
+  "metered_total_usd": 0.335436,
+  "by_provider": {
+    "?": 0.335436
+  },
+  "rows": 418
+}
