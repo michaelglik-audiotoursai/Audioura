@@ -13,6 +13,38 @@ local only, on the Mac Mini. It goes to Preview on GCloud, then to the first pub
   replaced phone restores its Listen page with the recovery code, at no charge (D660 addendum).
 - **Michael leaves for Vietnam ~Oct 28.** Anything that needs him at a store console or a phone at home goes before that date.
 
+
+## STATE 2026-11-05 (LEAD refresh, at GCloud_Storied's request) — target: submit to both stores **Thu Nov 13**, public **~Nov 17**
+
+**Code side: done (on `subscribed`)**
+
+| item | where | status |
+|---|---|---|
+| In-app account deletion | About → Delete Account → `DELETE /delete-account/<secret_id>` | ✅ in code; include in the purchase/QA matrix |
+| Block / report in communities (L2) | `communities_api.py` `/communities/<id>/report`, `blocked_owner_ids_for`, admin reports queue | ✅ in code |
+| wdvrday4pk: credentials and the AES key in debug logs | c0049a8b (redaction guard, legacy purge) | ✅ done |
+| wdvrdaz2ye: content-policy gaps | LOCAL-724/724B: rated in the orchestrator store path, whole-text windows, re-rate on edit | ✅ in code. ClickUp is still "to do": close it after GCloud proves "rated before listing" on Preview. Item 5 (in-app report endpoint) still uses mailto, which is acceptable because the approved text says so |
+| wdvrdaz2zf: Apple refunds | `/iap/apple/notifications` (App Store Server Notifications v2: REFUND/REVOKE), admin Apple-refund message, Google `orders.refund` | ✅ in code; prove it in the purchase matrix (refund removes access) |
+| Subscriptions + Day pass (D734/D735) | iap_service `restoreSubscriptions()` (real `restorePurchases`); 4 Apple products READY_TO_SUBMIT | ✅ code; Google products not created (Play API permission) |
+| Tile proxy for maps, iOS 92 | D757 | ✅ |
+
+**Code side: NOT done (blocking)**
+
+| item | status | owner |
+|---|---|---|
+| **D660 reversal (wdvrdaz2z0):** a tour purchase becomes a NON-CONSUMABLE licence, free re-download on the same store account, real Restore Purchases for tours | **Not started.** It is not a new decision: Michael's 2026-10-20 approval of Terms §2(a) promises free re-download, and that approval supersedes D660 (recorded as D763). Biggest App Review risk (Guideline 3.1.1). | LOCAL-869 (Kiro, queued after LOCAL-867). New Apple product IDs needed (the type cannot change after creation), created as drafts by LEAD via asc_api.py |
+| `wallet_screen.dart` `_restorePurchases()` stub | Part of LOCAL-869 (route to the real iap_service restore) | LOCAL-869 |
+
+**GCloud_Storied (laptop), in this order (agreed)**
+1. Android build with `MAP_TILE_URL` → Play **closed testing**.
+2. Free seat cap (100) + daily paid limit verified on Preview.
+3. Purchase test matrix on Preview, everything except paid tours. The paid-tour rows (buy, delete, re-download free, Restore on a fresh install, other-language purchase) wait for LOCAL-869.
+
+**Michael**
+- Google Play permissions for the play-publisher service account (unblocks Play API uploads + Google products) — see MICHAEL_TODO.
+- Sophie as a TestFlight external tester (needs Beta App Review of build 92).
+- Final: press **Submit** in App Store Connect and **Send to review** in Play (outward; Michael only).
+
 ---
 
 ## PHASE 0: now (Oct 21–27), all in parallel
@@ -20,8 +52,8 @@ local only, on the Mac Mini. It goes to Preview on GCloud, then to the first pub
 **Michael**
 | # | what | time | unblocks |
 |---|---|---|---|
-| M1 | **Apple products** (wdvrdayuf3): 11 products + the $1 pass `audioura.pass.usd1`, tours **Consumable**. Also create **one Sandbox tester** (App Store Connect → Users and Access → Sandbox → +, a new email such as glikfamily+sandbox1@gmail.com) | 30 min | Apple test purchases (L4) |
-| M2 | **Google payments:** check the payments-profile verification in Play Console (W-9 review, bank test deposit). Create the Play service account (wdvrdayzyj). Add your Gmail as a license tester (Settings → License testing) | 15 min | Google products + test purchases |
+| M1 ✅ (2026-10-22) | **Apple products** (wdvrdayuf3): 11 products + the $1 pass `audioura.pass.usd1`, tours **Consumable**. Also create **one Sandbox tester** (App Store Connect → Users and Access → Sandbox → +, a new email such as glikfamily+sandbox1@gmail.com) | 30 min | Apple test purchases (L4) |
+| M2 ✅ (2026-10-22) | **Google payments:** check the payments-profile verification in Play Console (W-9 review, bank test deposit). Create the Play service account (wdvrdayzyj). Add your Gmail as a license tester (Settings → License testing) | 15 min | Google products + test purchases |
 | M3 | **Register the DMCA agent** at copyright.gov (≈$6, ≈15 min): Audioura LLC, 44 Sharpe Rd, Newton Centre, MA 02459, info@audioura.com | 15 min | publishing the Terms |
 | M4 | **Review Subscribed + Communities**, step by step: `SUBSCRIBED_REVIEW_PLAN.md` | 60–75 min | approving Preview |
 | M5 | **Legal final read**: LEAD posts the final texts with your per-download rule applied → you say "publish" | 30 min | Preview (D661) |
@@ -65,6 +97,8 @@ local only, on the Mac Mini. It goes to Preview on GCloud, then to the first pub
 ---
 
 ## Done
+- ✅ **Legal pages published** on audioura.com, effective 2026-10-21 (D697); DMCA agent DMCA-1083696 active. The stores already point to /privacy (live since June 16); only confirm the URL.
+- ✅ Admin-only moderation (D693), reimbursement tools (D695), Treats from tour places (D696).
 - ✅ Keys rotated (wdvrdaxaw9, 2026-10-20).
 - ✅ Pixel-7 quick test of the official Storied app passed (Michael, 2026-10-21): download, generate, news articles on GCloud.
 - ✅ Content Policy approved (D656 add. 2) and true in code locally (LOCAL-724/724B @ 46301f3d).
