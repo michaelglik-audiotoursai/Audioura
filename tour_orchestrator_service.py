@@ -714,10 +714,132 @@ def _register_client_request_job(client_request_id, job_id):
         _CLIENT_REQUEST_JOBS[client_request_id] = (job_id, _t.monotonic())
 
 
+# ---------------------------------------------------------------------------
+# [LOCAL-871] Keep the instance alive while a job runs.
+#
+# Generation runs on background threads with NO open request, so Cloud Run sees
+# the instance as idle and scales it in (SIGTERM) mid-job even with CPU always
+# allocated. Only INBOUND requests count as busy, so while >=1 job is active a
+# daemon thread GETs this service's own public URL (SELF_URL) every
+# KEEPALIVE_INTERVAL_SECONDS. Cloud Run only: never runs unless K_SERVICE is set.
+# ---------------------------------------------------------------------------
+KEEPALIVE_INTERVAL_SECONDS = int(os.getenv('KEEPALIVE_INTERVAL_SECONDS', '45'))
+KEEPALIVE_PATH = '/health?keepalive=1'
+_RUN_LOCK = threading.Lock()
+_ACTIVE_RUNS = {}          # job_id -> lease owner token (None if unknown)
+_KEEPALIVE_THREAD = None
+
+
+def _keepalive_enabled():
+    """True only on Cloud Run (K_SERVICE set) with SELF_URL configured."""
+    return bool(os.getenv('K_SERVICE')) and bool(os.getenv('SELF_URL', '').strip())
+
+
+def _keepalive_sleep(seconds):
+    time.sleep(seconds)
+
+
+def _keepalive_ping():
+    """One inbound request to our own public URL. Never raises."""
+    url = os.getenv('SELF_URL', '').strip().rstrip('/') + KEEPALIVE_PATH
+    try:
+        r = _authenticated_request("GET", url, timeout=10)
+        return r.status_code
+    except Exception as e:
+        print(f"[LOCAL-871] keepalive ping failed ({type(e).__name__}: {e}) — will retry")
+        return None
+
+
+def _keepalive_loop():
+    global _KEEPALIVE_THREAD
+    while True:
+        _keepalive_sleep(KEEPALIVE_INTERVAL_SECONDS)
+        with _RUN_LOCK:
+            n = len(_ACTIVE_RUNS)
+            if n == 0:
+                _KEEPALIVE_THREAD = None   # decided under the lock: no start/stop race
+                print("[LOCAL-871] keepalive stopped (no active jobs)")
+                return
+        print(f"[LOCAL-871] keepalive {n} jobs")
+        sys.stdout.flush()
+        _keepalive_ping()
+
+
+def _ensure_keepalive_thread():
+    global _KEEPALIVE_THREAD
+    if not _keepalive_enabled():
+        return None
+    with _RUN_LOCK:
+        if _KEEPALIVE_THREAD is not None and _KEEPALIVE_THREAD.is_alive():
+            return _KEEPALIVE_THREAD
+        t = threading.Thread(target=_keepalive_loop, name='orch-keepalive', daemon=True)
+        _KEEPALIVE_THREAD = t
+        t.start()
+        print(f"[LOCAL-871] keepalive started (every {KEEPALIVE_INTERVAL_SECONDS}s)")
+        return t
+
+
+def _job_run_started(job_id):
+    with _RUN_LOCK:
+        _ACTIVE_RUNS.setdefault(job_id, None)
+    _ensure_keepalive_thread()
+
+
+def _job_run_note_lease(job_id, lease_owner):
+    with _RUN_LOCK:
+        if job_id in _ACTIVE_RUNS:
+            _ACTIVE_RUNS[job_id] = lease_owner
+
+
+def _job_run_finished(job_id):
+    with _RUN_LOCK:
+        _ACTIVE_RUNS.pop(job_id, None)   # the loop exits itself when the dict is empty
+
+
+def _checkpoint_active_jobs():
+    """[LOCAL-871] On SIGTERM, make sure the durable orchestrator_jobs row holds
+    what the LOCAL-821 resume needs: the generator job id (re-persisted from
+    memory in case the first write hit a DB blip). Returns the job ids."""
+    with _RUN_LOCK:
+        jobs = list(_ACTIVE_RUNS.keys())
+    store = _orch_jobs_store()
+    for jid in jobs:
+        gen_jid = (ACTIVE_JOBS.get(jid) or {}).get("text_job_id")
+        if store and gen_jid:
+            try:
+                store.set_generator_job_id(jid, gen_jid)
+                print(f"[LOCAL-871] checkpoint job {jid}: generator_job_id={gen_jid}")
+            except Exception as e:
+                print(f"[LOCAL-871] checkpoint failed for {jid}: {e}")
+        else:
+            print(f"[LOCAL-871] checkpoint job {jid}: no generator job id yet (nothing to re-attach to)")
+    return jobs
+
+
+def _release_active_leases():
+    """[LOCAL-871] Hand our leases back so the next instance resumes at once
+    instead of waiting out the lease (default 900 s). Status is untouched."""
+    store = _orch_jobs_store()
+    with _RUN_LOCK:
+        items = list(_ACTIVE_RUNS.items())
+    for jid, owner in items:
+        if store and owner:
+            try:
+                store.release_lease(jid, owner=owner)
+            except Exception as e:
+                print(f"[LOCAL-871] lease release failed for {jid}: {e}")
+
+
 def _graceful_shutdown(signum, frame):
     """Handle SIGTERM (Cloud Run shutdown signal) by waiting for in-flight generations."""
     global _SHUTTING_DOWN
     _SHUTTING_DOWN = True
+    with _RUN_LOCK:
+        n_jobs = len(_ACTIVE_RUNS)
+    if n_jobs:
+        print(f"[LOCAL-871] SIGTERM with {n_jobs} active jobs")
+        sys.stdout.flush()
+        _checkpoint_active_jobs()
     active = [t for t in _ACTIVE_GENERATION_THREADS if t.is_alive()]
     if active:
         print(f"[SHUTDOWN] SIGTERM received. Waiting for {len(active)} in-flight generation(s) to complete (max 240s)...")
@@ -730,6 +852,8 @@ def _graceful_shutdown(signum, frame):
             print(f"[SHUTDOWN] All in-flight generations completed cleanly.")
     else:
         print(f"[SHUTDOWN] SIGTERM received. No in-flight generations. Exiting cleanly.")
+    # [LOCAL-871] Anything still unfinished: free its lease for the next instance.
+    _release_active_leases()
     sys.exit(0)
 
 
@@ -1948,6 +2072,20 @@ def link_stop_metrics_to_tour(tour_id, job_id):
 
 
 def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None, mode=None, resume_generator_job_id=None, lease_owner=None):
+    """[LOCAL-871] Registers the run as active (drives the self keep-alive and the
+    SIGTERM checkpoint) around the real pipeline."""
+    _job_run_started(job_id)
+    try:
+        return _orchestrate_tour_async_impl(
+            job_id, location, tour_type, total_stops, user_id=user_id,
+            request_string=request_string, language=language, persona=persona,
+            is_test=is_test, stops=stops, mode=mode,
+            resume_generator_job_id=resume_generator_job_id, lease_owner=lease_owner)
+    finally:
+        _job_run_finished(job_id)
+
+
+def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_id=None, request_string=None, language='en', persona=None, is_test=None, stops=None, mode=None, resume_generator_job_id=None, lease_owner=None):
     """Orchestrate the complete tour generation pipeline asynchronously.
 
     [LOCAL-821] When resume_generator_job_id is set, this is a RESUME of a job
@@ -1993,6 +2131,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         _LEASE_SECS = 900
     _lease_owner = lease_owner or (_make_owner() if _make_owner else None)
     _lease_seconds = _LEASE_SECS
+    _job_run_note_lease(job_id, _lease_owner)  # [LOCAL-871] for SIGTERM lease release
 
     def _renew_lease(context=""):
         """[LOCAL-829] Heartbeat the lease so the sweep leaves this live row
@@ -2201,7 +2340,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             print(f"Checking tour text generator status: {datetime.now().isoformat()} (Poll #{poll_count})")
             try:
                 status_response = _authenticated_request("GET", f"{TOUR_GENERATOR_URL}/status/{job_id_1}", timeout=_POLL_TIMEOUT)
-            except (requests.Timeout, requests.ConnectionError) as poll_err:
+            except requests.RequestException as poll_err:  # [LOCAL-871] any transport error is transient
                 _consecutive_poll_failures_1 += 1
                 if _poll_failure_start_1 is None:
                     _poll_failure_start_1 = datetime.now()
@@ -2223,6 +2362,23 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
             _consecutive_poll_failures_1 = 0
             _poll_failure_start_1 = None
             print(f"Status response: {status_response.status_code}")
+            # [LOCAL-871] A 5xx from the generator (instance recycling / saturated) is
+            # transient: keep polling (every <=45 s) so the poller never dies and the
+            # generator keeps receiving inbound requests. Bounded by the same
+            # consecutive-failure limit and the stall/absolute caps above.
+            if status_response.status_code >= 500:
+                _consecutive_poll_failures_1 += 1
+                if _poll_failure_start_1 is None:
+                    _poll_failure_start_1 = datetime.now()
+                print(f"[LOCAL-871] Text-gen status poll #{poll_count} got HTTP "
+                      f"{status_response.status_code}; consecutive failures "
+                      f"{_consecutive_poll_failures_1}/{_MAX_CONSECUTIVE_POLL_FAILURES}")
+                if _consecutive_poll_failures_1 >= _MAX_CONSECUTIVE_POLL_FAILURES:
+                    raise Exception(f"Text-generation status polling failed: "
+                                    f"{_consecutive_poll_failures_1} consecutive HTTP "
+                                    f"{status_response.status_code} responses")
+                time.sleep(10)
+                continue
             
             if status_response.status_code == 200:
                 status_data = status_response.json()
@@ -2338,7 +2494,7 @@ def orchestrate_tour_async(job_id, location, tour_type, total_stops, user_id=Non
         while True:
             try:
                 modernized_status_response = _authenticated_request("GET", f"{MODERNIZED_URL}/status/{modernized_job_id}", timeout=_POLL_TIMEOUT)
-            except (requests.Timeout, requests.ConnectionError) as poll_err:
+            except requests.RequestException as poll_err:  # [LOCAL-871] any transport error is transient
                 _consecutive_poll_failures_2 += 1
                 if _poll_failure_start_2 is None:
                     _poll_failure_start_2 = datetime.now()
@@ -3693,6 +3849,9 @@ def get_coordinates_direct(location):
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint with cost ceiling stats."""
+    if request.args.get('keepalive'):
+        # [LOCAL-871] self keep-alive ping: cheap, no DB/ceiling work.
+        return jsonify({"status": "healthy", "service": "tour_orchestrator", "keepalive": True})
     try:
         from cost_ceiling_monitor import get_ceiling_stats
         _ceiling_stats = get_ceiling_stats()
