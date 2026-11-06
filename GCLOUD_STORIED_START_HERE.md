@@ -13,6 +13,41 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️▶️ RESUME HERE — written 2026-11-06 ~16:00 EST (Michael closed the laptop to travel; 3h watch cron 7503d257 deleted, nothing armed)
+
+1. Run `date` and prefix replies with `[GCloud_Storied_1]@…`. LEAD = Storied_Tours (bridge:session_0162Qu7k54NgjdiBu8pVkpwb). Re-arm the 3h CronCreate watch, check ClickUp `1000410000000733` for waves newer than **36**, and tell LEAD you're back.
+2. **The OpenAI account is out of credits** (first error 2026-11-06T10:10:34Z, last seen 12:52Z). This takes down all three generators: Beta, storied and subscribed. Michael tops up at https://platform.openai.com/settings/organization/billing (account probably michael.glik@audioura.com). Check: `gcloud logging read 'textPayload:"no credits remaining"' --limit 3` (Bash, `</dev/null`).
+3. **Wave 36 (wdvrdazdpz)** — gen 00038-qgw (67cab3dd, digest 2ba1bd64, build e6363ce6) is built and idle. Traffic is on 00036-qbq. The proof was invalid because of the credits, not the code. Once credits are back:
+   - run QUIET, then `update-traffic tour-generator-subscribed --to-revisions 00038-qgw=100`
+   - re-prove with Michael's 10 split stops (scratchpad wave36.json), using a NEW request string (D622)
+   - PASS = the Opera House stop names its architect + 1900; the Palace stop names Ngô Viết Thụ with no 1885; no empty stop; no Miss Saigon; no "According to Wikipedia". Then hide the proof.
+   - FAIL = roll back to 00036-qbq.
+   - Then regenerate Michael's 10 stops on USER-41659366 (runregen_m.py). **Don't send him a share code until LEAD posts its evaluation.** Note: the same request string would overwrite 544.
+4. **Android 97** = 2.4.47+97 from subscribed 233eb8d6 (LOCAL-877, Sophia's resume/play-bar/thumbs fixes).
+   - File: `C:\adev-wt\aab97\audioura-subscribed-2.4.47+97.aab`, sha256 dc80bb26…e874, upload key B3:AB…3A:64.
+   - Michael uploads it at https://play.google.com/console (michael.glik@audioura.com); it supersedes 95 and 93.
+   - The Android resume path still needs testing on a phone: play a stop, lock, unlock → same stop, still playing.
+   - **Build with `C:\Users\micha\eclipse-workspace\flutter-3.41.6\flutter\bin\flutter.bat`.** The old `eclipse-workspace\flutter` (3.29.3) fails because workmanager 0.9.3 needs Flutter 3.32 or newer.
+   - Worktree: C:\adev-wt\GCS-PLAY97.
+5. Still waiting on Michael:
+   - D758 "yes"
+   - AU-Q6CR / USER-933744565 tester level
+   - iOS 96 (2.4.47) TestFlight check
+   - Close wdvrdaz2ye; confirm the hourly Scheduler ping.
+
+**Live now (Subscribed):**
+- gen 00036-qbq (851e009c)
+- modernized 00009-cn4
+- orch 00021-lbb (7cb29935)
+- gateway 00004-8mw (17fb1d7d)
+- translation 00005-c9r
+- tour-editing 00003-tfp
+- map 00006-6kk
+- user-api 00003-hvw
+- tile-proxy 00002
+
+audio_tours = 438 rows. 544 (share ouVCyG8V) is visible for Michael. The 543 and 546 proofs are hidden (backups in AudiouraBackups\wave35_proof_hide_20261106).
+
 # ▶️ WAVE 35 — 2026-11-06 ~04:40 EST (wdvrdazdpp) — DEPLOYED then ROLLED BACK. gen 00037-k2h (768f8c55, LOCAL-872 claim gate) is built and idle; traffic is on 00036-qbq. Proof 543 failed: no Opera House architect named; Independence Palace 'built 1885'. Proofs 543 and 546 hidden (backup wave35_proof_hide_20261106). Tour 544 = Michael's regen (share ouVCyG8V), contains the Miss Saigon error. The runner's is_test:true came back false; check it.
 
 # ▶️ WAVE 34 + ANDROID 95 — 2026-11-06 ~01:00 EST (wdvrdazdne). LIVE: gateway api-gateway-subscribed-00004-8mw (17fb1d7d, POST /preview-stops for the LOCAL-868 paste box). Rollback 00003-x4s. Proof: 200, 10/10 HCMC stops, $0.004. Android 95 = 2.4.46+95 from 17fb1d7d at C:\adev-wt\aab95\audioura-subscribed-2.4.46+95.aab (sha256 a11c2fa9…ecd9), not uploaded yet (Michael). iOS 94 (2.4.45) is on TestFlight (LEAD). Build tip: mkbuild writes dir: <svc_dir>; for the gateway it must be src/api-gateway.
