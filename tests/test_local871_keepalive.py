@@ -196,3 +196,23 @@ class PollerResilienceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_self_url_learned_from_run_app_host(monkeypatch):
+    import tour_orchestrator_service as t
+    monkeypatch.setenv("K_SERVICE", "orch")
+    monkeypatch.delenv("SELF_URL", raising=False)
+    with t.app.test_request_context("/health", base_url="https://orch-abc-uc.a.run.app"):
+        t._learn_self_url_871()
+    import os
+    assert os.environ["SELF_URL"] == "https://orch-abc-uc.a.run.app"
+    monkeypatch.delenv("SELF_URL", raising=False)
+
+
+def test_self_url_not_learned_locally(monkeypatch):
+    import tour_orchestrator_service as t, os
+    monkeypatch.setenv("K_SERVICE", "orch")
+    monkeypatch.delenv("SELF_URL", raising=False)
+    with t.app.test_request_context("/health", base_url="http://localhost:5002"):
+        t._learn_self_url_871()
+    assert not os.environ.get("SELF_URL")

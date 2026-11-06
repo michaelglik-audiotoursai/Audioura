@@ -337,6 +337,21 @@ sys.stdout.reconfigure(line_buffering=True)
 
 app = Flask(__name__)
 
+
+@app.before_request
+def _learn_self_url_871():
+    """[LEAD 871 review] Learn SELF_URL from the first real Cloud Run request
+    (Host = this service's *.run.app name), so the keep-alive needs no env change.
+    An explicit SELF_URL env always wins."""
+    try:
+        if os.getenv('K_SERVICE') and not os.getenv('SELF_URL', '').strip():
+            _h = (request.host or '').split(':')[0]
+            if _h.endswith('.run.app'):
+                os.environ['SELF_URL'] = f"https://{_h}"
+                print(f"[LOCAL-871] SELF_URL learned from request host: https://{_h}")
+    except Exception:
+        pass
+
 # --- Failure recorder (LOCAL-785 / D723) ---
 # Every orchestrator failure is recorded to failure_events via failure_log.record
 # (never raises; 1s DB timeout; stdout JSON fallback). Imported guarded so a
