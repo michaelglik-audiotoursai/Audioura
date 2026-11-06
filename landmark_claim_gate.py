@@ -511,12 +511,12 @@ def evidence_fact_for(kind: str, auth: Dict, name: str = "") -> str:
         if auth.get("built_sentence"):
             return auth["built_sentence"]
         if auth.get("built_value"):
-            return f"According to Wikipedia, it was built {auth['built_value']}."
+            return f"It was built {auth['built_value']}."
     if kind == "person":
         if auth.get("architect_sentence"):
             return auth["architect_sentence"]
         if auth.get("architect_value"):
-            return f"According to Wikipedia, its architect was {auth['architect_value']}."
+            return f"Its architect was {auth['architect_value']}."
     return ""
 
 
@@ -733,7 +733,7 @@ _CLAUSE = {"established": "established in {y}", "founded": "founded in {y}",
 
 def ensure_evidence_dates(body: str, auth: Optional[Dict]) -> Tuple[str, str]:
     """The evidence's own establishment / start / opening / completion years the stop
-    never states are added once as 'According to Wikipedia, it was ...'.  Wave 36: the
+    never states are added once as 'It was ...' (only when the stop states no year at all).  Wave 36: the
     narrator wrote Notre-Dame 'completed 1880' and dropped the infobox's 'established
     1863'.  Returns (body, added_sentence or '')."""
     if not auth or not auth.get("dated"):
@@ -745,18 +745,20 @@ def ensure_evidence_dates(body: str, auth: Optional[Dict]) -> Tuple[str, str]:
             dated.append((k, y))
     has = lambda y: re.search(r"(?<!\d)" + y + r"(?!\d)", body)
     none_stated = not any(has(y) for _, y in dated)
-    missing = [(k, y) for k, y in dated if not has(y)
-               and (none_stated or k in ("established", "founded", "begun"))]
+    # [LEAD 872C review] Add evidence dates only when the stop states NO year at all.
+    # A stop that already says "constructed between 1877 and 1880" is right as written;
+    # bolting "it was established in 1863" onto it reads like a footnote.
+    missing = [(k, y) for k, y in dated if not has(y) and none_stated]
     if not missing:
         return body, ""
     passive = [_CLAUSE[k].format(y=y) for k, y in missing if k != "begun"]
     began = [y for k, y in missing if k == "begun"]
     parts = []
     if passive:
-        parts.append("According to Wikipedia, it was " + (" and ".join(passive) if len(passive) < 3
+        parts.append("It was " + (" and ".join(passive) if len(passive) < 3
                      else ", ".join(passive[:-1]) + " and " + passive[-1]) + ".")
     if began:
-        parts.append(("Construction" if passive else "According to Wikipedia, construction")
+        parts.append("Construction"
                      + f" began in {began[0]}.")
     sent = " ".join(parts)
     ys = set(auth.get("years") or ())

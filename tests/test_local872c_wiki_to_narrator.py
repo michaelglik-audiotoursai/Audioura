@@ -105,11 +105,16 @@ def test_narrator_block_has_key_facts_line():
 
 
 def test_missing_establishment_year_is_added_once():
+    # [LEAD 872C review] A stop that already states a correct year is left as written.
     ND = ("Notre-Dame - Wikipedia (en). The cathedral was constructed between 1877 and 1880.\n"
           "Infobox: established: 1863; completed: 1880")
-    body = "The cathedral was completed in 1880. Two towers rise 58 metres."
+    body0 = "The cathedral was completed in 1880. Two towers rise 58 metres."
+    new0, _ = lg.filter_stop_body(body0, [ND], "Notre-Dame", location=LOC, authority_items=[ND])
+    assert "1863" not in new0
+    # A stop stating NO year gets the evidence dates once, without "According to Wikipedia".
+    body = "The cathedral is the city's landmark. Two towers rise 58 metres."
     new, _ = lg.filter_stop_body(body, [ND], "Notre-Dame", location=LOC, authority_items=[ND])
-    assert "1863" in new and new.count("1863") == 1
+    assert "1863" in new and new.count("1863") == 1 and "According to Wikipedia" not in new
     again, _ = lg.filter_stop_body(new, [ND], "Notre-Dame", location=LOC, authority_items=[ND])
     assert again == new   # idempotent
 
@@ -118,8 +123,8 @@ def test_added_date_never_lands_in_directions_line():
     ND = "X - Wikipedia (en). A museum.\nInfobox: established: 1975"
     body = "\nA museum of the war years.\n\nDirections: Walk north. Enjoy the stroll!\n"
     new, _ = lg.filter_stop_body(body, [ND], "X", location=LOC, authority_items=[ND])
-    assert "years. According to Wikipedia, it was established in 1975." in new
-    assert "stroll! According" not in new
+    assert "years. It was established in 1975." in new
+    assert "stroll! It was" not in new
 
 
 PIER_LIVE = ("Stop 9: Bạch Đằng Pier\n\nCoordinates: 10.775240, 106.707002\n\n"
