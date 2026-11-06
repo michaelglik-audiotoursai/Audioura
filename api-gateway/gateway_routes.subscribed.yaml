@@ -667,6 +667,13 @@ routes:
     methods: [POST]
     auth: api_key
 
+  # [LOCAL-868 / D762] Free itinerary preview (no LLM; ~$0.004 per 10 stops).
+  - public_path: /preview-stops
+    backend: generator
+    upstream: /preview-stops
+    methods: [POST]
+    auth: api_key
+
   # ========================================================================
   # VOICE  (voice-subscribed) — rows 50, 51
   # ========================================================================
