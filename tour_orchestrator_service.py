@@ -3827,7 +3827,18 @@ def generate_complete_tour():
             from itinerary_import import expand_pasted_lists as _exp_lists
             _raw_stops, _exp_n = _exp_lists(_raw_stops, data.get('location') or '')
             from itinerary_import import resolve_user_stop_pins as _rusp
-            _raw_stops, _pin_n = _rusp(_raw_stops, data.get('location') or '')
+
+            def _gen_preview(_text, _city):
+                # [LEAD wave-31 finding] Resolve on the GENERATOR's /preview-stops:
+                # it already has the resolver modules and the Serper key; the
+                # orchestrator image has neither (No module named 'city_scope').
+                _r = _authenticated_request("POST", f"{TOUR_GENERATOR_URL}/preview-stops",
+                                            json={"text": _text, "city": _city}, timeout=20)
+                return _r.json() if _r is not None and _r.status_code == 200 else {
+                    "ok": False, "error": f"preview HTTP {getattr(_r, 'status_code', None)}"}
+
+            _raw_stops, _pin_n = _rusp(_raw_stops, data.get('location') or '',
+                                       preview_fn=_gen_preview)
             if _exp_n:
                 print(f"[D762] expanded {_exp_n} pasted list(s) into "
                       f"{len(_raw_stops)} stops, order kept")

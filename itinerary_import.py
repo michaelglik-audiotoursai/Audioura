@@ -850,7 +850,7 @@ def expand_pasted_lists(raw_stops, city_hint: str = "", resolve: bool = False):
         return raw_stops, 0
 
 
-def resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print):
+def resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn=None):
     """[LEAD wave-30 finding] Give every plain-name user stop a checked pin, with the
     same free resolvers as /preview-stops (no LLM; Serper /places only for leftovers).
     This covers the pasted list AND the app's already-split stops. Items that already
@@ -867,7 +867,10 @@ def resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print):
         if not idx or not (city_hint or "").strip():
             return raw_stops, 0
         names = [raw_stops[i].strip() for i in idx]
-        pv = preview_stops("\n".join(names), city_hint, log=lambda *_a: None)
+        if preview_fn is not None:
+            pv = preview_fn("\n".join(names), city_hint) or {}
+        else:
+            pv = preview_stops("\n".join(names), city_hint, log=lambda *_a: None)
         if not pv.get("ok"):
             log(f"[D762] user-stop pin resolve skipped: {pv.get('error')}")
             return raw_stops, 0

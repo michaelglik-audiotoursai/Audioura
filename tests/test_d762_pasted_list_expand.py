@@ -91,3 +91,25 @@ class TResolvePins(unittest.TestCase):
             self.assertTrue(any("skipped" in m for m in msgs))
         finally:
             ii.preview_stops = orig
+
+
+class TPreviewFn(unittest.TestCase):
+    def test_uses_injected_preview_fn(self):
+        import itinerary_import as ii
+        calls = []
+        def fn(text, city):
+            calls.append((text, city))
+            return {"ok": True, "city": {"name": "HCMC"},
+                    "stops": [{"name": "x", "lat": 10.774089, "lng": 106.704056}]}
+        out, n = ii.resolve_user_stop_pins(["Café Apartments 42"], "Ho Chi Minh City", log=lambda *a: None, preview_fn=fn)
+        self.assertEqual(n, 1)
+        self.assertEqual(calls[0][1], "Ho Chi Minh City")
+        self.assertIn("10.774089", out[0])
+
+    def test_preview_fn_error_is_logged(self):
+        import itinerary_import as ii
+        msgs = []
+        out, n = ii.resolve_user_stop_pins(["A"], "Hanoi", log=msgs.append,
+                                           preview_fn=lambda *a: {"ok": False, "error": "preview HTTP 503"})
+        self.assertEqual(n, 0)
+        self.assertTrue(any("HTTP 503" in m for m in msgs))
