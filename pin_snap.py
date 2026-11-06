@@ -146,6 +146,29 @@ def _is_user_pin(poi: Dict) -> bool:
     return src in _USER_PIN_COORD_SOURCES
 
 
+_MODEL_COORD_SOURCES = ("", "model", "llm", "ai", "gpt", "guess", "llm_guess",
+                        "phase3b", "phase_3b", "model_guess", "unknown_model")
+
+
+def _is_model_sourced_coord(poi: Dict) -> bool:
+    """[LOCAL-870] True when the poi's coordinate came from the language model
+    (or has no recorded source), NOT from a user source or a resolver (Serper /
+    Nominatim / Wikidata / landmark table). A landmark pin established by an
+    authority is never model-sourced."""
+    if not isinstance(poi, dict):
+        return False
+    if poi.get("_landmark_coord") or poi.get("wikidata_lat") is not None:
+        return False
+    src = str(poi.get("coord_source") or poi.get("_coord_source")
+              or poi.get("coordinate_source") or "").strip().lower()
+    return src in _MODEL_COORD_SOURCES or src.startswith(("model", "llm"))
+
+
+def _default_is_user_stop(poi: Dict) -> bool:
+    return bool(isinstance(poi, dict)
+                and (poi.get("user_explicit") or poi.get("_anchor")))
+
+
 def _poi_coord(poi: Dict) -> Optional[Tuple[float, float]]:
     """A poi's current coordinate, from the 'coordinates' string or lat/lng."""
     c = _parse_coord(poi.get("coordinates"))
@@ -557,6 +580,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          landmark_fn: Optional[Callable] = None,
                          venue_fallback_coordinate: Optional[Tuple[float, float]] = None,
                          city_centroid: Optional[Tuple[float, float]] = None,
+                         is_user_stop_fn: Optional[Callable[[Dict], bool]] = None,
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -839,8 +863,20 @@ def snap_poi_coordinates(poi_list: List[Dict],
         if _row_for(i).get("reference") is not None:
             continue
         _cluster_hit = _clustered(i)
+        # [LOCAL-870 item 3] A USER stop whose coordinate is the MODEL's (not a
+        # user_* source) and that found no reference is announced with no pin,
+        # regardless of clustering. Wave 28: "A Star is Born" shipped the model's
+        # 10.7762,106.6956 because the rest of its cluster were user pins/snapped,
+        # so _clustered found no unsnapped neighbour (859/863R rule).
+        _user_model_pin = bool(
+            (is_user_stop_fn or _default_is_user_stop)(poi)
+            and not _is_user_pin(poi) and _is_model_sourced_coord(poi))
+        if _user_model_pin:
+            emit(f"[LOCAL-870] user stop {title!r} has only a model coordinate "
+                 f"and no reference — announced with no pin")
         _collapsed = (
-            _coord_is_marked_fallback(poi)
+            _user_model_pin
+            or _coord_is_marked_fallback(poi)
             or _shipped_shared(i)
             or _cluster_hit
             or (city_centroid is not None
