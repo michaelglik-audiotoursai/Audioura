@@ -799,3 +799,39 @@ def stops_for_generation(items) -> Tuple[List[str], int]:
     pins = sum(1 for i in items if isinstance(i, dict)
                and "/@" in stop_to_generation_string(i))
     return strings, pins
+
+
+_LIST_MARKERS = ("→", "⇒", "➜", "->", "=>", "\n", ";", "|")
+
+
+def expand_pasted_lists(raw_stops, city_hint: str = ""):
+    """[LEAD, D762 quick path] The app's own-stop fields are free text. A listener
+    who pastes a whole itinerary ("Cathedral → Post Office → …") into ONE field
+    should get every place as its own stop, in order, before any app update.
+
+    A string item that carries a list marker (arrows, new lines, ``;``, ``|``)
+    and parses into 2+ places is replaced by those places, as names with any
+    pasted link kept (``"<name> <url>"``). Commas alone do NOT trigger expansion,
+    because a single stop is often "Name, street address". Everything else is
+    passed through unchanged. Returns ``(new_list, n_expanded_items)``. Never
+    raises; on any error the input is returned as-is."""
+    if not isinstance(raw_stops, list):
+        return raw_stops, 0
+    out, n = [], 0
+    try:
+        for item in raw_stops:
+            if isinstance(item, str) and any(m in item for m in _LIST_MARKERS):
+                parsed = parse_itinerary(item, city_hint)
+                if len(parsed) >= 2:
+                    n += 1
+                    for p in parsed:
+                        name = (p.get("name") or "").strip()
+                        if not name:
+                            continue
+                        url = (p.get("url") or "").strip()
+                        out.append(f"{name} {url}".strip())
+                    continue
+            out.append(item)
+        return out, n
+    except Exception:
+        return raw_stops, 0

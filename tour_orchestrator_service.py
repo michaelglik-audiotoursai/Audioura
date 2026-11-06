@@ -3818,6 +3818,19 @@ def generate_complete_tour():
         _raw_stops = data.get('user_stops')
         if _raw_stops is not None:
             _stops_field_present = 'user_stops'
+    # [LEAD D762 quick path] A whole itinerary pasted into ONE own-stop field
+    # ("Cathedral → Post Office → …") becomes one stop per place, in order, so the
+    # import works with the app already installed (before LOCAL-868's paste box).
+    try:
+        from user_stops_flag import user_stops_enabled as _us_on_exp
+        if _us_on_exp() and isinstance(_raw_stops, list):
+            from itinerary_import import expand_pasted_lists as _exp_lists
+            _raw_stops, _exp_n = _exp_lists(_raw_stops, data.get('location') or '')
+            if _exp_n:
+                print(f"[D762] expanded {_exp_n} pasted list(s) into "
+                      f"{len(_raw_stops)} stops, order kept")
+    except Exception as _exp_err:
+        print(f"[D762] pasted-list expansion skipped: {_exp_err}")
     # [LOCAL-867] A REVIEWED itinerary preview (POST /preview-stops on the
     # generator) arrives as user_stops entries that are objects
     # {name|stop_name, lat, lng, ...} in the listener's order. Fold each into the
