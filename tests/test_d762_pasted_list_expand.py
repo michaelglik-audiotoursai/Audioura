@@ -66,8 +66,8 @@ class TResolvePins(unittest.TestCase):
         orig = ii.preview_stops
         try:
             ii.preview_stops = lambda text, city, **k: {"ok": True, "city": {"name": "HCMC"}, "stops": [
-                {"name": "x", "lat": 10.779722, "lng": 106.699167},
-                {"name": "y", "unresolved": True, "lat": None, "lng": None}]}
+                {"name": "Cathedral", "lat": 10.779722, "lng": 106.699167},
+                {"name": "Mystery Bar", "unresolved": True, "lat": None, "lng": None}]}
             out, n = ii.resolve_user_stop_pins(["Cathedral", "Mystery Bar"], "Ho Chi Minh City", log=lambda *a: None)
             self.assertEqual(n, 1)
             self.assertTrue(out[0].startswith("Cathedral "))
@@ -113,3 +113,19 @@ class TPreviewFn(unittest.TestCase):
                                            preview_fn=lambda *a: {"ok": False, "error": "preview HTTP 503"})
         self.assertEqual(n, 0)
         self.assertTrue(any("HTTP 503" in m for m in msgs))
+
+
+class TCleanTitles(unittest.TestCase):
+    def test_titles_drop_alt_and_note(self):
+        import itinerary_import as ii
+        def fn(text, city):
+            parsed = ii.parse_itinerary(text, city)
+            return {"ok": True, "city": {"name": "HCMC"},
+                    "stops": [dict(p, lat=10.77, lng=106.70) for p in parsed]}
+        out, n = ii.resolve_user_stop_pins(["Opera House/Đồng Khởi", "Bạch Đằng Pier (tour-bus + waterbus)"],
+                                           "Ho Chi Minh City", log=lambda *a: None, preview_fn=fn)
+        self.assertEqual(n, 2)
+        self.assertTrue(out[0].startswith("Opera House "), out[0])
+        self.assertNotIn("Đồng Khởi", out[0].split(" http")[0])
+        self.assertTrue(out[1].startswith("Bạch Đằng Pier "), out[1])
+        self.assertNotIn("tour-bus", out[1])

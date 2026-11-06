@@ -884,7 +884,11 @@ def resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn
             if st.get("unresolved") or st.get("lat") is None:
                 continue
             st = dict(st)
-            st["name"] = st["stop_name"] = raw_stops[i].strip()  # the listener's own title
+            # The listener's own wording, cleaned the way the parser cleans it:
+            # "Opera House/Đồng Khởi" -> "Opera House", "(tour-bus + waterbus)" ->
+            # a note, never part of the title (wave-32 cosmetic finding).
+            _clean = (st.get("name") or "").strip() or raw_stops[i].strip()
+            st["name"] = st["stop_name"] = _clean
             s = stop_to_generation_string(st)
             if "/@" in s:
                 out[i] = s
