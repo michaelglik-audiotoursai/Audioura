@@ -1268,6 +1268,46 @@ def health_check():
         "cost_ceiling": _ceiling_stats,
     })
 
+@app.route('/preview-stops', methods=['POST'])
+def preview_stops_endpoint():
+    """[LOCAL-867 / D762] Preview a PASTED itinerary: parse it into ordered stops
+    and give each a map pin, so the listener can review before generating.
+
+    Body: ``{"text": "A → B → C", "city": "Ho Chi Minh City"}`` (``city`` optional
+    when the text names it). Returns each stop with ``lat``/``lng``/``source``/
+    ``confidence``, or ``unresolved: true`` with a reason, plus the ``cost`` of the
+    call. NO LLM. Resolution: curated city alias + landmark table -> Wikidata P625
+    -> Nominatim in the city box -> at most one Serper /places per item still
+    unresolved. Never the city or country centroid.
+
+    Gated by the same USER_STOPS_ENABLED kill switch as the rest of the user-stops
+    feature (D591); a request that can spend a paid lookup must not be reachable
+    on a deploy where that feature is off.
+    """
+    from user_stops_flag import user_stops_enabled
+    if not user_stops_enabled():
+        return jsonify({"error": "itinerary import is not enabled on this deploy"}), 404
+    data = request.get_json(silent=True) or {}
+    text = data.get('text')
+    city = data.get('city') or ''
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({"error": "'text' (the pasted itinerary) is required"}), 400
+    if len(text) > 8000:
+        return jsonify({"error": "'text' is too long (max 8000 characters)"}), 400
+    if not isinstance(city, str):
+        return jsonify({"error": "'city' must be a string"}), 400
+    import itinerary_import
+    out = itinerary_import.preview_stops(
+        text, city.strip(), max_stops=_MAX_USER_STOPS,
+        max_serper_calls=int(os.environ.get('PREVIEW_STOPS_MAX_SERPER', '10')))
+    if not out.get('ok'):
+        return jsonify({"error": out.get('error')}), 400
+    print(f"[LOCAL-867] preview-stops: {out['count']} stops, "
+          f"{out['unresolved_count']} unresolved, city={out['city']['name']!r}, "
+          f"cost={out['cost']}")
+    return jsonify(out)
+
+
 @app.route('/generate', methods=['POST'])
 def generate_tour():
     """Generate tour text."""

@@ -1,0 +1,10 @@
+{
+  "task_budget_id": "LOCAL-867",
+  "budget_usd": 0.5,
+  "metered_total_usd": 0.493572,
+  "by_provider": {
+    "serper": 0.128,
+    "openai": 0.365572
+  },
+  "rows": 571
+}
