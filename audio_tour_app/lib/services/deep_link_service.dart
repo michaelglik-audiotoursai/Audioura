@@ -29,6 +29,7 @@ import 'package:android_play_install_referrer/android_play_install_referrer.dart
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../utils/share_code.dart';
+import 'shared_text_service.dart';
 
 /// The one place a pending share-code search is parked between "a link/referrer/
 /// clipboard produced a code" and "Home ran the search". Home listens to
@@ -263,6 +264,7 @@ class DeepLinkService {
       final initial = await appLinks.getInitialLink();
       if (initial != null) {
         PendingShareSearch.instance.offer(codeFromUri(initial));
+        PendingSharedText.instance.offer(textFromPasteUri(initial));
       }
     } catch (_) {
       // No initial link, or the platform cannot provide one — ignore.
@@ -271,7 +273,11 @@ class DeepLinkService {
     // Warm start: links while the app runs.
     try {
       _sub = appLinks.uriLinkStream.listen(
-        (uri) => PendingShareSearch.instance.offer(codeFromUri(uri)),
+        (uri) {
+          PendingShareSearch.instance.offer(codeFromUri(uri));
+          // [LOCAL-868] iOS Share Extension hand-off: audioura://paste?text=…
+          PendingSharedText.instance.offer(textFromPasteUri(uri));
+        },
         onError: (Object _) {},
       );
     } catch (_) {

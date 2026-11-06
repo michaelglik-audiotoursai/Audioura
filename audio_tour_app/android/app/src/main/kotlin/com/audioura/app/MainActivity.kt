@@ -18,12 +18,30 @@ class MainActivity : FlutterActivity() {
     private var methodChannel: MethodChannel? = null
     private var pendingResult: MethodChannel.Result? = null
 
+    // [LOCAL-868] Share → Audioura: text/plain from another app (Musa.AI, Notes,
+    // ChatGPT…) arrives as an ACTION_SEND intent. Cold start: Dart asks for it
+    // (getInitialSharedText). Warm start (singleTop): onNewIntent pushes it.
+    private var shareChannel: MethodChannel? = null
+    private var pendingSharedText: String? = null
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         
         // Register native audio recorder plugin
         flutterEngine.plugins.add(NativeAudioRecorderPlugin())
         
+        shareChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.audioura.app/share")
+        shareChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getInitialSharedText" -> {
+                    captureSharedText(intent)
+                    result.success(pendingSharedText)
+                    pendingSharedText = null
+                }
+                else -> result.notImplemented()
+            }
+        }
+
         methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
         methodChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -53,6 +71,28 @@ class MainActivity : FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    /// Read EXTRA_TEXT from an ACTION_SEND text/plain intent, then strip it so a
+    /// rotation / activity recreate does not deliver the same share twice.
+    private fun captureSharedText(i: Intent?) {
+        if (i == null || i.action != Intent.ACTION_SEND) return
+        val type = i.type ?: return
+        if (!type.startsWith("text/")) return
+        val text = i.getStringExtra(Intent.EXTRA_TEXT)
+        if (!text.isNullOrBlank()) pendingSharedText = text
+        i.removeExtra(Intent.EXTRA_TEXT)
+        i.action = Intent.ACTION_MAIN
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        captureSharedText(intent)
+        val text = pendingSharedText
+        if (text != null) {
+            shareChannel?.invokeMethod("sharedText", text)
+            pendingSharedText = null
         }
     }
 

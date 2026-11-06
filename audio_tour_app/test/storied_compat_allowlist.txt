@@ -53,3 +53,5 @@ screens/about_screen.dart | SAFE diagnostics (health/user) + delete-account, eac
 # ─── Dead code (not reachable; cannot run, cannot crash) ──────────────────────
 services/tour_service.dart | DEAD unreferenced except by widgets/map_page.dart, which is never instantiated; references an undefined ApiConfig, so it is never compiled onto a live path.
 services/map_service.dart | DEAD no importers; hardcodes the Docker-internal host http://map_delivery:5005 and is not wired into the app.
+screens/paste_list_screen.dart | SAFE the only raw call is a best-effort OSM Nominatim reverse lookup to pre-fill the city (own try/catch in _prefillCity, returns null on any error; not a Subscribed route). LOCAL-868.
+services/preview_stops_service.dart | SAFE explicit handler — Endpoints.post then isRouteMissing(status,body) / transport error -> PreviewStopsException with a plain message (tested paste_list_local868_test.dart). LOCAL-868.

@@ -37,7 +37,10 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
-            <!-- Share target for Gmail newsletters -->
+            <!-- Share target for Gmail newsletters, and [LOCAL-868] Share → Audioura:
+                 a text/plain ACTION_SEND from Musa.AI / Notes / ChatGPT opens the
+                 "Paste a list of places" box pre-filled (MainActivity → Dart
+                 channel com.audioura.app/share). -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />

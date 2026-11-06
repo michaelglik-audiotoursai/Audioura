@@ -14,6 +14,7 @@ import '../services/notification_service.dart';
 import '../services/background_service.dart';
 import '../services/entitlements_service.dart';
 import '../services/deep_link_service.dart';
+import '../services/shared_text_service.dart';
 import '../renewal_logic.dart';
 import '../widgets/renewal_sheet.dart';
 import '../services/communities_service.dart';
@@ -111,6 +112,9 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // the deferred check), make sure we are on the Home tab so Home can fill
     // Search and run it. Home itself consumes the code via the same notifier.
     PendingShareSearch.instance.code.addListener(_onShareCodeArrived);
+    // [LOCAL-868] Text shared INTO Audioura (Share → Audioura): go to Create
+    // Tour, whose paste box takes the text. The generator screen consumes it.
+    PendingSharedText.instance.text.addListener(_onSharedTextArrived);
     // [LOCAL-716] A download snackbar's "View" asks to go to the Listen tab
     // (optionally opening one tour). Switch to the Listen tab exactly as a
     // notification tap does; MyToursScreen consumes the tour id itself.
@@ -119,6 +123,7 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // prompt), run once ever, after the first frame so a BuildContext exists.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _onShareCodeArrived(); // act on a code already waiting at launch.
+      _onSharedTextArrived(); // [LOCAL-868] and shared text waiting at launch.
       _runDeferredLinkCheck();
       // [LOCAL-732] Cold start: once Home is visible, warn (once) about any
       // community pass ending within 3 days. Deferred to the first frame so a
@@ -133,6 +138,15 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     if (PendingShareSearch.instance.code.value == null) return;
     if (_selectedIndex != kHomeTab && mounted) {
       _switchToTab(kHomeTab);
+    }
+  }
+
+  /// [LOCAL-868] Shared text is waiting: show the Create Tour tab. Its screen
+  /// listens to the same notifier and opens the paste box with the text.
+  void _onSharedTextArrived() {
+    if (PendingSharedText.instance.text.value == null) return;
+    if (_selectedIndex != kGenerateTab && mounted) {
+      _switchToTab(kGenerateTab);
     }
   }
 
@@ -305,6 +319,7 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     PendingShareSearch.instance.code.removeListener(_onShareCodeArrived);
+    PendingSharedText.instance.text.removeListener(_onSharedTextArrived);
     PendingListenOpen.instance.request.removeListener(_onListenOpenRequested);
     BackgroundService.stopBackgroundMonitoring();
     super.dispose();

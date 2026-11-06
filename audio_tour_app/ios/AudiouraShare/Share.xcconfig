@@ -1,0 +1,3 @@
+// [LOCAL-868] Gives the Share extension the same FLUTTER_BUILD_NAME / FLUTTER_BUILD_NUMBER
+// as Runner, so its CFBundleVersion always matches the host app (App Store rule).
+#include "../Flutter/Generated.xcconfig"

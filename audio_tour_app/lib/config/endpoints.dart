@@ -98,6 +98,13 @@ class Endpoints {
   /// Forces local mode when set, regardless of SharedPreferences.
   static const _debugServerIp = String.fromEnvironment('DEBUG_SERVER_IP');
 
+  /// DEBUG ONLY — [LOCAL-868] added to every local port when DEBUG_SERVER_IP is
+  /// set (--dart-define=DEBUG_PORT_OFFSET=10000 → generator 15000, orchestrator
+  /// 15002, …) so a task can point the app at its OWN stack while the shared
+  /// audioura-* containers keep 5000-5030. Has NO effect unless passed at build
+  /// time (default 0 → byte-for-byte the old behaviour).
+  static const _debugPortOffset = int.fromEnvironment('DEBUG_PORT_OFFSET');
+
   /// Returns the base URL for [s] based on current server_mode.
   /// Local:  http://<server_ip>:<port>
   /// Cloud (interim, bare per-service host):  <cloud_base_url>   (no prefix)
@@ -105,7 +112,7 @@ class Endpoints {
   static Future<String> base(Service s) async {
     // DEBUG: if DEBUG_SERVER_IP is baked in, force local mode to that IP.
     if (_debugServerIp.isNotEmpty) {
-      return 'http://$_debugServerIp:${_localPorts[s]}';
+      return 'http://$_debugServerIp:${_localPorts[s]! + _debugPortOffset}';
     }
     final prefs = await SharedPreferences.getInstance();
     final mode = prefs.getString('server_mode') ?? 'cloud';
