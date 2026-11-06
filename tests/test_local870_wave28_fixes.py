@@ -209,7 +209,7 @@ class TestFamousLandmarkUserStop(unittest.TestCase):
         self.assertEqual(use.classify_stop_kind("Palace Bar", "Bar"), "business")
         self.assertEqual(use.classify_stop_kind("Temple Bar", "Pub"), "business")
         self.assertEqual(use.classify_stop_kind("Cathedral Cafe", "Cafe"), "business")
-        self.assertEqual(use.classify_stop_kind("The Crazy Street", "Walking street"), "business")
+        self.assertEqual(use.classify_stop_kind("The Crazy Street", "Walking street"), "street_area")  # LOCAL-874
         self.assertEqual(use.classify_stop_kind("An Spa", "Spa"), "business")
 
     def test_existing_landmark_cases_unchanged(self):

@@ -574,7 +574,7 @@ def verify_user_stops_in_text(
         # Use the shared name+type classifier as well.
         try:
             from user_stop_enrichment import classify_stop_kind as _csk862
-            _is_landmark862 = _csk862(title, poi.get("type_specialty") or "") == "landmark"
+            _is_landmark862 = _csk862(title, poi.get("type_specialty") or "") in ("landmark", "both")  # [LOCAL-874]
         except Exception:
             _is_landmark862 = False
         if (set(_kind_fold.split()) & _DOCUMENTED_KINDS) or _is_landmark862:
