@@ -13,6 +13,8 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 28 — 2026-11-05 ~21:00 EST (wdvrdazc9w) — LIVE @ 90f6b592, kept by Michael despite 2 partial fails. gen 00034-dhs, orch 00016-7cn, modernized 00008-w2g, translation 00005-c9r, tour-editing 00003-tfp (Dockerfile.cloudrun → subscribed-cloudrun). Rollback: 00032-r8x / 00014-glv / 00006-9hq / 00004-n2f / 00002-mlg. Sophia 534 7/7 (city fixed), A Star is Born model pin, 🌈 strip unproven (TTS = Beta polly-tts), 534 rated mature/pending → share BcI2nBpQ 404. Lascaris died (orch SIGTERM, tour_requests 352 stuck 'started' → quiet.py will say busy until 30 min). Proofs hidden: AudiouraBackups\wave28_proof_hide_20261105. Launch target (LEAD): submit both stores Thu Nov 13, public ~Nov 17. My next: Android with MAP_TILE_URL → closed testing; Free cap + daily limit on Preview; purchase matrix (not paid tours until LOCAL-869). 3h watch re-armed 2026-11-05.
+
 # ▶️▶️ RESUME HERE — NEXT SESSION (written 2026-11-04 ~01:45 EST; Michael shut the laptop down to travel)
 
 1. `date`, prefix replies `[GCloud_Storied_1]@…`. Ask Michael for `/remote-control`. LEAD = Storied_Tours (bridge:session_0162Qu7k54NgjdiBu8pVkpwb).
