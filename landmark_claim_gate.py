@@ -366,6 +366,11 @@ def named_work_claims(sentence: str, blob: str, stop_title: str = "",
 
 # ---- 5. dated claims ---------------------------------------------------------
 _YEAR_RE = re.compile(r"(?<![\d.,])(1[0-9]{3}|20[0-9]{2})(?![\d])")
+# [LOCAL-879 §4] A century ordinal, with an optional "beginning/early/mid/late/end
+# of the" qualifier — "the 19th century", "the beginning of the 19th century".
+_CENTURY_RE = re.compile(
+    r"(?i)\b(?:(?:the\s+)?(?:beginning|start|early|mid(?:dle)?|late|end|turn)\s+of\s+)?"
+    r"the\s+(\d{1,2})(?:st|nd|rd|th)\s+century\b")
 _DATE_CUE_RE = re.compile(
     r"(?i)\b(built|construct\w+|completed|finished|opened|reopen\w*|inaugurat\w+|founded|"
     r"establish\w+|erected|designed|renovat\w+|restor\w+|destroyed|burn\w*|damaged|rebuilt|"
@@ -382,6 +387,29 @@ def dated_claims(sentence: str, blob: str, known: str = "") -> List[str]:
     for y in _YEAR_RE.findall(sentence):
         if not re.search(r"(?<!\d)" + y + r"(?!\d)", hay):
             bad.append(y)
+    # [LOCAL-879 §4] A CENTURY-level date is a dated claim too. Tour 547's Pier
+    # said "established at the beginning of the 19th century" — no year, so the
+    # year scan above never saw it, and the claim shipped unsourced. A "Nth
+    # century" attached to a construction/founding verb must appear in a source
+    # (the century ordinal or an equivalent year inside it). Only flag when the
+    # evidence does NOT mention that century at all.
+    for cm in _CENTURY_RE.finditer(sentence):
+        ordinal = cm.group(1)                  # "19"
+        try:
+            cnum = int(ordinal)
+        except ValueError:
+            continue
+        # The century is sourced when the evidence names the same ordinal century
+        # OR carries any year that falls inside it (e.g. 1805 for the 19th).
+        folded_phrase = _fold(cm.group(0))
+        if folded_phrase in hay:
+            continue
+        if re.search(r"(?<!\d)" + re.escape(ordinal) + r"\s*(?:st|nd|rd|th)\s+century", hay):
+            continue
+        lo, hi = (cnum - 1) * 100 + 1, cnum * 100
+        if any(lo <= int(y) <= hi for y in _YEAR_RE.findall(hay)):
+            continue
+        bad.append(cm.group(0).strip())
     return bad
 
 
@@ -452,8 +480,16 @@ def is_borderline(sentence: str, claims: Sequence[Tuple[str, str]]) -> bool:
     if _PERFORMER_RE.search(sentence) or not _HISTORY_VERB_RE.search(sentence):
         return False
     for k, c in claims:
-        if k == "date" and not (1000 <= int(c) <= 2100):
-            return False
+        if k == "date":
+            # [LOCAL-879 §4] Only a precise YEAR is a borderline (disclose-able)
+            # claim about the venue's own history. A CENTURY-level founding date
+            # ("established at the beginning of the 19th century") is speculation,
+            # not a near-sourced fact — it is dropped, never laundered behind a
+            # "sometimes said" hedge (Michael's Pier PASS criterion).
+            if not re.fullmatch(r"\d{3,4}", c or ""):
+                return False
+            if not (1000 <= int(c) <= 2100):
+                return False
     return True
 
 
@@ -467,6 +503,145 @@ _CORE_BUILT_RE = re.compile(
 _DESIGN_CUE_RE = re.compile(
     r"(?i)\b(designed|design|architect\w*|plans?|blueprints?|drawn up|engineered|"
     r"built by|constructed by|created by)\b")
+
+
+# [LOCAL-879 §4] EVIDENCE-TEXT CONTRADICTIONS.
+#
+# The gate's claim kinds (date/person/event/work/production) did not catch two
+# false claims in tour 547 that the stop's OWN Wikipedia evidence contradicts:
+#
+#  (a) Stop 4 (Independence Palace): "This assassination … took place within the
+#      walls of the still-unfinished palace." FALSE — the evidence says Diệm and
+#      Nhu were killed in an armoured personnel carrier after fleeing to Cholon.
+#  (b) Stop 5 (War Remnants Museum): "a building that once served as the U.S.
+#      military's intelligence headquarters." The evidence names the United
+#      States Information Agency building — "information", not "intelligence".
+#
+# Both are deterministic contradictions against the evidence blob and are DROPPED
+# (an invented location / wrong identity is worse than silence). No disclosure.
+
+# A violent-death / assassination placed AT the venue ("within the walls",
+# "inside the palace", "here at <venue>", "in the building").
+_DEATH_AT_VENUE_RE = re.compile(
+    r"(?i)\b(assassinat\w+|killed|murder\w+|execut\w+|shot dead|died)\b[^.]*?"
+    r"\b(?:within the walls|inside|in the (?:building|palace|grounds|compound)|"
+    r"at (?:the )?(?:site|palace|building)|here)\b")
+# Evidence markers that the death happened ELSEWHERE than the venue.
+_DEATH_ELSEWHERE_RE = re.compile(
+    r"(?i)\b(armou?red personnel carrier|\bapc\b|in a vehicle|in the back of|"
+    r"cholon|chợ lớn|cho lon|after (?:they )?fled|having fled|outside the|"
+    r"en route|on the way|in a convoy|at a church|in a truck|in the m113)\b")
+# The "intelligence" vs "Information Agency" identity contradiction. Consume the
+# "the U.S./US military's" prefix so the correction reads cleanly.
+_INTEL_HQ_RE = re.compile(
+    r"(?i)(?:the\s+)?(?:u\.?\s?s\.?(?:\s+military)?(?:'s|’s)?\s+|american\s+|"
+    r"military(?:'s|’s)?\s+)?intelligence\s+(?:headquarters|hq|agency|service|building)\b")
+_INFO_AGENCY_RE = re.compile(
+    r"(?i)\b(information agency|united states information|u\.?\s?s\.?\s?i\.?\s?a\.?|usia)\b")
+
+
+def evidence_text_contradiction(sentence: str, evidence_blob: str
+                                ) -> Optional[Tuple[str, str, Optional[str]]]:
+    """(kind, reason, replacement) when the sentence asserts something the evidence
+    text itself contradicts. ``replacement`` is a corrected sentence when the
+    contradiction can be fixed in place (the 'intelligence' -> 'Information
+    Agency' identity), else None (drop the sentence — a death placed at the venue
+    the evidence puts elsewhere). ``evidence_blob`` is the folded concatenation of
+    the stop's evidence."""
+    if not sentence or not evidence_blob:
+        return None
+    blob = evidence_blob
+    # (a) Death-at-venue vs death-elsewhere — DROP (no honest in-place fix).
+    if _DEATH_AT_VENUE_RE.search(sentence) and _DEATH_ELSEWHERE_RE.search(blob):
+        return ("contradiction",
+                "places a death at the venue the Wikipedia evidence puts elsewhere",
+                None)
+    # (b) "intelligence" where the evidence says "Information Agency" — CORRECT it
+    # in place so the sourced identity survives.
+    if (_INTEL_HQ_RE.search(sentence) and _INFO_AGENCY_RE.search(blob)
+            and not re.search(r"(?i)\bintelligence\b", blob)):
+        fixed = _INTEL_HQ_RE.sub("the United States Information Agency building", sentence)
+        return ("contradiction",
+                "calls the building an 'intelligence' HQ; the evidence names the "
+                "United States Information Agency",
+                fixed)
+    return None
+
+
+# A hedge/attribution wrapper the narrator sometimes drapes over a claim.
+_HEDGE_LEAD_RE = re.compile(
+    r"(?i)^\s*(it is sometimes said that|it is said that|some say that|"
+    r"according to (?:some|legend|local lore)|legend (?:has it|says) that|"
+    r"it is believed that|some believe that|it is sometimes claimed that|"
+    r"it is often said that)\s+")
+
+def _has_century_claim(claims) -> bool:
+    """True when any unsourced claim is a CENTURY-level date (not a 4-digit year).
+    A century founding date is speculation and always drops, even in an otherwise
+    well-sourced sentence (the Pier 'beginning of the 19th century')."""
+    return any(k == "date" and not re.fullmatch(r"\d{3,4}", str(c or ""))
+               for k, c in (claims or ()))
+
+
+
+def _claim_well_sourced(sentence: str, evidence_blob: str) -> bool:
+    """[LOCAL-879 §4] True when a distinctive cluster of the sentence's content
+    words is in the evidence — the signal that its claim is sourced, used both to
+    unwrap a hedge and to refuse to disclose (so the gate is idempotent).
+
+    Matching is tolerant of accents and inflection: a sentence token counts as a
+    hit when its 5-letter prefix begins a word in the evidence ("bombing" matches
+    "bombed", "dissident" matches "dissident"). This keeps the signal from
+    breaking on Vietnamese accents the fold leaves in place or on an -ing/-ed
+    stem difference between the narration and the Wikipedia lead."""
+    if not sentence or not evidence_blob:
+        return False
+    toks = [t for t in re.findall(r"[0-9a-zà-ÿđ]{4,}", _fold(sentence))
+            if t not in _HEDGE_STOPWORDS]
+    if len(toks) < 3:
+        return False
+    ev_words = set(re.findall(r"[0-9a-zà-ÿđ]{3,}", evidence_blob))
+    ev_prefixes = {w[:5] for w in ev_words}
+    hits = set()
+    for t in set(toks):
+        if t in ev_words or t[:5] in ev_prefixes:
+            hits.add(t)
+    return len(hits) >= 3
+
+
+def unwrap_sourced_hedge(sentence: str, evidence_blob: str
+                         ) -> Optional[str]:
+    """[LOCAL-879 §4] Strip a 'sometimes said'/'it is said' hedge off a sentence
+    whose claim the evidence SUPPORTS. Tour 547 hedged the SOURCED 1962 bombing of
+    the palace by dissident pilots ("It is sometimes said that … damaged by
+    bombing from dissident pilots"). A hedge laundering a sourced fact
+    understates the evidence; remove it when the sentence's key content words are
+    present in the evidence. Returns the de-hedged sentence, or None when the
+    claim is NOT supported (then the hedge is honest and stays)."""
+    m = _HEDGE_LEAD_RE.match(sentence or "")
+    if not m:
+        return None
+    rest = sentence[m.end():].strip()
+    if not rest:
+        return None
+    # Only a HISTORY/date hedge is unwrapped. A production/performer/event/work
+    # hedge stays disclosed (D760): "It is sometimes said that the Opera House
+    # staged productions of Miss Saigon" is a properly-disclosed unsourced claim
+    # and must NOT be laundered into a bare assertion.
+    if _PROD_CUE_RE.search(rest) or _PERFORMER_RE.search(rest):
+        return None
+    if not _HISTORY_VERB_RE.search(rest):
+        return None
+    if _claim_well_sourced(rest, evidence_blob or ""):
+        return rest[0].upper() + rest[1:]
+    return None
+
+
+_HEDGE_STOPWORDS = frozenset(
+    "this that these those with from into over under about after before during "
+    "when while which were have been they them their there here then than also "
+    "could would should still such many some most each every other another "
+    "palace building site venue".split())
 
 
 def contradicts_evidence(sentence: str, claims: Sequence[Tuple[str, str]],
@@ -637,6 +812,7 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
     drop: Dict[int, Tuple[str, str]] = {}
     soften: Dict[int, Tuple[str, str]] = {}
     replace: Dict[int, str] = {}
+    dehedge: Dict[int, Tuple[str, str]] = {}  # [LOCAL-879 §4] i -> (orig, de-hedged)
     auth: Dict = {}
     if authority_items:
         try:
@@ -645,8 +821,18 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
         except Exception:
             auth = {}
     used_facts: set = set()
+    _ev_blob = _blob(evidence)
     for i, s in enumerate(sents):
-        if is_disclosed(s) or _STRUCTURAL_RE.match(s):
+        # [LOCAL-879 §4] A "sometimes said"/"it is said" hedge over a SOURCED fact
+        # understates the evidence. It reads as DISCLOSED, so test it FIRST (before
+        # the is_disclosed skip) and unwrap it when the claim's distinctive content
+        # words are in the evidence. The de-hedged sentence is then screened for any
+        # OTHER unsourced claim below.
+        _dehedged = unwrap_sourced_hedge(s, _ev_blob)
+        if _dehedged and _dehedged != s:
+            dehedge[i] = (s, _dehedged)
+            s = _dehedged
+        if (is_disclosed(s) and i not in dehedge) or _STRUCTURAL_RE.match(s):
             continue
         if any(_mcg._span_hit(f, s) for f in flagged_l):
             drop[i] = ("flagged", "flagged UNSOURCED by the verifier")
@@ -656,6 +842,18 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
             drop[i] = ("contradiction", f"construction range contradicts the Wikipedia evidence ({auth['range'][0]}-{auth['range'][1]})")
             replace[i] = fixed
             continue
+        # [LOCAL-879 §4] Evidence-text contradictions the claim-kind scan misses:
+        # a death placed at the venue the evidence puts elsewhere; an
+        # "intelligence" identity the evidence records as "Information Agency".
+        _etc = evidence_text_contradiction(s, _ev_blob)
+        if _etc:
+            _kind, _reason, _repl = _etc
+            drop[i] = (_kind, _reason)
+            if _repl and _repl != s:
+                replace[i] = _repl      # correct in place (keeps the sourced identity)
+            continue
+        # [LOCAL-879 §4] A "sometimes said" hedge was handled above; screen the
+        # (possibly de-hedged) sentence for any unsourced claim.
         cl = unsourced_claims(s, stop_title, evidence, known, location, aliases)
         if cl:
             span = "; ".join(c for _, c in cl)
@@ -673,8 +871,23 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
                 if fact and not already and fact not in used_facts:
                     used_facts.add(fact)
                     replace[i] = fact
-            elif disclose_borderline and is_borderline(s, cl):
+            elif (is_borderline(s, cl) and _claim_well_sourced(s, _ev_blob)
+                  and not _has_century_claim(cl)
+                  and all(k == "date" for k, _ in cl)):
+                # A well-sourced history sentence whose ONLY unsourced claim is an
+                # incidental precise year/decade (e.g. "early 1960s" beside a
+                # sourced 1962 bombing): keep it plain. Disclosing it would launder
+                # nothing and, on a de-hedged sentence, re-add a hedge on the next
+                # pass (non-idempotent). A CENTURY date or a person/production claim
+                # is NOT covered here.
+                pass
+            elif disclose_borderline and is_borderline(s, cl) and i not in dehedge:
                 soften[i] = (cl[0][0], span)
+            elif i in dehedge and not _has_century_claim(cl) \
+                    and all(k in ("date", "person") for k, _ in cl):
+                # Idempotency guard for an unwrapped sourced hedge (see above); not
+                # extended to production/event/work (a fabricated show still drops).
+                pass
             else:
                 drop[i] = (cl[0][0], span)
     # dangling references left by a drop go with it
@@ -687,10 +900,20 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
                     or _DANGLING_RE.match(sents[j]))):
             drop[j] = ("dangling", "refers back to a dropped unsourced sentence")
             j += 1
-    if not drop and not soften:
+    if not drop and not soften and not dehedge:
         return body, removed
     kill: Dict[int, List[str]] = {}
     swap: Dict[int, List[Tuple[str, str]]] = {}
+    # [LOCAL-879 §4] De-hedge swaps first, but a sentence also marked drop/soften
+    # is handled there (drop wins; soften re-hedges differently).
+    for i, (orig, news) in dehedge.items():
+        if i in drop or i in soften:
+            continue
+        pi, _s = flat[i]
+        swap.setdefault(pi, []).append((orig, news))
+        removed.append({"sentence": orig, "kind": "sourced-hedge",
+                        "claim": "", "reason": "unwrapped 'sometimes said' hedge "
+                        "over a sourced fact"})
     for i, (kind, claim) in drop.items():
         pi, s = flat[i]
         if i in replace:

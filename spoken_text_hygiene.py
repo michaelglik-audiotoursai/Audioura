@@ -30,7 +30,8 @@ __all__ = ['clean_spoken_text', 'MISSING_SPACE_RE', 'TEMPLATE_SEAM_RE',
            'strip_degenerate_from_to_recap',
            'flag_sentence', 'grammar_splice_lint', 'strip_citation_tails',
            'CITATION_TAIL_RE', 'AS_OF_TAIL_RE',
-           'strip_recruitment_sentences', 'RECRUITMENT_SENTENCE_RE']
+           'strip_recruitment_sentences', 'RECRUITMENT_SENTENCE_RE',
+           'strip_promotional_sentences', 'PROMOTIONAL_SENTENCE_RE']
 
 # "At this work:", "in the stop:", "At this piece:" — the preposition keeps its
 # original case, because replacing with a literal "At " produced "Then, At Au
@@ -119,6 +120,69 @@ def strip_recruitment_sentences(text: str) -> tuple:
 # Directions stay, "because they let listeners know that they are not part of the
 # stop description" — so they are deliberately absent here.
 SPOKEN_LABEL_RE = re.compile(r'\b(?:Closing|Narration|Body|Summary)\s*:\s*')
+
+
+# [LOCAL-879 §6] PROMOTIONAL / SUPERLATIVE marketing copy, unattributed, repeated
+# as narration. Tour 547's Book Street carried "a diamond-valued location … a
+# distinctive cultural brand of the city" and "the Notting Hill of Ho Chi Minh";
+# Thi Bar carried "one of the only real gay bars". This is web promo copy, not a
+# sourced fact. A SENTENCE carrying one of these promo markers is dropped from
+# the spoken tour. Kept narrow (brochure superlatives / city-branding / "the X of
+# Y" boosterism) so an ordinary descriptive sentence is never dropped.
+PROMOTIONAL_SENTENCE_RE = re.compile(
+    r"(?i)("
+    r"\bdiamond[- ]valued\b"
+    r"|\bdistinctive cultural brand\b"
+    r"|\bcultural brand of the\b"
+    r"|\bthe notting hill of\b"
+    r"|\bthe (?:paris|venice|london|champs[- ]?élysées|times square) of\b"
+    r"|\bone of the only\b"
+    r"|\ba?\s*(?:true|real) (?:hidden )?(?:gem|paradise|oasis|haven)\b"
+    r"|\b(?:world[- ]?class|must[- ]see|must[- ]visit|iconic destination|"
+    r"premier destination|unrival+ed|unparalleled|second to none|"
+    r"crown jewel|jewel in the crown|bustling hub of|vibrant hub of)\b"
+    r"|\bnot to be missed\b"
+    r")")
+
+
+def strip_promotional_sentences(text: str) -> tuple:
+    """[LOCAL-879 §6] Drop whole sentences carrying unattributed promotional /
+    superlative marketing copy. Returns (cleaned_text, dropped_count). Pure:
+    splits on sentence boundaries, drops any sentence PROMOTIONAL_SENTENCE_RE
+    matches, rejoins; paragraph structure is preserved."""
+    if not text or not PROMOTIONAL_SENTENCE_RE.search(text):
+        return text or "", 0
+    try:
+        from sentence_split import split_sentences as _ss
+    except Exception:  # pragma: no cover
+        _ss = lambda t: re.split(r'(?<=[.!?])\s+', t)
+    dropped = 0
+    out_paras = []
+    for para in text.split("\n\n"):
+        # Preserve a leading structural label on a line ("Orientation:").
+        parts = _ss(para)
+        if len(parts) <= 1:
+            # Single fragment: still drop it if it is pure promo, else keep.
+            if para.strip() and PROMOTIONAL_SENTENCE_RE.search(para) \
+                    and not re.match(r"(?i)^\s*(orientation|directions|coordinates"
+                                     r"|type/specialty|specific examples|address"
+                                     r"|sources?|stop\s*\d+)\s*:", para):
+                dropped += 1
+                out_paras.append("")
+            else:
+                out_paras.append(para)
+            continue
+        kept = []
+        for p in parts:
+            if p.strip() and PROMOTIONAL_SENTENCE_RE.search(p):
+                dropped += 1
+                continue
+            kept.append(p)
+        out_paras.append(" ".join(k for k in kept if k).strip())
+    cleaned = "\n\n".join(out_paras)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned, dropped
 
 
 # -------- [LOCAL-623 defect 4] Strip provenance / citation tails from speech ---
@@ -703,6 +767,12 @@ def clean_spoken_text(text: str, verbose: bool = False) -> tuple:
     # Institute admissions copy that reached tour 485.
     out, _recruit = strip_recruitment_sentences(out)
     report['recruitment'] = _recruit
+
+    # [LOCAL-879 §6] Drop unattributed promotional/superlative marketing copy
+    # ("a diamond-valued location", "the Notting Hill of Ho Chi Minh", "one of the
+    # only real gay bars") repeated as narration.
+    out, _promo = strip_promotional_sentences(out)
+    report['promotional'] = _promo
 
     # [LOCAL-529] One name, four spellings — make the tour agree with itself.
     out, _name_rep = normalize_proper_noun_spellings(out)

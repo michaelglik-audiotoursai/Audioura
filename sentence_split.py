@@ -39,6 +39,7 @@ import re
 _ABBREV = {
     'st', 'ss', 'mr', 'mrs', 'ms', 'dr', 'prof', 'fr', 'rev', 'msgr', 'sr', 'jr',
     'hon', 'gen', 'col', 'capt', 'lt', 'sgt', 'gov', 'sen', 'rep', 'pres',
+    'mt', 'mtn',
     'no', 'vs', 'etc', 'al', 'inc', 'ltd', 'co', 'corp', 'dept', 'est',
     'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct',
     'nov', 'dec', 'approx', 'ca', 'cf', 'ed', 'eds', 'vol', 'pp', 'fig',

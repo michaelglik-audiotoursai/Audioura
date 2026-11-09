@@ -646,6 +646,13 @@ def _extract_parent_location(stop_name: str, tour_location: str) -> List[str]:
     )
     _clean_parts = [_location_keywords.sub('', p).strip() for p in _region_parts]
     _clean_parts = [p for p in _clean_parts if p and len(p) > 2]
+    # [LOCAL-879 §5] Drop a free-text TOPIC segment ("Saigon centre landmarks") so
+    # it never becomes a parent-location Wikipedia fetch (/wiki/Saigon_Centre).
+    try:
+        from text_polish import _is_topic_segment as _its879p
+        _clean_parts = [p for p in _clean_parts if not _its879p(p)]
+    except Exception:  # pragma: no cover
+        pass
     
     # Try stop_name + region
     if _clean_parts:
@@ -738,13 +745,27 @@ def _extract_city_hints_from_tour_location(tour_location: str) -> List[str]:
         r'\b(tour|tours|biking|cycling|bike|walking|walk|self[- ]guided|audio|guided)\b',
         re.IGNORECASE,
     )
+    # [LOCAL-879 §5] A leading free-text TOPIC segment ("Saigon centre landmarks",
+    # "best attractions") is NEVER a city hint. Tour 547's city-context Wikipedia
+    # fetch hit /wiki/Saigon_Centre because the first comma-part of the request
+    # reached this extractor as a "city". LOCAL-878 taught text_polish to skip
+    # topic segments when picking the locality; the city-context path must use the
+    # same rule so R5 fetches Ho Chi Minh City, not the Saigon Centre office tower.
+    try:
+        from text_polish import _is_topic_segment as _its879
+    except Exception:  # pragma: no cover
+        _its879 = lambda _s: False
     parts = [p.strip() for p in tour_location.split(",") if p.strip()]
     hints = []
     for part in parts:
         cleaned = _strip_keywords.sub('', part).strip()
         cleaned = re.sub(r'\s{2,}', ' ', cleaned).strip()
-        if cleaned and len(cleaned) >= 3:
-            hints.append(cleaned)
+        if not (cleaned and len(cleaned) >= 3):
+            continue
+        # Skip a topic/category segment ("Saigon centre landmarks").
+        if _its879(part) or _its879(cleaned):
+            continue
+        hints.append(cleaned)
     return hints
 
 

@@ -10886,7 +10886,26 @@ def _apply_delivery_hours_guard(result):
         # relocation moved other stops' sentences ("cost $26.5 million by 1969",
         # "is open to debate") into Stop 1 (Boston 557 v8, Kiro 5.5).
         _pf_cat = re.search(r"(?mi)^Tour-Category:\s*(\w+)", final or "")
-        _pf_single_venue = (not _pf_cat) or _pf_cat.group(1).lower() == "museum"
+        # [LOCAL-879 §1] The relocation moves EVERY stop's hours/price into Stop 1.
+        # That is correct only for a single-venue MUSEUM tour. Tour 547 shipped
+        # with NO "Tour-Category:" line (its header reads "… walking tour."), so
+        # the old "no category => single venue" assumption fired the relocation on
+        # a user-stops walking tour and dragged Thi Bar's (Stop 10) opening hours
+        # into Stop 1 (the Cathedral). A user-stops / walking tour is NEVER
+        # single-venue: detect it from the live user-stop titles and the header,
+        # and from an explicit non-museum Tour-Category.
+        _pf_is_museum_cat = bool(_pf_cat) and _pf_cat.group(1).lower() == "museum"
+        _pf_user_stops = False
+        try:
+            _pf_user_stops = bool(_get_user_stop_titles())
+        except Exception:
+            _pf_user_stops = False
+        _pf_walking_header = bool(re.search(
+            r"(?mi)^Step-by-step[^\n]*\b(walking|biking|cycling|driving|road[- ]trip)\b",
+            final or ""))
+        _pf_single_venue = (
+            _pf_is_museum_cat
+            or ((not _pf_cat) and not _pf_user_stops and not _pf_walking_header))
         try:
             if not _pf_single_venue:
                 raise StopIteration
@@ -11413,6 +11432,29 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # path below overwrites it. The service's fail-closed coordinate assertion
     # reads this to name the delivering path.
     _J._LAST_DELIVERY_PATH = 'fresh'
+
+    # [LOCAL-879 §5] Register any free-text TOPIC segment of the request as a
+    # banned R5 Wikipedia title, so the city-context / story page fetch never
+    # hits an office tower named after the topic (tour 547: /wiki/Saigon_Centre
+    # from the topic "Saigon centre landmarks"). Deterministic; no-op when the
+    # request carries no topic segment.
+    try:
+        import snippet_ranker as _sr879
+        import text_polish as _tp879
+        _sr879.clear_banned_wiki_titles()
+        for _seg in str(location or "").split(","):
+            _seg = _seg.strip()
+            if _seg and _tp879._is_topic_segment(_seg):
+                _sr879.register_banned_wiki_title(_seg)
+                # also ban the topic with its trailing scope noun dropped
+                # ("Saigon centre landmarks" -> "Saigon centre" -> Saigon Centre)
+                _seg2 = re.sub(r"(?i)\s+(landmarks?|sights?|highlights?|"
+                               r"attractions?|monuments?|points?\s+of\s+interest|"
+                               r"must[- ]sees?)\s*$", "", _seg).strip()
+                if _seg2 and _seg2 != _seg:
+                    _sr879.register_banned_wiki_title(_seg2)
+    except Exception:
+        pass
 
     # [LOCAL-873C] Establish this job's thin-fact sink bucket in the MAIN thread,
     # before any narration worker is spawned, so workers inherit the same key and
@@ -34493,6 +34535,53 @@ RULES:
                         pass
     except Exception as _usv_err:
         print(f"  [LOCAL-855D] fact-sheet verify skipped (non-fatal): {_usv_err}")
+
+    # [LOCAL-879 §1] CROSS-STOP BUSINESS-LINE GUARD — deterministic, offline, runs
+    # on every path (even when the LLM verify above is skipped). Tour 547 carried
+    # Thi Bar's (Stop 10) opening-hours line under Stop 1 (Cathedral). A business/
+    # opening-hours sentence belongs to the one stop whose venue it describes; a
+    # copy that landed in another stop's block is removed from THAT block only.
+    try:
+        import user_stop_verify as _usv879
+        if complete_tour:
+            complete_tour, _biz_dropped = _usv879.scrub_cross_stop_business_lines(
+                complete_tour, log=print)
+            if _biz_dropped:
+                print(f"  [LOCAL-879 §1] removed {_biz_dropped} cross-stop "
+                      f"business line(s) (hours/opening leaked from another stop)")
+                if output_file:
+                    try:
+                        with open(output_file, "w", encoding="utf-8") as _bf:
+                            _bf.write(complete_tour)
+                    except Exception:
+                        pass
+    except Exception as _biz_err:
+        print(f"  [LOCAL-879 §1] cross-stop business-line guard skipped "
+              f"(non-fatal): {_biz_err}")
+
+    # [LOCAL-879 §3] FOREIGN-DATE NORMALISER — a date written in a SOURCE language
+    # must be spoken in the TOUR language. Tour 547 shipped "1 tháng 7 năm 1962"
+    # (vi) inside English narration; the vi local-edition evidence (LOCAL-875/873)
+    # reached the narrator verbatim. Render vi/fr/es/ru/zh date forms in English as
+    # a final pass. Deterministic, offline, idempotent; English prose untouched.
+    try:
+        import foreign_date_normalize as _fdn879
+        if complete_tour:
+            complete_tour, _fdn_n = _fdn879.normalize_foreign_dates(
+                complete_tour, lang="en")
+            if _fdn_n:
+                print(f"  [LOCAL-879 §3] normalised {_fdn_n} foreign-language "
+                      f"date(s) into English (e.g. '1 tháng 7 năm 1962' -> "
+                      f"'1 July 1962')")
+                if output_file:
+                    try:
+                        with open(output_file, "w", encoding="utf-8") as _df:
+                            _df.write(complete_tour)
+                    except Exception:
+                        pass
+    except Exception as _fdn_err:
+        print(f"  [LOCAL-879 §3] foreign-date normaliser skipped (non-fatal): "
+              f"{_fdn_err}")
 
     # [LOCAL-872C / D760] NEVER AN EMPTY STOP -- the very last pass. Wave 35/36: Bach
     # Dang Pier (a business-kind user stop) shipped with an Orientation line and

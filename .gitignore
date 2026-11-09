@@ -98,3 +98,6 @@ catalog/export/
 # Machine-local run state — never committed (see run_local873_live.py).
 _local873_meterlogs/
 _local873b_meterlogs/
+_local873c_meterlogs/
+_local878_meterlogs/
+_local879_meterlogs/
