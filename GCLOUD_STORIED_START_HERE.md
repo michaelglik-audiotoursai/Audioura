@@ -13,6 +13,8 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 41 — 2026-11-09 ~12:15 EST (wdvrdazf73) — DEPLOYED then ROLLED BACK. gen 00043-srs + orch 00023-sks (a831ba0c, build c0ec8105, bsub49) are idle; traffic is on gen 00039-mtv / orch 00022-m9c (wave 37). Failed: the Palace has no 30 April 1975 or tank; no cache re-validation log line; wrong canonical picks (Thi Bar → DDA Hotel 183 De Tham leaked). City Hall is fixed. 547 hidden; rows 440. Proof spend so far is about $1.46.
+
 # ▶️ WAVE 40 — 2026-11-09 ~07:45 EST (wdvrdazeze) — DEPLOYED then ROLLED BACK. gen 00042-n7f (a31ead22, build 5ff0a91d, bsub48) is idle; traffic is on wave 37's gen 00039-mtv. Failed: City Hall still has the Gia Long "Museum of Commercial Trade" sentence; the "A note on current affairs" closing is back. 547 hidden; rows 440. Proof spend so far is about $1.21.
 
 # ▶️ WAVE 39 — 2026-11-09 ~06:45 EST (wdvrdazeya) — DEPLOYED then ROLLED BACK. gen 00041-lkk (7d5f2c93, build 25bebcd4, bsub47) is idle; traffic is on wave 37's gen 00039-mtv. The proof 547 failed: no "30 April 1975"; the signature stories brought back the Eiffel myth, put the Loan execution on Book Street, and described the Gia Long Palace as City Hall. 547 hidden. Rows 440 (548 = Sophia's real tour, not a proof). Proof spend so far: ~$0.95 of the $19.98.
