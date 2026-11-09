@@ -97,6 +97,32 @@ class VenueFunctionFalseFriend(unittest.TestCase):
         self.assertNotIn("hotel", new.lower())
         self.assertIn("statue of Ho Chi Minh", new)  # the real sentence stays
 
+    def test_sourced_year_and_architect_survive_the_hotel_drop(self):
+        # Excising the false-friend clause must keep the sentence's sourced date
+        # and architect, so City Hall still states when it was built.
+        tour = (
+            "Stop 1: City Hall\n"
+            "The building was completed in 1908, designed by Fernand Gardè, and "
+            "opened in 1909 as a hotel named Hotel de Ville. Its Beaux-Arts façade "
+            "frames the square. Today it is the seat of the People's Committee.\n")
+        new, _ = lg.filter_tour_text(
+            tour, stop_evidence={1: [CITY_HALL_EV]},
+            stop_authority={1: [CITY_HALL_EV]}, stop_titles={1: "City Hall"},
+            stop_aliases={1: ["Hôtel de Ville de Saïgon"]},
+            location="Ho Chi Minh City, Vietnam")
+        self.assertNotIn("hotel", new.lower())
+        self.assertIn("1908", new)
+        self.assertIn("Gardè", new)
+
+    def test_correction_helper_excises_only_the_function_clause(self):
+        s = ("The building was completed in 1908, designed by Fernand Gardè, and "
+             "opened in 1909 as a hotel named Hotel de Ville.")
+        out = lg.venue_function_correction(s, ["hotel"])
+        self.assertIsNotNone(out)
+        self.assertNotIn("hotel", out.lower())
+        self.assertIn("1908", out)
+        self.assertIn("1909", out)
+
 
 # ───────────────────────── Fix #2 — orphan capacity ───────────────────────────
 class OrphanCapacityClause(unittest.TestCase):

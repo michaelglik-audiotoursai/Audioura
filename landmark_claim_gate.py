@@ -46,6 +46,7 @@ import museum_claim_gate as _mcg
 __all__ = [
     "venue_aliases", "production_claims", "named_person_claims", "named_event_claims",
     "named_work_claims", "dated_claims", "venue_function_claims",
+    "venue_function_correction",
     "political_institution_claims", "unsourced_claims", "filter_stop_body",
     "filter_tour_text", "claim_span_lines", "is_borderline", "disclose",
     "contradicts_evidence", "fill_empty_stops", "ensure_evidence_dates", "correct_build_range", "evidence_fact_for", "minimal_body",
@@ -551,6 +552,44 @@ def venue_function_claims(sentence: str, evidence_blob: str, stop_title: str = "
             if word not in bad:
                 bad.append(word)
     return bad
+
+
+# The false-friend clause to excise from a sentence: "... as a hotel named Hotel
+# de Ville" / "opened as a hotel" / "as a hotel". Removing just the clause keeps
+# any sourced date/architect the same sentence carries ("completed in 1908,
+# designed by Gardè, and opened in 1909"), so the venue's real facts survive.
+_FUNCTION_CLAUSE_RE = re.compile(
+    r"(?i)(?:,\s*)?\b(?:and\s+)?(?:opened|built|operated|used|served|functioned|"
+    r"known)?\s*(?:as|named|called)\s+(?:a|an|the)?\s*"
+    r"(?:" + _FUNCTION_NOUN + r")\b"
+    r"(?:\s+(?:named|called|known as)\s+[A-ZÀ-Þ][\w'’.\- ]{0,40})?")
+
+
+def venue_function_correction(sentence: str, bad_words: Sequence[str]) -> Optional[str]:
+    """Remove the false-friend function clause(s) from ``sentence`` in place,
+    keeping the rest (dates, architect, the connective). Returns the corrected
+    sentence, or None when the removal would empty the sentence (then the caller
+    drops it). Idempotent."""
+    if not sentence or not bad_words:
+        return None
+    new = sentence
+    # Excise "opened in 1909 as a hotel named Hotel de Ville" -> "opened in 1909".
+    new = _FUNCTION_CLAUSE_RE.sub("", new)
+    new = re.sub(r"\s+([.,;:])", r"\1", new)
+    new = re.sub(r"[ \t]{2,}", " ", new).strip()
+    new = re.sub(r"(?i)\b(and)\s*([.,;:])", r"\2", new)   # dangling "and."
+    new = re.sub(r"[,;]\s*$", ".", new)
+    new = re.sub(r"\s+\.", ".", new)
+    if new and not new.endswith((".", "!", "?")):
+        new += "."
+    # Must still be a real clause with a verb-ish body, and must no longer carry
+    # the false-friend word; else let the caller drop the sentence.
+    low = new.lower()
+    if any(w and re.search(r"\b" + re.escape(w) + r"\b", low) for w in bad_words):
+        return None
+    if len(re.findall(r"[a-z]{3,}", low)) < 4:
+        return None
+    return new
 
 
 # ---- 7. political-institution claim (LOCAL-882B §3) -------------------------
@@ -1128,6 +1167,17 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
                 if fact and not already and fact not in used_facts:
                     used_facts.add(fact)
                     replace[i] = fact
+            elif any(k == "function" for k, _ in cl):
+                # [LOCAL-882B §1] A false-friend FUNCTION claim ("opened in 1909 as
+                # a hotel named Hotel de Ville"). Excise just the function clause so
+                # the sentence's sourced date/architect survive ("...completed in
+                # 1908, designed by Gardè, and opened in 1909."). If the excision
+                # would empty the sentence, drop it instead.
+                _bad_fns = [c for k, c in cl if k == "function"]
+                _fixed = venue_function_correction(s, _bad_fns)
+                drop[i] = ("function", span)
+                if _fixed and _fixed != s:
+                    replace[i] = _fixed
             elif (is_borderline(s, cl) and _claim_well_sourced(s, _ev_blob)
                   and not _has_century_claim(cl)
                   and all(k == "date" for k, _ in cl)):
