@@ -35296,6 +35296,88 @@ RULES:
         print(f"  [LOCAL-880] signature-story survival skipped (non-fatal): "
               f"{_sig_e_err}")
 
+    # [LOCAL-884 §1] FINAL grounding re-pass — the TRUE last word on "no evidence,
+    # no claim". Signature-story survival runs AFTER the first grounding pass and
+    # can RE-INJECT a factual sentence (a wave-42 leak: "designed by Gustave
+    # Eiffel", a Tet-Offensive execution) that the gate had dropped. Re-ground the
+    # tour ONCE more against the SAME per-stop evidence bundle so any re-added
+    # sentence the evidence does not support is dropped again. Idempotent on an
+    # already-grounded tour (supported sentences are kept, so a stop that only
+    # regained a SUPPORTED signature sentence is untouched); guarded, offline-safe.
+    try:
+        if (complete_tour
+                and os.environ.get('GROUNDING_GATE_ENABLED', '1').strip() != '0'
+                and os.environ.get('GROUNDING_GATE_FINAL_PASS', '1').strip() != '0'):
+            import strict_grounding_gate as _sgg884f
+            # rebuild the evidence bundle from the same sinks the first pass used.
+            _evf = {}
+            try:
+                _faf = dict(_J._THIN_FACTS_PER_STOP or {})
+                try:
+                    _sbf = _THIN_FACTS_SINK.get(_J._THIN_SINK_KEY, {}) or {}
+                    for _k, _v in _sbf.items():
+                        _faf.setdefault(_k, [])
+                        for _t in _v:
+                            if _t and _t not in _faf[_k]:
+                                _faf[_k].append(_t)
+                except Exception:
+                    pass
+                for _k, _v in _faf.items():
+                    _evf[str(_k)] = " ".join(str(x) for x in (_v or []))
+                for _sinkname in ("_DIRECT_SNIPPETS_PER_STOP",):
+                    for _k, _snips in dict(getattr(_J, _sinkname, {}) or {}).items():
+                        _texts = []
+                        for _s in (_snips or []):
+                            if isinstance(_s, dict):
+                                _texts.append(str(_s.get("title", "")))
+                                _texts.append(str(_s.get("snippet", "")))
+                            else:
+                                _texts.append(str(_s))
+                        _blob = " ".join(t for t in _texts if t)
+                        if _blob.strip():
+                            _evf[str(_k)] = (_evf.get(str(_k), "") + " " + _blob).strip()
+                for _k, _items in dict(_WIKI_EVIDENCE_SINK.get(_J._THIN_SINK_KEY, {}) or {}).items():
+                    _blob = " ".join(str(x) for x in (_items or []) if str(x).strip())
+                    if _blob.strip():
+                        _evf[str(_k)] = (_evf.get(str(_k), "") + " " + _blob).strip()
+            except Exception:
+                _evf = {}
+            try:
+                _nsf = len(re.findall(r"(?mi)^Stop\s+\d+:", complete_tour)) or 10
+            except Exception:
+                _nsf = 10
+            # [LOCAL-884 §1] The FINAL pass uses the STRONGER model (gpt-4.1, same
+            # family the independent auditor uses) so the last-word gate is as
+            # strict as the audit: a claim the mini first-pass kept but a gpt-4.1
+            # reader would not ground is dropped here, keeping the gate and the
+            # audit in agreement. ~$0.01/stop; capped.
+            _final_model = os.environ.get("GROUNDING_GATE_FINAL_MODEL", "gpt-4.1")
+            _capf = float(os.environ.get(
+                "GROUNDING_GATE_FINAL_MAX_USD", f"{max(1, _nsf) * 0.012:.4f}"))
+            # The FINAL pass is DROP-ONLY (no creative rebuild): its job is to
+            # remove any sentence a gpt-4.1 reader cannot ground — including a
+            # signature sentence re-injected after the first pass. It must not add
+            # material (a creative rebuild here re-introduces embellishments the
+            # auditor rejects), so the first pass owns the evidence-only refill and
+            # the honest no-history disclosure.
+            complete_tour, _gf_rep = _sgg884f.ground_tour_text(
+                complete_tour, _evf, location=location or "",
+                model=_final_model, max_cost_usd=_capf, log=print)
+            print(f"  [LOCAL-884] FINAL grounding re-pass: "
+                  f"{_gf_rep.get('stops', 0)} stop(s), "
+                  f"{_gf_rep.get('grounded', 0)} edited, "
+                  f"{_gf_rep.get('total_labelled', 0)} labelled, "
+                  f"{_gf_rep.get('total_dropped', 0)} re-injected sentence(s) dropped; "
+                  f"cost ${_gf_rep.get('cost_usd', 0.0):.4f}")
+            if output_file:
+                try:
+                    with open(output_file, "w", encoding="utf-8") as _ff884:
+                        _ff884.write(complete_tour)
+                except Exception:
+                    pass
+    except Exception as _gf_err:
+        print(f"  [LOCAL-884] final grounding re-pass skipped (non-fatal): {_gf_err}")
+
     return complete_tour, output_file, first_poi_coordinates
 
 if __name__ == "__main__":

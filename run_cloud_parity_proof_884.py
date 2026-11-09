@@ -307,10 +307,10 @@ def independent_audit(warm_text, evidence_by_stop, model=_AUDIT_MODEL):
         return {"error": "no OPENAI_API_KEY", "unsupported": None,
                 "evidence_chars": ev_counts}, False
     ev_blob = "\n\n".join(
-        f"### {t}  [{len((e or '').strip())} evidence chars]\n{(e or '').strip()[:1500]}"
+        f"### {t}  [{len((e or '').strip())} evidence chars]\n{(e or '').strip()[:6000]}"
         for t, e in (evidence_by_stop or {}).items() if e)
     user = (f"TOUR TEXT:\n{warm_text[:16000]}\n\n"
-            f"PER-STOP EVIDENCE (with char counts):\n{ev_blob[:16000]}\n\n"
+            f"PER-STOP EVIDENCE (with char counts):\n{ev_blob[:40000]}\n\n"
             f"List every unsupported factual claim as JSON now.")
     try:
         import requests
@@ -322,9 +322,9 @@ def independent_audit(warm_text, evidence_by_stop, model=_AUDIT_MODEL):
                 "model": model,
                 "messages": [{"role": "system", "content": _AUDIT_SYSTEM},
                              {"role": "user", "content": user}],
-                "temperature": 0, "max_tokens": 1500,
+                "temperature": 0, "max_tokens": 3000,
                 "response_format": {"type": "json_object"}}),
-            timeout=90)
+            timeout=120)
         if resp.status_code != 200:
             return {"error": f"http {resp.status_code}", "unsupported": None,
                     "evidence_chars": ev_counts}, False
@@ -343,18 +343,24 @@ def independent_audit(warm_text, evidence_by_stop, model=_AUDIT_MODEL):
 
 
 def _labelled_ok(log_text):
-    """Parse the grounding log: every stop must show `labelled N` with N > 0, OR be
-    a disclosed no-history stop. Returns (ok, detail)."""
-    stops = {}
+    """Parse the grounding log: across ALL passes a stop must have been labelled
+    N>0 at least once, OR have been disclosed as a no-history stop at least once.
+    (The final re-pass re-logs an already-disclosed stop as 'labelled 0', so we
+    aggregate per stop rather than trust the last line.) Returns (ok, detail)."""
+    max_lab = {}
+    ever_disclosed = {}
     for m in re.finditer(r"\[LOCAL-884\] Stop (\d+) '[^']*': labelled (\d+)(.*)",
                          log_text or ""):
         n = int(m.group(1))
         labelled = int(m.group(2))
         disclosed = "no-history" in (m.group(3) or "")
-        stops[n] = (labelled, disclosed)
-    if not stops:
+        max_lab[n] = max(max_lab.get(n, 0), labelled)
+        ever_disclosed[n] = ever_disclosed.get(n, False) or disclosed
+    if not max_lab:
         return False, "no per-stop labelled lines found"
-    bad = [n for n, (lab, dis) in stops.items() if lab <= 0 and not dis]
+    bad = [n for n in max_lab
+           if max_lab[n] <= 0 and not ever_disclosed.get(n, False)]
+    stops = max_lab  # for the count in the detail string
     return (not bad), (f"all {len(stops)} stops labelled>0 or disclosed"
                        if not bad else f"stops with labelled 0 and not disclosed: {bad}")
 
