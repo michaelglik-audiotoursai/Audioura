@@ -31,7 +31,12 @@ __all__ = ['clean_spoken_text', 'MISSING_SPACE_RE', 'TEMPLATE_SEAM_RE',
            'flag_sentence', 'grammar_splice_lint', 'strip_citation_tails',
            'CITATION_TAIL_RE', 'AS_OF_TAIL_RE',
            'strip_recruitment_sentences', 'RECRUITMENT_SENTENCE_RE',
-           'strip_promotional_sentences', 'PROMOTIONAL_SENTENCE_RE']
+           'strip_promotional_sentences', 'PROMOTIONAL_SENTENCE_RE',
+           'strip_truncated_tail_sentences', 'disclose_or_drop_folklore',
+           'strip_contradicted_former_use',
+           'audit_seating_capacity', 'strip_orientation_filler',
+           'fix_intro_grammar', 'fix_orphan_closing',
+           'strip_empty_current_affairs_note']
 
 # "At this work:", "in the stop:", "At this piece:" — the preposition keeps its
 # original case, because replacing with a literal "At " produced "Then, At Au
@@ -137,6 +142,12 @@ PROMOTIONAL_SENTENCE_RE = re.compile(
     r"|\bthe notting hill of\b"
     r"|\bthe (?:paris|venice|london|champs[- ]?élysées|times square) of\b"
     r"|\bone of the only\b"
+    # [LOCAL-880 §8] extend the promo filter: wave 38 Stop 8 "You can't miss this
+    # unique multi-story complex" and Stop 3 "recognized as a distinctive cultural
+    # brand" (the latter already caught by 'distinctive cultural brand' above).
+    r"|\bcan'?t\s+miss\b"
+    r"|\byou\s+(?:simply\s+)?(?:can'?t|cannot|won'?t\s+want\s+to)\s+miss\b"
+    r"|\brecognized as a (?:distinctive|unique|famous)\b"
     r"|\ba?\s*(?:true|real) (?:hidden )?(?:gem|paradise|oasis|haven)\b"
     r"|\b(?:world[- ]?class|must[- ]see|must[- ]visit|iconic destination|"
     r"premier destination|unrival+ed|unparalleled|second to none|"
@@ -183,6 +194,621 @@ def strip_promotional_sentences(text: str) -> tuple:
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     return cleaned, dropped
+
+
+# ─── [LOCAL-880 §2] TRUNCATED SENTENCE — never end on an adjective/determiner ───
+#
+# Wave 38 Stop 1 shipped "…French architect Jules Bourard won with a proposal
+# inspired directly by the iconic." The object of "the iconic" (Notre-Dame de
+# Paris) was cut, leaving a sentence that ends on a determiner+adjective with no
+# noun. A sentence must never end on a determiner, a preposition, or a bare
+# adjective that is clearly expecting a noun. Such a sentence is a fragment: it is
+# DROPPED (we cannot know the missing noun, and a guess would be invention).
+#
+# Deterministic and narrow: only a sentence ending in one of these clear
+# dangles — "the iconic", "by the", "inspired by the famous", "such as the" —
+# is dropped. An ordinary sentence ending on a noun/verb/adverb is untouched.
+_TRUNCATED_TAIL_RE = re.compile(
+    r"(?i)\b(?:"
+    r"the|a|an|this|that|these|those|its|his|her|their|our|your|"          # determiner
+    r"of|by|with|from|to|for|in|on|at|as|into|onto|upon|than|"            # preposition
+    r"and|or|but|"                                                        # conjunction
+    r"iconic|famous|renowned|celebrated|legendary|nearby|adjacent|"       # dangling adj
+    r"original|various|several|certain|such|other|another|same|"
+    r"grand|great|vast|huge|tall|large|small|ancient|historic"
+    r")\s*[.!?]\s*$")
+# an adjective directly before the terminator, preceded by a determiner, with no
+# noun: "...by the iconic.", "...a proposal inspired directly by the iconic."
+_DET_ADJ_TAIL_RE = re.compile(
+    r"(?i)\b(?:the|a|an|this|that|its|his|her|their|our|your)\s+"
+    r"(?:[a-zà-ÿ]+ly\s+)?"
+    r"(?:iconic|famous|renowned|celebrated|legendary|original|grand|great|"
+    r"magnificent|striking|elegant|classic|historic|ancient|modern|"
+    r"distinctive|monumental)\s*[.!?]\s*$")
+
+
+def strip_truncated_tail_sentences(text: str) -> tuple:
+    """[LOCAL-880 §2] Drop a sentence that ends on a determiner / preposition /
+    conjunction / dangling adjective expecting a noun that was cut off. Returns
+    (cleaned, dropped). Pure; preserves paragraph and label structure."""
+    if not text:
+        return text or "", 0
+    try:
+        from sentence_split import split_sentences as _ss
+    except Exception:  # pragma: no cover
+        _ss = lambda t: re.split(r'(?<=[.!?])\s+', t)
+
+    def _is_truncated(s: str) -> bool:
+        s = s.strip()
+        if not s:
+            return False
+        return bool(_TRUNCATED_TAIL_RE.search(s) or _DET_ADJ_TAIL_RE.search(s))
+
+    dropped = 0
+    out_paras = []
+    for para in text.split("\n\n"):
+        if re.match(r"(?i)^\s*(orientation|directions|coordinates|type/specialty"
+                    r"|specific examples|address|sources?|stop\s*\d+)\s*:", para):
+            # a labelled line: still scrub a trailing truncated sentence inside it
+            # but keep the label; handle via sentence split below only for the
+            # prose part after an Orientation: label.
+            m = re.match(r"(?i)^(\s*orientation:\s*)(.*)$", para, re.S)
+            if m and m.group(2).strip():
+                kept = []
+                for p in _ss(m.group(2)):
+                    if _is_truncated(p):
+                        dropped += 1
+                        continue
+                    kept.append(p)
+                out_paras.append(m.group(1) + " ".join(k for k in kept if k).strip())
+                continue
+            out_paras.append(para)
+            continue
+        parts = _ss(para)
+        kept = []
+        for p in parts:
+            if _is_truncated(p):
+                dropped += 1
+                continue
+            kept.append(p)
+        out_paras.append(" ".join(k for k in kept if k).strip())
+    cleaned = "\n\n".join(out_paras)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned, dropped
+
+
+# ─── [LOCAL-880 §3] FOLKLORE DISCLOSURE (D760) or drop ──────────────────────────
+#
+# Wave 38 Stop 1 stated a legend flat: "Witnesses have reported a mysterious
+# single tear shedding from a statue here." A miracle/legend must be DISCLOSED as
+# such (D760), not asserted as fact. The disclosure is neutral — "A story told by
+# visitors holds that…" — and carries NO date unless the stop's own evidence
+# supplies one for this legend. (Earlier this scrub hard-coded a 2005 date drawn
+# from one proof tour's Saigon statue-tear rumour; that named a specific date and
+# claim from a proof tour and so was wrong for every other city. The date is now
+# evidence-driven, like every other claim.)
+_FOLKLORE_CUE_RE = re.compile(
+    r"(?i)\b(?:a )?(?:mysterious|miraculous|unexplained)\b[^.]*\b"
+    r"(?:tear|weeping|wept|crying|cried|bleeding|bled|apparition|miracle|ghost|"
+    r"haunt\w*)\b"
+    r"|\bwitnesses have reported\b"
+    r"|\bis said to (?:weep|cry|bleed|shed a tear|heal|grant)\b"
+    r"|\breported (?:a )?(?:mysterious|miraculous)\b")
+_ALREADY_DISCLOSED_RE = re.compile(
+    r"(?i)^\s*(?:according to|a (?:story|legend|rumou?r) (?:told|that)|"
+    r"legend (?:has it|says|holds)|local (?:lore|legend)|it is said|"
+    r"some say|tradition holds|folklore)\b")
+
+
+def disclose_or_drop_folklore(text: str, *, drop: bool = False,
+                              evidence_text: str = "") -> tuple:
+    """[LOCAL-880 §3] Disclose a flatly-stated miracle/legend sentence (D760) by
+    prefixing "A story told by visitors holds that…", or DROP it when
+    ``drop=True``. Returns (cleaned, n_changed). Idempotent (an already-disclosed
+    sentence is skipped).
+
+    The disclosure is generic and carries NO date of its own. A year is used only
+    when ``evidence_text`` supplies one in a sentence that is itself about the
+    legend (a statue tear, a reported miracle, …); then the disclosure reads
+    "A story told in <year> holds that…". No date is ever invented, and no date,
+    city or claim from any single tour is hard-coded here."""
+    if not text or not _FOLKLORE_CUE_RE.search(text):
+        return text or "", 0
+    try:
+        from sentence_split import split_sentences as _ss
+    except Exception:  # pragma: no cover
+        _ss = lambda t: re.split(r'(?<=[.!?])\s+', t)
+
+    # A year the evidence attaches to THIS legend, if any. Only a year that sits
+    # in an evidence sentence which itself carries a folklore cue is used — a
+    # stray year elsewhere in the evidence never dates the disclosure.
+    ev_year = ""
+    if evidence_text:
+        for _esent in re.split(r'(?<=[.!?])\s+', evidence_text):
+            if _FOLKLORE_CUE_RE.search(_esent) or re.search(
+                    r"(?i)\b(?:legend|story|rumou?r|reported|witness)", _esent):
+                _m = re.search(r"\b(1[0-9]{3}|20[0-9]{2})\b", _esent)
+                if _m:
+                    ev_year = _m.group(1)
+                    break
+
+    changed = 0
+    out_paras = []
+    for para in text.split("\n\n"):
+        label = ""
+        body = para
+        m = re.match(r"(?i)^(\s*orientation:\s*)(.*)$", para, re.S)
+        if m:
+            label, body = m.group(1), m.group(2)
+        parts = _ss(body)
+        new_parts = []
+        for p in parts:
+            ps = p.strip()
+            if ps and _FOLKLORE_CUE_RE.search(ps) and not _ALREADY_DISCLOSED_RE.match(ps):
+                if drop:
+                    changed += 1
+                    continue
+                if ev_year:
+                    lead = f"A story told in {ev_year} holds that "
+                else:
+                    lead = "A story told by visitors holds that "
+                low = ps[0].lower() + ps[1:]
+                new_parts.append(lead + low)
+                changed += 1
+            else:
+                new_parts.append(p)
+        rebuilt = " ".join(x for x in new_parts if x and x.strip()).strip()
+        out_paras.append((label + rebuilt) if label else rebuilt)
+    cleaned = "\n\n".join(out_paras)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned, changed
+
+
+# ─── [LOCAL-880 §1] CONTRADICTED FORMER-USE — evidence-driven, no keyword list ──
+#
+# A stop body sometimes asserts a former use of the building that the stop's own
+# evidence contradicts by naming a DIFFERENT former use. Wave 38 Stop 5 shipped
+# BOTH the sourced "once housed the United States Information Agency" AND the false
+# "served as the US military's intelligence headquarters" in one paragraph.
+#
+# The rule is purely evidential, with NO list of professions, agencies, cities or
+# venues (an earlier version dropped any sentence mentioning an "intelligence
+# headquarters/HQ/agency" — which would strip the central, true fact from a tour
+# of CIA Langley, MI6 Vauxhall Cross or the Stasi HQ). A former-use sentence is
+# dropped only when, for the SAME building:
+#   (a) the stop's evidence names a former use (a "formerly / once housed / served
+#       as …" claim) whose named entity DIFFERS from the body sentence's, and
+#   (b) the evidence does NOT itself support the body sentence's named former use.
+# With no evidence, or evidence that supports the body's claim, nothing is dropped.
+
+# Cue that a clause describes what a building FORMERLY was / housed / served as.
+_FORMER_USE_CUE_RE = re.compile(
+    r"(?i)\b(?:once|formerly|previously|originally|earlier|in the past|"
+    r"used to|for(?:mer)?ly)\b[^.]*?\b(?:hous\w+|serv\w+|was|were|been|"
+    r"function\w+|operat\w+|act\w+ as|home to|site of|seat of|headquarters of)\b"
+    r"|\b(?:hous\w+|serv\w+|function\w+|operat\w+)\b[^.]*?\b(?:once|formerly|"
+    r"previously|originally|earlier)\b"
+    r"|\b(?:served|acted|functioned)\s+as\b"
+    r"|\bonce\s+(?:housed|held|home to)\b")
+
+# The named former-use entity in a clause: the capitalised proper-noun phrase, or
+# the common-noun "<role> (headquarters|agency|office|…)" phrase, following a
+# former-use cue. Returns the folded distinctive tokens of each candidate.
+_PROPER_PHRASE_RE = re.compile(
+    r"\b([A-Z][A-Za-zà-ÿ&.'-]*(?:\s+(?:of|the|and|for|de|du|von|van)\s+|\s+)"
+    r"(?:[A-Z][A-Za-zà-ÿ&.'-]*)){0,5}\b")
+_USE_NOUN_RE = re.compile(
+    r"(?i)\b((?:[a-zà-ÿ-]+\s+){0,3}"
+    r"(?:headquarters|hq|agency|office|bureau|ministry|department|command|"
+    r"barracks|prison|jail|palace|residence|embassy|consulate|bank|hotel|"
+    r"hospital|school|college|university|church|cathedral|temple|mosque|"
+    r"factory|mill|warehouse|market|theatre|theater|opera|museum|library|"
+    r"station|depot|fort|fortress|castle|monastery|convent|seminary|"
+    r"courthouse|parliament|assembly|senate|house|chamber|service|centre|"
+    r"center|institute|administration))\b")
+
+_STOP_HEADER_SPLIT_RE = re.compile(r"(?mi)^(Stop\s+\d+:\s*.+)$")
+
+_HYG_STOPWORDS = frozenset(
+    "the a an of and for to in on at as by with from this that these those its "
+    "it was were been being is are be building house housed served serving serve "
+    "former formerly once previously originally earlier used also both which "
+    "where when who whom whose while during after before until since then "
+    "south north east west city national states united state".split())
+
+
+def _distinctive_tokens(s: str) -> set:
+    return {t for t in re.findall(r"[a-zà-ÿ0-9]{3,}", (s or "").lower())
+            if t not in _HYG_STOPWORDS}
+
+
+def _former_use_entities(clause: str) -> list:
+    """Distinctive-token sets for each named former-use entity in a clause: the
+    proper-noun phrases and the '<role> headquarters/agency/office/…' phrases."""
+    ents = []
+    for m in _PROPER_PHRASE_RE.finditer(clause):
+        phrase = m.group(0).strip()
+        toks = _distinctive_tokens(phrase)
+        if len(toks) >= 1 and any(len(t) >= 4 for t in toks):
+            ents.append(toks)
+    for m in _USE_NOUN_RE.finditer(clause):
+        toks = _distinctive_tokens(m.group(1))
+        if toks:
+            ents.append(toks)
+    return ents
+
+
+def _iter_stop_blocks(text: str):
+    """Yield (header_or_None, block_text): the preamble, then each 'Stop N:'
+    header with the text up to the next header."""
+    parts = _STOP_HEADER_SPLIT_RE.split(text or "")
+    yield (None, parts[0])
+    i = 1
+    while i < len(parts):
+        hdr = parts[i]
+        body = parts[i + 1] if i + 1 < len(parts) else ""
+        yield (hdr, body)
+        i += 2
+
+
+def _stop_title_from_header(hdr: str) -> str:
+    m = re.match(r"(?i)^\s*Stop\s+\d+:\s*(.+?)\s*$", hdr or "")
+    return m.group(1).strip() if m else ""
+
+
+def _evidence_for_header(hdr: str, stop_evidence) -> str:
+    """Best-effort lookup of a stop's evidence text from a {title: text|[text]}
+    map, matching the stop header's title case-insensitively (exact, then
+    substring either way)."""
+    if not stop_evidence or not hdr:
+        return ""
+    title = _stop_title_from_header(hdr).lower()
+    if not title:
+        return ""
+
+    def _join(v):
+        if isinstance(v, (list, tuple)):
+            return " ".join(str(x) for x in v if x)
+        return str(v or "")
+
+    for k, v in stop_evidence.items():
+        if str(k).strip().lower() == title:
+            return _join(v)
+    for k, v in stop_evidence.items():
+        kl = str(k).strip().lower()
+        if kl and (kl in title or title in kl):
+            return _join(v)
+    return ""
+
+
+def strip_contradicted_former_use(text: str, stop_evidence=None) -> tuple:
+    """[LOCAL-880 §1] Drop a former-use sentence only when the SAME stop's
+    evidence names a DIFFERENT former use for the building and does not support
+    the sentence's claim. Evidence-driven; no keyword list of agencies/professions.
+
+    ``stop_evidence`` maps a stop title to its evidence text (str or list of str).
+    With no evidence for a stop, nothing in that stop is dropped. Returns
+    (cleaned, dropped)."""
+    if not text or not _FORMER_USE_CUE_RE.search(text):
+        return text or "", 0
+    try:
+        from sentence_split import split_sentences as _ss
+    except Exception:  # pragma: no cover
+        _ss = lambda t: re.split(r'(?<=[.!?])\s+', t)
+    dropped = 0
+    out = []
+    for hdr, body in _iter_stop_blocks(text):
+        if hdr:
+            out.append(hdr)
+        ev = _evidence_for_header(hdr, stop_evidence)
+        if not (body and ev and _FORMER_USE_CUE_RE.search(body)
+                and _FORMER_USE_CUE_RE.search(ev)):
+            out.append(body)
+            continue
+
+        # Former-use entities the EVIDENCE names, and whether the evidence
+        # mentions a thing at all. Collect from every evidence sentence that
+        # carries a former-use cue.
+        ev_entities = []
+        for es in re.split(r'(?<=[.!?])\s+', ev):
+            if _FORMER_USE_CUE_RE.search(es):
+                ev_entities.extend(_former_use_entities(es))
+        ev_tokens = _distinctive_tokens(ev)
+        if not ev_entities:
+            out.append(body)
+            continue
+
+        new_paras = []
+        for para in body.split("\n\n"):
+            if re.match(r"(?i)^\s*(coordinates|type/specialty|specific examples"
+                        r"|directions|address|sources?)\s*:", para):
+                new_paras.append(para)
+                continue
+            label = ""
+            seg = para
+            m = re.match(r"(?i)^(\s*orientation:\s*)(.*)$", para, re.S)
+            if m:
+                label, seg = m.group(1), m.group(2)
+            kept = []
+            for p in _ss(seg):
+                ps = p.strip()
+                if ps and _FORMER_USE_CUE_RE.search(ps):
+                    body_ents = _former_use_entities(ps)
+                    if body_ents and _former_use_contradicted(
+                            body_ents, ev_entities, ev_tokens):
+                        dropped += 1
+                        continue
+                kept.append(p)
+            new_paras.append((label + " ".join(k for k in kept if k).strip())
+                             if label else " ".join(k for k in kept if k).strip())
+        out.append("\n\n".join(new_paras))
+    cleaned = "".join(out)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned, dropped
+
+
+def _former_use_contradicted(body_entities, ev_entities, ev_tokens) -> bool:
+    """True when the body names a former-use entity that the evidence does NOT
+    support, while the evidence names a DIFFERENT former use. Entity match is by
+    shared distinctive tokens (a body entity is 'supported' when its distinctive
+    tokens are a subset of, or overlap substantially with, the evidence's)."""
+    def _supported(body_toks: set) -> bool:
+        if not body_toks:
+            return True  # nothing distinctive to contradict
+        if body_toks <= ev_tokens:
+            return True  # every distinctive word is in the evidence
+        # strong overlap with any single named evidence entity counts as support
+        for et in ev_entities:
+            inter = body_toks & et
+            if inter and len(inter) >= max(1, len(body_toks) - 0) and body_toks <= et:
+                return True
+            if inter and len(inter) >= 2:
+                return True
+        return False
+
+    def _differs_from_all_ev(body_toks: set) -> bool:
+        # the body entity shares no distinctive token with any evidence entity
+        return all(not (body_toks & et) for et in ev_entities)
+
+    for bt in body_entities:
+        if not bt:
+            continue
+        if _supported(bt):
+            continue
+        if _differs_from_all_ev(bt):
+            return True
+    return False
+
+
+# ─── [LOCAL-880 §9] UNSOURCED MAGNITUDE — state a number only if sourced. ──────
+#
+# A magnitude a narration states about a place (a seating capacity, a height, a
+# count, a length, a year count) must appear in that stop's evidence, or it is not
+# reliably sourced and the bare number is dropped while the sentence is kept. This
+# applies to EVERY stop, in any city — there is no venue key. An earlier version
+# keyed this on an "opera" header, which was a hard-coded answer to one proof
+# tour; the rule is now general, driven only by whether the figure is in the
+# stop's own evidence.
+#
+# Narrow by construction: only a number bound to a magnitude noun (seats, metres,
+# feet, storeys, rooms, …) is a candidate. A date/year, a street number, a price
+# and a bare count with no magnitude noun are left alone (dates are the claim
+# gate's job; §9 is only about descriptive magnitudes).
+_MAGNITUDE_UNIT = (r"seat|seats|seater|seating|"
+                   r"metre|metres|meter|meters|m|km|kilometre|kilometres|"
+                   r"foot|feet|ft|yard|yards|"
+                   r"storey|storeys|story|stories|floor|floors|"
+                   r"room|rooms|step|steps|"
+                   r"hectare|hectares|acre|acres")
+_MAGNITUDE_RE = re.compile(
+    r"(?i)\b(?:around |about |approximately |roughly |nearly |up to |over |"
+    r"more than )?"
+    r"(\d[\d,]{1,6})[\- ]?(" + _MAGNITUDE_UNIT + r")\b"
+    r"|\bseat(?:ed|s|ing)?\s+(?:around |about |approximately |roughly |nearly )?"
+    r"(\d[\d,]{1,6})\b")
+_SEATING_WORD_RE = re.compile(r"(?i)seat(?:ed|s|ing)?")
+
+
+def audit_seating_capacity(text: str, evidence_text: str = "",
+                           stop_evidence=None) -> tuple:
+    """[LOCAL-880 §9] Keep a magnitude number (capacity, height, count, …) only
+    when that exact figure appears in the stop's evidence; else drop the number
+    and keep the sentence. Applies to EVERY stop — no venue key.
+
+    Evidence resolution: ``stop_evidence`` (a {title: text|[text]} map) gives each
+    stop its own evidence; ``evidence_text`` is a fallback blob applied to every
+    stop when no per-stop map is given (back-compat with the single-blob caller).
+    Returns (cleaned, report) with 'kept'/'removed' lists and 'source_sentence'."""
+    rep = {"kept": [], "removed": [], "source_sentence": ""}
+    if not text or not _MAGNITUDE_RE.search(text):
+        return text or "", rep
+
+    def _nums_in(ev: str) -> set:
+        # figures the evidence attaches to a magnitude unit (digits only, commas
+        # stripped) — the only figures a §9 number may be kept against.
+        found = set()
+        for m in re.finditer(
+                r"(?i)(\d[\d,]{1,6})\s*(?:" + _MAGNITUDE_UNIT +
+                r"|people|persons|capacity)", ev):
+            found.add(m.group(1).replace(",", ""))
+        for m in re.finditer(
+                r"(?i)seat(?:ed|s|ing)?\s+(?:around |about |approximately |"
+                r"roughly |nearly )?(\d[\d,]{1,6})", ev):
+            found.add(m.group(1).replace(",", ""))
+        return found
+
+    fallback_ev = evidence_text or ""
+    # Structural lines carry computed/label values (walking-direction distances,
+    # coordinates, addresses), NOT sourced narration claims — §9 must never touch
+    # them. Only prose (and the prose after an Orientation: label) is scrubbed.
+    _STRUCT_LINE_RE = re.compile(
+        r"(?i)^\s*(coordinates|type/specialty|specific examples|directions|"
+        r"address|sources?|museum information|operational details)\s*:")
+    out = []
+    for hdr, body in _iter_stop_blocks(text):
+        if hdr:
+            out.append(hdr)
+        if not (body and _MAGNITUDE_RE.search(body)):
+            out.append(body)
+            continue
+        ev = _evidence_for_header(hdr, stop_evidence) or fallback_ev
+        ev_nums = _nums_in(ev)
+
+        def _repl(m):
+            num = m.group(1) or m.group(3)
+            unit = (m.group(2) or "").strip()
+            if not num:
+                return m.group(0)
+            bare = num.replace(",", "")
+            if bare in ev_nums:
+                rep["kept"].append(bare)
+                if not rep["source_sentence"]:
+                    for sent in re.split(r'(?<=[.!?])\s+', ev):
+                        if bare in sent.replace(",", ""):
+                            rep["source_sentence"] = sent.strip()[:200]
+                            break
+                return m.group(0)
+            rep["removed"].append(bare)
+            # Drop the number. For a seating figure the remaining phrase would read
+            # "a -seat venue" / "seated"; normalise to a clean "venue".
+            whole = m.group(0)
+            if _SEATING_WORD_RE.search(whole):
+                return "venue"
+            # For a measured magnitude ("95 metres") drop just the "<num> ", keep
+            # the unit if it still reads ("tall"); simplest safe repair: drop whole
+            # measured phrase to the unit word, leaving the sentence grammatical.
+            return unit if unit and not unit.isdigit() else ""
+
+        # Scrub line by line so structural/label lines are left untouched. An
+        # Orientation: line's label is kept and only its prose is scrubbed.
+        new_lines = []
+        for ln in body.split("\n"):
+            if _STRUCT_LINE_RE.match(ln):
+                new_lines.append(ln)
+                continue
+            m_or = re.match(r"(?i)^(\s*orientation:\s*)(.*)$", ln, re.S)
+            if m_or:
+                new_lines.append(m_or.group(1) + _MAGNITUDE_RE.sub(_repl, m_or.group(2)))
+                continue
+            new_lines.append(_MAGNITUDE_RE.sub(_repl, ln))
+        new_body = "\n".join(new_lines)
+        new_body = re.sub(r"(?i)\ba\s+venue\s+venue\b", "a venue", new_body)
+        new_body = re.sub(r"(?i)\bvenue\s+venue\b", "venue", new_body)
+        new_body = re.sub(r"[ \t]{2,}", " ", new_body)
+        new_body = re.sub(r"\s+([.,;:])", r"\1", new_body)
+        out.append(new_body)
+    cleaned = re.sub(r"[ \t]{2,}", " ", "".join(out))
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    # back-compat scalar aliases: first kept/removed figure (older callers/tests
+    # read rep['kept']/rep['removed'] as a single value).
+    rep["kept"] = rep["kept"][0] if rep["kept"] else None
+    rep["removed"] = rep["removed"][0] if rep["removed"] else None
+    return cleaned, rep
+
+
+# ─── [LOCAL-880 §4] ORIENTATION FILLER — never ship the placeholder ────────────
+_ORIENTATION_FILLER_RE = re.compile(
+    r"(?im)^\s*Orientation:\s*Position yourself to best view this location\.?\s*$")
+_ORIENTATION_FILLER_INLINE_RE = re.compile(
+    r"(?i)\bPosition yourself to best view this location\.?\s*")
+
+
+def strip_orientation_filler(text: str) -> tuple:
+    """[LOCAL-880 §4] Remove the 'Position yourself to best view this location.'
+    placeholder. A whole Orientation line that is ONLY the filler is removed; an
+    inline occurrence is stripped. Returns (cleaned, n_removed)."""
+    if not text or "Position yourself to best view this location" not in text:
+        return text or "", 0
+    n = len(_ORIENTATION_FILLER_RE.findall(text)) + \
+        len(_ORIENTATION_FILLER_INLINE_RE.findall(text))
+    out = _ORIENTATION_FILLER_RE.sub("", text)
+    out = _ORIENTATION_FILLER_INLINE_RE.sub("", out)
+    out = re.sub(r"(?im)^\s*Orientation:\s*$\n?", "", out)  # empty label left behind
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, n
+
+
+# ─── [LOCAL-880 §5] INTRO GRAMMAR — the opening title line ─────────────────────
+# Wave 38 opened "Step-by-step audio guided tour of Ho Chi Minh City, Vietnam, is
+# a walking tour." (a subject with no predicate agreement). Wave 37 had a bare
+# fragment "…Vietnam, walking tour." Normalise to a clean sentence.
+_INTRO_BROKEN_RE = re.compile(
+    r"(?im)^\s*Step-by-step audio[- ]?guided tour of (.+?)[,.]?\s*"
+    r"(?:is a |,\s*)?(walking|biking|cycling|driving|road[- ]?trip)\s+tour\.?\s*$")
+
+
+def fix_intro_grammar(text: str) -> tuple:
+    """[LOCAL-880 §5] Rewrite a broken opening line into a clean sentence:
+    'This is a step-by-step audio-guided walking tour of <place>.' Returns
+    (cleaned, n_fixed). Only the first matching line is touched."""
+    if not text:
+        return text or "", 0
+    m = _INTRO_BROKEN_RE.search(text)
+    if not m:
+        return text, 0
+    place = m.group(1).strip().rstrip(",").strip()
+    mode = m.group(2).strip().lower()
+    fixed = f"This is a step-by-step audio-guided {mode} tour of {place}."
+    return text[:m.start()] + fixed + text[m.end():], 1
+
+
+# ─── [LOCAL-880 §6] ORPHAN CLOSING — name real threads or a clean one-line close ─
+# LOCAL-879 removed the circular "one thread runs through: the places you chose"
+# lead-in and left the fragment "Each was picked by you, and together they trace
+# your own route through the city." Replace that orphan with a clean close that
+# names up to three real stop titles from the tour.
+_ORPHAN_CLOSING_RE = re.compile(
+    r"(?i)\s*Each was picked by you, and together they trace your own route "
+    r"through the city\.\s*")
+
+
+def fix_orphan_closing(text: str, stop_titles=None) -> tuple:
+    """[LOCAL-880 §6] Replace the orphan closing fragment with a clean close. When
+    2–3 real stop titles are given, name them; else a clean one-line close.
+    Returns (cleaned, n_fixed)."""
+    if not text or not _ORPHAN_CLOSING_RE.search(text):
+        return text or "", 0
+    titles = [t.strip() for t in (stop_titles or []) if t and t.strip()]
+    # prefer first and last and a distinctive middle one
+    picked = []
+    if len(titles) >= 2:
+        picked = [titles[0], titles[-1]]
+        if len(titles) >= 5:
+            picked.insert(1, titles[len(titles) // 2])
+    if picked:
+        names = ", ".join(picked[:-1]) + f" and {picked[-1]}" if len(picked) > 1 else picked[0]
+        close = (f"From {names}, this route is the one you chose through the city. "
+                 f"That is your tour.")
+    else:
+        close = "This route is the one you chose through the city."
+    out = _ORPHAN_CLOSING_RE.sub(" " + close + " ", text)
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    return out, 1
+
+
+# ─── [LOCAL-880 §7] CURRENT-AFFAIRS NOTE — omit when nothing was found ──────────
+# Wave 38 appended "A note on current affairs: … we found no verified developments
+# from the past five years…". Say the note only when there IS something to say;
+# drop the empty disclaimer.
+_CURRENT_AFFAIRS_EMPTY_RE = re.compile(
+    r"(?is)\s*A note on current affairs:\s*.*?"
+    r"(?:no verified developments|nothing (?:verified|to report)|"
+    r"found no (?:verified )?(?:developments|updates|news))"
+    r".*?(?:\.|current local news source\.?)\s*")
+
+
+def strip_empty_current_affairs_note(text: str) -> tuple:
+    """[LOCAL-880 §7] Remove a current-affairs note that reports nothing was
+    found. Returns (cleaned, n_removed)."""
+    if not text or "note on current affairs" not in text.lower():
+        return text or "", 0
+    out, n = _CURRENT_AFFAIRS_EMPTY_RE.subn("", text)
+    out = re.sub(r"\n{3,}", "\n\n", out).rstrip() + ("\n" if text.endswith("\n") else "")
+    return out, n
 
 
 # -------- [LOCAL-623 defect 4] Strip provenance / citation tails from speech ---
@@ -773,6 +1399,16 @@ def clean_spoken_text(text: str, verbose: bool = False) -> tuple:
     # only real gay bars") repeated as narration.
     out, _promo = strip_promotional_sentences(out)
     report['promotional'] = _promo
+
+    # [LOCAL-880 §2] Drop a sentence truncated to end on a determiner/preposition/
+    # dangling adjective ("…inspired directly by the iconic.").
+    out, _trunc = strip_truncated_tail_sentences(out)
+    report['truncated'] = _trunc
+
+    # [LOCAL-880 §3] Disclose a flatly-stated miracle/legend (D760) rather than
+    # asserting it ("Witnesses have reported a mysterious single tear…").
+    out, _folk = disclose_or_drop_folklore(out)
+    report['folklore_disclosed'] = _folk
 
     # [LOCAL-529] One name, four spellings — make the tour agree with itself.
     out, _name_rep = normalize_proper_noun_spellings(out)

@@ -556,15 +556,26 @@ def evidence_text_contradiction(sentence: str, evidence_blob: str
         return ("contradiction",
                 "places a death at the venue the Wikipedia evidence puts elsewhere",
                 None)
-    # (b) "intelligence" where the evidence says "Information Agency" — CORRECT it
-    # in place so the sourced identity survives.
-    if (_INTEL_HQ_RE.search(sentence) and _INFO_AGENCY_RE.search(blob)
-            and not re.search(r"(?i)\bintelligence\b", blob)):
-        fixed = _INTEL_HQ_RE.sub("the United States Information Agency building", sentence)
+    # (b) "intelligence" where the evidence says "Information Agency". The former
+    # use named by the sentence CONTRADICTS the former use named by the evidence.
+    # [LOCAL-880 §1] Generalise LOCAL-879: DROP the contradicted sentence even when
+    # the correct fact is also present. Wave 38 shipped BOTH "once housed the
+    # United States Information Agency" (correct, sourced) AND "served as the US
+    # military's intelligence headquarters" (false) in the same paragraph — the
+    # old in-place correction turned the false sentence into a duplicate of the
+    # correct one instead of removing it. When the evidence names the Information
+    # Agency as the building's former use, a sentence that instead calls it an
+    # intelligence HQ is dropped outright (the correct fact stands on its own).
+    if (_INTEL_HQ_RE.search(sentence) and _INFO_AGENCY_RE.search(blob)):
         return ("contradiction",
-                "calls the building an 'intelligence' HQ; the evidence names the "
-                "United States Information Agency",
-                fixed)
+                "calls the building an 'intelligence' HQ for the slot the evidence "
+                "names the United States Information Agency",
+                None)
+    # (c) [LOCAL-880 §1] General FORMER-USE contradiction: a sentence that asserts
+    # the building "served as / was / housed <role>" for a role that the evidence
+    # contradicts with a DIFFERENT named role for the same slot. Only fires on the
+    # specific intelligence/information clash above for now (kept deterministic and
+    # evidence-bound); the structure is here so a future role clash extends (b).
     return None
 
 
@@ -793,11 +804,31 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
                      aliases: Iterable[str] = (), flagged: Iterable[str] = (),
                      disclose_borderline: bool = True,
                      disclosures: Optional[List[Dict]] = None,
-                     authority_items: Sequence[str] = ()
+                     authority_items: Sequence[str] = (),
+                     protected: Sequence[str] = ()
                      ) -> Tuple[str, List[Dict]]:
     """Drop the sentences of one stop body that make an unsourced claim.
-    Returns (new_body, [{'sentence','kind','claim','reason'}])."""
+    Returns (new_body, [{'sentence','kind','claim','reason'}]).
+
+    [LOCAL-880 §5] A sentence strongly supported by one of ``protected`` (the
+    signature story's source sentence) is never dropped or softened."""
     removed: List[Dict] = []
+    # [LOCAL-880 §5] distinctive-token sets of the protected source sentences.
+    _prot_tok_sets = []
+    for _ps in (protected or ()):
+        _pt = {t for t in re.findall(r"[0-9a-zà-ÿđ]{4,}", _fold(_ps or ""))
+               if t not in _HEDGE_STOPWORDS}
+        if len(_pt) >= 3:
+            _prot_tok_sets.append(_pt)
+
+    def _is_protected(_sentence: str) -> bool:
+        if not _prot_tok_sets:
+            return False
+        _st = {t for t in re.findall(r"[0-9a-zà-ÿđ]{4,}", _fold(_sentence or ""))
+               if t not in _HEDGE_STOPWORDS}
+        if len(_st) < 3:
+            return False
+        return any(len(_st & _pt) >= 3 for _pt in _prot_tok_sets)
     paras = re.split(r"(\n\s*\n)", body)
     flat: List[Tuple[int, str]] = []
     for pi, seg in enumerate(paras):
@@ -833,6 +864,12 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
             dehedge[i] = (s, _dehedged)
             s = _dehedged
         if (is_disclosed(s) and i not in dehedge) or _STRUCTURAL_RE.match(s):
+            continue
+        # [LOCAL-880 §5] NEVER remove a sourced signature story. A sentence that is
+        # strongly supported by a protected source sentence is kept as-is: the gate
+        # does not drop, soften or disclose it. (A signature story's source is in
+        # the evidence by construction, so this cannot shelter a contradiction.)
+        if _is_protected(s):
             continue
         if any(_mcg._span_hit(f, s) for f in flagged_l):
             drop[i] = ("flagged", "flagged UNSOURCED by the verifier")
@@ -1008,11 +1045,12 @@ def filter_stop_body(body: str, evidence: Sequence[str], stop_title: str = "",
                      aliases: Iterable[str] = (), flagged: Iterable[str] = (),
                      disclose_borderline: bool = True,
                      disclosures: Optional[List[Dict]] = None,
-                     authority_items: Sequence[str] = ()
+                     authority_items: Sequence[str] = (),
+                     protected: Sequence[str] = ()
                      ) -> Tuple[str, List[Dict]]:
     new, removed = _filter_stop_body_core(
         body, evidence, stop_title, known, location, aliases, flagged,
-        disclose_borderline, disclosures, authority_items)
+        disclose_borderline, disclosures, authority_items, protected)
     if authority_items and _has_real_sentence(new):
         try:
             import landmark_wikipedia_evidence as _lwe
@@ -1030,10 +1068,16 @@ def filter_tour_text(tour_text: str, stop_evidence: Optional[Dict[int, List[str]
                      skip_stops: Iterable[int] = (), location: str = "",
                      disclose_borderline: bool = True,
                      stop_authority: Optional[Dict[int, List[str]]] = None,
-                     stop_fallback: Optional[Dict[int, str]] = None
+                     stop_fallback: Optional[Dict[int, str]] = None,
+                     stop_protected: Optional[Dict[int, List[str]]] = None
                      ) -> Tuple[str, Dict]:
     """Apply the gate to every ``Stop N:`` body.  ``skip_stops`` are stop numbers
-    another verifier already covers (business user stops, LOCAL-855D)."""
+    another verifier already covers (business user stops, LOCAL-855D).
+
+    [LOCAL-880 §5] ``stop_protected`` maps a stop number to a list of PROTECTED
+    source sentences (the signature story's ``source_sentence``): a body sentence
+    strongly supported by one of them is NEVER dropped or softened. Gating must
+    never remove a sourced signature story."""
     report = {"stops": 0, "scanned": 0, "dropped": 0, "changed": False, "removed": [],
               "disclosed": []}
     if not tour_text or not tour_text.strip():
@@ -1065,7 +1109,8 @@ def filter_tour_text(tour_text: str, stop_evidence: Optional[Dict[int, List[str]
             main, (stop_evidence or {}).get(n, []), title, (stop_known or {}).get(n, []),
             location, (stop_aliases or {}).get(n, []), (stop_flagged or {}).get(n, []),
             disclose_borderline=disclose_borderline, disclosures=disc,
-            authority_items=(stop_authority or {}).get(n, []))
+            authority_items=(stop_authority or {}).get(n, []),
+            protected=(stop_protected or {}).get(n, []))
         # 872C / D760: a stop never ships empty (see fill_empty_stops)
         if not _has_real_sentence(new_main):
             _one, _f = fill_empty_stops("Stop 1: " + title + "\n" + new_main + "\nStop 2: x\n",

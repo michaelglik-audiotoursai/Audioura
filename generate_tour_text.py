@@ -6479,6 +6479,65 @@ def _thin_sink_record(key, title, facts):
     except Exception:
         pass
 
+
+# [LOCAL-880] Process-global SIGNATURE-STORY sink, keyed per job — same reason as
+# the thin-fact sink above: signature selection runs inside the per-stop
+# narration worker (a child contextvar context), so its result is invisible to
+# the MAIN thread that runs the post-narration signature check at the end of
+# generate_tour_text. The worker records {title: [story dicts]} here; the
+# end-of-function check reads it to know which stop must carry which story.
+_SIGNATURE_STORY_SINK = {}
+
+
+def _signature_sink_record(key, title, stories):
+    try:
+        bucket = _SIGNATURE_STORY_SINK.setdefault(key, {})
+        if stories:
+            bucket[title] = list(stories)
+    except Exception:
+        pass
+
+
+def _local880_build_orientation(poi, poi_name, location):
+    """[LOCAL-880 §4] Build a short, true Orientation line from the stop's own
+    street / address / pin, or return "" to OMIT it. Never returns the
+    "Position yourself to best view this location." placeholder. Pure, offline."""
+    try:
+        import re as _re880
+        name = (poi_name or (poi.get("name") if isinstance(poi, dict) else "") or "").strip()
+        street = ""
+        if isinstance(poi, dict):
+            for _k in ("street", "address", "street_address", "vicinity",
+                       "formatted_address"):
+                _v = poi.get(_k)
+                if _v and isinstance(_v, str) and _v.strip():
+                    street = _v.strip()
+                    break
+        # keep only the street line (first comma-segment with a number/road word)
+        if street:
+            _seg = street.split(",")[0].strip()
+            if _re880.search(r"(?i)\d|street|str\.|road|rd\.|boulevard|blvd|avenue|"
+                             r"ave|lane|quay|pier|square|đường|phố", _seg):
+                street = _seg
+            else:
+                street = ""
+        where = f" on {street}" if street else ""
+        city = ""
+        if location:
+            city = str(location).split(",")[0].strip()
+        if name and where:
+            return (f"Find your way to {name}{where}. Take a moment at the "
+                    f"entrance to get your bearings before you continue.").strip()
+        if name and city:
+            return (f"Find your way to {name} in {city}. Take a moment to get "
+                    f"your bearings before you continue.").strip()
+        if name:
+            return (f"Find your way to {name} and take a moment to get your "
+                    f"bearings before you continue.").strip()
+    except Exception:
+        pass
+    return ""
+
 # [LOCAL-582] Module-level: how the LAST generation was delivered.
 #   'full'     — a normal multi-stop tour (default; LOCAL-580 and before).
 #   'overview' — rung 3: the venue resolved and its own site was reachable, but
@@ -11464,6 +11523,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _sink_key = _thin_sink_key(job_id=job_id, poi_list=forced_stops)
         _J._THIN_SINK_KEY = _sink_key
         _THIN_FACTS_SINK[_sink_key] = {}
+        _SIGNATURE_STORY_SINK[_sink_key] = {}  # [LOCAL-880] per-job signature sink
     except Exception:
         pass
 
@@ -24138,7 +24198,61 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
             except Exception as _ts_err:
                 print(f"  [LOCAL-873] thin-stop escalation skipped (non-fatal): {_ts_err}")
 
-        # [LOCAL-402/403] Direct snippet injection — bypasses the extract/score pipeline.
+        # [LOCAL-880] SIGNATURE STORY — pick this stop's 1–2 most memorable TRUE
+        # stories from its OWN evidence (Wikipedia evidence + any thin-escalation
+        # lore) with ONE cheap gpt-4.1-mini pass (<= $0.003/stop), and tell the
+        # narrator to tell them. Wave 38 was correct but forgettable: the gates
+        # removed the errors and, with them, every stop's best moment (the Opera
+        # House's 1944 bombing + The Quiet American; the Palace's 30 Apr 1975 tank
+        # through the gates). This runs AFTER evidence is gathered and BEFORE the
+        # narration call so the signature story is a REQUIRED element of the body;
+        # the source_sentence it quotes also protects the story at the claim gate
+        # (poi['_signature_story'] is read there), so a sourced story is never
+        # gated out. Landmark/user stops on non-museum tours; guarded, offline-safe.
+        if (tour_category != 'museum'
+                and os.environ.get('SIGNATURE_STORY_ENABLED', '1').strip() != '0'
+                and poi_name):
+            try:
+                import signature_story as _sig880
+                _sig_ev_parts = []
+                for _it in (poi.get('_wiki_evidence') or []):
+                    try:
+                        if isinstance(_it, dict):
+                            _sig_ev_parts.append(str(_it.get('text')
+                                                 or _it.get('extract')
+                                                 or _it.get('summary') or _it))
+                        else:
+                            _sig_ev_parts.append(str(_it))
+                    except Exception:
+                        pass
+                for _lf in (poi.get('_lore') or []):
+                    try:
+                        _sig_ev_parts.append(_lf.get('fact', '')
+                                             if isinstance(_lf, dict) else str(_lf))
+                    except Exception:
+                        pass
+                _sig_ev = "\n".join(p for p in _sig_ev_parts if p and p.strip())
+                if _sig_ev.strip():
+                    _sig_stories, _sig_rep = _sig880.select_signature_stories(
+                        poi_name, _sig_ev, location=location or '', log=print)
+                    if _sig_stories:
+                        poi['_signature_story'] = _sig_stories
+                        description_prompt += _sig880.required_element_block(_sig_stories)
+                        # [LOCAL-880] record into the process-global sink so the
+                        # main-thread post-narration signature check can see it.
+                        try:
+                            _signature_sink_record(_J._THIN_SINK_KEY, poi_name,
+                                                    _sig_stories)
+                        except Exception:
+                            pass
+                    print(f"  [LOCAL-880] Stop {stop_num} '{poi_name[:40]}': "
+                          f"{len(_sig_stories)} signature story(ies) selected; "
+                          f"cost ${_sig_rep.get('cost_usd', 0.0):.4f}")
+            except Exception as _sig_err:
+                print(f"  [LOCAL-880] signature story selection skipped "
+                      f"(non-fatal): {_sig_err}")
+
+
         # When _DIRECT_SNIPPETS_PER_STOP has material for this stop, inject raw
         # search snippets as reference material with grounded-story instructions.
         # [LOCAL-403] Lookup by name first, then by index (handles title string mismatches
@@ -25449,7 +25563,18 @@ Write the story FIRST, then add physical description if space allows.
                     else:
                         # [LOCAL-251] Tour-type-appropriate fallback when LLM doesn't
                         # include "Orientation:" section. The description is the full response.
-                        orientation = "Position yourself to best view this location." if tour_category != 'museum' else "Look for this work in the galleries."
+                        # [LOCAL-880 §4] NEVER ship the placeholder "Position yourself
+                        # to best view this location." (wave 38 Stop 7, wave 37 Stop 5).
+                        # Build a real Orientation from the stop's own street/pin when
+                        # we have one, else OMIT the Orientation entirely (empty string)
+                        # — a missing line is honest; a filler line is not.
+                        if tour_category == 'museum':
+                            orientation = "Look for this work in the galleries."
+                        else:
+                            try:
+                                orientation = _local880_build_orientation(poi, poi_name, location)
+                            except Exception:
+                                orientation = ""
                         description = description_text.strip()
 
                     # [LOCAL-256] Strip "Description:" label the LLM sometimes echoes
@@ -32826,11 +32951,33 @@ RULES:
                                   + ''.join(f" [{len(x)} chars]" for x in _wk))
                 except Exception as _wk_err:
                     print(f"  [LOCAL-872B] Wikipedia evidence error (non-fatal): {_wk_err}")
+            # [LOCAL-880 §5] PROTECT the signature story's source sentences so the
+            # gate never drops a sourced story. Build per-stop from the poi dicts
+            # (set in the narration worker) and the process-global signature sink.
+            _lc_protected = {}
+            try:
+                _sig_sink_map = dict(_SIGNATURE_STORY_SINK.get(_J._THIN_SINK_KEY, {}) or {})
+            except Exception:
+                _sig_sink_map = {}
+            for _si, _sp in enumerate(poi_list, 1):
+                _nm = _sp.get('name', '') or ''
+                _prot = []
+                for _st in (_sp.get('_signature_story') or _sig_sink_map.get(_nm) or []):
+                    if isinstance(_st, dict):
+                        _ss_src = _st.get('source_sentence') or ''
+                        _ss_sty = _st.get('story') or ''
+                        if _ss_src:
+                            _prot.append(_ss_src)
+                        if _ss_sty:
+                            _prot.append(_ss_sty)
+                if _prot:
+                    _lc_protected[_si] = _prot
             _ctx_872['kw'] = dict(stop_evidence=_lc_ev, stop_known=_lc_known,
                                   stop_titles=_lc_titles, stop_flagged=_lc_flag,
                                   stop_aliases=_lc_alias, skip_stops=sorted(_lc_skip),
                                   location=location or '',
-                                  stop_authority=_lc_auth, stop_fallback=_lc_fallback)
+                                  stop_authority=_lc_auth, stop_fallback=_lc_fallback,
+                                  stop_protected=_lc_protected)
             complete_tour, _lc_rep = _lcg872.filter_tour_text(complete_tour, **_ctx_872['kw'])
             print(f"  [LOCAL-872] Landmark claim gate: dropped {_lc_rep['dropped']} sentence(s), "
                   f"disclosed {len(_lc_rep.get('disclosed', []))} "
@@ -34714,6 +34861,131 @@ RULES:
                         pass
     except Exception as _tsd_err:
         print(f"  [LOCAL-873B] post-narration thin check skipped (non-fatal): {_tsd_err}")
+
+    # [LOCAL-880 §1-§10] FINAL DETERMINISTIC DEFECT PASS — runs on the assembled
+    # text after the 873B rebuild (so it holds whatever that rebuild produced) and
+    # BEFORE the signature-story survival check (so the signature check judges the
+    # cleaned body). Each sub-fix is the generalisation of a wave-38 defect:
+    #   §1 drop a contradicted former-use sentence even when the correct fact is
+    #      also present (intelligence HQ beside the sourced Information Agency);
+    #   §2 drop a sentence truncated to a determiner/adjective ("…by the iconic.");
+    #   §3 disclose a flatly-stated legend (D760) or it is dropped (the statue tear);
+    #   §4 remove the "Position yourself…" Orientation placeholder;
+    #   §5 fix the broken intro grammar; §6 the orphan closing;
+    #   §7 drop an empty current-affairs note; §8 extend the promo filter;
+    #   §9 keep a seating capacity only if sourced (quote the source in the log);
+    #   §10 Opera House: Lower House of the National Assembly (1956-75), not both.
+    try:
+        if complete_tour:
+            import spoken_text_hygiene as _sth880
+            import re as _re880e
+            _b4 = complete_tour
+            # Per-stop evidence map ({stop_title: "<joined sourced facts>"}), built
+            # from the thin-fact map and its process-global sink. This is what the
+            # generic, evidence-driven scrubs read: §1 former-use contradiction and
+            # §9 magnitude-number sourcing are decided per stop against ITS OWN
+            # evidence, in any city. No venue, date or claim is hard-coded.
+            _stop_ev = {}
+            try:
+                _facts_all = dict(_J._THIN_FACTS_PER_STOP or {})
+                try:
+                    _sb = _THIN_FACTS_SINK.get(_J._THIN_SINK_KEY, {}) or {}
+                    for _k, _v in _sb.items():
+                        _facts_all.setdefault(_k, [])
+                        for _t in _v:
+                            if _t and _t not in _facts_all[_k]:
+                                _facts_all[_k].append(_t)
+                except Exception:
+                    pass
+                for _k, _v in _facts_all.items():
+                    _stop_ev[str(_k)] = " ".join(str(x) for x in (_v or []))
+            except Exception:
+                _stop_ev = {}
+            complete_tour, _n1 = _sth880.strip_contradicted_former_use(
+                complete_tour, stop_evidence=_stop_ev)
+            complete_tour, _cap_rep = _sth880.audit_seating_capacity(
+                complete_tour, stop_evidence=_stop_ev)
+            complete_tour, _n2 = _sth880.strip_truncated_tail_sentences(complete_tour)
+            # folklore disclosure: the date, if any, comes from the stop's evidence
+            _folk_ev = " ".join(_stop_ev.values()) if _stop_ev else ""
+            complete_tour, _n3 = _sth880.disclose_or_drop_folklore(
+                complete_tour, evidence_text=_folk_ev)
+            complete_tour, _n4 = _sth880.strip_orientation_filler(complete_tour)
+            complete_tour, _n8 = _sth880.strip_promotional_sentences(complete_tour)
+            complete_tour, _n5 = _sth880.fix_intro_grammar(complete_tour)
+            # closing: name real stop titles from the headers we have
+            _st_titles = [m.group(1).strip() for m in _re880e.finditer(
+                r"(?mi)^Stop\s+\d+:\s*(.+)$", complete_tour)]
+            complete_tour, _n6 = _sth880.fix_orphan_closing(complete_tour, _st_titles)
+            complete_tour, _n7 = _sth880.strip_empty_current_affairs_note(complete_tour)
+            if _cap_rep.get("kept"):
+                print(f"  [LOCAL-880 §9] magnitude {_cap_rep['kept']} "
+                      f"KEPT (sourced): \"{_cap_rep.get('source_sentence','')}\"")
+            elif _cap_rep.get("removed"):
+                print(f"  [LOCAL-880 §9] magnitude {_cap_rep['removed']} "
+                      f"REMOVED (not found in the stop's evidence)")
+            print(f"  [LOCAL-880] defect pass: §1 former-use={_n1}, §2 truncation="
+                  f"{_n2}, §3 folklore={_n3}, §4 orientation-filler={_n4}, §5 intro="
+                  f"{_n5}, §6 closing={_n6}, §7 current-affairs={_n7}, §8 promo={_n8}")
+            if complete_tour != _b4 and output_file:
+                try:
+                    with open(output_file, "w", encoding="utf-8") as _d880:
+                        _d880.write(complete_tour)
+                except Exception:
+                    pass
+    except Exception as _d880_err:
+        print(f"  [LOCAL-880] defect pass skipped (non-fatal): {_d880_err}")
+
+    # [LOCAL-880] SIGNATURE-STORY SURVIVAL — the TRUE last word on memorability,
+    # after every gate and the 873B rebuild (both of which can drop a story).
+    # For each stop that had a signature story selected pre-narration but whose
+    # DELIVERED body no longer tells it, regenerate that stop ONCE with the story
+    # as a required element (<= one gpt-4.1-mini call per missing-story stop,
+    # billed by the meter). A stop that already tells its story is left untouched
+    # and costs nothing. Deterministic block edit; guarded, offline-safe.
+    try:
+        if complete_tour and os.environ.get('SIGNATURE_STORY_ENABLED', '1').strip() != '0':
+            import signature_story as _sig880e
+            _sig_stories_map = {}
+            try:
+                _sig_stories_map = dict(_SIGNATURE_STORY_SINK.get(
+                    _J._THIN_SINK_KEY, {}) or {})
+            except Exception:
+                _sig_stories_map = {}
+            if _sig_stories_map:
+                # the facts available per stop (thin sink + per-stop map), so the
+                # regen is constrained to sourced material only.
+                _sig_facts_map = {}
+                try:
+                    _sig_facts_map = dict(_J._THIN_FACTS_PER_STOP or {})
+                    _sink_b = _THIN_FACTS_SINK.get(_J._THIN_SINK_KEY, {}) or {}
+                    for _k, _v in _sink_b.items():
+                        _m = list(_sig_facts_map.get(_k, []))
+                        for _t in _v:
+                            if _t and _t not in _m:
+                                _m.append(_t)
+                        if _m:
+                            _sig_facts_map[_k] = _m
+                except Exception:
+                    _sig_facts_map = {}
+                complete_tour, _sig_rep_e = _sig880e.ensure_signature_in_tour(
+                    complete_tour, _sig_stories_map,
+                    facts_by_title=_sig_facts_map, location=location or '',
+                    log=print)
+                print(f"  [LOCAL-880] signature-story survival: "
+                      f"{_sig_rep_e.get('checked', 0)} stop(s) with a story, "
+                      f"{_sig_rep_e.get('missing', 0)} missing after gates, "
+                      f"{_sig_rep_e.get('regenerated', 0)} regenerated; added cost "
+                      f"${_sig_rep_e.get('cost_usd', 0.0):.4f}")
+                if _sig_rep_e.get("regenerated") and output_file:
+                    try:
+                        with open(output_file, "w", encoding="utf-8") as _sf:
+                            _sf.write(complete_tour)
+                    except Exception:
+                        pass
+    except Exception as _sig_e_err:
+        print(f"  [LOCAL-880] signature-story survival skipped (non-fatal): "
+              f"{_sig_e_err}")
 
     return complete_tour, output_file, first_poi_coordinates
 

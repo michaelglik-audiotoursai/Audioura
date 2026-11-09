@@ -95,8 +95,11 @@ class TestEmptyClosing(unittest.TestCase):
         self.assertNotIn("one thread runs through: the places you chose on this route",
                          out)
         self.assertNotIn("one thread runs through", out)
-        # the substantive meaning sentence remains
-        self.assertIn("trace your own route through the city", out)
+        # [LOCAL-880 §6] the orphan "Each was picked by you … trace your own route"
+        # meaning is replaced by a clean close naming the route (here one title ->
+        # the one-line close). Never the bare orphan fragment.
+        self.assertNotIn("Each was picked by you", out)
+        self.assertIn("route is the one you chose through the city", out)
 
     def test_real_city_thread_kept(self):
         out = self._body("the places you chose across Ho Chi Minh City")

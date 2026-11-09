@@ -74,8 +74,10 @@ class TestFalseFactsGate(unittest.TestCase):
                          self.out)
 
     def test_war_museum_information_not_intelligence(self):
+        # [LOCAL-880 §1] generalised: the contradicted 'intelligence headquarters'
+        # sentence is DROPPED (not corrected in place) when the evidence names the
+        # Information Agency — even if the correct fact is also present.
         self.assertNotIn("intelligence", self.out.lower())
-        self.assertIn("United States Information Agency building", self.out)
 
     def test_pier_unsourced_century_dropped(self):
         self.assertNotIn("19th century", self.out)
@@ -118,7 +120,9 @@ class TestUnitHelpers(unittest.TestCase):
             "a building that once served as the U.S. military's intelligence headquarters.",
             lg._fold(WAR_EV))
         self.assertIsNotNone(r)
-        self.assertIn("Information Agency", r[2])
+        # [LOCAL-880 §1] now a DROP (replacement None), not an in-place correction
+        self.assertIsNone(r[2],
+                          "intelligence-HQ contradiction is now a DROP (LOCAL-880 §1)")
 
     def test_unwrap_sourced_hedge(self):
         de = lg.unwrap_sourced_hedge(
