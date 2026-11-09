@@ -93,3 +93,8 @@ canary/tried_venues.jsonl
 # LOCAL-808 catalog export bundle: kept-tour ZIPs + manifest are produced on disk for
 # GCloud_Storied but must NOT be committed (3-4 MB audio ZIPs each).
 catalog/export/
+
+# LOCAL-873 thin-stop live-proof run logs (meter rows, generated tour text/log).
+# Machine-local run state — never committed (see run_local873_live.py).
+_local873_meterlogs/
+_local873b_meterlogs/
