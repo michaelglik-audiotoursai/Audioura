@@ -50,6 +50,12 @@ __all__ = [
 # A ``Stop N:`` header on its own line. The title is everything after the colon.
 _STOP_HEADER_RE = re.compile(r'^Stop\s+(\d+):\s*(.*)$', re.MULTILINE)
 
+# [LOCAL-883] A block whose prose body is shorter than this (characters, fields
+# and the Orientation label excluded) is treated as a STUB: on a title collision
+# a stub never beats a real block. Tuned so a lone Directions hand-off counts as
+# a stub while any genuine one-sentence body does not.
+_STUB_BODY_CHARS = 40
+
 
 def normalize_stop_title(title: str) -> str:
     """Normalise a stop/work title so two labels for the same work collapse.
@@ -149,15 +155,55 @@ def dedupe_delivered_stops(tour_text: str):
     first_by_norm = {}
     kept = []
     dropped = []
+    # [LOCAL-883] When two blocks share a normalised title (e.g. "War Remnants
+    # Museum" vs "War Remnants Museum."), the LOCAL-722 rule keeps the FIRST — but
+    # a reordered / budget-starved run can emit a near-empty STUB (just a
+    # Directions hand-off) before the real, fact-rich block, and keeping the stub
+    # drops the content, leaving a 1-sentence stop. So the first is kept UNLESS it
+    # is a stub and the later block carries real body; then the richer block takes
+    # the earlier slot. A tie, or two real blocks, keeps the first exactly as
+    # before (back-compat with LOCAL-722).
+    pos_by_norm = {}            # norm -> index in `kept`
+
+    def _body_weight(block_text: str) -> int:
+        # count non-field, non-header prose characters as a cheap richness measure.
+        w = 0
+        for ln in (block_text or "").split("\n"):
+            s = ln.strip()
+            if not s or _STOP_HEADER_RE.match(s):
+                continue
+            if re.match(r"(?i)^(coordinates|type/specialty|specific examples|"
+                        r"directions|address|sources?|operational details):", s):
+                continue
+            m = re.match(r"(?i)^orientation:\s*(.*)$", s)
+            w += len(m.group(1)) if m else len(s)
+        return w
+
     for b in blocks:
         norm = normalize_stop_title(b['title'])
         # A header with an empty title is left in place (nothing to dedup on);
         # the D3(d)/header guards handle malformed headers separately.
         if norm and norm in first_by_norm:
-            dropped.append((b['title'], first_by_norm[norm]))
+            # a duplicate of an earlier title. LOCAL-722 keeps the FIRST occurrence;
+            # but when that first occurrence is a near-empty STUB (a reordered /
+            # budget-starved run can emit just a Directions hand-off before the
+            # real, fact-rich block) keeping it would ship the stub and drop the
+            # content. So: if the earlier kept block is a stub AND this later block
+            # has real body, swap the later block into the earlier's slot. Otherwise
+            # keep the first, exactly as before.
+            idx = pos_by_norm[norm]
+            earlier = kept[idx]
+            earlier_w, later_w = _body_weight(earlier['text']), _body_weight(b['text'])
+            if earlier_w < _STUB_BODY_CHARS <= later_w:
+                dropped.append((earlier['title'], b['title']))
+                kept[idx] = b
+                first_by_norm[norm] = b['title']
+            else:
+                dropped.append((b['title'], first_by_norm[norm]))
             continue
         if norm:
             first_by_norm[norm] = b['title']
+            pos_by_norm[norm] = len(kept)
         kept.append(b)
 
     if not dropped:

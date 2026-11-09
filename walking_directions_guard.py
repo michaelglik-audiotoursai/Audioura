@@ -213,7 +213,55 @@ def _directions_target_is_wrong(dir_text: str, next_name: str,
             tail = _norm(dir_text[m.end():m.end() + len(other) + 40])
             if tail.startswith(on) or on in tail[:len(on) + 15]:
                 return True
+    # [LOCAL-883] A DANGLING go-to destination: "Continue to City Hall" when the
+    # next stop is not City Hall. This fires even when the named place is NOT a
+    # delivered stop (it was dropped or reordered away), which the arrival-cue
+    # pass above cannot see. We only trust an explicit go-to cue
+    # ("continue to / head to / proceed to / make your way to") that is followed
+    # by a capitalised destination phrase, and only when that phrase does not name
+    # the next stop — so a passed-in-transit landmark (no go-to cue) is still kept.
+    if not names_next:
+        for dest in _goto_destinations(dir_text):
+            dn = _norm(dest)
+            if not dn:
+                continue
+            if dn == nn or nn in dn or dn in nn:
+                return False
+            return True
     return False
+
+
+# A go-to cue followed by a capitalised destination phrase (the place the line
+# tells you to head to). Captures up to a short run of Title-Case words, stopping
+# at a distance/clause boundary.
+_GOTO_CUE_RE = re.compile(
+    r"(?i)\b(?:continue(?:\s+on)?\s+to|head\s+(?:to|for|towards?)|proceed\s+to|"
+    r"make\s+your\s+way\s+to|walk\s+(?:to|towards?)|go\s+to)\s+")
+
+
+def _goto_destinations(dir_text: str) -> List[str]:
+    """Destination phrases named right after a go-to cue in a Directions line.
+    Returns the raw phrase(s) ("City Hall", "the Post Office"); empty when the
+    cue is followed by a bare bearing/distance ("head north", "continue for
+    200 m") rather than a named place."""
+    out: List[str] = []
+    for m in _GOTO_CUE_RE.finditer(dir_text or ""):
+        tail = (dir_text[m.end():]).lstrip()
+        # a leading article is part of the destination ("the Post Office")
+        mm = re.match(
+            r"(?:the\s+|a\s+)?((?:[A-ZÀ-Ý][\wÀ-ÿ'’.&-]*)(?:\s+(?:of|de|du|la|le|des|"
+            r"and|[A-ZÀ-Ý][\wÀ-ÿ'’.&-]*)){0,5})",
+            tail)
+        if not mm:
+            continue
+        phrase = mm.group(1).strip(" .,;:")
+        # reject a bare bearing/compass word masquerading as a destination
+        if re.fullmatch(r"(?i)(north|south|east|west|northeast|northwest|"
+                        r"southeast|southwest|ahead|straight|left|right)", phrase):
+            continue
+        if phrase:
+            out.append(phrase)
+    return out
 
 
 def analyze(text: str) -> List[dict]:

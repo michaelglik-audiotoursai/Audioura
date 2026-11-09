@@ -397,12 +397,16 @@ class Resolvers:
         self.canonical = canonical if canonical is not None else _default_canonical
 
 
-def _default_canonical(user_name, pin, city="", local_lang=""):
+def _default_canonical(user_name, pin, city="", local_lang="", user_link=""):
     """Live canonical-venue resolution (Wikidata within 300 m of the pin, then
-    Places). Fails soft to None so pin resolution is never blocked by it."""
+    Places). Fails soft to None so pin resolution is never blocked by it.
+    [LOCAL-883] ``user_link`` is the listener's own Maps/link text, which lets a
+    pick the link itself names be accepted even without a shared distinctive
+    token in the typed short name."""
     try:
         import venue_canonical_resolver as _vcr
-        return _vcr.resolve_canonical(user_name, pin, city=city, local_lang=local_lang)
+        return _vcr.resolve_canonical(user_name, pin, city=city,
+                                      local_lang=local_lang, user_link=user_link or "")
     except Exception:
         return None
 
@@ -739,8 +743,15 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
                         f"{c.get('name','')}, {c.get('country_code','')}")
                 except Exception:
                     _local_lang = ""
-                _canon = res.canonical(s["name"], (r["lat"], r["lng"]),
-                                       c.get("name", ""), _local_lang)
+                _user_link882 = str(s.get("url") or "")
+                try:
+                    _canon = res.canonical(s["name"], (r["lat"], r["lng"]),
+                                           c.get("name", ""), _local_lang,
+                                           user_link=_user_link882)
+                except TypeError:
+                    # an injected resolver without the LOCAL-883 user_link kwarg
+                    _canon = res.canonical(s["name"], (r["lat"], r["lng"]),
+                                           c.get("name", ""), _local_lang)
             except Exception as _ce882:
                 log(f"[LOCAL-882] canonical resolve skipped for {s['name']!r}: {_ce882}")
                 _canon = None

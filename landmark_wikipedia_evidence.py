@@ -583,12 +583,25 @@ def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None,
             return None
         payload, found, row_ver = row[0], row[1], (row[2] if len(row) > 2 else None)
         if row_ver != RULES_VERSION:
+            # [LOCAL-882] A row stored under an older acceptance-rule revision is
+            # treated as a miss and re-fetched (never DELETEd). Logged so the
+            # cloud proof can SEE the re-validation happen on a warm cache.
+            print(f"[LOCAL-882] cache revalidate {name!r} @{_pin_cell(pin)}: "
+                  f"STALE rules_version ({row_ver} != {RULES_VERSION}) -> re-fetch",
+                  flush=True)
             return None                       # stale rule set: re-fetch (no DELETE)
         if not found:
+            print(f"[LOCAL-882] cache revalidate {name!r} @{_pin_cell(pin)}: "
+                  f"negative row honoured (no article at this pin)", flush=True)
             return (False, None)              # negative row: version + expiry suffice
         art = json.loads(payload)
         if not _revalidate_payload(art, name, pin=pin, city=city, match_name=match_name):
+            print(f"[LOCAL-882] cache revalidate {name!r} @{_pin_cell(pin)}: "
+                  f"REJECT cached {(art.get('title') or '')!r} (current rules would "
+                  f"not pick it) -> re-fetch", flush=True)
             return None                       # current rules would reject it: re-fetch
+        print(f"[LOCAL-882] cache revalidate {name!r} @{_pin_cell(pin)}: "
+              f"HIT {(art.get('title') or '')!r} passes current rules", flush=True)
         return (True, art)
     except Exception:
         return None
