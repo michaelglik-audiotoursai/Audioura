@@ -923,6 +923,23 @@ def _body_sentence_count(block: str) -> int:
     return len([s for s in _ss_split('\n'.join(lines)) if len(s.strip()) > 20])
 
 
+# [LOCAL-880C] A number bound to a magnitude unit (58 metres, a 500-seat hall,
+# 95 feet tall). Mirrors spoken_text_hygiene's magnitude vocabulary but kept
+# local to avoid an import cycle. Used to prefer keeping, among two tellings of
+# one within-stop fact, the one that carries the concrete sourced figure.
+_MAGNITUDE_NUMBER_RE = re.compile(
+    r"(?i)\b\d[\d,]*\s*[- ]?"
+    r"(?:seat|seats|seater|seating|metre|metres|meter|meters|km|"
+    r"kilometre|kilometres|foot|feet|ft|yard|yards|storey|storeys|story|"
+    r"stories|floor|floors|room|rooms|step|steps|hectare|hectares|acre|acres|"
+    r"ton|tons|tonne|tonnes|m)\b"
+    r"|\bseat(?:ed|s|ing)?\s+\d[\d,]*\b")
+
+
+def _carries_magnitude_number(sentence: str) -> bool:
+    return bool(_MAGNITUDE_NUMBER_RE.search(sentence or ""))
+
+
 def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
     """Delete later re-tellings of a fact already told at an earlier stop.
 
@@ -943,6 +960,18 @@ def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
     # One sentence can carry several repeated signatures; remove it once.
     handled = set()
     for r in repeats:
+        # [LOCAL-880C] Within a stop, the later telling is normally the repeat to
+        # drop — but when that later telling carries a SOURCED magnitude number
+        # ("the twin bell towers reach 58 metres high") and the earlier, kept
+        # telling does not, dropping it would delete the one concrete, sourced
+        # figure and leave the vaguer sentence. Keep the richer telling: swap so
+        # the number-free first telling is the one removed instead.
+        if r.get('within_stop') and r.get('first_sentence'):
+            _repeat_has_num = _carries_magnitude_number(r['sentence'])
+            _first_has_num = _carries_magnitude_number(r['first_sentence'])
+            if _repeat_has_num and not _first_has_num:
+                r = dict(r, sentence=r['first_sentence'],
+                         first_sentence=r['sentence'])
         sent = r['sentence']
         if sent in handled:
             continue
