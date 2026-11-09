@@ -32,7 +32,13 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 __all__ = ["fetch_article", "evidence_for", "local_languages", "parse_infobox"]
 
 CACHE_TTL_DAYS = int(os.environ.get("LANDMARK_WIKI_CACHE_TTL_DAYS", "90"))
-CACHE_NEG_TTL_DAYS = int(os.environ.get("LANDMARK_WIKI_CACHE_NEG_TTL_DAYS", "3"))
+# [LOCAL-884 §2] A NEGATIVE (found=False) row is a MISS — "no article at this pin
+# under the rules in force when it was stored". Misses go stale fast: a resolver
+# change, a new canonical name, or a freshly-created article can turn a miss into
+# a hit within a day. The negative TTL is therefore <= 1 day, so an old miss
+# cached by an earlier resolver cannot starve a stop of evidence for long.
+CACHE_NEG_TTL_DAYS = min(
+    1, int(os.environ.get("LANDMARK_WIKI_CACHE_NEG_TTL_DAYS", "1")))
 
 # LOCAL-878: the geo-gate. An article whose own coordinate is more than this many km
 # from the stop's pin is a DIFFERENT place (the bare-name "Opera House" search returned
@@ -272,6 +278,12 @@ _GENERIC_NAME_WORDS = frozenset({
     "station", "market", "monument", "memorial", "centre", "center", "office",
     "post", "central", "committee", "people", "peoples", "government", "national",
     "municipal", "provincial", "cong", "trade", "commercial", "old",
+    # [LOCAL-884 §3] more KIND words a coordinate-less article must not qualify on
+    # ("Book Street" must not match "Street Without Joy (book)" on "book"): the
+    # kind of venue, never the venue itself.
+    "book", "books", "bookstore", "bookshop", "bar", "pub", "club", "cafe",
+    "coffee", "restaurant", "hotel", "temple", "pagoda", "garden", "walking",
+    "new", "apartments", "apartment",
 })
 
 
@@ -306,6 +318,41 @@ def _titles_share_distinctive_token(stop_name: str, title: str, city: str = "") 
     if not a:
         return True
     return bool(a & _distinctive_name_tokens(title, city))
+
+
+def _shares_distinctive_token_strict(stop_name: str, title: str, city: str = "") -> bool:
+    """[LOCAL-884 §3] Like ``_titles_share_distinctive_token`` but NEVER vacuously
+    true: a title and stop name share a distinctive token ONLY when both have at
+    least one distinctive (non-kind, non-city) token and the sets overlap. Used
+    for a coordinate-less article, where geo cannot confirm the place: a stop name
+    that is all kind words ("Book Street", "Opera House") can never be confidently
+    matched to a coordinate-less article, so this returns False for it — the
+    article is rejected and the fetch retried with a city-qualified name."""
+    a = _distinctive_name_tokens(stop_name, city)
+    b = _distinctive_name_tokens(title, city)
+    return bool(a and b and (a & b))
+
+
+def _same_canonical_identity(name_a: str, name_b: str, city: str = "") -> bool:
+    """[LOCAL-884 §2] True when two names denote the SAME place for the purpose of
+    honouring a cached MISS. A negative row records "no article for THIS name at
+    this pin"; when the stop's canonical name now DIFFERS from the name the miss
+    was cached under, the miss does not apply and we re-fetch (it is cheap and
+    self-heals via ON CONFLICT). "Same" means the folded names are equal, OR they
+    carry the SAME distinctive (non-kind, non-city) token set — a mere shared KIND
+    word ("Post Office" ⊂ "Saigon Central Post Office") is NOT the same place, so
+    the richer canonical name re-fetches rather than inheriting the bare miss."""
+    fa, fb = _fold2(name_a), _fold2(name_b)
+    if not fa or not fb:
+        return True                       # nothing to compare: do not force a re-fetch
+    if fa == fb:
+        return True
+    da, db = _distinctive_name_tokens(name_a, city), _distinctive_name_tokens(name_b, city)
+    if da or db:
+        return da == db and bool(da)      # same iff identical non-empty distinctive sets
+    # both sides are pure kind/city words with no distinctive token: treat equal
+    # folded containment as the same place (a trivial rewording).
+    return fa in fb or fb in fa
 
 
 def _p625_for_qid(qid: str) -> Optional[Tuple[float, float]]:
@@ -433,6 +480,18 @@ def _pick(name: str, raw: Optional[Dict], pin: Optional[Tuple[float, float]] = N
             within_300 = coord is not None and _haversine_km(pin, coord) <= DENSE_CENTRE_KM
             shares_token = _titles_share_distinctive_token(mn, _title, city)
             if not (within_300 and shares_token):
+                continue
+        # [LOCAL-884 §3] evidence relevance. A coordinate-less article (no article
+        # coord and no P625) cannot be placed at the pin, so the geo-gate only had
+        # the city-name fallback to lean on — which "Street Without Joy (book)"
+        # cleared for a "Book Street" stop because the two share the generic token
+        # "street"/"book". When geo cannot be verified, require a DISTINCTIVE
+        # shared token (kind words like "book"/"street"/"hall" never count): the
+        # article must really name THIS venue, not merely its kind. An article WITH
+        # a coordinate is unaffected — its geo (within GEO_GATE_KM, checked above)
+        # already proves it is the right place.
+        if _art_coord is None:
+            if not _shares_distinctive_token_strict(mn, _title, city):
                 continue
         # [LOCAL-882] carry the article's own coordinate into the cached payload so
         # a later cache HIT can re-run the EXACT dense-centre distance check on
@@ -576,12 +635,13 @@ def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None,
         if not _ensure(conn):
             return None
         with conn.cursor() as cur:
-            cur.execute("SELECT payload, found, rules_version FROM landmark_wiki_cache "
+            cur.execute("SELECT payload, found, rules_version, name FROM landmark_wiki_cache "
                         "WHERE cache_key = %s AND expires_at > NOW()", (_key(name, lang, pin),))
             row = cur.fetchone()
         if not row:
             return None
         payload, found, row_ver = row[0], row[1], (row[2] if len(row) > 2 else None)
+        row_name = row[3] if len(row) > 3 else None
         if row_ver != RULES_VERSION:
             # [LOCAL-882] A row stored under an older acceptance-rule revision is
             # treated as a miss and re-fetched (never DELETEd). Logged so the
@@ -591,6 +651,20 @@ def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None,
                   flush=True)
             return None                       # stale rule set: re-fetch (no DELETE)
         if not found:
+            # [LOCAL-884 §2] A negative row says "no article found for THIS name at
+            # this pin". The stop now carries a CANONICAL name (``match_name``)
+            # resolved at the pin; when that canonical name differs from the name
+            # the miss was cached under, the miss does not apply — it was recorded
+            # for a different (older, generic) search string, and the canonical
+            # name may well have an article. Re-fetch rather than honour the stale
+            # miss (never DELETE; the re-fetch overwrites via ON CONFLICT).
+            _mn = (match_name or "").strip()
+            _rn = (row_name or "").strip()
+            if _mn and _rn and not _same_canonical_identity(_mn, _rn, city):
+                print(f"[LOCAL-884] cache revalidate {name!r} @{_pin_cell(pin)}: "
+                      f"negative row NOT honoured — canonical name {_mn!r} differs "
+                      f"from cached {_rn!r} -> re-fetch", flush=True)
+                return None
             print(f"[LOCAL-882] cache revalidate {name!r} @{_pin_cell(pin)}: "
                   f"negative row honoured (no article at this pin)", flush=True)
             return (False, None)              # negative row: version + expiry suffice

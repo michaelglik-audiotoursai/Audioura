@@ -84,12 +84,30 @@ def test_gate_discloses_legend_not_drops_it():
     assert "installed in 1959" in out
 
 
-def test_gate_keeps_unjudged_and_nonfactual_when_no_evidence():
+def test_gate_drops_factual_when_no_evidence_keeps_nonfactual():
+    # [LOCAL-884 §1] "No evidence" means "no factual claim": a factual sentence
+    # with no evidence to back it is UNSUPPORTED and dropped (no LLM call); a
+    # non-factual sentence is kept.
     body = ("The hall opened in 1908. You cross a wide courtyard.")
     out, rep = sgg.apply_grounding_gate("City Hall", body, evidence="",
                                         classify_fn=_fake_classify([]))
-    assert out.strip() == body.strip()           # no evidence → keep everything
-    assert rep["called"] is False
+    assert "1908" not in out                     # factual, no evidence → dropped
+    assert "wide courtyard" in out               # non-factual → kept
+    assert rep["called"] is False                # no LLM call: nothing to check
+    assert rep["no_evidence"] is True
+    assert rep["labelled"] == 1 and rep["unsupported"] == 1
+
+
+def test_gate_drops_founded_1163_on_empty_evidence():
+    # the cathedral wave-42 regression: an empty bundle with "founded in 1163"
+    # (Notre-Dame de Paris, not the Saigon cathedral) is dropped, never shipped.
+    body = ("The cathedral was founded in 1163, built in 1182 and completed in 1345. "
+            "You hear the bells drift across the square.")
+    out, rep = sgg.apply_grounding_gate("Cathedral", body, evidence="  ",
+                                        classify_fn=_fake_classify([]))
+    assert "1163" not in out and "1182" not in out and "1345" not in out
+    assert "bells drift" in out
+    assert rep["no_evidence"] is True and rep["labelled"] >= 1
 
 
 # ═══════════════════ 3. tour-level gate + shortfall rebuild ════════════════════
@@ -170,8 +188,11 @@ def test_cost_cap_stops_further_calls():
 
     def cls(system, user, model, **kw):
         return ({"verdicts": [{"i": 1, "verdict": "SUPPORTED", "evidence": "e", "legend": False}]}, 10**6, 10**6)
-    out, rep = sgg.ground_tour_text(tour, {"City Hall": "ev", "Post Office": "ev"},
-                                    classify_fn=cls, max_cost_usd=0.0001)
+    # substantial evidence per stop so a real LLM call is made (an empty/thin
+    # bundle would be handled by the no-evidence drop, with no call and no cost).
+    ev = {"City Hall": "The Hôtel de Ville was built from 1898 to 1909 for the colonial administration.",
+          "Post Office": "The Saigon Central Post Office opened in 1891, designed by Foulhoux."}
+    out, rep = sgg.ground_tour_text(tour, ev, classify_fn=cls, max_cost_usd=0.0001)
     # the first call alone blows the cap, so the second stop is skipped
     assert rep["cost_usd"] > 0
 
