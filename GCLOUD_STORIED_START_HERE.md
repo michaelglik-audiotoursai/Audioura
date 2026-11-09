@@ -13,6 +13,8 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 38 — 2026-11-09 ~03:45 EST (wdvrdazevx) — DEPLOYED then ROLLED BACK. gen 00040-2z8 (241c4199, build 7196c69a, bsub46) is idle; traffic is back on wave 37's gen 00039-mtv. The proof 547 failed one string: War Remnants "intelligence headquarters". 547 hidden; rows 439. Spent so far on the $19.98: 0.231 + 0.233 + 0.238.
+
 # ▶️ WAVE 37 — 2026-11-09 ~02:30 EST (wdvrdazevt) — LIVE @ fb520b34 (build 0a935aa9, bsub45).
 - Live revisions: gen 00039-mtv, orch 00022-m9c, map 00007-7n8.
 - Rollback targets: 00036-qbq / 00021-lbb / 00006-6kk.
