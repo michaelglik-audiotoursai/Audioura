@@ -557,6 +557,19 @@ def _revalidate_payload(art: Optional[Dict[str, str]], name: str,
                 return False
         elif not shares_token:
             return False
+    # [LOCAL-884 §3] A coordinate-less CACHED payload cannot be placed at the pin,
+    # so — exactly as in ``_pick`` — it is only re-validated as the venue when it
+    # shares a DISTINCTIVE token with the stop (never a kind word) AND its title or
+    # lead names the tour city. This rejects two warm-cache wave-42 leaks that
+    # name-matched on generic/shared tokens but sit elsewhere: "Street Without Joy
+    # (book)" for a "Book Street" stop (shares only the kind word), and
+    # "Notre-Dame de Paris" for the Saigon cathedral (shares "notre"/"dame" but
+    # names Paris, not Saigon). A coordinate-bearing payload is unaffected — its
+    # geo was already checked above.
+    if pin is not None and art.get("coord") is None:
+        if not (_shares_distinctive_token_strict(mn, title, city)
+                and _city_named(city, title, art.get("lead", ""))):
+            return False
     return True
 
 
@@ -635,13 +648,16 @@ def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None,
         if not _ensure(conn):
             return None
         with conn.cursor() as cur:
-            cur.execute("SELECT payload, found, rules_version, name FROM landmark_wiki_cache "
-                        "WHERE cache_key = %s AND expires_at > NOW()", (_key(name, lang, pin),))
+            cur.execute(
+                "SELECT payload, found, rules_version, name, "
+                "EXTRACT(EPOCH FROM (NOW() - created_at)) FROM landmark_wiki_cache "
+                "WHERE cache_key = %s AND expires_at > NOW()", (_key(name, lang, pin),))
             row = cur.fetchone()
         if not row:
             return None
         payload, found, row_ver = row[0], row[1], (row[2] if len(row) > 2 else None)
         row_name = row[3] if len(row) > 3 else None
+        row_age_s = row[4] if len(row) > 4 else None
         if row_ver != RULES_VERSION:
             # [LOCAL-882] A row stored under an older acceptance-rule revision is
             # treated as a miss and re-fetched (never DELETEd). Logged so the
@@ -658,6 +674,21 @@ def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None,
             # for a different (older, generic) search string, and the canonical
             # name may well have an article. Re-fetch rather than honour the stale
             # miss (never DELETE; the re-fetch overwrites via ON CONFLICT).
+            # [LOCAL-884 §2] Enforce the negative TTL on READ, from created_at:
+            # a MISS goes stale within <= 1 day (CACHE_NEG_TTL_DAYS). A row the
+            # cloud wrote under an older, longer negative TTL (its stored
+            # expires_at is days out) is re-fetched once it is older than the
+            # current negative TTL, so an old miss cannot keep starving a stop of
+            # evidence even while its row has not yet expired. (never DELETE.)
+            try:
+                _age_days = float(row_age_s) / 86400.0 if row_age_s is not None else 0.0
+            except (TypeError, ValueError):
+                _age_days = 0.0
+            if _age_days > CACHE_NEG_TTL_DAYS:
+                print(f"[LOCAL-884] cache revalidate {name!r} @{_pin_cell(pin)}: "
+                      f"negative row STALE (age {_age_days:.2f}d > "
+                      f"{CACHE_NEG_TTL_DAYS}d neg TTL) -> re-fetch", flush=True)
+                return None
             _mn = (match_name or "").strip()
             _rn = (row_name or "").strip()
             if _mn and _rn and not _same_canonical_identity(_mn, _rn, city):

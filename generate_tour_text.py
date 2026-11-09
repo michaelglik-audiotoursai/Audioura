@@ -6498,6 +6498,31 @@ def _signature_sink_record(key, title, stories):
         pass
 
 
+# [LOCAL-884 §1] Process-global WIKI-EVIDENCE sink, keyed per job. The strict
+# grounding gate runs AFTER narration on the MAIN thread and builds each stop's
+# evidence bundle; before 884 it saw only the thin-facts + direct-snippets sinks,
+# so a stop whose evidence came through the LOCAL-872C Wikipedia narrator feed
+# (poi['_wiki_evidence']) looked like it had NO evidence — and the gate then
+# dropped every factual sentence and disclosed a no-history stop even though a
+# real article had been fed. The narration worker records the stop's Wikipedia
+# evidence text here so the gate grounds against the SAME evidence the narrator
+# used.
+_WIKI_EVIDENCE_SINK = {}
+
+
+def _wiki_evidence_sink_record(key, title, items):
+    try:
+        bucket = _WIKI_EVIDENCE_SINK.setdefault(key, {})
+        texts = [str(x) for x in (items or []) if str(x).strip()]
+        if texts:
+            bucket.setdefault(title, [])
+            for t in texts:
+                if t not in bucket[title]:
+                    bucket[title].append(t)
+    except Exception:
+        pass
+
+
 def _local880_build_orientation(poi, poi_name, location):
     """[LOCAL-880 §4] Build a short, true Orientation line from the stop's own
     street / address / pin, or return "" to OMIT it. Never returns the
@@ -11565,6 +11590,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _J._THIN_SINK_KEY = _sink_key
         _THIN_FACTS_SINK[_sink_key] = {}
         _SIGNATURE_STORY_SINK[_sink_key] = {}  # [LOCAL-880] per-job signature sink
+        _WIKI_EVIDENCE_SINK[_sink_key] = {}    # [LOCAL-884] per-job wiki-evidence sink
     except Exception:
         pass
 
@@ -24144,6 +24170,14 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     if _w_items:
                         poi['_wiki_evidence'] = _w_items
                         description_prompt += _lwe872c.narrator_block(poi_name, _w_items)
+                        # [LOCAL-884 §1] record the SAME evidence the narrator saw
+                        # into the per-job sink, so the post-narration strict
+                        # grounding gate grounds this stop against it (and does not
+                        # mistake a Wikipedia-fed stop for a no-evidence stop).
+                        try:
+                            _wiki_evidence_sink_record(_J._THIN_SINK_KEY, poi_name, _w_items)
+                        except Exception:
+                            pass
                         print(f"  [LOCAL-872C] Stop {stop_num} '{poi_name[:40]}': Wikipedia evidence "
                               f"({len(_w_items)} article(s)) fed to the narrator"
                               + (f" [geo-gated on {_w_pin[0]:.4f},{_w_pin[1]:.4f}]" if _w_pin else ""))
@@ -35142,6 +35176,20 @@ RULES:
                         else:
                             _texts.append(str(_s))
                     _blob = " ".join(t for t in _texts if t)
+                    if _blob.strip():
+                        _key = str(_k)
+                        _ev883[_key] = (_ev883.get(_key, "") + " " + _blob).strip()
+            except Exception:
+                pass
+
+            # [LOCAL-884 §1] Merge the LOCAL-872C Wikipedia evidence the narrator
+            # was fed (per-job sink), so a stop whose evidence came ONLY through the
+            # Wikipedia path is grounded against that article — not mistaken for a
+            # no-evidence stop and stripped of every factual sentence.
+            try:
+                _wiki883 = dict(_WIKI_EVIDENCE_SINK.get(_J._THIN_SINK_KEY, {}) or {})
+                for _k, _items in _wiki883.items():
+                    _blob = " ".join(str(x) for x in (_items or []) if str(x).strip())
                     if _blob.strip():
                         _key = str(_k)
                         _ev883[_key] = (_ev883.get(_key, "") + " " + _blob).strip()
