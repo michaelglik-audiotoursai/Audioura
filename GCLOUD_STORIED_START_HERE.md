@@ -13,6 +13,8 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 39 — 2026-11-09 ~06:45 EST (wdvrdazeya) — DEPLOYED then ROLLED BACK. gen 00041-lkk (7d5f2c93, build 25bebcd4, bsub47) is idle; traffic is on wave 37's gen 00039-mtv. The proof 547 failed: no "30 April 1975"; the signature stories brought back the Eiffel myth, put the Loan execution on Book Street, and described the Gia Long Palace as City Hall. 547 hidden. Rows 440 (548 = Sophia's real tour, not a proof). Proof spend so far: ~$0.95 of the $19.98.
+
 # ▶️ WAVE 38 — 2026-11-09 ~03:45 EST (wdvrdazevx) — DEPLOYED then ROLLED BACK. gen 00040-2z8 (241c4199, build 7196c69a, bsub46) is idle; traffic is back on wave 37's gen 00039-mtv. The proof 547 failed one string: War Remnants "intelligence headquarters". 547 hidden; rows 439. Spent so far on the $19.98: 0.231 + 0.233 + 0.238.
 
 # ▶️ WAVE 37 — 2026-11-09 ~02:30 EST (wdvrdazevt) — LIVE @ fb520b34 (build 0a935aa9, bsub45).
