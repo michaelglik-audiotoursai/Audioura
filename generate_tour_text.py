@@ -24214,27 +24214,59 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 and poi_name):
             try:
                 import signature_story as _sig880
-                _sig_ev_parts = []
+                # [LOCAL-881] The stop's OWN source (its name-matched + geo-gated
+                # Wikipedia article, LOCAL-878) is the ONLY admissible signature
+                # source. The 873 thin-stop page facts (poi['_lore'], dicts
+                # {text,url}) may ADD detail but may not themselves be the
+                # signature source unless a fact names the stop. Keep the two
+                # apart so the picker can enforce provenance.
+                _own_ev_parts = []
                 for _it in (poi.get('_wiki_evidence') or []):
                     try:
                         if isinstance(_it, dict):
-                            _sig_ev_parts.append(str(_it.get('text')
+                            _own_ev_parts.append(str(_it.get('text')
                                                  or _it.get('extract')
                                                  or _it.get('summary') or _it))
                         else:
-                            _sig_ev_parts.append(str(_it))
+                            _own_ev_parts.append(str(_it))
                     except Exception:
                         pass
+                _own_ev = "\n".join(p for p in _own_ev_parts if p and p.strip())
+                # 873 page facts, normalised to {text,url} for the provenance test.
+                _page_facts = []
                 for _lf in (poi.get('_lore') or []):
                     try:
-                        _sig_ev_parts.append(_lf.get('fact', '')
-                                             if isinstance(_lf, dict) else str(_lf))
+                        if isinstance(_lf, dict):
+                            _pf_txt = str(_lf.get('text') or _lf.get('fact')
+                                          or _lf.get('snippet') or '')
+                            _pf_url = str(_lf.get('url') or _lf.get('source') or '')
+                        else:
+                            _pf_txt, _pf_url = str(_lf), ''
+                        if _pf_txt.strip():
+                            _page_facts.append({'text': _pf_txt, 'url': _pf_url})
                     except Exception:
                         pass
-                _sig_ev = "\n".join(p for p in _sig_ev_parts if p and p.strip())
+                # the model still SEES both (own evidence + page facts) so it can
+                # draw a story; the provenance gate decides what may be the source.
+                _sig_ev = "\n".join(
+                    [p for p in _own_ev_parts if p and p.strip()]
+                    + [f['text'] for f in _page_facts])
+                # the stop's aliases, for the names-the-stop provenance/location test.
+                try:
+                    _sig_aliases = list(_J._USER_STOP_ALIASES.get(poi_name) or [])
+                    if isinstance(_sig_aliases, str):
+                        _sig_aliases = [_sig_aliases]
+                except Exception:
+                    _sig_aliases = []
+                try:
+                    _sig_aliases += list(poi.get('aliases') or [])
+                except Exception:
+                    pass
                 if _sig_ev.strip():
                     _sig_stories, _sig_rep = _sig880.select_signature_stories(
-                        poi_name, _sig_ev, location=location or '', log=print)
+                        poi_name, _sig_ev, location=location or '', log=print,
+                        own_evidence_text=_own_ev or None,
+                        page_facts=_page_facts, aliases=_sig_aliases)
                     if _sig_stories:
                         poi['_signature_story'] = _sig_stories
                         description_prompt += _sig880.required_element_block(_sig_stories)
@@ -24245,9 +24277,38 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                                                     _sig_stories)
                         except Exception:
                             pass
+                        # [LOCAL-881] log the SOURCE of each signature story (its
+                        # own Wikipedia article, or the 873 page URL that names the
+                        # stop) so the proof can show provenance per stop.
+                        try:
+                            import landmark_wikipedia_evidence as _lwe881
+                            for _ks in _sig_stories:
+                                _ss = _ks.get('source_sentence', '')
+                                _src_url = ''
+                                for _it in (poi.get('_wiki_evidence') or []):
+                                    _si = _lwe881.split_item(str(_it))
+                                    if _ss and _sig880._quote_in_evidence(_ss, str(_it)):
+                                        _t = (_si.get('title') or '').replace(' ', '_')
+                                        _lg = _si.get('lang') or 'en'
+                                        _src_url = (f"https://{_lg}.wikipedia.org/wiki/{_t}"
+                                                    if _t else f"own article ({_si.get('title','')})")
+                                        break
+                                if not _src_url:
+                                    for _pf in _page_facts:
+                                        if _ss and _sig880._quote_in_evidence(_ss, _pf['text']):
+                                            _src_url = _pf.get('url') or '(873 page, names stop)'
+                                            break
+                                print(f"  [LOCAL-881] Stop {stop_num} '{poi_name[:40]}' "
+                                      f"signature source: {_src_url or '(own evidence)'}")
+                        except Exception:
+                            pass
                     print(f"  [LOCAL-880] Stop {stop_num} '{poi_name[:40]}': "
                           f"{len(_sig_stories)} signature story(ies) selected; "
-                          f"cost ${_sig_rep.get('cost_usd', 0.0):.4f}")
+                          f"cost ${_sig_rep.get('cost_usd', 0.0):.4f} "
+                          f"(off-source={_sig_rep.get('dropped_off_source', 0)}, "
+                          f"myth={_sig_rep.get('dropped_myth', 0)}, "
+                          f"loc={_sig_rep.get('dropped_location', 0)}, "
+                          f"rel-time={_sig_rep.get('dropped_rel_time', 0)})")
             except Exception as _sig_err:
                 print(f"  [LOCAL-880] signature story selection skipped "
                       f"(non-fatal): {_sig_err}")

@@ -55,6 +55,52 @@ _sentences = _mcg._sentences
 is_disclosed = _mcg.is_disclosed
 _STOP_HEADER_RE = _mcg._STOP_HEADER_RE
 
+# ── LOCAL-881: contradiction beats protection, and relative-time checks ─────────
+# These reuse the generic detectors defined in signature_story (no venue, date or
+# name is hard-coded, D769). Imported lazily so the gate has no hard dependency.
+try:
+    from signature_story import (
+        _MYTH_MARKER_RE, relative_time_consistent as _sig_rel_time_consistent,
+        _content_tokens as _sig_content_tokens)
+except Exception:                       # pragma: no cover - fallback if unavailable
+    _MYTH_MARKER_RE = re.compile(r"(?i)\b(?:often (?:wrongly |incorrectly )?attributed"
+                                 r"|contrary to (?:popular|common) belief|is a myth"
+                                 r"|commonly but incorrectly|wrongly attributed)\b")
+
+    def _sig_rel_time_consistent(sentence, *, extra_dates=""):
+        return True
+
+    def _sig_content_tokens(s):
+        return {w for w in re.findall(r"[a-z0-9]+", _fold(s or "")) if len(w) >= 3}
+
+
+def _evidence_flags_myth_about(sentence: str, evidence_blob: str) -> bool:
+    """True when the stop's evidence carries a myth/misattribution marker that
+    shares >= 2 distinctive tokens with ``sentence`` — i.e. the evidence corrects
+    the very claim the sentence makes. Protection must not shield such a sentence.
+    """
+    if not evidence_blob:
+        return False
+    stok = {t for t in _sig_content_tokens(sentence) if not t.isdigit()}
+    if not stok:
+        return False
+    for sent in _sentences(evidence_blob):
+        if not _MYTH_MARKER_RE.search(sent):
+            continue
+        if len(stok & _sig_content_tokens(sent)) >= 2:
+            return True
+    return False
+
+
+def _relative_time_consistent(sentence: str, evidence_blob: str = "") -> bool:
+    """A sentence's relative-time phrase ("months/years before/after X") must agree
+    with the dates in the sentence (plus the evidence). Generic; True when none."""
+    try:
+        return bool(_sig_rel_time_consistent(sentence, extra_dates=evidence_blob or ""))
+    except Exception:
+        return True
+
+
 # A capitalised token (accents allowed) and a capitalised phrase with connectors.
 _UP = "A-ZÀ-ÖØ-ÞĀ-ŽẠ-Ỹ"
 _LO = "a-zà-ÿā-žạ-ỹ"
@@ -865,12 +911,17 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
             s = _dehedged
         if (is_disclosed(s) and i not in dehedge) or _STRUCTURAL_RE.match(s):
             continue
-        # [LOCAL-880 §5] NEVER remove a sourced signature story. A sentence that is
-        # strongly supported by a protected source sentence is kept as-is: the gate
-        # does not drop, soften or disclose it. (A signature story's source is in
-        # the evidence by construction, so this cannot shelter a contradiction.)
-        if _is_protected(s):
-            continue
+        # [LOCAL-880 §5 / LOCAL-881 §3] A sourced signature story is protected from
+        # the gate — BUT contradiction beats protection. The wave-39 picker chose
+        # FALSE stories (Eiffel designed the Post Office) and the old code skipped
+        # them here, BEFORE the contradiction checks, so a myth the evidence itself
+        # corrects was shielded. Protection is therefore NOT applied to a sentence
+        # that the evidence flags as a myth/misattribution; and it is applied only
+        # AFTER the three contradiction checks below (build-range, evidence-text,
+        # claim-vs-authority), each of which always wins over protection.
+        _protected_here = _is_protected(s) and not _evidence_flags_myth_about(s, _ev_blob)
+        if _protected_here and _MYTH_MARKER_RE.search(s):
+            _protected_here = False
         if any(_mcg._span_hit(f, s) for f in flagged_l):
             drop[i] = ("flagged", "flagged UNSOURCED by the verifier")
             continue
@@ -888,6 +939,20 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
             drop[i] = (_kind, _reason)
             if _repl and _repl != s:
                 replace[i] = _repl      # correct in place (keeps the sourced identity)
+            continue
+        # [LOCAL-881 §7] A relative-time phrase ("months/years before/after X")
+        # that disagrees with the dates in the sentence (plus the evidence) is
+        # dropped even when the sentence is otherwise protected — the wave-39
+        # Palace said "months before … 31 October 1966" of a Nov 1963 event, a
+        # three-year gap. Contradiction beats protection.
+        if not _relative_time_consistent(s, _ev_blob):
+            drop[i] = ("rel-time", "relative-time phrase contradicts the dates "
+                                   "in the evidence/body")
+            continue
+        # [LOCAL-880 §5] NEVER remove a sourced, NON-contradicted signature story.
+        # A sentence strongly supported by a protected source sentence (and not a
+        # myth) is kept as-is past this point.
+        if _protected_here:
             continue
         # [LOCAL-879 §4] A "sometimes said" hedge was handled above; screen the
         # (possibly de-hedged) sentence for any unsourced claim.

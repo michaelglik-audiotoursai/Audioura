@@ -42,6 +42,12 @@ CACHE_NEG_TTL_DAYS = int(os.environ.get("LANDMARK_WIKI_CACHE_NEG_TTL_DAYS", "3")
 # a specific gate), yet far tighter than any same-name place in another city — the metro
 # radius a genuine different-city hit would exceed is tens to thousands of km.
 GEO_GATE_KM = float(os.environ.get("LANDMARK_WIKI_GEO_GATE_KM", "2.0"))
+# LOCAL-881: the dense-centre gate. In a packed city centre, two unrelated civic
+# buildings can sit well within the 2 km LOCAL-878 gate (the Gia Long Palace is
+# ≈600 m from the Hôtel de Ville). An article whose title does NOT share a
+# distinctive name token with the stop must therefore sit within this tighter
+# radius, or it is a different venue and is rejected.
+DENSE_CENTRE_KM = float(os.environ.get("LANDMARK_WIKI_DENSE_CENTRE_KM", "0.3"))
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 _MAX_LEAD = 6000
 _MAX_INFOBOX = 2500
@@ -228,6 +234,55 @@ def _haversine_km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
     return 2 * R * math.asin(min(1.0, math.sqrt(h)))
 
 
+# LOCAL-881: words that name a KIND of civic/landmark venue, not a specific one.
+# Two different buildings can share all of these ("Ho Chi Minh City Hall" vs
+# "Gia Long Palace" share none; "City Hall" vs "Town Hall" share only kind words),
+# so they do not count as a distinctive shared name token. Generic, not tied to a
+# tour (D769); the city's own name is handled by _city_named, not here.
+_GENERIC_NAME_WORDS = frozenset({
+    "the", "of", "and", "de", "du", "la", "le", "des", "city", "town", "hall",
+    "palace", "house", "building", "museum", "cathedral", "basilica", "church",
+    "opera", "theatre", "theater", "square", "street", "road", "avenue",
+    "boulevard", "bridge", "tower", "gate", "park", "pier", "wharf", "quay",
+    "station", "market", "monument", "memorial", "centre", "center", "office",
+    "post", "central", "committee", "people", "peoples", "government", "national",
+    "municipal", "provincial", "cong", "trade", "commercial", "old",
+})
+
+
+def _distinctive_name_tokens(s: str) -> set:
+    """Folded tokens of a name that are NOT generic venue/kind words — the tokens
+    that pick out THIS venue ("vildieu"/"foulhoux"/"gia"/"long"/"bach"/"dang"),
+    not its kind ("hall"/"palace")."""
+    return {t for t in re.findall(r"[a-z0-9]+", _fold2(s or ""))
+            if len(t) >= 3 and t not in _GENERIC_NAME_WORDS}
+
+
+def _distinctive_name_tokens(s: str, city: str = "") -> set:
+    """Folded tokens of a name that are NOT generic venue/kind words and NOT the
+    tour city's own words — the tokens that pick out THIS venue
+    ("vildieu"/"foulhoux"/"gia"/"long"/"bach"/"dang"), not its kind ("hall"/
+    "palace") nor the city ("ho"/"chi"/"minh"), which every central article shares."""
+    city_toks = {t for t in re.findall(r"[a-z0-9]+", _fold2(city or ""))} if city else set()
+    return {t for t in re.findall(r"[a-z0-9]+", _fold2(s or ""))
+            if len(t) >= 3 and t not in _GENERIC_NAME_WORDS and t not in city_toks}
+
+
+def _titles_share_distinctive_token(stop_name: str, title: str, city: str = "") -> bool:
+    """True when the article title shares a distinctive name token with the stop
+    name — i.e. the title really names this venue, not just its kind or the city.
+    "Ho Chi Minh City Hall" vs "Gia Long Palace" share none (both drop to kind +
+    city words); "Saigon Opera House" vs "Nhà hát Thành phố" share none either.
+
+    When the STOP name has no distinctive token of its own (a bare "Opera House",
+    "City Hall" once kind + city words are removed), this sub-condition is vacuously
+    satisfied (returns True); the 300 m distance test alone then decides."""
+    a = _distinctive_name_tokens(stop_name, city)
+    if not a:
+        return True
+    return bool(a & _distinctive_name_tokens(title, city))
+
+
 def _p625_for_qid(qid: str) -> Optional[Tuple[float, float]]:
     """P625 (lat, lng) for a Wikidata QID, via the same backoff client, or None.
     The geo-gate fallback when a Wikipedia article carries no ``coordinates`` of its
@@ -322,16 +377,38 @@ def _pick(name: str, raw: Optional[Dict], pin: Optional[Tuple[float, float]] = N
     Saigon pin) is skipped, not returned. ``match_name`` is the name used for the
     name-match test (the ORIGINAL stop name on a city-qualified "<name> <city>" retry,
     whose search string would not itself name-match the plain title); defaults to
-    ``name``."""
+    ``name``.
+
+    [LOCAL-881 §4] DENSE-CENTRE venue match. The 2 km LOCAL-878 geo-gate alone let
+    the Gia Long Palace article (≈600 m away) stand in for a "City Hall" stop. An
+    article whose TITLE does not share a distinctive name token with the stop name
+    must also sit within ``DENSE_CENTRE_KM`` (300 m) of the pin; otherwise it is a
+    different nearby venue and is rejected. A title that DOES share a distinctive
+    name token keeps the wider 2 km gate (a complex pinned to its centroid)."""
     mn = match_name or name
     for p in (raw or {}).get("pages") or []:
-        name_match = ((raw or {}).get("trusted") or _name_ok(mn, p.get("title", ""))
+        _title = p.get("title", "")
+        _title_name_match = _name_ok(mn, _title)
+        name_match = ((raw or {}).get("trusted") or _title_name_match
                       or _lead_names(mn, p.get("lead", "")))
         if not name_match:
             continue
         if not _geo_ok(pin, city, p):
             continue
-        return {"title": p["title"], "lead": (p.get("lead") or "")[:_MAX_LEAD],
+        # [LOCAL-881 §4] dense-centre rule. When the article TITLE does not itself
+        # name-match the stop (it was admitted via a trusted langlink, a lead
+        # alias, or the city-name path), the 2 km LOCAL-878 gate is too wide in a
+        # packed centre — the Gia Long Palace (~600 m) passed it for a City Hall
+        # stop. Such a title must ALSO sit within 300 m AND share a distinctive
+        # name token with the stop; otherwise it is a different nearby venue and is
+        # rejected (the caller then retries with a city-qualified name).
+        if pin is not None and not _title_name_match:
+            coord = p.get("coord") or _p625_for_qid(p.get("qid", ""))
+            within_300 = coord is not None and _haversine_km(pin, coord) <= DENSE_CENTRE_KM
+            shares_token = _titles_share_distinctive_token(mn, _title, city)
+            if not (within_300 and shares_token):
+                continue
+        return {"title": _title, "lead": (p.get("lead") or "")[:_MAX_LEAD],
                 "infobox": parse_infobox(p.get("wikitext", ""))}
     return None
 
