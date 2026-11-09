@@ -45,7 +45,9 @@ import museum_claim_gate as _mcg
 
 __all__ = [
     "venue_aliases", "production_claims", "named_person_claims", "named_event_claims",
-    "named_work_claims", "dated_claims", "unsourced_claims", "filter_stop_body",
+    "named_work_claims", "dated_claims", "venue_function_claims",
+    "venue_function_correction",
+    "political_institution_claims", "unsourced_claims", "filter_stop_body",
     "filter_tour_text", "claim_span_lines", "is_borderline", "disclose",
     "contradicts_evidence", "fill_empty_stops", "ensure_evidence_dates", "correct_build_range", "evidence_fact_for", "minimal_body",
 ]
@@ -250,6 +252,13 @@ def production_claims(sentence: str, stop_title: str, evidence: Sequence[str],
     for t in _after_cue_titles(sentence, stop_tokens):
         # a person's name is handled as a person; a date or generic word is not a show
         if re.fullmatch(r"[\d\W]+", t):
+            continue
+        # [LOCAL-882B §3] a POLITICAL institution ("Lower House", "Senate",
+        # "National Assembly") is not a production/performance — it is handled by
+        # political_institution_claims, which checks the evidence for a legislature,
+        # not for a show tied to the venue. Skip it here so a SOURCED bicameral
+        # claim is not mis-dropped as an unsourced "production".
+        if _POLITY_RE.search(t):
             continue
         if not _source_names_both(t, evidence, al):
             bad.append(t)
@@ -459,6 +468,183 @@ def dated_claims(sentence: str, blob: str, known: str = "") -> List[str]:
     return bad
 
 
+# ---- 6. venue-FUNCTION claim (LOCAL-882B §1) --------------------------------
+# A sentence that tells you what KIND of place the venue is / was ("opened as a
+# hotel", "a hospital", "served as a market") asserts a function. That function
+# must be in the stop's evidence. Tour 547's City Hall shipped "opened in 1909 as
+# a hotel named Hotel de Ville … this hotel became a gathering place" — a literal
+# read of the French "hôtel de ville" (= city hall). The evidence says city hall /
+# municipal / People's Committee, never "hotel".
+#
+# FALSE-FRIEND GLOSSARY — DATA, not code paths. Common institutional names across
+# languages whose literal word is a false friend in English. Each maps the foreign
+# name (folded) to (a) the English function word it is wrongly read as, and (b) the
+# true-function tokens that belong to it. The glossary FEEDS the gate: when the
+# venue's own name/evidence is one of these, a sentence that assigns the venue the
+# false-friend function is treated as contradicted. The narrator text never sees
+# this table (D769: no venue names in code paths — this is a reference list of
+# generic institutional terms, like a dictionary).
+_FALSE_FRIEND_INSTITUTIONS = {
+    # foreign name (folded)         false-friend word   true-function tokens
+    "hotel de ville":              ("hotel",           ("city hall", "town hall", "municipal", "hall")),
+    "rathaus":                     ("rat",             ("city hall", "town hall", "municipal", "hall")),
+    "ayuntamiento":                ("",                ("city hall", "town hall", "municipal", "hall")),
+    "palazzo comunale":            ("palace",          ("city hall", "town hall", "municipal", "hall")),
+    "mairie":                      ("",                ("city hall", "town hall", "municipal", "hall")),
+    "camara municipal":            ("",                ("city hall", "town hall", "municipal", "hall")),
+}
+# Function nouns a sentence can assign to the venue. A real-hotel control ("Hotel
+# Continental", "the Ritz") has "hotel" in its OWN evidence, so it is never
+# dropped — the test is always against the stop's evidence, never a word list.
+_FUNCTION_NOUN = (r"hotel|hostel|inn|hospital|clinic|market|marketplace|bazaar|"
+                  r"prison|jail|gaol|barracks|factory|mill|warehouse|school|college|"
+                  r"brothel|casino|cinema|bank|bakery|brewery|distillery|"
+                  r"palace|castle|fortress|monastery|convent|mosque|synagogue")
+_FUNCTION_CUE_RE = re.compile(
+    r"(?i)\b(?:as|named|called|was|is|became|served as|functioned as|used as|"
+    r"opened as|built as|operated as|known as)\s+(?:a|an|the|its?\s+)?\s*"
+    r"(" + _FUNCTION_NOUN + r")\b"
+    r"|\bthis\s+(" + _FUNCTION_NOUN + r")\b")
+
+
+def _evidence_tokens(evidence_blob: str) -> set:
+    return set(re.findall(r"[a-z0-9]+", evidence_blob or ""))
+
+
+def venue_function_claims(sentence: str, evidence_blob: str, stop_title: str = "",
+                          aliases: Iterable[str] = ()) -> List[str]:
+    """Function nouns the sentence assigns to the venue ("a hotel", "a hospital")
+    that the stop's EVIDENCE does not support. [] when none, or when the function
+    word IS in the evidence (a real hotel keeps 'hotel'). Generic: always tested
+    against the stop's own evidence, never a hard-coded venue.
+
+    The false-friend glossary strengthens the signal: when the venue's name (title
+    or an alias) is a known institutional false friend (hôtel de ville, Rathaus…)
+    AND the sentence assigns it that false-friend word, the claim is flagged even
+    if the fold leaves the foreign word loosely in the evidence — because the
+    evidence's TRUE-function tokens (city hall / municipal / hall) are what the
+    place actually is."""
+    ev_tokens = _evidence_tokens(evidence_blob)
+    name_blob = _fold(" ".join([stop_title or ""] + [str(a) for a in (aliases or [])]))
+    name_and_ev = name_blob + " " + (evidence_blob or "")
+    bad: List[str] = []
+    for m in _FUNCTION_CUE_RE.finditer(sentence):
+        word = (m.group(1) or m.group(2) or "").lower()
+        if not word:
+            continue
+        # is this venue a known false-friend institution?
+        ff_true_here = None
+        for ff_name, (ff_word, true_toks) in _FALSE_FRIEND_INSTITUTIONS.items():
+            if ff_name in name_and_ev and word == ff_word:
+                ff_true_here = true_toks
+                break
+        if ff_true_here is not None:
+            # The venue is a city-hall-type place; "hotel" is the false read. Drop
+            # it only when the evidence actually carries a true-function token
+            # (so we never mis-drop on a venue we have no civic evidence for).
+            if any(t.split()[0] in ev_tokens or t in (evidence_blob or "")
+                   for t in ff_true_here):
+                if word not in bad:
+                    bad.append(word)
+            continue
+        # General case: the function word must appear in the stop's evidence.
+        if word and word not in ev_tokens:
+            if word not in bad:
+                bad.append(word)
+    return bad
+
+
+# The false-friend clause to excise from a sentence: "... as a hotel named Hotel
+# de Ville" / "opened as a hotel" / "as a hotel". Removing just the clause keeps
+# any sourced date/architect the same sentence carries ("completed in 1908,
+# designed by Gardè, and opened in 1909"), so the venue's real facts survive.
+_FUNCTION_CLAUSE_RE = re.compile(
+    r"(?i)(?:,\s*)?\b(?:and\s+)?(?:opened|built|operated|used|served|functioned|"
+    r"known)?\s*(?:as|named|called)\s+(?:a|an|the)?\s*"
+    r"(?:" + _FUNCTION_NOUN + r")\b"
+    r"(?:\s+(?:named|called|known as)\s+[A-ZÀ-Þ][\w'’.\- ]{0,40})?")
+
+
+def venue_function_correction(sentence: str, bad_words: Sequence[str]) -> Optional[str]:
+    """Remove the false-friend function clause(s) from ``sentence`` in place,
+    keeping the rest (dates, architect, the connective). Returns the corrected
+    sentence, or None when the removal would empty the sentence (then the caller
+    drops it). Idempotent."""
+    if not sentence or not bad_words:
+        return None
+    new = sentence
+    # Excise "opened in 1909 as a hotel named Hotel de Ville" -> "opened in 1909".
+    new = _FUNCTION_CLAUSE_RE.sub("", new)
+    new = re.sub(r"\s+([.,;:])", r"\1", new)
+    new = re.sub(r"[ \t]{2,}", " ", new).strip()
+    new = re.sub(r"(?i)\b(and)\s*([.,;:])", r"\2", new)   # dangling "and."
+    new = re.sub(r"[,;]\s*$", ".", new)
+    new = re.sub(r"\s+\.", ".", new)
+    if new and not new.endswith((".", "!", "?")):
+        new += "."
+    # Must still be a real clause with a verb-ish body, and must no longer carry
+    # the false-friend word; else let the caller drop the sentence.
+    low = new.lower()
+    if any(w and re.search(r"\b" + re.escape(w) + r"\b", low) for w in bad_words):
+        return None
+    if len(re.findall(r"[a-z]{3,}", low)) < 4:
+        return None
+    return new
+
+
+# ---- 7. political-institution claim (LOCAL-882B §3) -------------------------
+# A sentence that ties the venue to a named POLITICAL/LEGISLATIVE institution
+# ("home to both the Lower House and the Senate", "seat of the National Assembly",
+# "housed the parliament") makes a checkable place claim. Tour 547's Opera House
+# shipped "became home to both the Lower House (Hạ Nghị Viện) and the Senate
+# (Thượng Nghị Viện)" with nothing in its evidence to source it. Generic: a
+# political-institution claim needs an evidence sentence; else drop.
+_POLITY_CUE_RE = re.compile(
+    r"(?i)\b(home to|housed|seat of|headquarters of|chamber of|used by|occupied by|"
+    r"became (?:the )?(?:home|seat)|served as (?:the )?(?:home|seat|meeting place)|"
+    r"met (?:here|at)|convened|sat here|host(?:ed|s)? the)\b")
+# Institution tokens (one word each so the evidence test is fold-tolerant).
+_POLITY_TERMS = (
+    "parliament", "senate", "congress", "assembly", "legislature", "legislative",
+    "chamber", "deputies", "representatives", "lawmakers", "bicameral",
+    # lower/upper house is a two-word term handled below
+)
+_POLITY_RE = re.compile(
+    r"(?i)\b(lower house|upper house|national assembly|house of representatives|"
+    r"chamber of deputies|legislative assembly|parliament|senate|congress|"
+    r"legislature|bicameral|the house\b)\b")
+
+
+def political_institution_claims(sentence: str, evidence_blob: str,
+                                 stop_title: str = "") -> List[str]:
+    """Named political/legislative institutions a sentence says the venue was home
+    to / housed that the stop's evidence does not support. [] when none or sourced.
+
+    The claim is sourced when the evidence carries the SAME institution term (a
+    bicameral claim like 'both the Lower House and the Senate' is sourced only if
+    the evidence mentions the legislature's use of the building). A single generic
+    word shared by the title is not enough."""
+    if not _POLITY_CUE_RE.search(sentence) and not _POLITY_RE.search(sentence):
+        return []
+    # Require BOTH a cue (home to / seat of / housed …) and a named institution:
+    # a bare "the Senate approved" elsewhere is not a venue claim.
+    if not _POLITY_CUE_RE.search(sentence):
+        return []
+    ev = evidence_blob or ""
+    bad: List[str] = []
+    for m in _POLITY_RE.finditer(sentence):
+        term = m.group(1).lower().strip()
+        # sourced if the evidence names this institution, or any legislative token.
+        term_words = [w for w in re.findall(r"[a-z]+", term) if len(w) >= 4]
+        if any(re.search(r"\b" + re.escape(w) + r"\b", ev) for w in term_words):
+            continue
+        if any(re.search(r"\b" + re.escape(t) + r"\b", ev) for t in _POLITY_TERMS):
+            continue
+        if term not in bad:
+            bad.append(term)
+    return bad
+
+
 # ---- the gate ----------------------------------------------------------------
 _STRUCTURAL_RE = _mcg._STRUCTURAL_RE
 _LABEL_RE = re.compile(r"\s*(Coordinates|Address|Type(?:/Specialty)?|Specific Examples|Directions)\s*:")
@@ -492,6 +678,14 @@ def unsourced_claims(sentence: str, stop_title: str, evidence: Sequence[str],
         out.append(("work", w))
     for y in dated_claims(sentence, blob, " ".join(kn)):
         out.append(("date", y))
+    # [LOCAL-882B §1] a venue-FUNCTION the evidence does not support ("a hotel"
+    # for the City Hall / Hôtel de Ville). [LOCAL-882B §3] a political institution
+    # the venue is said to have housed that the evidence does not name.
+    _ev_known = blob + " " + _fold(" ".join(kn))
+    for f in venue_function_claims(sentence, _ev_known, stop_title, aliases):
+        out.append(("function", f))
+    for p in political_institution_claims(sentence, _ev_known, stop_title):
+        out.append(("polity", p))
     return out
 
 
@@ -973,6 +1167,17 @@ def _filter_stop_body_core(body: str, evidence: Sequence[str], stop_title: str =
                 if fact and not already and fact not in used_facts:
                     used_facts.add(fact)
                     replace[i] = fact
+            elif any(k == "function" for k, _ in cl):
+                # [LOCAL-882B §1] A false-friend FUNCTION claim ("opened in 1909 as
+                # a hotel named Hotel de Ville"). Excise just the function clause so
+                # the sentence's sourced date/architect survive ("...completed in
+                # 1908, designed by Gardè, and opened in 1909."). If the excision
+                # would empty the sentence, drop it instead.
+                _bad_fns = [c for k, c in cl if k == "function"]
+                _fixed = venue_function_correction(s, _bad_fns)
+                drop[i] = ("function", span)
+                if _fixed and _fixed != s:
+                    replace[i] = _fixed
             elif (is_borderline(s, cl) and _claim_well_sourced(s, _ev_blob)
                   and not _has_century_claim(cl)
                   and all(k == "date" for k, _ in cl)):

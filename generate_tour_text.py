@@ -11318,7 +11318,19 @@ def _apply_delivery_hours_guard(result):
         #    the fresh items). The injected items ARE the recent coverage.
         try:
             import current_affairs_coverage as _cac
-            if "In recent news:" in final:
+            # [LOCAL-882] The honest note must fire ONLY when the REQUEST asked for
+            # current affairs. _cac.ensure_current_affairs_coverage keys off the
+            # delivered TEXT's first line, and when that line is the tour intro
+            # (no "step-by-step …:" request form) it falls back to scanning the
+            # WHOLE body — so a plain landmarks tour whose stop prose happens to
+            # contain a recency word ("today's", "contemporary") wrongly got the
+            # note (wave 40, the quick path). The authoritative signal is the
+            # request-derived context flag set at entry; require it here so a tour
+            # that never asked for current affairs never gets the note.
+            _ca_wanted, _ca_req, _ca_cat = _get_current_affairs_context()
+            if not _ca_wanted:
+                pass  # request did not ask for current affairs → no honest note
+            elif "In recent news:" in final:
                 print("  [LOCAL-655B] dated news injected — LOCAL-650 honesty "
                       "note suppressed (would contradict the delivered news).",
                       flush=True)
@@ -11447,6 +11459,35 @@ def _apply_delivery_hours_guard(result):
                       f"line(s) from delivered text (every-path guard)", flush=True)
         except Exception as _dge:  # pragma: no cover
             _import_logger.error(f"[LOCAL-811] disambiguation-line guard skipped: {_dge}")
+        # [LOCAL-882] FINAL directions guarantee. The fix2 walking-directions guard
+        # (above) runs BEFORE the conclusion rebuild and the current-affairs passes;
+        # a later pass can reformat a stop's block and leave its Directions as a
+        # bare "Enjoy the stroll!" with no next-stop hand-off (wave 40, Stop 1). Run
+        # the (idempotent, walking-only) guard once more HERE, after every other
+        # pass, so every non-last stop's Directions names its next stop. No-op for
+        # museum/building/venue tours and when every hand-off is already named.
+        try:
+            import walking_directions_guard as _wdg_final
+            _vc_final = None
+            try:
+                _vc_final = {}
+                for _si, _sp in enumerate(poi_list, 1):
+                    _wlat, _wlng = _sp.get('wikidata_lat'), _sp.get('wikidata_lng')
+                    if _wlat and _wlng:
+                        _vc_final[_si] = (float(_wlat), float(_wlng))
+                _vc_final = _vc_final or None
+            except Exception:
+                _vc_final = None
+            final, _wdg_final_rep = _wdg_final.ensure_walking_directions_lead_to_next(
+                final, verified_stop_coords=_vc_final)
+            if _wdg_final_rep.get('corrected') or _wdg_final_rep.get('distance_added'):
+                print(f"  [LOCAL-882] final directions guarantee: "
+                      f"{_wdg_final_rep.get('corrected', 0)} corrected, "
+                      f"{_wdg_final_rep.get('distance_added', 0)} distance(s) added "
+                      f"(every non-last stop now hands off to its next stop)",
+                      flush=True)
+        except Exception as _wdgf:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-882] final directions guarantee skipped: {_wdgf}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
@@ -23540,6 +23581,14 @@ one clause of explanation. If you cannot explain it in a clause, cut the referen
   its ports after two centuries of isolation"
 The stop's own subject needs no gloss. But anything mentioned in passing that most
 visitors won't know MUST get one explanatory clause or be cut entirely.
+
+FOREIGN-NAME RULE (critical): A name in another language must NEVER be explained by
+its literal word-for-word translation unless the reference material states that
+meaning. Many institutional names are false friends: "Hôtel de Ville" is French for
+"city hall", not a hotel; "Rathaus" is a town hall, not a house of rats;
+"ayuntamiento", "mairie", "palazzo comunale" and "câmara municipal" all mean the
+town/city hall. Describe what the place IS (per the evidence), not what its name
+sounds like in English. If the source does not give the meaning, do not guess it.
 
 NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims unless the preceding
 sentences contain the specific evidence that earns them. Delete praise that isn't earned
