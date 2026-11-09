@@ -23902,12 +23902,22 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     except Exception:
                         _w_al = None
                     _w_al = [_w_al] if isinstance(_w_al, str) else list(_w_al or [])
-                    _w_items = _lwe872c.cached_evidence(poi_name, location or '', _w_al)
+                    # [LOCAL-878] Geo-gate the Wikipedia lookup on the stop's own pin so a
+                    # bare-name search ("Opera House") can never feed a far article (Sydney
+                    # Opera House) to a Saigon stop.
+                    try:
+                        from pin_snap import _parse_coord as _pc878
+                        _w_pin = _pc878(poi.get('coordinates') or '')
+                    except Exception:
+                        _w_pin = None
+                    _w_items = _lwe872c.cached_evidence(poi_name, location or '', _w_al,
+                                                        pin=_w_pin)
                     if _w_items:
                         poi['_wiki_evidence'] = _w_items
                         description_prompt += _lwe872c.narrator_block(poi_name, _w_items)
                         print(f"  [LOCAL-872C] Stop {stop_num} '{poi_name[:40]}': Wikipedia evidence "
-                              f"({len(_w_items)} article(s)) fed to the narrator")
+                              f"({len(_w_items)} article(s)) fed to the narrator"
+                              + (f" [geo-gated on {_w_pin[0]:.4f},{_w_pin[1]:.4f}]" if _w_pin else ""))
             except Exception as _w_err:
                 print(f"  [LOCAL-872C] narrator evidence skipped (non-fatal): {_w_err}")
 
@@ -29870,12 +29880,20 @@ REWRITE RULES (all mandatory):
     if _neutral_label_843:
         _display_category = _neutral_label_843
 
-    if tour_type.lower() in location.lower():
+    # [LOCAL-878] The title names the PLACE, not a leading free-text topic segment
+    # ("Saigon centre landmarks, Ho Chi Minh City" -> "Ho Chi Minh City") — the request
+    # string is not a place.
+    try:
+        from text_polish import place_location_for_title as _pllt878
+        _title_loc = _pllt878(location)
+    except Exception:
+        _title_loc = location
+    if tour_type.lower() in _title_loc.lower():
         # If tour type is already in the location name, don't repeat it
-        tour_title = f"Step-by-Step Audio Guided Tour: {location}"
+        tour_title = f"Step-by-Step Audio Guided Tour: {_title_loc}"
     else:
         # Otherwise, create a title that incorporates the category naturally
-        tour_title = f"Step-by-Step Audio Guided Tour: {location} - {_display_category} Tour"
+        tour_title = f"Step-by-Step Audio Guided Tour: {_title_loc} - {_display_category} Tour"
     
     # [LOCAL-286] Tour-Category header: write the effective category.
     # For non-on_foot tours that classify as 'walking' (biking, driving, animal),
@@ -31277,10 +31295,15 @@ RULES:
     # [LOCAL-292] Rebuild tour title with correct stop count if stops were removed
     if _l292_failed_stops and poi_list:
         # The tour_title line is the first line of complete_tour; rebuild complete_tour header
-        if tour_type.lower() in location.lower():
-            tour_title = f"Step-by-Step Audio Guided Tour: {location}"
+        try:
+            from text_polish import place_location_for_title as _pllt878b
+            _title_loc2 = _pllt878b(location)
+        except Exception:
+            _title_loc2 = location
+        if tour_type.lower() in _title_loc2.lower():
+            tour_title = f"Step-by-Step Audio Guided Tour: {_title_loc2}"
         else:
-            tour_title = f"Step-by-Step Audio Guided Tour: {location} - {_display_category} Tour"
+            tour_title = f"Step-by-Step Audio Guided Tour: {_title_loc2} - {_display_category} Tour"
         complete_tour = tour_title + "\n" + f"Tour-Category: {_header_category}" + "\n\n"
 
     if len(poi_list) == 0:
@@ -32561,11 +32584,20 @@ RULES:
                 try:
                     import landmark_wikipedia_evidence as _lwe872
                     from concurrent.futures import ThreadPoolExecutor as _TPE872
-                    _wk_jobs = {_si: (_sp.get('name', '') or '', list(_lc_alias.get(_si) or []))
+                    # [LOCAL-878] Parse each stop's pin so the gate's Wikipedia lookup is
+                    # geo-gated on it too (narrator + gate share ONE memoised lookup, so
+                    # both must pass the SAME pin or the memo key diverges).
+                    try:
+                        from pin_snap import _parse_coord as _pc878g
+                    except Exception:
+                        _pc878g = lambda _s: None
+                    _wk_jobs = {_si: (_sp.get('name', '') or '', list(_lc_alias.get(_si) or []),
+                                      _pc878g(_sp.get('coordinates') or ''))
                                 for _si, _sp in enumerate(poi_list, 1) if _si not in _lc_skip}
                     with _TPE872(max_workers=4) as _ex872:
-                        _futs = {_si: _ex872.submit(_lwe872.cached_evidence, _n, location or '', _al)
-                                 for _si, (_n, _al) in _wk_jobs.items() if _n}
+                        _futs = {_si: _ex872.submit(_lwe872.cached_evidence, _n, location or '',
+                                                    _al, _pin)
+                                 for _si, (_n, _al, _pin) in _wk_jobs.items() if _n}
                         for _si, _f in _futs.items():
                             try:
                                 _wk = _f.result(timeout=60) or []

@@ -24,14 +24,25 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
-from typing import Callable, Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 __all__ = ["fetch_article", "evidence_for", "local_languages", "parse_infobox"]
 
 CACHE_TTL_DAYS = int(os.environ.get("LANDMARK_WIKI_CACHE_TTL_DAYS", "90"))
 CACHE_NEG_TTL_DAYS = int(os.environ.get("LANDMARK_WIKI_CACHE_NEG_TTL_DAYS", "3"))
+
+# LOCAL-878: the geo-gate. An article whose own coordinate is more than this many km
+# from the stop's pin is a DIFFERENT place (the bare-name "Opera House" search returned
+# the Sydney article, 6,834 km from a District-1 pin). 2 km is wide enough to admit the
+# article's coordinate when it is pinned to a neighbouring entrance / plaza of the SAME
+# venue (Wikipedia often pins a large complex to its centroid, a few hundred metres from
+# a specific gate), yet far tighter than any same-name place in another city — the metro
+# radius a genuine different-city hit would exceed is tens to thousands of km.
+GEO_GATE_KM = float(os.environ.get("LANDMARK_WIKI_GEO_GATE_KM", "2.0"))
+WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 _MAX_LEAD = 6000
 _MAX_INFOBOX = 2500
 _INFOBOX_KEYS = (
@@ -129,6 +140,20 @@ def _http_json(lang: str, params: dict) -> Optional[dict]:
         return None
 
 
+def _page_coord(p: dict) -> Optional[tuple]:
+    """(lat, lng) from a MediaWiki page's ``coordinates`` list, else None. LOCAL-878:
+    the article's OWN coordinate, used by the geo-gate to prove it sits at the stop pin
+    (so a bare "Opera House" search can never feed the Sydney article to a Saigon stop)."""
+    for c in (p.get("coordinates") or []):
+        lat, lng = c.get("lat"), c.get("lon")
+        if lat is not None and lng is not None:
+            try:
+                return (float(lat), float(lng))
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
 def _pages_from(data):
     pages = ((data or {}).get("query") or {}).get("pages") or []
     pages = sorted((p for p in pages if isinstance(p, dict)), key=lambda p: p.get("index", 99))
@@ -137,11 +162,18 @@ def _pages_from(data):
         "wikitext": (((p.get("revisions") or [{}])[0].get("slots") or {})
                      .get("main") or {}).get("content", "") or "",
         "langlinks": [l.get("title", "") for l in (p.get("langlinks") or [])],
+        "coord": _page_coord(p),
+        "qid": (p.get("pageprops") or {}).get("wikibase_item", "") or "",
     } for p in pages if not p.get("missing")]
 
 
-_CONTENT = {"prop": "extracts|revisions", "exintro": "1", "explaintext": "1",
-            "exlimit": "3", "rvprop": "content", "rvslots": "main", "rvsection": "0"}
+# LOCAL-878: ask for the article's OWN coordinate (prop=coordinates) and its Wikidata
+# item (pageprops.wikibase_item, so a P625 fallback is possible) alongside the lead +
+# infobox, in ONE call per page.
+_CONTENT = {"prop": "extracts|revisions|coordinates|pageprops",
+            "exintro": "1", "explaintext": "1", "exlimit": "3",
+            "rvprop": "content", "rvslots": "main", "rvsection": "0",
+            "coprop": "type|name", "colimit": "5", "ppprop": "wikibase_item"}
 
 
 def _default_fetch(name: str, lang: str) -> Optional[Dict]:
@@ -186,12 +218,121 @@ def _lead_names(name: str, lead: str) -> bool:
     return len(n) >= 8 and n in _fold((lead or "")[:400])
 
 
-def _pick(name: str, raw: Optional[Dict]) -> Optional[Dict[str, str]]:
+# ---- LOCAL-878 geo-gate ------------------------------------------------------
+def _haversine_km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
+    R = 6371.0
+    la1, lo1 = math.radians(a[0]), math.radians(a[1])
+    la2, lo2 = math.radians(b[0]), math.radians(b[1])
+    h = (math.sin((la2 - la1) / 2) ** 2
+         + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2)
+    return 2 * R * math.asin(min(1.0, math.sqrt(h)))
+
+
+def _p625_for_qid(qid: str) -> Optional[Tuple[float, float]]:
+    """P625 (lat, lng) for a Wikidata QID, via the same backoff client, or None.
+    The geo-gate fallback when a Wikipedia article carries no ``coordinates`` of its
+    own but does carry a ``wikibase_item``."""
+    if not qid:
+        return None
+    try:
+        from venue_resolver import _request_with_backoff, _USER_AGENT
+        r = _request_with_backoff(
+            WIKIDATA_API,
+            params={"action": "wbgetentities", "ids": qid, "props": "claims",
+                    "format": "json"},
+            headers={"User-Agent": _USER_AGENT}, timeout=12,
+            host_for_cold="https://www.wikidata.org", label="LOCAL-878 P625")
+        if r is None or getattr(r, "status_code", 0) != 200:
+            return None
+        ent = (r.json().get("entities") or {}).get(qid) or {}
+        for claim in (ent.get("claims") or {}).get("P625", []) or []:
+            val = (((claim.get("mainsnak") or {}).get("datavalue") or {}).get("value") or {})
+            lat, lng = val.get("latitude"), val.get("longitude")
+            if lat is not None and lng is not None:
+                return (float(lat), float(lng))
+    except Exception:
+        return None
+    return None
+
+
+# LOCAL-878: city aliases so a coordinate-less article naming the city by ANY common
+# form qualifies ("Saigon Central Post Office" names Ho Chi Minh City via "Saigon").
+_CITY_ALIASES = (
+    ({"ho chi minh city", "ho chi minh", "hcmc", "saigon", "sai gon"},
+     {"saigon", "ho chi minh"}),
+    ({"hanoi", "ha noi"}, {"hanoi", "ha noi"}),
+)
+
+
+def _city_tokens(city: str) -> set:
+    """Folded forms that NAMING the tour's city can take (the city itself plus any
+    known alias), for the coordinate-less article test."""
+    c = _fold2(city or "").strip()
+    forms = {c} if c else set()
+    for keys, aliases in _CITY_ALIASES:
+        if c in keys or any(k in c for k in keys):
+            forms |= {_fold2(a) for a in aliases}
+    return {f for f in forms if len(f) >= 3}
+
+
+def _city_named(city: str, title: str, lead: str) -> bool:
+    """A coordinate-less article is accepted only when its title or lead also names the
+    tour's city / locality or a known alias (so "Saigon Central Post Office" names Ho Chi
+    Minh City via "Saigon", but a plain "Opera House" with no pin and no city word does
+    not stand in for the Saigon stop)."""
+    forms = _city_tokens(city)
+    if not forms:
+        return False
+    hay = _fold2((title or "") + " . " + (lead or "")[:800])
+    return any(f in hay for f in forms)
+
+
+def _geo_ok(pin: Optional[Tuple[float, float]], city: str, page: dict,
+            allow_p625: bool = True) -> bool:
+    """LOCAL-878: is this article's own location consistent with the stop?
+
+    - With a pin: the article's coordinate (prop=coordinates, else a P625 fallback via
+      its wikibase_item) must be within ``GEO_GATE_KM`` of the pin. An article with NO
+      coordinate at all is accepted only when its title/lead names the city.
+    - With no pin but a city: a coordinate-less article must name the city; a located
+      article is accepted (the pin is what refutes a far place, and we have none).
+    - With neither pin nor city: no geo signal to test, accept (old behaviour).
+    """
+    coord = page.get("coord")
+    if coord is None and allow_p625 and pin is not None:
+        coord = _p625_for_qid(page.get("qid", ""))
+        if coord is not None:
+            page["coord"] = coord       # memoise so the caller can log it
+    if pin is not None:
+        if coord is not None:
+            return _haversine_km(pin, coord) <= GEO_GATE_KM
+        # no coordinate anywhere: fall back to a city-name requirement
+        return bool(city) and _city_named(city, page.get("title", ""), page.get("lead", ""))
+    if city:
+        if coord is not None:
+            return True
+        return _city_named(city, page.get("title", ""), page.get("lead", ""))
+    return True
+
+
+def _pick(name: str, raw: Optional[Dict], pin: Optional[Tuple[float, float]] = None,
+          city: str = "", match_name: str = "") -> Optional[Dict[str, str]]:
+    """The first name-matching page that also PASSES the geo-gate (LOCAL-878).
+    A page that name-matches but sits at the wrong place (Sydney Opera House for a
+    Saigon pin) is skipped, not returned. ``match_name`` is the name used for the
+    name-match test (the ORIGINAL stop name on a city-qualified "<name> <city>" retry,
+    whose search string would not itself name-match the plain title); defaults to
+    ``name``."""
+    mn = match_name or name
     for p in (raw or {}).get("pages") or []:
-        if (raw or {}).get("trusted") or _name_ok(name, p.get("title", "")) \
-                or _lead_names(name, p.get("lead", "")):
-            return {"title": p["title"], "lead": (p.get("lead") or "")[:_MAX_LEAD],
-                    "infobox": parse_infobox(p.get("wikitext", ""))}
+        name_match = ((raw or {}).get("trusted") or _name_ok(mn, p.get("title", ""))
+                      or _lead_names(mn, p.get("lead", "")))
+        if not name_match:
+            continue
+        if not _geo_ok(pin, city, p):
+            continue
+        return {"title": p["title"], "lead": (p.get("lead") or "")[:_MAX_LEAD],
+                "infobox": parse_infobox(p.get("wikitext", ""))}
     return None
 
 
@@ -199,8 +340,18 @@ def _pick(name: str, raw: Optional[Dict]) -> Optional[Dict[str, str]]:
 _TABLE_OK = False
 
 
-def _key(name: str, lang: str) -> str:
-    return hashlib.sha1(f"{name.strip().lower()}|{lang}".encode("utf-8")).hexdigest()
+def _pin_cell(pin: Optional[Tuple[float, float]]) -> str:
+    """A coarse grid cell (~1 km) for the stop pin, so a rejected article is cached as
+    rejected for THIS (name, pin-cell) pair and a same-name stop elsewhere is unaffected
+    (LOCAL-878). '' when no pin."""
+    if not pin:
+        return ""
+    return f"{round(pin[0], 2):.2f},{round(pin[1], 2):.2f}"
+
+
+def _key(name: str, lang: str, pin: Optional[Tuple[float, float]] = None) -> str:
+    return hashlib.sha1(
+        f"{name.strip().lower()}|{lang}|{_pin_cell(pin)}".encode("utf-8")).hexdigest()
 
 
 def _conn():
@@ -232,7 +383,7 @@ def _ensure(conn) -> bool:
     return True
 
 
-def _cache_get(name: str, lang: str):
+def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None):
     """(found, article|None) for a live row, else None."""
     conn = _conn()
     if not conn:
@@ -242,7 +393,7 @@ def _cache_get(name: str, lang: str):
             return None
         with conn.cursor() as cur:
             cur.execute("SELECT payload, found FROM landmark_wiki_cache "
-                        "WHERE cache_key = %s AND expires_at > NOW()", (_key(name, lang),))
+                        "WHERE cache_key = %s AND expires_at > NOW()", (_key(name, lang, pin),))
             row = cur.fetchone()
         if not row:
             return None
@@ -251,7 +402,8 @@ def _cache_get(name: str, lang: str):
         return None
 
 
-def _cache_put(name: str, lang: str, art: Optional[Dict[str, str]]) -> None:
+def _cache_put(name: str, lang: str, art: Optional[Dict[str, str]],
+               pin: Optional[Tuple[float, float]] = None) -> None:
     conn = _conn()
     if not conn:
         return
@@ -267,7 +419,7 @@ def _cache_put(name: str, lang: str, art: Optional[Dict[str, str]]) -> None:
                 ON CONFLICT (cache_key) DO UPDATE SET payload = EXCLUDED.payload,
                 found = EXCLUDED.found, created_at = CURRENT_TIMESTAMP,
                 expires_at = EXCLUDED.expires_at""",
-                        (_key(name, lang), name, lang, json.dumps(art) if art else None,
+                        (_key(name, lang, pin), name, lang, json.dumps(art) if art else None,
                          bool(art), datetime.utcnow() + timedelta(days=ttl)))
         try:
             conn.commit()
@@ -278,39 +430,103 @@ def _cache_put(name: str, lang: str, art: Optional[Dict[str, str]]) -> None:
 
 
 def fetch_article(name: str, lang: str = "en", fetch_fn: Optional[Callable] = None,
-                  use_cache: bool = True) -> Optional[Dict[str, str]]:
-    """The name-matched Wikipedia article for a stop, or None.  Cached (hit and miss)
-    when the live fetcher is used."""
+                  use_cache: bool = True, pin: Optional[Tuple[float, float]] = None,
+                  city: str = "", match_name: str = "") -> Optional[Dict[str, str]]:
+    """The name-matched, GEO-GATED Wikipedia article for a stop, or None (LOCAL-878).
+    ``pin`` is the stop's (lat, lng); an article whose own coordinate is >GEO_GATE_KM
+    from it is rejected (never cached as the venue's article). ``city`` lets a
+    coordinate-less article qualify by naming the city. ``match_name`` is the original
+    stop name on a city-qualified "<name> <city>" retry (the search string ``name`` may
+    not itself name-match the plain article title). Cached (hit and miss, keyed by the
+    SEARCH name + lang + pin-cell) when the live fetcher is used."""
     nm = (name or "").strip()
     if not nm:
         return None
     live = fetch_fn is None
     if use_cache and live:
-        c = _cache_get(nm, lang)
+        c = _cache_get(nm, lang, pin)
         if c is not None:
             return c[1]
     try:
         raw = (fetch_fn or _default_fetch)(nm, lang)
     except Exception:
         raw = None
-    art = _pick(nm, raw)
-    # only cache a real answer: a transport failure (raw None) must be retried
+    art = _pick(nm, raw, pin=pin, city=city, match_name=match_name)
+    # only cache a real answer: a transport failure (raw None) must be retried. A
+    # name-matching-but-rejected article is cached as a MISS for this (search-name,
+    # pin-cell), so a repeat run does not re-fetch Sydney for the Saigon pin.
     if use_cache and live and raw is not None:
-        _cache_put(nm, lang, art)
+        _cache_put(nm, lang, art, pin)
     return art
+
+
+_COUNTRY_WORDS = frozenset({
+    "vietnam", "viet nam", "việt nam", "usa", "us", "u.s.", "u.s.a.", "united states",
+    "united states of america", "france", "spain", "italy", "germany", "portugal",
+    "netherlands", "japan", "china", "thailand", "australia", "uk", "united kingdom",
+    "england", "canada", "russia", "greece", "poland", "sweden", "korea", "austria",
+    "belgium", "switzerland",
+})
+
+
+def _city_of(location: str) -> str:
+    """Best-effort city / locality string from a tour ``location`` for the geo-gate's
+    city-name test and the city-qualified retry.
+
+    A tour location is "City, Country" ("Ho Chi Minh City, Vietnam") or
+    "Neighbourhood, City" ("District 1, Ho Chi Minh City"); the CITY/locality is the
+    first comma-part that is not a bare country. (``venue_resolver.city_hint_from_location``
+    is for "Venue, City, Country" request strings and skips the first part, so it is only
+    a fallback here.)"""
+    loc = (location or "").strip()
+    if not loc:
+        return ""
+    parts = [p.strip() for p in loc.split(",") if p.strip()]
+    for seg in parts:
+        if seg.lower() not in _COUNTRY_WORDS and len(seg) > 1:
+            return seg
+    try:
+        from venue_resolver import city_hint_from_location
+        c = city_hint_from_location(loc)
+        if c:
+            return c
+    except Exception:
+        pass
+    return parts[0] if parts else ""
 
 
 def evidence_for(name: str, location: str = "", langs: Optional[Sequence[str]] = None,
                  fetch_fn: Optional[Callable] = None, use_cache: bool = True,
-                 extra_names: Sequence[str] = ()) -> List[str]:
+                 extra_names: Sequence[str] = (),
+                 pin: Optional[Tuple[float, float]] = None, city: str = "") -> List[str]:
     """Evidence strings for the claim gate: per language, '<title>. <lead> Infobox: ...'.
     ``extra_names`` are alternative names to try when the stop's own title finds none
-    (the user's wording, the Places name)."""
+    (the user's wording, the Places name).
+
+    LOCAL-878: ``pin`` (the stop's lat,lng) and ``city`` geo-gate every candidate — the
+    bare-name search can no longer feed a far place (Sydney Opera House) to the stop. When
+    the bare name is rejected, retry ONCE with "<name> <city>" so "Opera House" + HCMC
+    reaches the Saigon Opera House / Nhà hát Thành phố listing."""
+    city = city or _city_of(location)
     out: List[str] = []
+    bases = [n for n in ([name] + [x for x in extra_names if x and x != name]) if n]
     for lang in (langs or local_languages(location)):
         art = None
-        for nm in [name] + [x for x in extra_names if x and x != name]:
-            art = fetch_article(nm, lang, fetch_fn=fetch_fn, use_cache=use_cache)
+        # (search_query, match_name): the plain names first, then each name qualified
+        # with the city (match still against the ORIGINAL name — "Opera House" — so the
+        # retry's article "Saigon Opera House" is accepted even though the search string
+        # "Opera House Ho Chi Minh City" would not itself name-match that title).
+        tried: List[Tuple[str, str]] = [(b, b) for b in bases]
+        if city:
+            seen = {q for q, _ in tried}
+            for base in bases:
+                q = f"{base} {city}"
+                if _fold2(city) not in _fold2(base) and q not in seen:
+                    tried.append((q, base))
+                    seen.add(q)
+        for query, base in tried:
+            art = fetch_article(query, lang, fetch_fn=fetch_fn, use_cache=use_cache,
+                                pin=pin, city=city, match_name=base)
             if art:
                 break
         if art:
@@ -353,13 +569,17 @@ def _fold2(s: str) -> str:
     return "".join(c for c in s if not _ud.combining(c)).lower()
 
 
-def cached_evidence(name: str, location: str = "", aliases: Sequence[str] = ()) -> List[str]:
+def cached_evidence(name: str, location: str = "", aliases: Sequence[str] = (),
+                    pin: Optional[Tuple[float, float]] = None, city: str = "") -> List[str]:
     """``evidence_for`` memoised per process (the DB cache sits underneath), so the
-    narrator prompt and the claim gate read ONE lookup."""
-    key = (name or "", location or "", tuple(aliases or ()))
+    narrator prompt and the claim gate read ONE lookup. LOCAL-878: ``pin``/``city``
+    geo-gate the lookup (and are part of the memo key, so a different pin re-looks-up)."""
+    key = (name or "", location or "", tuple(aliases or ()),
+           _pin_cell(pin), (city or "").strip().lower())
     if key not in _MEMO:
         try:
-            _MEMO[key] = list(evidence_for(name, location, None, None, True, list(aliases or ())) or [])
+            _MEMO[key] = list(evidence_for(name, location, None, None, True,
+                                           list(aliases or ()), pin=pin, city=city) or [])
         except Exception:
             _MEMO[key] = []
     return list(_MEMO[key])
