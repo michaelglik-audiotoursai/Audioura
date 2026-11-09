@@ -69,6 +69,28 @@ _MAX_TOKENS = int(os.environ.get("GROUNDING_GATE_MAX_TOKENS", "900"))
 # A content sentence is non-trivial prose (not a one-word fragment).
 _MIN_CONTENT_LEN = 15
 
+# [LOCAL-884 §1] "No evidence" means "no factual claim", never "nothing to check".
+# A stop whose evidence bundle is below this many characters is treated as having
+# NO evidence: every FACTUAL sentence in it is UNSUPPORTED and dropped (it can
+# only have come from the narrator's memory, since there is nothing to support
+# it). Below this floor a bundle is too thin to ground anything — a stray token
+# is not evidence for a date, a person or an event.
+THIN_EVIDENCE_MIN_CHARS = int(os.environ.get("GROUNDING_THIN_EVIDENCE_CHARS", "20"))
+
+# [LOCAL-884 §1] The D760 disclosure a stop gets when it has NO evidence at all
+# and therefore no verified history to tell. It is honest and non-factual: it
+# makes no checkable claim, so it never needs grounding.
+NO_HISTORY_DISCLOSURE = (
+    "We could not confirm verified historical details for this stop, so this "
+    "part of the tour focuses on what you can see and sense here rather than on "
+    "dates or events.")
+
+
+def _evidence_is_thin(evidence: str) -> bool:
+    """True when the stop's evidence bundle is empty or below the thin floor —
+    i.e. there is effectively nothing to ground a factual claim against."""
+    return len((evidence or "").strip()) < THIN_EVIDENCE_MIN_CHARS
+
 # ── block grammar (mirrors signature_story / spoken_text_hygiene exactly) ─────
 _STOP_HEADER_RE = re.compile(r"(?mi)^Stop\s+(\d+):\s*(.+?)\s*$")
 _FIELD_RE = re.compile(
@@ -313,12 +335,25 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
                          log: Optional[Callable] = None
                          ) -> Tuple[str, Dict]:
     """Ground ONE stop's body prose against its evidence. Returns (new_prose,
-    report). report carries kept/contradicted/unsupported counts, the dropped
-    sentences, and cost. Deterministic apart from the single LLM call; never
-    raises. A sentence the gate cannot judge (no evidence, no LLM answer) is KEPT
-    — the gate removes only what it can show is contradicted or unsupported."""
+    report). report carries kept/contradicted/unsupported/labelled counts, the
+    dropped sentences, and cost. Deterministic apart from the single LLM call;
+    never raises.
+
+    [LOCAL-884 §1] "No evidence" means "no factual claim", never "nothing to
+    check". When the stop's evidence bundle is empty or thin
+    (< THIN_EVIDENCE_MIN_CHARS), every FACTUAL sentence is UNSUPPORTED and is
+    dropped (it can only have come from the narrator's memory, since there is
+    nothing to support it) — no LLM call is made. Non-factual sentences (sensory,
+    directional, reflective) are always kept. When there IS evidence, each factual
+    sentence is judged by the single LLM call: KEEP supported, DROP contradicted,
+    DROP unsupported (unless the evidence frames it as a legend → disclose, D760).
+    A sentence the LLM is silent on (judged against real evidence but no verdict
+    returned) is KEPT. ``labelled`` counts every factual sentence the gate acted
+    on (dropped or kept-after-judgement); it is > 0 whenever the body carries a
+    factual sentence."""
     rep = {"title": title, "kept": 0, "contradicted": 0, "unsupported": 0,
-           "disclosed": 0, "dropped": [], "cost_usd": 0.0, "called": False,
+           "disclosed": 0, "labelled": 0, "dropped": [], "cost_usd": 0.0,
+           "called": False, "no_evidence": False,
            "sentences_before": 0, "sentences_after": 0}
     sents = _content_sentences(body_prose)
     rep["sentences_before"] = len(sents)
@@ -326,11 +361,37 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
         return body_prose, rep
 
     factual_idx = [i for i, s in enumerate(sents) if is_factual_sentence(s)]
-    if not factual_idx or not (evidence or "").strip():
-        # nothing checkable, or no evidence to check against: keep the body as-is.
+    if not factual_idx:
+        # no factual claim at all: nothing to ground, keep the atmospheric body.
         rep["kept"] = len(sents)
         rep["sentences_after"] = len(sents)
         return body_prose, rep
+
+    # [LOCAL-884 §1] Factual sentences present but NO (or thin) evidence to back
+    # them: every factual sentence is UNSUPPORTED and dropped. This is the main
+    # wave-42 bug — the cloud shipped "founded in 1163" / "designed by Eiffel" /
+    # "ordered by Diệm" precisely because the stop had no evidence and the gate
+    # kept everything. No LLM call: there is nothing to check against.
+    if _evidence_is_thin(evidence):
+        rep["no_evidence"] = True
+        out: List[str] = []
+        for i, s in enumerate(sents):
+            if i in factual_idx:
+                rep["labelled"] += 1
+                rep["unsupported"] += 1
+                rep["dropped"].append(("UNSUPPORTED(no-evidence)", s[:80]))
+            else:
+                out.append(s)
+                rep["kept"] += 1
+        new_prose = " ".join(out).strip()
+        rep["sentences_after"] = len(_content_sentences(new_prose))
+        if log:
+            log(f"  [LOCAL-884] grounding {title[:48]}: no evidence -> "
+                f"labelled {rep['labelled']}, {rep['unsupported']} unsupported "
+                f"(dropped), {rep['kept']} non-factual kept")
+            for why, frag in rep["dropped"]:
+                log(f"      [LOCAL-884] dropped ({why}): {frag}")
+        return new_prose, rep
 
     factual_sentences = [sents[i] for i in factual_idx]
     verdicts, crep = classify_sentences(
@@ -338,7 +399,7 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
     rep["cost_usd"] = crep.get("cost_usd", 0.0)
     rep["called"] = crep.get("called", False)
 
-    out: List[str] = []
+    out = []
     for i, s in enumerate(sents):
         if i not in factual_idx:
             out.append(s)                 # non-factual: always kept
@@ -349,6 +410,7 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
             out.append(s)                 # unjudged (LLM silent): keep
             rep["kept"] += 1
             continue
+        rep["labelled"] += 1
         verdict = v["verdict"]
         if verdict == "SUPPORTED":
             out.append(s)
@@ -368,7 +430,8 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
     new_prose = " ".join(out).strip()
     rep["sentences_after"] = len(_content_sentences(new_prose))
     if log:
-        log(f"  [LOCAL-883] grounding {title[:48]}: {rep['kept']} kept, "
+        log(f"  [LOCAL-883] grounding {title[:48]}: labelled {rep['labelled']}, "
+            f"{rep['kept']} kept, "
             f"{rep['contradicted']} contradicted, {rep['unsupported']} unsupported"
             + (f", {rep['disclosed']} disclosed" if rep['disclosed'] else ""))
         for why, frag in rep["dropped"]:
@@ -474,6 +537,7 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
     ``max_cost_usd`` caps spend: once the running cost would exceed it, remaining
     stops are left untouched (logged). Returns (new_tour_text, report)."""
     rep = {"stops": 0, "grounded": 0, "rebuilt": 0, "total_dropped": 0,
+           "total_labelled": 0, "no_history_stops": 0,
            "cost_usd": 0.0, "details": []}
     if not tour_text:
         return tour_text or "", rep
@@ -501,6 +565,7 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
             title, body, ev or "", classify_fn=classify_fn, model=model, log=log)
         rep["cost_usd"] += grep.get("cost_usd", 0.0)
         rep["total_dropped"] += len(grep.get("dropped", []))
+        rep["total_labelled"] += grep.get("labelled", 0)
         changed = grounded.strip() != body.strip()
         if changed:
             new_text = _replace_block_body(new_text, stop_num,
@@ -509,6 +574,7 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
 
         # Shortfall → 873C narrated rebuild from evidence only, re-gated once.
         after = grep.get("sentences_after", 0)
+        rebuilt_ok = False
         if (after < MIN_CONTENT_SENTENCES and rebuild_fn is not None
                 and (max_cost_usd is None or rep["cost_usd"] < max_cost_usd)):
             facts = _lookup(norm_facts, title) or []
@@ -522,17 +588,49 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                     title, rebuilt_prose, ev or "", classify_fn=classify_fn,
                     model=model, log=log)
                 rep["cost_usd"] += rgrep.get("cost_usd", 0.0)
-                if rgrep.get("sentences_after", 0) >= after:
+                rep["total_labelled"] += rgrep.get("labelled", 0)
+                if rgrep.get("sentences_after", 0) >= max(after, 1):
                     new_text = _replace_block_body(
                         new_text, stop_num, _content_sentences(reg))
                     rep["rebuilt"] += 1
+                    rebuilt_ok = True
+                    after = rgrep.get("sentences_after", 0)
+
+        # [LOCAL-884 §1] A stop with NO evidence whose factual sentences were all
+        # dropped, and which the evidence-only rebuild could not refill (there was
+        # no evidence to rebuild from), must NOT be left with a bare or empty
+        # body. Give it a short, honest, NON-FACTUAL body: whatever atmospheric /
+        # orientation sentences survived, plus the D760 disclosure that no
+        # verified history was found. It never gets the narrator's memory back.
+        if grep.get("no_evidence") and not rebuilt_ok:
+            cur_block = _block_for(new_text, stop_num)
+            cur_prose = _block_body_prose(cur_block) if cur_block is not None else ""
+            kept_sents = _content_sentences(cur_prose)
+            disclosure = NO_HISTORY_DISCLOSURE
+            if not any(_fold(disclosure)[:30] in _fold(s) for s in kept_sents):
+                kept_sents = kept_sents + [disclosure]
+            new_text = _replace_block_body(new_text, stop_num, kept_sents)
+            rep["no_history_stops"] += 1
+            if log:
+                log(f"  [LOCAL-884] Stop {stop_num} '{title[:40]}': no verified "
+                    f"history; honest non-factual body + D760 disclosure "
+                    f"({len(kept_sents)} sentence(s))")
+
+        if log:
+            log(f"  [LOCAL-884] Stop {stop_num} '{title[:40]}': labelled "
+                f"{grep.get('labelled', 0)}"
+                + (" (no-history disclosed)" if grep.get("no_evidence")
+                   and not rebuilt_ok else ""))
         rep["details"].append({
-            "stop": stop_num, "title": title,
+            "stop": stop_num, "title": title, "labelled": grep.get("labelled", 0),
             "kept": grep["kept"], "contradicted": grep["contradicted"],
-            "unsupported": grep["unsupported"], "disclosed": grep["disclosed"]})
+            "unsupported": grep["unsupported"], "disclosed": grep["disclosed"],
+            "no_evidence": grep.get("no_evidence", False)})
     if log:
         log(f"  [LOCAL-883] grounding gate: {rep['stops']} stop(s), "
             f"{rep['grounded']} edited, {rep['rebuilt']} rebuilt, "
+            f"{rep['no_history_stops']} no-history, "
+            f"{rep['total_labelled']} labelled, "
             f"{rep['total_dropped']} sentence(s) dropped; cost ${rep['cost_usd']:.4f}")
     return new_text, rep
 

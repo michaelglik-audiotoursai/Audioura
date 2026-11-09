@@ -1,0 +1,64 @@
+{
+  "unsupported": [
+    {
+      "stop": "Cathedral",
+      "claim": "Its red brick walls, imported from Marseille, France, give the building a distinctive warm hue that sets it apart from the surrounding concrete and glass.",
+      "why": "The evidence does not mention the origin of the red bricks or that they were imported from Marseille, France."
+    },
+    {
+      "stop": "Cathedral",
+      "claim": "The cathedral serves as the seat of the Saigon Archdiocese and draws visitors from around the world, standing as a reminder of the French colonial era’s impact on the city’s landscape.",
+      "why": "The evidence states it is the cathedral of the Archdiocese of Saigon and a famous tourist destination, but does not explicitly state it is the seat of the Archdiocese or that it draws visitors from around the world as a reminder of the French colonial era’s impact."
+    },
+    {
+      "stop": "Cathedral",
+      "claim": "The arrival of the statue also led to the local adoption of the name “Notre Dame,” connecting the cathedral’s identity more closely with Catholic devotion to the Immaculate Conception.",
+      "why": "The evidence states the name 'Nhà thờ Đức Bà' began to be used in 1959 with the placement of the statue, but does not mention the connection to Catholic devotion to the Immaculate Conception."
+    },
+    {
+      "stop": "Post Office",
+      "claim": "Imagine the soft clang of telegraph equipment mixing with conversations in multiple languages, as this post office was once a bustling hub of communication.",
+      "why": "The evidence does not mention telegraph equipment, conversations in multiple languages, or describe the post office as a bustling hub of communication."
+    },
+    {
+      "stop": "Opera House",
+      "claim": "The Saigon Opera House opened its doors on January 1, 1900, as the Opéra de Saïgon.",
+      "why": "The evidence states the building was completed in 1900 and opened in 1900-01-01, but does not explicitly state the opening date as January 1, 1900, or that it opened as the Opéra de Saïgon."
+    },
+    {
+      "stop": "Opera House",
+      "claim": "Between 1956 and 1967, the Opera House was transformed from a venue for ballets and operas into a political arena.",
+      "why": "The evidence states it served as the house of the unicameral National Assembly from 1956 until 1967, but does not mention a transformation from ballets and operas into a political arena."
+    },
+    {
+      "stop": "Opera House",
+      "claim": "When the government shifted to a bicameral legislature, the building became home to both the Lower House and the Senate, where laws were debated and decided.",
+      "why": "The evidence states the Opera House became home to the Lower House and the Senate after the National Assembly became bicameral, but does not specify that laws were debated and decided there."
+    }
+  ],
+  "_model": "gpt-4.1",
+  "_usage": {
+    "prompt_tokens": 5318,
+    "completion_tokens": 655,
+    "total_tokens": 5973,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "evidence_chars": {
+    "City Hall": 7527,
+    "Independence Palace": 1239,
+    "War Remnants Museum": 359,
+    "Post Office": 1385,
+    "Cathedral": 967,
+    "Opera House": 2002
+  },
+  "used_cloud_snapshot": true
+}
