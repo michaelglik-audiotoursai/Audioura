@@ -51,7 +51,8 @@ from user_stop_narration import (
     _fold, _split_sentences, grounded_user_stop_body, is_user_stop,
 )
 
-__all__ = ["build_fact_sheet", "verify_user_stops_in_text"]
+__all__ = ["build_fact_sheet", "verify_user_stops_in_text",
+           "scrub_cross_stop_business_lines"]
 
 # Structural block grammar (mirrors user_stop_narration.scrub_tour_text_user_stops).
 _STOP_HDR_RE = re.compile(r"(?mi)^Stop\s+(\d+):\s*(.+?)\s*$")
@@ -293,6 +294,14 @@ def retrieve_user_stop_snippets(name, poi, location, serp_fn=None, log=None,
         if _snippet_names_venue(name, title, snippet, poi=poi,
                                 location=location):
             text = snippet.strip() or title.strip()
+            # [LOCAL-879 §3] Render a foreign-language date in the evidence into
+            # the tour language BEFORE it reaches the narrator ("1 tháng 7 năm
+            # 1962" -> "1 July 1962"). Deterministic; English snippets untouched.
+            try:
+                from foreign_date_normalize import normalize_foreign_dates as _fdn
+                text = _fdn(text, lang="en")[0]
+            except Exception:
+                pass
             if text and text not in kept:
                 kept.append(text[:400])
         if len(kept) >= max_snippets:
@@ -980,3 +989,228 @@ def _apply_grounded_with_orientation(lines: List[str], meta: dict,
             if is_or:
                 lines[abs_idx] = f"{lines[abs_idx]} {grounded}".strip()
                 break
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# [LOCAL-879 §1] CROSS-STOP BUSINESS-LINE GUARD
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# Tour 547 (wave 37) carried, under Stop 1 (Cathedral), a line that belongs to
+# Stop 10 (Thi Bar):
+#
+#   Stop 1: Cathedral
+#   Coordinates: 10.779722, 106.699167
+#   The bar opens every day at 7pm and features live music from 10pm until
+#   late, except on Tuesdays when it is closed.
+#   Type/Specialty: Historical Landmark
+#
+# A business/opening-hours sentence is bound to ONE venue — the stop whose venue
+# it describes. When such a sentence lands in a block for a DIFFERENT venue it is
+# a cross-stop leak and must be removed from that block. The rule is deterministic
+# and offline, so it runs on every path (with or without the LLM verify pass):
+#
+#   A sentence is a "business line" when it carries an opening-hours / happy-hour
+#   / live-music cue (the same cue used by the practical-facts gate, plus the bar
+#   phrasings). Its SUBJECT venue-kind is read from "The <kind> …" / "<Name>
+#   opens …". If that venue-kind is NOT one the block's own Type/Specialty
+#   carries, and the sentence does not name the block's own venue, the sentence
+#   does not belong to this stop → drop it.
+#
+# This never drops a venue's own hours line (its subject kind matches the block's
+# Type/Specialty, e.g. "The bar opens …" under a stop whose kind is "Gay bar"),
+# and it is idempotent and pure.
+
+# Opening-hours / business cue. Mirrors practical_facts_gate._PRACTICAL_HOURS_CUE_RE
+# intent, widened for bar/nightlife phrasing ("opens at 7pm", "happy hour",
+# "live music … until late", "closed on Tuesdays").
+_BUSINESS_LINE_CUE_RE = re.compile(
+    r"(?i)\b("
+    r"open(?:s|ing)?\s+(?:every\s+day|daily|from|at|on|\d|noon|mon|tue|wed|thu|fri|sat|sun)"
+    r"|happy hour"
+    r"|live music"
+    r"|until late"
+    r"|last orders?"
+    r"|doors? open"
+    r"|closed\s+(?:on\s+)?(?:every\s+)?(?:mon|tue|wed|thu|fri|sat|sun)"
+    r")\b")
+
+# The subject venue-kind of a business line: "The bar opens…", "The café is open…",
+# "Thi Bar opens…". Returns the folded venue-kind word when the sentence names one
+# as its subject, else "".
+_BIZ_SUBJECT_RE = re.compile(
+    r"(?i)^\s*(?:the\s+)?([A-Za-zÀ-ỹ][\wÀ-ỹ'’&.\- ]{0,40}?)\s+"
+    r"(?:opens?|is\s+open|features?|offers?|serves?|welcomes?|has\s+(?:a\s+)?(?:dj|dance))\b")
+
+
+def _business_subject_kind(sentence: str):
+    """[LOCAL-879 §1] The venue-kind word a business line names as its subject.
+
+    "The bar opens every day at 7pm …"          -> "bar"
+    "The café is open from 8 am …"               -> "cafe"  (folded)
+    "Longan welcomes guests nightly …"           -> "" (a proper name, no kind word)
+
+    Returns the folded venue-kind word (``user_stop_narration._VENUE_KIND_WORDS``)
+    when the subject is a bare kind, else "". A proper-name subject yields "": the
+    caller then falls back to a venue-NAME match instead.
+    """
+    from user_stop_narration import _VENUE_KIND_WORDS
+    m = _BIZ_SUBJECT_RE.match(sentence or "")
+    if not m:
+        return ""
+    subj = _fold(m.group(1))
+    toks = subj.split()
+    # The subject is a bare venue-kind ("the bar", "the coffee shop") when its
+    # LAST token is a kind word and it carries no other (proper-name) tokens that
+    # are not kind/stop words.
+    if not toks:
+        return ""
+    kind_toks = [t for t in toks if t in _VENUE_KIND_WORDS]
+    if kind_toks and all(t in _VENUE_KIND_WORDS or t in {"the", "a", "an"} for t in toks):
+        return kind_toks[-1]
+    return ""
+
+
+# Venue-kind synonym groups: a business line's SUBJECT kind ("the cafe") and a
+# block's Type/Specialty ("Coffee shop") may name the same kind with different
+# words. Each key maps to a canonical token so the two are compared fairly.
+_KIND_SYNONYM = {
+    "cafe": "cafe", "coffee": "cafe", "bistro": "cafe", "teahouse": "cafe",
+    "patisserie": "cafe", "bakery": "cafe",
+    "bar": "bar", "pub": "bar", "tavern": "bar", "taproom": "bar",
+    "brewery": "bar", "lounge": "bar", "speakeasy": "bar", "izakaya": "bar",
+    "club": "club", "nightclub": "club", "karaoke": "club",
+    "restaurant": "restaurant", "diner": "restaurant", "eatery": "restaurant",
+    "grill": "restaurant",
+    "spa": "spa", "salon": "spa", "massage": "spa", "wellness": "spa",
+    "shop": "shop", "store": "shop", "boutique": "shop", "market": "shop",
+    "gallery": "gallery", "studio": "studio", "gym": "gym",
+    "hotel": "lodging", "hostel": "lodging",
+}
+
+
+def _canon_kinds(kinds):
+    """Fold a set of venue-kind words to their canonical synonym tokens."""
+    return {_KIND_SYNONYM.get(k, k) for k in (kinds or set())}
+
+
+# [LOCAL-879 §1] Canonical hospitality kinds — places that legitimately carry an
+# opening-hours / happy-hour / live-music line. A nightlife cue in a block whose
+# canonical kind is NOT one of these is a cross-stop leak.
+_HOSPITALITY_KINDS = {"bar", "club", "cafe", "restaurant", "spa", "shop",
+                      "gallery", "studio", "gym", "lodging"}
+
+# Nightlife / hospitality-specific cues: these describe a bar/club/café/restaurant,
+# never a cathedral/museum/palace/pier.
+_NIGHTLIFE_CUE_RE = re.compile(
+    r"(?i)\b(happy hour|live music|doors? open|last orders?|until late|"
+    r"dance floor|cocktails?|\bdj\b|nightlife"
+    r"|open(?:s)?\s+(?:from\s+)?\d{1,2}\s*(?:am|pm)"
+    r"|open(?:s)?\s+every\s+day\s+at\s+\d)\b")
+
+
+def scrub_cross_stop_business_lines(tour_text: str, log=None):
+    """[LOCAL-879 §1] Remove a business/opening-hours sentence from any stop block
+    whose venue it does not describe. Returns ``(text, n_dropped)``.
+
+    A business line (opening hours, happy hour, live music, "closed on Tuesdays",
+    "doors open") belongs to the one stop whose venue it is about. When its
+    subject names a venue-KIND the block's own Type/Specialty does not carry — and
+    the sentence does not name the block's own venue — it is a leak from another
+    stop and is dropped from this block. Deterministic, offline, idempotent;
+    never drops a stop's own hours line and never empties a block to nothing.
+    """
+    if not tour_text or not tour_text.strip():
+        return tour_text or "", 0
+    try:
+        from user_stop_narration import venue_kind_words
+    except Exception:  # pragma: no cover
+        return tour_text, 0
+
+    lines = tour_text.split("\n")
+    headers = [(i, m) for i, ln in enumerate(lines)
+               for m in [_STOP_HDR_RE.match(ln)] if m]
+    if not headers:
+        return tour_text, 0
+
+    dropped = 0
+    for h_idx, (line_no, m) in enumerate(headers):
+        title = (m.group(2) or "").strip()
+        start = line_no + 1
+        end = headers[h_idx + 1][0] if h_idx + 1 < len(headers) else len(lines)
+        block_text = "\n".join(lines[start:end])
+        tm = _TYPE_LINE_RE.search(block_text)
+        block_kinds = _canon_kinds(venue_kind_words(tm.group(1))) if tm else set()
+        folded_title = _fold(title)
+        title_toks = [w for w in folded_title.split() if len(w) >= 3]
+
+        for li in range(start, end):
+            ln = lines[li]
+            stripped = ln.strip()
+            if not stripped:
+                continue
+            if _FIELD_LINE_RE.match(ln) or _STOP_HDR_RE.match(ln) \
+                    or stripped.lower().startswith("sources"):
+                continue
+            # Keep a leading label ("Orientation:"/"Directions:") and only edit
+            # the spoken value after it.
+            lbl_m = re.match(r"(?i)^(\s*(?:orientation|directions)\s*:\s*)", ln)
+            label = lbl_m.group(1) if lbl_m else ""
+            body = ln[len(label):] if label else ln
+            sents = _split_sentences(body)
+            if len(sents) < 1:
+                continue
+            kept, pulled = [], []
+            for s in sents:
+                if not _BUSINESS_LINE_CUE_RE.search(s):
+                    kept.append(s)
+                    continue
+                subj_kind = _business_subject_kind(s)
+                folded_s = _fold(s)
+                names_own_venue = bool(title_toks) and all(
+                    t in folded_s for t in title_toks)
+                if names_own_venue:
+                    kept.append(s)
+                    continue
+                if subj_kind:
+                    # Subject is a bare venue-kind. It belongs here only when the
+                    # block's own Type/Specialty carries that kind.
+                    if _KIND_SYNONYM.get(subj_kind, subj_kind) in block_kinds:
+                        kept.append(s)
+                    else:
+                        pulled.append(s)
+                    continue
+                # No kind subject and does not name this venue.
+                # [LOCAL-879 §1] A NIGHTLIFE / hospitality cue (happy hour, live
+                # music, doors open, "opens at 7pm … until late") in a block whose
+                # own venue is a documented NON-hospitality kind (cathedral,
+                # museum, palace, landmark, pier, …) can only be a leak from a bar/
+                # café/restaurant stop — the relocated Thi Bar line under the
+                # Cathedral ("It opens from 7pm until late and offers a happy hour
+                # … live music at 10pm"). Drop it.
+                other_kinds = _canon_kinds(venue_kind_words(s))
+                if (_NIGHTLIFE_CUE_RE.search(s)
+                        and not (block_kinds & _HOSPITALITY_KINDS)):
+                    pulled.append(s)
+                    continue
+                # Otherwise: if the block has a venue kind and the sentence names a
+                # DIFFERENT kind word, it is a leak; else keep (never guess).
+                if block_kinds and other_kinds and not (other_kinds & block_kinds):
+                    pulled.append(s)
+                else:
+                    kept.append(s)
+            if not pulled:
+                continue
+            dropped += len(pulled)
+            new_body = " ".join(k.strip() for k in kept).strip()
+            lines[li] = (label + new_body).rstrip() if (label or new_body) else ""
+            if log:
+                for p in pulled:
+                    log(f"[LOCAL-879] cross-stop business line removed from "
+                        f"Stop {m.group(1)} ({title}): {p[:120]}")
+
+    if not dropped:
+        return tour_text, 0
+    out = "\n".join(l for l in lines)
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out, dropped

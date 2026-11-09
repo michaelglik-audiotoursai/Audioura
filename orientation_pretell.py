@@ -16,6 +16,27 @@ onto the DELIVERED Stop-1 orientation text, after Part 4 has been folded in.
 import re
 from typing import Dict, List, Tuple
 
+# [LOCAL-879 §2] Abbreviation-safe sentence splitting. The preview builders below
+# used a bare ``re.split(r"(?<=[.!?])\s+", …)`` which treats "U.S." (and "U.K.",
+# "St.", "Dr.", …) as a sentence end. Tour 547's preview carried the Stop-5 fact
+# "…the building that once served as the U.S. military's intelligence
+# headquarters"; the bare split cut it after "U.S.", strip_later_stop_facts then
+# dropped the "military's intelligence headquarters" fragment as a later-stop
+# fact, and the surviving stub "…served as the U.S." shipped — "served as the
+# U.S. Your first stop is Cathedral." The shared splitter keeps the whole
+# sentence together, so the entire later-stop fact is dropped cleanly with no
+# dangling abbreviation.
+try:
+    from sentence_split import split_sentences as _split_sentences_abbrev
+except Exception:  # pragma: no cover
+    def _split_sentences_abbrev(text):
+        return re.split(r"(?<=[.!?])\s+", (text or "").strip())
+
+
+def _preview_sentences(body: str) -> List[str]:
+    """Abbreviation-safe sentence split for the orientation-preview guards."""
+    return [s for s in _split_sentences_abbrev(body) if s and s.strip()]
+
 __all__ = [
     "extract_later_stop_terms",
     "sentence_delivers_later_stop_fact",
@@ -117,7 +138,7 @@ def strip_later_stop_facts(orientation: str,
                                            [stop1_text] if stop1_text else [])
     stop1_name_l = stop1_name.strip().lower()
 
-    sentences = re.split(r"(?<=[.!?])\s+", body.strip())
+    sentences = _preview_sentences(body)
     kept: List[str] = []
     dropped = 0
     for sent in sentences:
@@ -183,7 +204,7 @@ def strip_phantom_preview_names(orientation: str,
         label = orientation[: m.end()]
         body = orientation[m.end():]
 
-    sentences = re.split(r"(?<=[.!?])\s+", body.strip())
+    sentences = _preview_sentences(body)
     kept: List[str] = []
     dropped = 0
     for sent in sentences:

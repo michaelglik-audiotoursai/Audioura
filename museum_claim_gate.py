@@ -56,7 +56,15 @@ def _fold(s: str) -> str:
 
 
 def _sentences(text: str) -> List[str]:
-    return [s for s in re.split(r"(?<=[.!?])\s+", (text or "").strip()) if s.strip()]
+    # [LOCAL-879 §4] Use the shared abbreviation-safe splitter so a sentence is
+    # never cut at "U.S."/"U.K."/"St."/"Dr." — the raw (?<=[.!?])\s+ split cut
+    # "…served as the U.S. military…" in two, which let the §4 intel correction
+    # touch only the second fragment and recombine as "the U.S. the United States".
+    try:
+        from sentence_split import split_sentences as _ss
+        return [s for s in _ss(text or "") if s.strip()]
+    except Exception:
+        return [s for s in re.split(r"(?<=[.!?])\s+", (text or "").strip()) if s.strip()]
 
 
 # ═══ 2. STOP IDENTITY ════════════════════════════════════════════════════════

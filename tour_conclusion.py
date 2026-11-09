@@ -1592,6 +1592,25 @@ def _template_thematic_body(
     else:
         thread_sentence = f"Across these stops, one thread runs through: {thread_phrase}."
 
+    # [LOCAL-879 §6] A CIRCULAR thread is not a thread. Tour 547 closed with
+    # "one thread runs through: the places you chose on this route." — the
+    # "thread" just restates that the listener chose the stops, saying nothing.
+    # When the thread phrase is that circular user-stops phrasing (no real
+    # subject/period/city thread), DROP the thread sentence and let the MEANING
+    # sentence (the substantive "Each was picked by you … trace your own route
+    # through the city.") carry the close. Never ship an empty "one thread".
+    _tp_l = thread_phrase.lower()
+    _circular = (
+        "the places you chose on this route" in _tp_l
+        or _tp_l in ("the places you chose", "this collection", "this route",
+                     "the places on this route")
+        or (user_stops and not common.get("subject_phrase")
+            and not common.get("period_label")
+            and _tp_l.startswith("the places you chose")
+            and " across " not in _tp_l))
+    if _circular:
+        thread_sentence = ""
+
     # (c) OPTIONAL single example — only when the thread is generic (no strong
     # subject/period element), to keep the close concrete. At most ONE title.
     # Never for a user-stops tour (LOCAL-855B defect 10).

@@ -237,6 +237,15 @@ def fact_sentences(facts, limit: int = 6, require_specific: bool = True,
         s = repair_fact_sentence(s, title)
         if not s:
             continue
+        # [LOCAL-879 §6] Drop unattributed promotional / superlative marketing
+        # copy before it reaches the narrator ("a diamond-valued location", "the
+        # Notting Hill of Ho Chi Minh", "one of the only real gay bars").
+        try:
+            from spoken_text_hygiene import PROMOTIONAL_SENTENCE_RE as _promo879
+            if _promo879.search(s):
+                continue
+        except Exception:
+            pass
         if require_specific and not _is_specific(s):
             continue
         if not require_specific and len(s) < 25:
@@ -404,6 +413,10 @@ _NARRATE_SYSTEM = (
     "what is there. Do NOT add anything the facts do not state: no invented "
     "date, person, event or figure. Do NOT repeat the orientation line you are "
     "shown. Use the place name's spelling exactly as given (keep its diacritics). "
+    "Do NOT use promotional or superlative marketing phrasing — no 'a "
+    "diamond-valued location', no 'the Notting Hill of …', no 'world-class', "
+    "'must-see', 'iconic destination', 'one of the only', 'hidden gem', or "
+    "city-branding boosterism. State plain facts, not brochure copy.\n"
     "Plain sentences, no headings, no lists, no quotation of raw web copy.\n"
     'Return ONLY JSON of the exact shape: {"sentences":["<sentence>", ...]}')
 

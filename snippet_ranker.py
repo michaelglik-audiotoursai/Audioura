@@ -42,6 +42,37 @@ from story_opportunity_scan import _STAKES
 # Configurable cap — default 5
 SNIPPET_CAP_PER_STOP = int(os.environ.get('SNIPPET_CAP_PER_STOP', '5'))
 
+# [LOCAL-879 §5] Banned WIKIPEDIA titles for R5 page fetches. Tour 547's city
+# scope was the free-text TOPIC "Saigon centre landmarks"; a story-search query
+# built from it surfaced the Saigon Centre office tower, and R5 fetched
+# /wiki/Saigon_Centre (LOCAL-459 log). The derived-city fix (three_class_retrieval
+# / _scope_from_request) stops most of it, but a topic string can still ride a
+# SERP snippet into R5. The generator registers the request's topic segment here
+# (folded); R5 then refuses to fetch a Wikipedia page whose title IS that topic —
+# an office tower named after a request topic is never a tour landmark's story.
+_BANNED_WIKI_TITLES: Set[str] = set()
+
+
+def register_banned_wiki_title(title: str) -> None:
+    """[LOCAL-879 §5] Register a folded Wikipedia title/topic R5 must not fetch."""
+    t = _fold_title(title)
+    if t:
+        _BANNED_WIKI_TITLES.add(t)
+
+
+def clear_banned_wiki_titles() -> None:
+    _BANNED_WIKI_TITLES.clear()
+
+
+def _fold_title(s: str) -> str:
+    """Fold a string or a /wiki/<Title> URL to a comparable lowercase token run."""
+    s = (s or "").strip()
+    m = re.search(r"/wiki/([^?#]+)", s)
+    if m:
+        import urllib.parse as _up
+        s = _up.unquote(m.group(1)).replace("_", " ")
+    return re.sub(r"[^a-z0-9]+", " ", s.lower()).strip()
+
 # [LOCAL-414] Tier3 penalty: unverified domains score -5 so they cannot outrank
 # tier1/tier2 material with comparable story quality. A tier1/tier2 snippet with
 # person+verb+date = 9; a tier3 snippet with the same = 3 (9-6 is too harsh,
@@ -892,6 +923,16 @@ def fetch_pages_for_top_snippets(ranked_snippets: List[Dict],
         url = snip.get('url', '')
         if not url:
             continue
+
+        # [LOCAL-879 §5] Never fetch a Wikipedia page whose title is a registered
+        # banned topic (e.g. the Saigon Centre office tower named after the request
+        # topic "Saigon centre"). Keeps /wiki/Saigon_Centre out of the R5 log and
+        # out of the evidence.
+        if "wikipedia.org/wiki/" in url.lower() and _BANNED_WIKI_TITLES:
+            _ft = _fold_title(url)
+            if _ft and any(_ft == b or b in _ft for b in _BANNED_WIKI_TITLES):
+                print(f"  [LOCAL-879 §5] R5: skipped banned off-topic page {url[:60]}")
+                continue
 
         try:
             page_text, _ = _fetch_page(url)
