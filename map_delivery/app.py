@@ -1098,7 +1098,8 @@ def compute_rating(ratings, verified=None, paid=False, prior=None):
     # [LOCAL-685] The tour's evaluated score replaces the flat 7.5 when it has one.
     base = float(prior) if prior is not None else RATING_DEFAULT_SCORE
     if count == 0:
-        return {"score": base, "count": 0,
+        # [LOCAL-876] display_rating None → the app shows "New", no number.
+        return {"score": base, "count": 0, "display_rating": None,
                 "label": "Audioura score" if prior is not None else "New"}
     if count < RATING_MEDIAN_SWITCH_COUNT:
         blended = [base] + [float(r) for r in ratings]
@@ -1106,7 +1107,8 @@ def compute_rating(ratings, verified=None, paid=False, prior=None):
     else:
         score = _rating_round_1dp(_rating_median(ratings))
     label = f"{count} rating" if count == 1 else f"{count} ratings"
-    return {"score": score, "count": count, "label": label}
+    return {"score": score, "count": count, "label": label,
+            "display_rating": score}
 
 
 # ─── [LOCAL-672] Verified counting, Bayesian ranking, distribution ────────────
@@ -1204,12 +1206,22 @@ def _rating_payload(rating_values, verified_values, created_values, paid, prior=
     """Build the full per-tour rating block for a response (LOCAL-670 + 672).
 
     Returns a dict with:
+      display_rating          — [LOCAL-876] the number the app shows beside the
+          ★, or None when the tour has NO real ratings.  An unrated tour must
+          read as "New" with no number: the flat 7.5 prior (or an evaluated
+          prior) is a LIST-ORDER device, never an evaluation to show (Michael
+          read "★ 7.5 · New" on tour 544 as a rating).  So display_rating is
+          None exactly when rating_count == 0, else the shown score.
       rating_score / rating_count / rating_label  — the SHOWN score (D647);
           on a PAID tour computed from VERIFIED ratings only, on a FREE tour
-          from all counted ratings (LOCAL-670).
+          from all counted ratings (LOCAL-670).  rating_score is kept for
+          backward compatibility with an app that predates display_rating; a
+          current app reads display_rating and shows "New" when it is null.
       verified_count          — how many of the ratings are verified.
       is_paid                 — whether this tour is treated as paid.
-      rank_score              — the Bayesian list-ORDER key (items 4/11).
+      rank_score              — the Bayesian list-ORDER key (items 4/11).  This
+          is the sort key and KEEPS the 7.5 prior for an unrated tour (a new
+          tour sorts mid-list); it is independent of display_rating.
       rating_distribution     — the five-band distribution (item 8), from the
           same source set as the shown score (verified on paid, all on free).
     The caller supplies the already-fetched arrays and the paid flag, so this is
@@ -1218,6 +1230,9 @@ def _rating_payload(rating_values, verified_values, created_values, paid, prior=
     vals = [r for r in (rating_values or []) if r is not None]
     verified_count = sum(1 for v in (verified_values or []) if v)
     return {
+        # [LOCAL-876] None when the tour has no real ratings → the app shows
+        # "New" with NO number; the 7.5 prior never reads as an evaluation.
+        'display_rating': rating['display_rating'],
         'rating_score': rating['score'],
         'rating_count': rating['count'],
         'rating_label': rating['label'],

@@ -27,25 +27,53 @@ class TourRating {
   final int count;
   final String label;
 
-  const TourRating({required this.score, required this.count, required this.label});
+  /// [LOCAL-876] The number to SHOW beside the ★, or null when the tour has no
+  /// real ratings. The server sends `display_rating` = null for an unrated
+  /// tour; [score] still carries the 7.5 prior (used for sorting / placeholder),
+  /// but it must never be shown as if it were an evaluation (Michael read
+  /// "★ 7.5 · New" on tour 544 as a rating).
+  final double? displayRating;
 
-  /// 0 ratings → 7.5 "New". Used as a safe default when the network is
-  /// unavailable so the badge always has something sensible to show.
-  static const TourRating unrated = TourRating(score: 7.5, count: 0, label: 'New');
+  const TourRating({
+    required this.score,
+    required this.count,
+    required this.label,
+    this.displayRating,
+  });
+
+  /// 0 ratings → "New" with NO number. Used as a safe default when the network
+  /// is unavailable so the badge always has something sensible to show.
+  static const TourRating unrated =
+      TourRating(score: 7.5, count: 0, label: 'New', displayRating: null);
 
   factory TourRating.fromJson(Map<String, dynamic> json) {
     final rawScore = json['score'] ?? json['rating_score'] ?? 7.5;
     final rawCount = json['count'] ?? json['rating_count'] ?? 0;
     final rawLabel = json['label'] ?? json['rating_label'] ?? 'New';
+    // [LOCAL-876] display_rating is null for an unrated tour. An older server
+    // that predates the field omits it — in that case fall back to the shown
+    // score only when the tour actually has ratings, so a legacy unrated tour
+    // still reads as "New".
+    final count = (rawCount as num).toInt();
+    final rawDisplay = json['display_rating'];
+    final double? display = rawDisplay != null
+        ? (rawDisplay as num).toDouble()
+        : (count > 0 ? (rawScore as num).toDouble() : null);
     return TourRating(
       score: (rawScore as num).toDouble(),
-      count: (rawCount as num).toInt(),
+      count: count,
       label: rawLabel.toString(),
+      displayRating: display,
     );
   }
 
-  /// Badge text, e.g. "7.5 · New" or "8.3 · 2 ratings".
-  String get badgeText => '${score.toStringAsFixed(1)} · $label';
+  /// True when the tour has NO real ratings — show "New", never a number.
+  bool get isUnrated => displayRating == null || count == 0;
+
+  /// Badge text, e.g. "New" (unrated) or "8.3 · 2 ratings".
+  String get badgeText => isUnrated
+      ? label
+      : '${displayRating!.toStringAsFixed(1)} · $label';
 }
 
 /// The outcome of an offline-first rating submission: the listener's OWN rating

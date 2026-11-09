@@ -2066,6 +2066,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     item['rating_score'] = result.aggregate!.score;
                     item['rating_count'] = result.aggregate!.count;
                     item['rating_label'] = result.aggregate!.label;
+                    // [LOCAL-876] Keep display_rating in sync so the badge shows
+                    // the new number (the tour now has at least one rating).
+                    item['display_rating'] = result.aggregate!.displayRating;
                     setDialogState(() {});
                     // [LOCAL-672] Offer "Add a short review" right after rating.
                     if (context.mounted) {

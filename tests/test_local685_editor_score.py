@@ -33,11 +33,15 @@ md = _md()
 
 def test_unrated_shows_evaluated_score():
     r = md['compute_rating']([], prior=6.3)
-    assert r == {'score': 6.3, 'count': 0, 'label': 'Audioura score'}
+    # [LOCAL-876] display_rating None → the app shows "New"/"Audioura score"
+    # with no number; score keeps the evaluated prior for back-compat.
+    assert r == {'score': 6.3, 'count': 0, 'label': 'Audioura score',
+                 'display_rating': None}
 
 
 def test_unscored_tour_keeps_old_default():
-    assert md['compute_rating']([]) == {'score': 7.5, 'count': 0, 'label': 'New'}
+    assert md['compute_rating']([]) == {'score': 7.5, 'count': 0, 'label': 'New',
+                                        'display_rating': None}
 
 
 def test_first_ratings_blend_with_evaluated_score():
