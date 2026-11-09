@@ -2,16 +2,24 @@ import 'package:flutter/material.dart';
 import '../services/tour_rating_service.dart';
 import '../services/tour_listen_service.dart';
 
-/// A small "★ 8.3 · 2 ratings" / "★ 7.5 · New" badge, shown on home-page tour
+/// A small "★ 8.3 · 2 ratings" / "★ New" badge, shown on home-page tour
 /// list items and in tour dialogs (LOCAL-670).
 ///
-/// Pass whatever the map-delivery record already carries (rating_score /
+/// Pass whatever the map-delivery record already carries (display_rating /
 /// rating_count / rating_label). When those are absent (older server), it
-/// falls back to the 7.5 "New" default so the badge is never blank.
+/// falls back to "New" so the badge is never blank.
+///
+/// [LOCAL-876] A tour with NO ratings shows "New" with NO number. The 7.5
+/// RANK_PRIOR_SCORE is a sort device, not an evaluation: showing "★ 7.5 · New"
+/// read as a rating (tour 544, Michael). The number is shown ONLY once the tour
+/// has real ratings (display_rating non-null and count > 0).
 class TourRatingBadge extends StatelessWidget {
   final double? score;
   final int? count;
   final String? label;
+
+  /// [LOCAL-876] The number to show beside the ★, or null for an unrated tour.
+  final double? displayRating;
 
   /// Compact variant uses a smaller font / tighter padding for list rows.
   final bool compact;
@@ -24,6 +32,7 @@ class TourRatingBadge extends StatelessWidget {
     this.score,
     this.count,
     this.label,
+    this.displayRating,
     this.compact = false,
     this.onTap,
   });
@@ -31,10 +40,19 @@ class TourRatingBadge extends StatelessWidget {
   /// Build from a tour map returned by map-delivery (/tours-near etc.).
   factory TourRatingBadge.fromTour(Map<String, dynamic> tour,
       {bool compact = false, VoidCallback? onTap}) {
+    final count = (tour['rating_count'] as num?)?.toInt();
+    // [LOCAL-876] Prefer display_rating; an older server without it falls back
+    // to rating_score ONLY when the tour has ratings, so a legacy unrated tour
+    // still reads "New".
+    final rawDisplay = tour['display_rating'];
+    final double? display = rawDisplay != null
+        ? (rawDisplay as num).toDouble()
+        : ((count ?? 0) > 0 ? (tour['rating_score'] as num?)?.toDouble() : null);
     return TourRatingBadge(
       score: (tour['rating_score'] as num?)?.toDouble(),
-      count: (tour['rating_count'] as num?)?.toInt(),
+      count: count,
       label: tour['rating_label'] as String?,
+      displayRating: display,
       compact: compact,
       onTap: onTap,
     );
@@ -42,10 +60,11 @@ class TourRatingBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = score ?? 7.5;
     final c = count ?? 0;
     final l = label ?? (c == 0 ? 'New' : (c == 1 ? '1 rating' : '$c ratings'));
-    final text = '${s.toStringAsFixed(1)} · $l';
+    // [LOCAL-876] Unrated → show just the label ("New"), never the 7.5 prior.
+    final bool unrated = displayRating == null || c == 0;
+    final text = unrated ? l : '${displayRating!.toStringAsFixed(1)} · $l';
     final fontSize = compact ? 11.0 : 13.0;
 
     final badge = Container(

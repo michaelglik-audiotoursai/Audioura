@@ -81,12 +81,19 @@ def compute_score(ratings, prior=None):
         ratings: list[int] — the real 1..10 ratings for the tour (may be empty).
 
     Returns:
-        dict: {"score": float (1 dp), "count": int, "label": str}
+        dict: {"score": float (1 dp), "count": int, "label": str,
+               "display_rating": float|None}
 
     Rules (D647):
         0        → 7.5, "New"
         1..3     → average of (7.5 + ratings), rounded to 1 dp
         >= 4     → median of ratings only, rounded to 1 dp
+
+    [LOCAL-876] `display_rating` is the number the app shows beside the ★, or
+    None when the tour has NO real ratings (count == 0).  The 7.5 prior (or an
+    evaluated prior) is a sort/placeholder device, never an evaluation to show,
+    so an unrated tour reads as "New" with no number.  `score` is kept for
+    backward compatibility; a current app reads display_rating.
     """
     count = len(ratings)
     # [LOCAL-685] The tour's evaluated score (editor_score, 5.0–8.0) replaces the
@@ -94,7 +101,7 @@ def compute_score(ratings, prior=None):
     base = float(prior) if prior is not None else DEFAULT_SCORE
 
     if count == 0:
-        return {"score": base, "count": 0,
+        return {"score": base, "count": 0, "display_rating": None,
                 "label": "Audioura score" if prior is not None else "New"}
 
     if count < MEDIAN_SWITCH_COUNT:  # 1, 2, or 3 real ratings
@@ -104,7 +111,8 @@ def compute_score(ratings, prior=None):
         score = _round_half_up_1dp(_median(ratings))
 
     label = f"{count} rating" if count == 1 else f"{count} ratings"
-    return {"score": score, "count": count, "label": label}
+    return {"score": score, "count": count, "label": label,
+            "display_rating": score}
 
 
 # ─── Translation mapping ──────────────────────────────────────────────────────

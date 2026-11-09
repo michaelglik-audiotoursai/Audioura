@@ -37,7 +37,9 @@ TEST_PREFIX = "TEST-670-"
 
 def test_zero_ratings_is_default_new():
     r = svc.compute_score([])
-    assert r == {"score": 7.5, "count": 0, "label": "New"}
+    # [LOCAL-876] display_rating is None for an unrated tour (the app shows
+    # "New" with no number); score keeps the 7.5 prior for back-compat.
+    assert r == {"score": 7.5, "count": 0, "label": "New", "display_rating": None}
 
 
 def test_one_rating_blends_the_prior_brief_example():
@@ -173,8 +175,9 @@ def test_record_and_get_roundtrip(db):
     try:
         tid = _seed_tour(db, "TEST-670 roundtrip tour")
 
-        # 0 ratings → default.
-        assert svc.get_rating(tid) == {"score": 7.5, "count": 0, "label": "New"}
+        # 0 ratings → default. [LOCAL-876] display_rating None → app shows "New".
+        assert svc.get_rating(tid) == {
+            "score": 7.5, "count": 0, "label": "New", "display_rating": None}
 
         # One rating of 9 → 8.3.
         out = svc.record_rating(f"{TEST_PREFIX}a", tid, 9)

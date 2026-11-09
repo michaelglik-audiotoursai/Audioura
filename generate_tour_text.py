@@ -33598,6 +33598,36 @@ RULES:
     except Exception as _sh_err:
         print(f"  [LOCAL-866] header restore skipped (non-fatal): {_sh_err}")
 
+    # [LOCAL-876] Header-line consistency: the Type/Specialty and Specific Examples
+    # lines are restored above from the poi dict, but nothing reconciled them with
+    # the stop's body or evidence. Tour 544's Stop 1 shipped "Specific Examples:
+    # ... neo-Romanesque architecture ..." while the narration/evidence say
+    # neo-Gothic. Prefer the fact sheet when the stop has one; otherwise drop a
+    # header style that contradicts the body or the evidence (the LOCAL-872 idea,
+    # applied to the header lines). Pure, idempotent, guarded — never fatal.
+    try:
+        from stop_header_consistency import reconcile_stop_headers as _reconcile_headers_876
+        _stop_evidence_876 = {}
+        for _p876 in (poi_list or []):
+            try:
+                _sn = int(_p876.get('stop_number'))
+            except (TypeError, ValueError):
+                continue
+            _ev = []
+            _desc = _p876.get('description')
+            if _desc:
+                _ev.append(str(_desc))
+            if _p876.get('_thin_evidence'):
+                _ev.append(str(_p876.get('_thin_evidence')))
+            for _lf in (_p876.get('_lore') or []):
+                _ev.append(_lf.get('fact', '') if isinstance(_lf, dict) else str(_lf))
+            if _ev:
+                _stop_evidence_876[_sn] = _ev
+        complete_tour = _reconcile_headers_876(
+            complete_tour, poi_list, stop_evidence=_stop_evidence_876, log=print)
+    except Exception as _hc_err:
+        print(f"  [LOCAL-876] header consistency skipped (non-fatal): {_hc_err}")
+
     # ── [LOCAL-619] THE ONE CONCLUSION, built from the FINAL delivered text ────
     # The critic's #1 blocker on 440/441/442 was the trailing recap STUB
     # ("That's N stops — …"): wrong count (3 when a late gate delivered 2), only
