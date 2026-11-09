@@ -13,6 +13,12 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 42 — 2026-11-09 ~14:00 EST (wdvrdazfdh) — DEPLOYED then ROLLED BACK. gen 00044-w2d + orch 00024-tc9 (6fe0577f, build 2f3e2671, bsub50) are idle; traffic is on gen 00039-mtv / orch 00022-m9c (wave 37). Failed:
+- Eiffel credited as designer; no 30 April 1975; City Hall generic.
+- The grounding gate dropped 0 sentences (negative cache rows starve the evidence).
+- Raw stop labels; Café pin moved.
+547 hidden (its lat/lng were 10.7765,106.6953 this time); rows 440. Proof spend so far is about $1.75 over 7 runs.
+
 # ▶️ WAVE 41 — 2026-11-09 ~12:15 EST (wdvrdazf73) — DEPLOYED then ROLLED BACK. gen 00043-srs + orch 00023-sks (a831ba0c, build c0ec8105, bsub49) are idle; traffic is on gen 00039-mtv / orch 00022-m9c (wave 37). Failed: the Palace has no 30 April 1975 or tank; no cache re-validation log line; wrong canonical picks (Thi Bar → DDA Hotel 183 De Tham leaked). City Hall is fixed. 547 hidden; rows 440. Proof spend so far is about $1.46.
 
 # ▶️ WAVE 40 — 2026-11-09 ~07:45 EST (wdvrdazeze) — DEPLOYED then ROLLED BACK. gen 00042-n7f (a31ead22, build 5ff0a91d, bsub48) is idle; traffic is on wave 37's gen 00039-mtv. Failed: City Hall still has the Gia Long "Museum of Commercial Trade" sentence; the "A note on current affairs" closing is back. 547 hidden; rows 440. Proof spend so far is about $1.21.
