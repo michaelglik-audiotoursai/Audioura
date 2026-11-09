@@ -35086,6 +35086,117 @@ RULES:
     except Exception as _d880_err:
         print(f"  [LOCAL-880] defect pass skipped (non-fatal): {_d880_err}")
 
+    # [LOCAL-883 / D771] STRICT GROUNDING GATE — every FACTUAL sentence must be
+    # backed by the stop's OWN evidence. Runs AFTER narration, the 873B rebuild
+    # and the 880 deterministic defect pass (so it judges the cleaned body), and
+    # BEFORE the signature-story survival (so a signature sentence this gate drops
+    # is restored by that survival step with its exact source sentence — §2).
+    #
+    # For each stop (landmark, user, business): split the body into sentences,
+    # mark each FACTUAL (date / number / named person / event / function /
+    # first-only-largest) or NON-FACTUAL (sensory, directional, reflective), make
+    # ONE gpt-4.1-mini call (temperature 0, JSON) giving it the stop's evidence
+    # bundle (its article(s), the 873 page facts, the 873 geo/name-gated snippets)
+    # and the factual sentences, KEEP SUPPORTED, DROP CONTRADICTED, DROP
+    # UNSUPPORTED (unless the evidence frames it as a legend → disclose, D760). A
+    # stop that falls below 5 content sentences is rebuilt from evidence only (the
+    # 873C narrated rebuild) and re-gated ONCE. Cost ≤ $0.003/stop; guarded.
+    try:
+        if (complete_tour
+                and os.environ.get('GROUNDING_GATE_ENABLED', '1').strip() != '0'):
+            import strict_grounding_gate as _sgg883
+            import thin_stop_delivery as _tsd883
+
+            # Evidence bundle per stop — the SAME map the 880C defect pass builds:
+            # 873 thin facts (job-scoped map + process-global sink) PLUS the 873
+            # direct snippets (title + text) the narrator drew from. All already
+            # geo/name-gated, so no off-pin evidence leaks in.
+            _ev883 = {}
+            _facts883 = {}
+            try:
+                _fa883 = dict(_J._THIN_FACTS_PER_STOP or {})
+                try:
+                    _sb883 = _THIN_FACTS_SINK.get(_J._THIN_SINK_KEY, {}) or {}
+                    for _k, _v in _sb883.items():
+                        _fa883.setdefault(_k, [])
+                        for _t in _v:
+                            if _t and _t not in _fa883[_k]:
+                                _fa883[_k].append(_t)
+                except Exception:
+                    pass
+                for _k, _v in _fa883.items():
+                    _facts883[str(_k)] = list(_v or [])
+                    _ev883[str(_k)] = " ".join(str(x) for x in (_v or []))
+            except Exception:
+                _ev883, _facts883 = {}, {}
+            try:
+                _snip883 = dict(getattr(_J, "_DIRECT_SNIPPETS_PER_STOP", {}) or {})
+                for _k, _snips in _snip883.items():
+                    if not _snips:
+                        continue
+                    _texts = []
+                    for _s in _snips:
+                        if isinstance(_s, dict):
+                            _texts.append(str(_s.get("title", "")))
+                            _texts.append(str(_s.get("snippet", "")))
+                        else:
+                            _texts.append(str(_s))
+                    _blob = " ".join(t for t in _texts if t)
+                    if _blob.strip():
+                        _key = str(_k)
+                        _ev883[_key] = (_ev883.get(_key, "") + " " + _blob).strip()
+            except Exception:
+                pass
+
+            # The 873C narrated rebuild as the shortfall backstop: rewrite a stop
+            # from its SOURCED facts only (one cheap gpt-4.1-mini call), each
+            # sentence verified traceable + claim-gate-cleared, so a stop the gate
+            # trims below 5 content sentences is refilled from evidence, not memory.
+            def _rebuild_from_facts_883(_title, _facts):
+                try:
+                    def _claim_gate_883(_sentence, _t, _evidence, _loc):
+                        try:
+                            import landmark_claim_gate as _lcg883
+                            return _lcg883.unsourced_claims(
+                                _sentence, _t, _evidence, known=(),
+                                location=_loc or "")
+                        except Exception:
+                            return []
+                    _sents, _r = _tsd883.narrate_stop_body(
+                        _title, _facts or [], location=location or "",
+                        claim_gate_fn=_claim_gate_883, log=print)
+                    return _sents or []
+                except Exception:
+                    return []
+
+            # Per-stop cap × stop count = total cap (≤ $0.003/stop, §1).
+            try:
+                _n_stops883 = len(re.findall(r"(?mi)^Stop\s+\d+:", complete_tour))
+            except Exception:
+                _n_stops883 = 10
+            _ground_cap883 = float(os.environ.get(
+                "GROUNDING_GATE_MAX_USD",
+                f"{max(1, _n_stops883) * 0.003:.4f}"))
+
+            complete_tour, _g883_rep = _sgg883.ground_tour_text(
+                complete_tour, _ev883, location=location or "",
+                rebuild_fn=_rebuild_from_facts_883, facts_by_title=_facts883,
+                max_cost_usd=_ground_cap883, log=print)
+            print(f"  [LOCAL-883] grounding gate: "
+                  f"{_g883_rep.get('stops', 0)} stop(s), "
+                  f"{_g883_rep.get('grounded', 0)} edited, "
+                  f"{_g883_rep.get('rebuilt', 0)} rebuilt, "
+                  f"{_g883_rep.get('total_dropped', 0)} sentence(s) dropped; "
+                  f"cost ${_g883_rep.get('cost_usd', 0.0):.4f}")
+            if output_file:
+                try:
+                    with open(output_file, "w", encoding="utf-8") as _gf883:
+                        _gf883.write(complete_tour)
+                except Exception:
+                    pass
+    except Exception as _g883_err:
+        print(f"  [LOCAL-883] grounding gate skipped (non-fatal): {_g883_err}")
+
     # [LOCAL-880] SIGNATURE-STORY SURVIVAL — the TRUE last word on memorability,
     # after every gate and the 873B rebuild (both of which can drop a story).
     # For each stop that had a signature story selected pre-narration but whose

@@ -793,6 +793,18 @@ def audit_seating_capacity(text: str, evidence_text: str = "",
                 r"(?i)\s*\b(?:is|was|are|were|stands?|stood|rises?|rose|reach(?:es|ed)?|"
                 r"measures?|measured|soars?|towers?)\s+\x00MAG\x00\s*(?=[.!?]|$)",
                 "", new_body)
+            # [LOCAL-883 / extend 880C] a linking verb + sentinel + a LONE
+            # dimension adjective at the sentence end ("This narrow street is
+            # \x00MAG\x00 long.") — removing just the sentinel leaves the orphan
+            # "This narrow street is long." The adjective only qualified the gone
+            # measurement, so drop the whole predicate, leaving the clean subject
+            # ("This narrow street."). Generic: any dimension word, any city.
+            new_body = re.sub(
+                r"(?i)\s*\b(?:is|was|are|were|stands?|stood|runs?|ran|stretch(?:es|ed)?|"
+                r"extend(?:s|ed)?|measures?|measured)\s+\x00MAG\x00\s+"
+                r"(?:long|tall|high|wide|deep|large|small|short|in\s+(?:length|height|"
+                r"width|depth))\s*(?=[.!?]|$)",
+                "", new_body)
             # otherwise just remove the sentinel, keeping any comparative/descriptive
             # word that followed it ("rise \x00MAG\x00 high" -> "rise high").
             new_body = re.sub(r"\s*\x00MAG\x00\s*", " ", new_body)
