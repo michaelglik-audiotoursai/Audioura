@@ -1209,7 +1209,16 @@ def build_conclusion(
     # chose across the city — never a fabricated period/subject thread. Force it
     # and give it a matching meaning so the closer names the ACTUAL thread.
     if user_stops:
-        v = (venue_name or "").strip()
+        # [LOCAL-878] The user-stops thread names the CITY the route runs across, never
+        # the raw request/location string — tour 547 closed with "the places you chose
+        # across Saigon centre landmarks" because venue_name was the request topic. Run
+        # it through city_from_scope so it resolves to "Ho Chi Minh City" (and a
+        # topic-only string yields no place, giving the generic "on this route" closer).
+        try:
+            from text_polish import city_from_scope as _cfs878
+            v = (_cfs878(venue_name) or "").strip()
+        except Exception:
+            v = (venue_name or "").strip()
         thread_phrase = (f"the places you chose across {v}" if v
                          else "the places you chose on this route")
         common = dict(common)

@@ -308,6 +308,24 @@ _CITY_ALIASES = {
     "sgn": "Ho Chi Minh City", "nyc": "New York City",
 }
 
+# [LOCAL-878] A free-text TOPIC/category segment is not a place: "Saigon centre
+# landmarks", "best attractions", "top sights", "things to see", "must-see spots".
+# The tour-547 bug took "Saigon centre landmarks" (the first comma-part of the request)
+# as the locality, so narration said "in Saigon centre landmarks" and the city-context
+# fetch hit /wiki/Saigon_Centre (an office building). A segment that carries one of
+# these category words, or is phrased as a theme, is skipped in favour of the next real
+# place segment.
+_TOPIC_SEGMENT_RE = re.compile(
+    r"(?i)\b(landmarks|attractions|sights|sightseeing|highlights|spots|"
+    r"things\s+to\s+(?:see|do)|must[\s-]?sees?|points?\s+of\s+interest|"
+    r"best\s+of|top\s+\d+|hidden\s+gems?|places?\s+to\s+(?:see|visit))\b")
+
+
+def _is_topic_segment(seg: str) -> bool:
+    """A comma-part that names a theme/category ("Saigon centre landmarks"), not a
+    place. Such a part must never become the tour's locality."""
+    return bool(_TOPIC_SEGMENT_RE.search(seg or ""))
+
 
 def city_from_scope(location: str) -> str:
     """The place a tour is ABOUT, from the string the pipeline calls ``location``,
@@ -318,6 +336,7 @@ def city_from_scope(location: str) -> str:
     s = (location or "").strip()
     if not s:
         return ""
+    raw = s
     # Only a TITLE-shaped string ("<who>'s biking tour in <place>") needs the
     # in/of split; a plain place string ("Museum of Fine Arts, Boston") keeps its
     # first comma segment exactly as before.
@@ -327,8 +346,36 @@ def city_from_scope(location: str) -> str:
         if m:
             s = s[m[-1].end():]
     s = s.split(",")[0].strip()
+    # [LOCAL-878] The first segment is a TOPIC, not a place ("Saigon centre landmarks").
+    # Take the next comma-part that is a real place (not a topic, not a tour phrase).
+    if _is_topic_segment(s):
+        for seg in [p.strip() for p in raw.split(",")[1:]]:
+            if seg and not _is_topic_segment(seg) \
+                    and not re.search(r"(?i)\b(?:tour|walk|ride|trip)\b", seg):
+                s = seg
+                break
+        else:
+            return ""          # only a topic was given — no place to narrate
     # A leftover tour phrase ("Sophia's biking tour") is not a place.
     if re.search(r"(?i)\b(?:tour|walk|ride|trip)\b", s):
         return ""
     s = re.sub(r"(?i)^(?:the)\s+", "", s).strip()
     return _CITY_ALIASES.get(s.lower(), s)
+
+
+def place_location_for_title(location: str) -> str:
+    """[LOCAL-878] The location string to show in the tour TITLE, with a leading
+    free-text TOPIC segment dropped so the title names the place, not the request topic:
+    "Saigon centre landmarks, Ho Chi Minh City, Vietnam" -> "Ho Chi Minh City, Vietnam".
+    A plain place string is returned unchanged; a topic-only string falls back to the
+    city derived from it (else the original, so the title is never emptied)."""
+    loc = (location or "").strip()
+    if not loc or "," not in loc:
+        return loc
+    parts = [p.strip() for p in loc.split(",") if p.strip()]
+    if parts and _is_topic_segment(parts[0]):
+        rest = [p for p in parts[1:] if not _is_topic_segment(p)]
+        if rest:
+            return ", ".join(rest)
+        return city_from_scope(loc) or loc
+    return loc

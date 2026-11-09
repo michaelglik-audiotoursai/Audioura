@@ -67,6 +67,16 @@ _TRANSPORT_TAIL_RE = re.compile(
     r'(?i)[,\s]+(?:\d+\s+stops?|museum|walking|biking|driving|tour).*$'
 )
 
+# [LOCAL-878] A leading comma-part that names a THEME/category ("Saigon centre
+# landmarks", "best attractions", "top sights") is not a place and must be dropped
+# before picking the locality — tour 547 took "Saigon centre landmarks" as the
+# locality. Kept local (this module is pure, no cross-imports).
+_TOPIC_SEGMENT_RE = re.compile(
+    r'(?i)\b(landmarks|attractions|sights|sightseeing|highlights|spots|'
+    r'things\s+to\s+(?:see|do)|must[\s-]?sees?|points?\s+of\s+interest|best\s+of|'
+    r'top\s+\d+|hidden\s+gems?|places?\s+to\s+(?:see|visit))\b'
+)
+
 
 def derive_locality(request: str, evidence: Optional[Dict] = None) -> str:
     """Best-effort locality (city[, region]) for the suggestion.
@@ -88,8 +98,10 @@ def derive_locality(request: str, evidence: Optional[Dict] = None) -> str:
     if len(parts) < 2:
         return ''
 
-    # Drop a leading venue segment ("Griffin museum of photography").
-    body = parts[1:] if _VENUE_WORDS_RE.search(parts[0]) else parts
+    # Drop a leading venue segment ("Griffin museum of photography") or a leading
+    # TOPIC segment ("Saigon centre landmarks") — neither is the locality.
+    body = (parts[1:] if (_VENUE_WORDS_RE.search(parts[0])
+                          or _TOPIC_SEGMENT_RE.search(parts[0])) else parts)
 
     # Clean a transport/stop-count suffix off the last segment.
     cleaned = []
