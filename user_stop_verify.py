@@ -463,6 +463,7 @@ def verify_user_stops_in_text(
         outdoor_facts_by_title: Optional[Dict[str, list]] = None,
         serp_fn=None, retrieve: bool = True,
         material_by_title: Optional[Dict[str, list]] = None,
+        thin_facts_by_title: Optional[Dict[str, list]] = None,
         precomposed_titles: Optional[List[str]] = None,
         ) -> Tuple[str, dict]:
     """Fact-sheet verify every USER stop in an assembled tour text with ONE cheap
@@ -561,6 +562,28 @@ def verify_user_stops_in_text(
         if _mat:
             facts["retrieved_sources"] = [str(x)[:400] for x in _mat][:20]
             odf = list(_mat)
+
+        # [LOCAL-873B] Merge the LOCAL-873 thin-stop escalation facts into the
+        # fact sheet. These are REAL retrieved facts (each carried a source URL
+        # into the narrator), so sentences the narrator wrote FROM them must be
+        # judged SUPPORTED — not dropped as UNSUPPORTED because the verifier's
+        # fact sheet never saw them. This is the Book Street bug: 13 sourced
+        # facts fed the narrator, but the verify pass (kept 1 dropped 15) never
+        # received them. A thin stop with its own escalation facts therefore no
+        # longer needs a fresh Serper query; the escalation already searched.
+        _thin = None
+        if thin_facts_by_title:
+            for _k, _v in thin_facts_by_title.items():
+                if _fold(_k) == _fold(title):
+                    _thin = [str(x)[:400] for x in _v if str(x).strip()]
+                    break
+        if _thin:
+            existing = list(facts.get("retrieved_sources", []) or [])
+            # Keep every thin fact (up to a generous cap) so a stop escalated to
+            # >=5 facts can deliver >=5 fact-traceable sentences.
+            merged = _thin + [e for e in existing if e not in _thin]
+            facts["retrieved_sources"] = merged[:24]
+            odf = list(facts["retrieved_sources"])
 
         # [LOCAL-855D] A documented monument/institution (cathedral, basilica,
         # palace, museum, …) is SOURCED — skip it so its dates survive

@@ -555,6 +555,24 @@ def _prolog_place(location: str) -> str:
         "Tour Eiffel, Paris"
             → "Tour Eiffel, Paris"  (unchanged)
     """
+    # [LOCAL-873B] Drop a leading DESCRIPTIVE SCOPE segment that is not a place.
+    # A request like "Saigon centre landmarks, Ho Chi Minh City, Vietnam" carries a
+    # scope phrase ("Saigon centre landmarks") that does not geocode (LOCAL-847
+    # logs "scope … did not geocode; using enclosing segment 'Ho Chi Minh City,
+    # Vietnam'"). It must never reach the prolog as a place — the opening would
+    # read "a walking journey through Saigon centre landmarks". When the first
+    # comma-segment ends in a generic scope word AND a following segment exists,
+    # drop the scope segment and keep the real place. General (no place list):
+    # keyed only on the trailing scope noun, so "Hyde Park, London" is untouched.
+    _SCOPE_TAIL_RE = re.compile(
+        r"(?i)\b(landmarks?|sights?|highlights?|attractions?|monuments?|"
+        r"points?\s+of\s+interest|must[- ]sees?|centre|center|downtown|"
+        r"old\s+town|city\s+centre|city\s+center)\s*$")
+    _segs = [s.strip() for s in location.split(",")]
+    if len(_segs) >= 2 and _SCOPE_TAIL_RE.search(_segs[0]):
+        _rest = ", ".join(_segs[1:]).strip()
+        if _rest:
+            location = _rest
     # Try prefix strip first
     stripped = _PROLOG_TOUR_PREFIX_RE.sub('', location, count=1)
     if stripped != location:
@@ -6358,6 +6376,14 @@ _J = _jss.attach_to_module(__name__, {
     "_LAST_VENUE_PREFLIGHT": dict,
     "_LAST_PREFLIGHT_COST": dict,
     "_DIRECT_SNIPPETS_PER_STOP": dict,
+    # [LOCAL-873B] {stop display title: [sourced fact text, ...]} — the facts the
+    # LOCAL-873 thin-stop escalation found for a thin stop, per JOB. These are
+    # REAL retrieved facts (each carries a source URL), so the post-assembly
+    # user-stop fact-sheet verify (user_stop_verify) must judge the delivered
+    # sentences against them too — otherwise a stop whose escalation returned 13
+    # facts (Nguyễn Văn Bình Book Street) has its fact-rich sentences dropped as
+    # UNSUPPORTED because the verifier's fact sheet never saw them.
+    "_THIN_FACTS_PER_STOP": dict,
     # [LOCAL-855B defect 9] The clean display names of the user-chosen stops,
     # per JOB. Was a plain module global (_USER_STOP_TITLES) — the cloud generator
     # serves concurrent jobs in one process, so tour A's titles leaked into tour B
@@ -23985,6 +24011,22 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                                              '_thin_search': True})
                         poi['_lore'] = _ts_lore
                         poi['_thin_evidence'] = _ts_rep['evidence']
+                        # [LOCAL-873B] (c) persist the sourced facts by TITLE so the
+                        # post-assembly user-stop fact-sheet verify judges the
+                        # delivered sentences against them too — else a stop whose
+                        # escalation returned >=5 facts has its fact-rich sentences
+                        # dropped as UNSUPPORTED (Book Street: kept 1 dropped 15).
+                        try:
+                            _tf_map = _J._THIN_FACTS_PER_STOP
+                            _tf_list = list(_tf_map.get(poi_name, []))
+                            for _f in _ts_rep['facts']:
+                                _txt = (_f.get('text', '') or '').strip()
+                                if _txt:
+                                    _tf_list.append(_txt)
+                            if _tf_list:
+                                _tf_map[poi_name] = _tf_list
+                        except Exception:
+                            pass
                         print(f"  [LOCAL-873] Stop {stop_num} '{poi_name[:40]}' was thin "
                               f"({_ts_rep['specifics_before']} specifics): escalated -> "
                               f"{len(_ts_rep['facts'])} sourced fact(s) from "
@@ -34336,6 +34378,7 @@ RULES:
                 complete_tour, _us_titles_855d, location,
                 api_key=api_key, log=print,
                 material_by_title=(_enrich_rep_862 or {}).get("material_by_title"),
+                thin_facts_by_title=dict(_J._THIN_FACTS_PER_STOP or {}),
                 precomposed_titles=(_enrich_rep_862 or {}).get("precomposed"))
             # [LOCAL-855E item 3 / D759] Report Serper retrieval per tour (one
             # query per user stop; venue-naming snippets fold into the fact sheet).
@@ -34383,6 +34426,81 @@ RULES:
                     pass
     except Exception as _fe872c:
         print(f"  [LOCAL-872C] empty-stop fill skipped (non-fatal): {_fe872c}")
+
+    # [LOCAL-873B] POST-NARRATION THIN CHECK — THE TRUE LAST WORD on the delivered
+    # body, after the fact-sheet verify and the never-empty fill (both of which
+    # can leave a stop thin: the verify gutted Book Street's 13-fact body to a
+    # grounded stub; the Pier was never escalated and shipped ~2 specifics). For
+    # each stop whose DELIVERED body carries fewer than 3 sourced specifics (or
+    # fewer than 4 content sentences), escalate NOW if we have no facts for it yet
+    # (cost cap ~$0.01/stop) and rebuild the body ONCE from the sourced facts
+    # (deterministic — no LLM for the rewrite). Running here, last, means the
+    # facts cannot be dropped again. Each candidate fact is PRE-FILTERED through
+    # the 855B user-stop scrub (off-pin landmark / admin-geography), so only clean,
+    # on-pin facts are appended — no destructive re-scrub that would drop a good
+    # sourced fact. Non-museum tours; guarded.
+    try:
+        if (tour_category != 'museum'
+                and os.environ.get('THIN_STOP_SEARCH', '1').strip() != '0'
+                and complete_tour):
+            import thin_stop_delivery as _tsd873b
+            import user_stop_narration as _usn873b
+            try:
+                import wikidata_landmark_lookup as _wll873b
+                _lm_fn_873b = (lambda _n: _wll873b.lookup(_n))
+            except Exception:
+                _lm_fn_873b = None
+
+            def _fact_ok_873b(_title, _sentence, _block_text):
+                """True when a candidate fact sentence survives the 855B user-stop
+                scrub for this stop (not an off-pin landmark, not an admin-geo
+                digression). Keeps the rebuild from appending the same junk the
+                scrub removes elsewhere."""
+                _poi = {"name": _title, "title": _title, "user_explicit": True}
+                try:
+                    import re as _re873b
+                    _cm = _re873b.search(
+                        r"(?mi)^Coordinates:\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)",
+                        _block_text)
+                    if _cm:
+                        _poi["coordinates"] = f"{_cm.group(1)}, {_cm.group(2)}"
+                    _tm = _re873b.search(r"(?mi)^Type/Specialty:\s*(.+?)\s*$",
+                                         _block_text)
+                    if _tm:
+                        _poi["type_specialty"] = _tm.group(1).strip()
+                except Exception:
+                    pass
+                try:
+                    _s1, _d1 = _usn873b.scrub_user_stop_body(
+                        _sentence, _poi, location, source_gated=False)
+                    if _d1:
+                        return False
+                    _s2, _d2 = _usn873b.scrub_offpin_landmarks(
+                        _sentence, _poi, location, landmark_fn=_lm_fn_873b)
+                    if _d2:
+                        return False
+                except Exception:
+                    return True
+                return True
+
+            _facts_map_873b = dict(_J._THIN_FACTS_PER_STOP or {})
+            complete_tour, _tsd_rep = _tsd873b.rebuild_thin_delivered_stops(
+                complete_tour, location,
+                facts_by_title=_facts_map_873b, fact_filter=_fact_ok_873b,
+                log=print)
+            if _tsd_rep.get("rebuilt"):
+                print(f"  [LOCAL-873B] post-narration thin check: "
+                      f"{_tsd_rep.get('rebuilt', 0)} stop(s) rebuilt from facts, "
+                      f"{_tsd_rep.get('escalated', 0)} escalated now; added cost "
+                      f"${_tsd_rep.get('added_cost_usd', 0.0):.4f}")
+                if output_file:
+                    try:
+                        with open(output_file, "w", encoding="utf-8") as _tf:
+                            _tf.write(complete_tour)
+                    except Exception:
+                        pass
+    except Exception as _tsd_err:
+        print(f"  [LOCAL-873B] post-narration thin check skipped (non-fatal): {_tsd_err}")
 
     return complete_tour, output_file, first_poi_coordinates
 

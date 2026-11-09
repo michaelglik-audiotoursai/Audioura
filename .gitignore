@@ -97,3 +97,4 @@ catalog/export/
 # LOCAL-873 thin-stop live-proof run logs (meter rows, generated tour text/log).
 # Machine-local run state — never committed (see run_local873_live.py).
 _local873_meterlogs/
+_local873b_meterlogs/

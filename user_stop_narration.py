@@ -56,9 +56,20 @@ __all__ = [
 
 
 def _fold(text: str) -> str:
+    """Accent-fold to lowercase ASCII words.
+
+    [LOCAL-873B] The Vietnamese letter ``đ``/``Đ`` is a DISTINCT Unicode letter,
+    not a base + combining mark, so NFKD leaves it intact. Left alone, ``Đằng``
+    folds to ``đang`` (not ``dang``) and no English snippet's "Dang" ever
+    matches — the exact bug that rejected every English result for a đ-name
+    (e.g. "Bạch Đằng Pier"). Fold ``đ``/``Đ`` → ``d`` FIRST, then NFKD-strip.
+    This is the one ``_fold`` ``user_stop_verify`` imports, so D759's own
+    snippet retrieval accepts "Bach Dang …" too.
+    """
     if not text:
         return ""
-    nfkd = unicodedata.normalize("NFKD", str(text))
+    pre = str(text).replace("đ", "d").replace("Đ", "D")
+    nfkd = unicodedata.normalize("NFKD", pre)
     stripped = "".join(c for c in nfkd if not unicodedata.combining(c))
     stripped = re.sub(r"[^\w\s]", " ", stripped.lower())
     return " ".join(stripped.split())
@@ -354,6 +365,23 @@ _ADMIN_GEOGRAPHY_RE = re.compile(
     r"(?:south|north|east|west|southeast|southwest|northeast|northwest)"
     r"(?:east|west)?\b|"
     r"\b\d{1,3}\s*km\s+(?:south|north|east|west|from)\b|"
+    # [LOCAL-873B] OFF-PIN ADMINISTRATIVE PLACEMENT in an Orientation/body line.
+    # Bạch Đằng Pier (pin 10.775,106.707 — District 1 riverfront) was oriented
+    # "near the boundary of Thủ Dầu Một ward … the view toward Bình Mỹ across the
+    # Saigon River … this northern part of Ho Chi Minh City" — all ~25 km north.
+    # A venue is at its PIN, never at an adjacent/other ward, and the compass
+    # placement ("the northern/southern/… part of <city>") is model-invented
+    # geography. These are off-venue even when the stop names itself, so they are
+    # ALWAYS-drop like the rest of this tier.
+    #   * the two specific wrong wards from the field run (robust to diacritics);
+    r"\bTh[ủu]\s+D[ầa]u\s+M[ộo]t\b|\bB[ìi]nh\s+M[ỹy]\b|\bB[ìi]nh\s+D[ưu][ơo]ng\b|"
+    #   * a generic "boundary of <Proper> ward" / "adjacent ward(s)";
+    r"\bboundar(?:y|ies)\s+of\s+[A-ZÀ-Ỹ][\w ]*\bwards?\b|"
+    r"\badjacent\s+wards?\b|\bneighbou?ring\s+wards?\b|"
+    #   * a cardinal-direction placement of the stop within the city
+    #     ("this northern part of Ho Chi Minh City", "the eastern edge of …");
+    r"\b(?:northern|southern|eastern|western|central)\s+(?:part|edge|side|section|"
+    r"reaches|district)\s+of\s+[A-ZÀ-Ỹ]|"
     # Infrastructure project the venue is not part of ("… the government approved
     # the construction of Long Thanh International Airport …") — ALWAYS-drop even
     # when the sentence also names the venue (it rode in on a "just as … the venue
