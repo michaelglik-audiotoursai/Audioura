@@ -77,11 +77,16 @@ DENSE_CENTRE_KM = float(os.environ.get("LANDMARK_WIKI_DENSE_CENTRE_KM", "0.3"))
 # Hall stop shipped the Gia Long Palace again. Bumping RULES_VERSION to the
 # LOCAL-881 value retires that row; the payload re-check rejects it even if the
 # version matched.
-RULES_VERSION = os.environ.get("LANDMARK_WIKI_RULES_VERSION", "local881-dense300")
+# [LOCAL-885] bumped: the cached payload now carries the article's FULL plain text
+# (``full_text``, <= _MAX_FULL chars). A row stored under the previous version has
+# only the 1,500-char lead, so it is ignored on read and re-fetched (never DELETEd).
+RULES_VERSION = os.environ.get("LANDMARK_WIKI_RULES_VERSION", "local885-fulltext")
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 _MAX_LEAD = 6000
 _MAX_INFOBOX = 2500
+_MAX_FULL = int(os.environ.get("LANDMARK_WIKI_MAX_FULL", "20000"))      # [LOCAL-885]
+PASSAGE_CAP = int(os.environ.get("LANDMARK_WIKI_PASSAGE_CAP", "6000"))  # [LOCAL-885]
 _INFOBOX_KEYS = (
     "built", "construction", "construction_start", "construction_end", "completed",
     "completion_date", "opened", "opening", "opening_date", "open", "established",
@@ -201,6 +206,7 @@ def _pages_from(data):
         "langlinks": [l.get("title", "") for l in (p.get("langlinks") or [])],
         "coord": _page_coord(p),
         "qid": (p.get("pageprops") or {}).get("wikibase_item", "") or "",
+        "full_text": p.get("full_text", "") or "",
     } for p in pages if not p.get("missing")]
 
 
@@ -501,6 +507,8 @@ def _pick(name: str, raw: Optional[Dict], pin: Optional[Tuple[float, float]] = N
                 "infobox": parse_infobox(p.get("wikitext", ""))}
         if _art_coord is not None:
             _out["coord"] = [round(_art_coord[0], 6), round(_art_coord[1], 6)]
+        if p.get("full_text"):                 # [LOCAL-885] injected/recorded fetchers
+            _out["full_text"] = str(p["full_text"])[:_MAX_FULL]
         return _out
     return None
 
@@ -571,6 +579,121 @@ def _revalidate_payload(art: Optional[Dict[str, str]], name: str,
                 and _city_named(city, title, art.get("lead", ""))):
             return False
     return True
+
+
+
+# ---- LOCAL-885: full article text + relevance-ranked passages -----------------
+def fetch_full_text(title: str, lang: str = "en") -> Optional[str]:
+    """Plain text of the WHOLE article (``prop=extracts&explaintext=1``, no exintro;
+    section headings arrive as ``== History ==`` lines), capped at ``_MAX_FULL``.
+    FREE MediaWiki call. None on transport failure; '' for an empty extract."""
+    if not title:
+        return None
+    d = _http_json(lang, {"action": "query", "format": "json", "formatversion": "2",
+                          "prop": "extracts", "explaintext": "1", "exsectionformat": "wiki",
+                          "titles": title, "redirects": "1"})
+    if d is None:
+        return None
+    pages = ((d.get("query") or {}).get("pages") or [])
+    for p in pages:
+        if isinstance(p, dict) and not p.get("missing"):
+            return (p.get("extract") or "")[:_MAX_FULL]
+    return ""
+
+
+_HEADING_RE = re.compile(r"^\s*(={2,6})\s*(.*?)\s*\1\s*$")
+_SKIP_SECTIONS = frozenset({
+    "see also", "references", "external links", "notes", "further reading",
+    "bibliography", "sources", "footnotes", "citations", "gallery", "tham khảo",
+    "liên kết ngoài", "xem thêm", "chú thích", "ghi chú", "thư mục"})
+_STORY_RE = re.compile(
+    r"(?i)\b(designed|architects?|built|constructed?|construction|opened|inaugurat\w+|"
+    r"consecrated|completed|bombed|bombing|bombed|destroyed|crashed|crash\w*|captured|"
+    r"served as|renamed|named|rebuilt|restored|renovat\w+|damaged|occupied|surrender\w*|"
+    r"founded|established|foundation stone|demolished|headquarters|assembly|"
+    r"xây dựng|thiết kế|khánh thành|khởi công|hoàn thành|đổi tên|ném bom|xe tăng)\b")
+_NAME_RE = re.compile(r"\b[A-ZÀ-Ỹ][a-zà-ỹ]{2,}(?:\s+(?:de|du|von|van)?\s*[A-ZÀ-Ỹ][a-zà-ỹ]{2,})+")
+_DATE_FULL_RE = re.compile(
+    r"(?i)\b\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{4}\b|"
+    r"\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4}\b")
+
+
+def article_sections(full_text: str) -> List[str]:
+    """Section titles of a full plain-text article, in order."""
+    out = []
+    for ln in (full_text or "").splitlines():
+        m = _HEADING_RE.match(ln)
+        if m and m.group(2):
+            out.append(m.group(2))
+    return out
+
+
+def split_paragraphs(full_text: str) -> List[Tuple[str, str]]:
+    """[(section, paragraph)] from the plain text. Headings are not paragraphs;
+    reference-like sections are dropped; paragraphs under 60 chars are noise."""
+    out: List[Tuple[str, str]] = []
+    section = ""
+    skipping = False
+    for ln in (full_text or "").splitlines():
+        m = _HEADING_RE.match(ln)
+        if m:
+            section = m.group(2).strip()
+            skipping = section.lower() in _SKIP_SECTIONS
+            continue
+        t = ln.strip()
+        if skipping or len(t) < 60:
+            continue
+        out.append((section, t))
+    return out
+
+
+def _score_paragraph(par: str) -> float:
+    years = set(_YEAR_RE2.findall(par))
+    sc = 2.0 * min(len(years), 4)
+    sc += 3.0 * min(len(_DATE_FULL_RE.findall(par)), 2)          # exact dates (30 April 1975)
+    sc += 1.5 * min(len(_STORY_RE.findall(par)), 5)
+    sc += 0.7 * min(len(_NAME_RE.findall(par)), 5)               # named people / places
+    if len(par) > 1200:                                            # a wall of text is diluted
+        sc *= 0.8
+    return sc
+
+
+def select_passages(full_text: str, lead: str = "", cap: int = PASSAGE_CAP) -> str:
+    """The most history/story-relevant paragraphs of the article, <= ``cap`` chars,
+    emitted in ARTICLE order (so the narrative reads straight), each prefixed
+    ``[Section]``. Paragraphs already in the lead are skipped (the lead is shipped
+    separately). Deterministic."""
+    lead_f = _fold2(lead or "")
+    cands = []
+    for i, (sec, par) in enumerate(split_paragraphs(full_text)):
+        if _fold2(par[:80]) in lead_f:
+            continue
+        sc = _score_paragraph(par)
+        if sc > 0:
+            cands.append((-sc, i, sec, par))
+    cands.sort()
+    chosen, used = [], 0
+    for _, i, sec, par in cands:
+        piece = (f"[{sec}] " if sec else "") + par
+        if len(piece) > cap:
+            piece = piece[:cap].rsplit(" ", 1)[0]
+        if used + len(piece) + 2 > cap:
+            continue
+        chosen.append((i, piece))
+        used += len(piece) + 2
+    chosen.sort()
+    return "\n".join(p for _, p in chosen)
+
+
+class EvidenceBundle(list):
+    """[LOCAL-885] THE shared evidence object for one stop: a list of evidence item
+    strings (so every existing consumer works unchanged) that the narrator, the
+    grounding gate and the audit all read -- the SAME object, never copies, so they
+    cannot drift. ``stats`` gives per-article sizes."""
+    stats: List[Dict] = []
+
+    def chars(self) -> int:
+        return sum(len(x) for x in self)
 
 
 # ---- cache (venue-cache DB, like landmark_coord_cache) -------------------------
@@ -700,6 +823,12 @@ def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None,
                   f"negative row honoured (no article at this pin)", flush=True)
             return (False, None)              # negative row: version + expiry suffice
         art = json.loads(payload)
+        if isinstance(art, dict) and "full_text" not in art:
+            # [LOCAL-885] a same-version row without the full-text key (the full-text
+            # fetch failed when it was stored): re-fetch, overwrite via ON CONFLICT.
+            print(f"[LOCAL-882] cache revalidate {name!r} @{_pin_cell(pin)}: "
+                  f"[LOCAL-885] row has no full_text -> re-fetch", flush=True)
+            return None
         if not _revalidate_payload(art, name, pin=pin, city=city, match_name=match_name):
             print(f"[LOCAL-882] cache revalidate {name!r} @{_pin_cell(pin)}: "
                   f"REJECT cached {(art.get('title') or '')!r} (current rules would "
@@ -763,6 +892,13 @@ def fetch_article(name: str, lang: str = "en", fetch_fn: Optional[Callable] = No
     except Exception:
         raw = None
     art = _pick(nm, raw, pin=pin, city=city, match_name=match_name)
+    # [LOCAL-885] The article is ALREADY accepted (name + geo + dense-centre +
+    # distinctive-token rules above, unchanged). Only now fetch its FULL plain text;
+    # this changes how much text we keep, never which article is accepted.
+    if art is not None and "full_text" not in art and fetch_fn is None:
+        ft = fetch_full_text(art.get("title", ""), lang)
+        if ft is not None:
+            art["full_text"] = ft
     # only cache a real answer: a transport failure (raw None) must be retried. A
     # name-matching-but-rejected article is cached as a MISS for this (search-name,
     # pin-cell), so a repeat run does not re-fetch Sydney for the Saigon pin.
@@ -844,6 +980,10 @@ def evidence_for(name: str, location: str = "", langs: Optional[Sequence[str]] =
             txt = f"{art['title']} - Wikipedia ({lang}). {art['lead']}"
             if art.get("infobox"):
                 txt += f"\nInfobox: {art['infobox']}"
+            # [LOCAL-885] relevance-ranked passages from the FULL article (<= 6 KB)
+            psg = select_passages(art.get("full_text", ""), art.get("lead", ""))
+            if psg:
+                txt += f"\nPassages: {psg}"
             out.append(txt)
     return out
 
@@ -889,18 +1029,25 @@ def cached_evidence(name: str, location: str = "", aliases: Sequence[str] = (),
            _pin_cell(pin), (city or "").strip().lower())
     if key not in _MEMO:
         try:
-            _MEMO[key] = list(evidence_for(name, location, None, None, True,
-                                           list(aliases or ()), pin=pin, city=city) or [])
+            _MEMO[key] = EvidenceBundle(evidence_for(name, location, None, None, True,
+                                                     list(aliases or ()), pin=pin,
+                                                     city=city) or [])
         except Exception:
-            _MEMO[key] = []
-    return list(_MEMO[key])
+            _MEMO[key] = EvidenceBundle()
+    # [LOCAL-885] the SAME bundle object every time (narrator, gate, audit share it).
+    return _MEMO[key]
 
 
 def split_item(item: str) -> Dict[str, str]:
     m = _HEAD_RE.match(item or "")
     title, lang, rest = (m.group("title"), m.group("lang"), m.group("rest")) if m else ("", "", item or "")
     lead, _, box = rest.partition("\nInfobox:")
-    return {"title": title.strip(), "lang": lang, "lead": lead.strip(), "infobox": box.strip()}
+    if not box:                                   # [LOCAL-885] passages but no infobox
+        lead, _, psg = lead.partition("\nPassages:")
+    else:
+        box, _, psg = box.partition("\nPassages:")
+    return {"title": title.strip(), "lang": lang, "lead": lead.strip(),
+            "infobox": box.strip(), "passages": psg.strip()}
 
 
 def _infobox_map(box: str) -> Dict[str, str]:
@@ -991,7 +1138,14 @@ def narrator_block(name: str, items: Sequence[str]) -> str:
         return ""
     en = [i for i in items if "Wikipedia (en)" in i[:200]]
     pick = (en + [i for i in items if i not in en])[:2]
-    body = "\n\n".join(i[:3200] for i in pick)
+    # [LOCAL-885] the English item carries lead + infobox + ranked passages (<= 6 KB);
+    # the local edition is for the GATE only, so the narrator sees its lead/infobox
+    # but not its passages.
+    def _render(i):
+        if "Wikipedia (en)" in i[:200]:
+            return i[:3200 + PASSAGE_CAP + 400]
+        return i.partition("\nPassages:")[0][:3200]
+    body = "\n\n".join(_render(i) for i in pick)
     au = authority(items)
     key = []
     if au["date_facts"]:
