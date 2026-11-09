@@ -6384,6 +6384,12 @@ _J = _jss.attach_to_module(__name__, {
     # facts (Nguyễn Văn Bình Book Street) has its fact-rich sentences dropped as
     # UNSUPPORTED because the verifier's fact sheet never saw them.
     "_THIN_FACTS_PER_STOP": dict,
+    # [LOCAL-873C] The per-job key into the process-global _THIN_FACTS_SINK. Set
+    # once in the MAIN thread at the top of generate_tour_text, BEFORE the
+    # narration workers are spawned, so each worker inherits (reads) the same key
+    # from the parent context and writes its escalation facts into the one bucket
+    # the main-thread rebuild later reads.
+    "_THIN_SINK_KEY": lambda: ("global",),
     # [LOCAL-855B defect 9] The clean display names of the user-chosen stops,
     # per JOB. Was a plain module global (_USER_STOP_TITLES) — the cloud generator
     # serves concurrent jobs in one process, so tour A's titles leaked into tour B
@@ -6437,6 +6443,41 @@ _J = _jss.attach_to_module(__name__, {
     "_LAST_NAMED_PLACE_COORDS": dict,
     "_LAST_WALK_SCOPE": lambda: "",
 })
+
+# [LOCAL-873C] Process-global thin-fact sink, keyed per job. The LOCAL-873
+# thin-stop escalation runs inside the per-stop narration work (a worker context
+# under job_scoped_state), so the facts it writes to the job-scoped
+# ``_THIN_FACTS_PER_STOP`` are NOT visible to the MAIN thread that runs the
+# post-narration rebuild at the end of generate_tour_text — contextvar writes do
+# not propagate back out of a child context. That left the rebuild's facts map
+# empty, forcing a wasteful re-escalation (and, under a tight budget, no rebuild
+# at all). This plain module dict is written alongside the job-scoped map and
+# read by the rebuild as a fallback. It is keyed by a per-job token (the job_id,
+# else the id() of the job's poi list) and reset at the top of each generation,
+# so concurrent jobs in one process never read each other's facts.
+_THIN_FACTS_SINK = {}
+
+
+def _thin_sink_key(job_id=None, poi_list=None):
+    if job_id:
+        return ("job", str(job_id))
+    if poi_list is not None:
+        return ("poi", id(poi_list))
+    return ("global",)
+
+
+def _thin_sink_record(key, title, facts):
+    try:
+        bucket = _THIN_FACTS_SINK.setdefault(key, {})
+        cur = list(bucket.get(title, []))
+        for f in facts or []:
+            t = (f.get("text", "") if isinstance(f, dict) else str(f)).strip()
+            if t:
+                cur.append(t)
+        if cur:
+            bucket[title] = cur
+    except Exception:
+        pass
 
 # [LOCAL-582] Module-level: how the LAST generation was delivered.
 #   'full'     — a normal multi-stop tour (default; LOCAL-580 and before).
@@ -11372,6 +11413,17 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # path below overwrites it. The service's fail-closed coordinate assertion
     # reads this to name the delivering path.
     _J._LAST_DELIVERY_PATH = 'fresh'
+
+    # [LOCAL-873C] Establish this job's thin-fact sink bucket in the MAIN thread,
+    # before any narration worker is spawned, so workers inherit the same key and
+    # write their escalation facts where the post-narration rebuild (also main
+    # thread) can read them. Keyed by job_id when present, else a per-call token.
+    try:
+        _sink_key = _thin_sink_key(job_id=job_id, poi_list=forced_stops)
+        _J._THIN_SINK_KEY = _sink_key
+        _THIN_FACTS_SINK[_sink_key] = {}
+    except Exception:
+        pass
 
     # [LOCAL-656] This wrapper is the per-tour boundary. Clear the per-tour
     # resolve_venue / fetch_venue_works memo so this generation starts with an
@@ -24027,6 +24079,14 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                                 _tf_map[poi_name] = _tf_list
                         except Exception:
                             pass
+                        # [LOCAL-873C] also record into the process-global sink
+                        # (visible to the main-thread rebuild despite contextvar
+                        # isolation of the job-scoped map written in this worker).
+                        try:
+                            _thin_sink_record(_J._THIN_SINK_KEY, poi_name,
+                                              _ts_rep['facts'])
+                        except Exception:
+                            pass
                         print(f"  [LOCAL-873] Stop {stop_num} '{poi_name[:40]}' was thin "
                               f"({_ts_rep['specifics_before']} specifics): escalated -> "
                               f"{len(_ts_rep['facts'])} sourced fact(s) from "
@@ -34484,13 +34544,47 @@ RULES:
                 return True
 
             _facts_map_873b = dict(_J._THIN_FACTS_PER_STOP or {})
+            # [LOCAL-873C] merge the process-global sink (facts the escalation
+            # wrote from narration workers, invisible to this main-thread map).
+            try:
+                _sink_bucket = _THIN_FACTS_SINK.get(_J._THIN_SINK_KEY, {}) or {}
+                for _k, _v in _sink_bucket.items():
+                    _merged = list(_facts_map_873b.get(_k, []))
+                    for _t in _v:
+                        if _t and _t not in _merged:
+                            _merged.append(_t)
+                    if _merged:
+                        _facts_map_873b[_k] = _merged
+            except Exception:
+                pass
+            print(f"  [LOCAL-873C] rebuild facts map: "
+                  f"{len(_facts_map_873b)} stop(s) with sourced facts")
+
+            # [LOCAL-873C] The rebuild is NARRATED: one cheap gpt-4.1-mini call
+            # per rebuilt stop rewrites its facts as 5–7 spoken sentences, each
+            # verified traceable to a fact and cleared by the LOCAL-872 claim
+            # gate. The default narrate backend (thin_stop_delivery._default_narrate)
+            # is a plain requests.post the live meter already intercepts, so it is
+            # billed and cost-capped like every other paid call. On failure/reject
+            # the rebuild falls back to the deterministic append (873C repair
+            # fixes applied). claim_gate_fn is the LOCAL-872 unsourced-claim check.
+            def _claim_gate_873c(_sentence, _title, _evidence, _loc):
+                try:
+                    import landmark_claim_gate as _lcg873c
+                    return _lcg873c.unsourced_claims(
+                        _sentence, _title, _evidence, known=(),
+                        location=_loc or "")
+                except Exception:
+                    return []
+
             complete_tour, _tsd_rep = _tsd873b.rebuild_thin_delivered_stops(
                 complete_tour, location,
                 facts_by_title=_facts_map_873b, fact_filter=_fact_ok_873b,
-                log=print)
+                claim_gate_fn=_claim_gate_873c, log=print)
             if _tsd_rep.get("rebuilt"):
                 print(f"  [LOCAL-873B] post-narration thin check: "
-                      f"{_tsd_rep.get('rebuilt', 0)} stop(s) rebuilt from facts, "
+                      f"{_tsd_rep.get('rebuilt', 0)} stop(s) rebuilt from facts "
+                      f"({_tsd_rep.get('narrated', 0)} narrated), "
                       f"{_tsd_rep.get('escalated', 0)} escalated now; added cost "
                       f"${_tsd_rep.get('added_cost_usd', 0.0):.4f}")
                 if output_file:
