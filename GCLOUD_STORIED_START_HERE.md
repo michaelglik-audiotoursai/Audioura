@@ -13,6 +13,8 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ 2026-11-08 ~20:40 EST — credits restored ($19.98). Wave 36 re-proof FAILED (547: Opera House narrated as the Sydney Opera House; Post Office empty) → rolled back to gen 00036-qbq; 547 hidden; rows 439. Item 3 below is DONE (failed). Michael's regen is on hold until LEAD's combined 873/875/876 wave. 3h watch is still not armed.
+
 # ▶️▶️ RESUME HERE — written 2026-11-06 ~16:00 EST (Michael closed the laptop to travel; 3h watch cron 7503d257 deleted, nothing armed)
 
 1. Run `date` and prefix replies with `[GCloud_Storied_1]@…`. LEAD = Storied_Tours (bridge:session_0162Qu7k54NgjdiBu8pVkpwb). Re-arm the 3h CronCreate watch, check ClickUp `1000410000000733` for waves newer than **36**, and tell LEAD you're back.
