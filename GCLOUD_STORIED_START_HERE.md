@@ -13,6 +13,14 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 37 — 2026-11-09 ~02:30 EST (wdvrdazevt) — LIVE @ fb520b34 (build 0a935aa9, bsub45).
+- Live revisions: gen 00039-mtv, orch 00022-m9c, map 00007-7n8.
+- Rollback targets: 00036-qbq / 00021-lbb / 00006-6kk.
+- Proof 547 = Michael's 10 stops, $0.233. It passes criteria 1, 2, 3, 5 and 6. Criterion 4 is clean in the text, but the log shows one LOCAL-459 /wiki/Saigon_Centre fetch; kept live and flagged to LEAD.
+- Share 2SER1Npc is NOT for Michael until LEAD evaluates. 547 is hidden (backup wave37_547_latlng.json); rows 439.
+- Michael's own regen is held until LEAD says go.
+- Flutter for Android = flutter-3.41.6.
+
 # ▶️ 2026-11-08 ~20:40 EST — credits restored ($19.98). Wave 36 re-proof FAILED (547: Opera House narrated as the Sydney Opera House; Post Office empty) → rolled back to gen 00036-qbq; 547 hidden; rows 439. Item 3 below is DONE (failed). Michael's regen is on hold until LEAD's combined 873/875/876 wave. 3h watch is still not armed.
 
 # ▶️▶️ RESUME HERE — written 2026-11-06 ~16:00 EST (Michael closed the laptop to travel; 3h watch cron 7503d257 deleted, nothing armed)
