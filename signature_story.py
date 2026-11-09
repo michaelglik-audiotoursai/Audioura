@@ -131,6 +131,279 @@ def _looks_like_story(story: str) -> bool:
     return True
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# LOCAL-881 — TRUST ONLY THE STOP'S OWN SOURCE
+#
+# Wave 39 (proof 547, gen 00041-lkk, rolled back) shipped FALSE or off-site
+# signature stories that the LOCAL-880 design then PROTECTED from the claim gate,
+# so a wrong pick became worse than no story:
+#   * Post Office: "designed by Gustave Eiffel" (a myth the evidence itself flags;
+#     truth is Vildieu + Foulhoux, 1886-91);
+#   * Book Street: the 1968 Loan/Lém execution "right here" (it was in Chợ Lớn);
+#   * City Hall: the Gia Long Palace article (a different building ~600 m away);
+#   * Palace: "months before … 31 October 1966" with a Nov 1963 event (3 years);
+#   * Palace: the tank story that lost "30 April 1975".
+#
+# These all entered because the picker drew its source from the 873 thin-stop page
+# facts (``poi['_lore']``), not the stop's OWN Wikipedia article. The helpers below
+# are generic (D769 — no venue, city, date or name is hard-coded): a story is kept
+# only when its source sentence comes from the stop's own source (own article, or a
+# page that names the stop), does not carry a myth/contradiction marker about the
+# stop, names the stop when it makes an on-this-spot location claim, and keeps a
+# consistent relative-time phrasing. The full date is preserved for survival.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# A sentence makes an "it happened HERE" location claim with one of these phrases.
+# Generic deixis, no place name: "right here", "on this spot", "on this street",
+# "in this building", "at this corner", "here, on a … street". Whitespace-tolerant.
+_LOCATION_CLAIM_RE = re.compile(
+    r"(?i)\b("
+    r"right here"
+    r"|here on (?:a|this|the)\b"
+    r"|on this (?:spot|street|site|corner|square|avenue|boulevard|road|pavement|sidewalk)"
+    r"|on these (?:steps|streets)"
+    r"|at this (?:spot|street|site|corner|square|location|building|address)"
+    r"|in this (?:building|house|hall|palace|room|very)"
+    r"|outside this (?:building|house|hall)"
+    r"|where you (?:are )?stand"
+    r"|on the (?:spot|very spot) where"
+    r"|at the (?:spot|very spot) where"
+    r")\b")
+
+# A sentence that CORRECTS or FLAGS a myth / misattribution about its subject.
+# The marked (wrong) version may be told only as a myth correction (D760); it must
+# never be picked as the stop's signature story nor protected at the gate.
+_MYTH_MARKER_RE = re.compile(
+    r"(?i)\b("
+    r"often (?:wrongly |incorrectly |mistakenly |falsely )?(?:attributed|credited|said|claimed|believed|thought)"
+    r"|wrongly attributed|incorrectly attributed|mistakenly attributed|falsely attributed"
+    r"|commonly but incorrectly|popularly but"
+    r"|contrary to (?:popular|common) (?:belief|opinion|myth)"
+    r"|is a (?:myth|misconception|legend|popular myth|common myth)"
+    r"|(?:a|the|this) (?:myth|misconception|legend|urban legend|folk tale|folklore)\b"
+    r"|despite (?:the )?popular belief"
+    r"|not (?:actually |in fact )?(?:designed|built|by)\b"
+    r"|has no (?:actual |real )?(?:connection|link|involvement)"
+    r"|no (?:evidence|record|proof) (?:that|of|for|supports)"
+    r"|did not (?:design|build|create)"
+    r"|was not (?:designed|built|created) by"
+    r"|rumou?red|legend (?:has it|says)|it is said that"
+    r")\b")
+
+# A relative-time phrase relating two events: "months before X", "three years
+# after Y", "weeks before …". We extract the unit and whether it is a "small"
+# (days/weeks/months) or large (years/decades) gap, to contradict it against the
+# actual gap between the two dates in the sentence/evidence.
+_REL_TIME_RE = re.compile(
+    r"(?i)\b(?:(?P<num>a|an|one|two|three|four|five|six|seven|eight|nine|ten|"
+    r"eleven|twelve|several|a few|some|\d+)\s+)?"
+    r"(?P<unit>day|days|week|weeks|month|months|year|years|decade|decades)\s+"
+    r"(?P<dir>before|after|earlier than|later than|prior to)\b")
+
+_MONTHS = ("january", "february", "march", "april", "may", "june", "july",
+           "august", "september", "october", "november", "december")
+_MONTH_IDX = {m: i + 1 for i, m in enumerate(_MONTHS)}
+# common abbreviations
+_MONTH_IDX.update({m[:3]: i + 1 for i, m in enumerate(_MONTHS)})
+_MONTH_IDX["sept"] = 9
+
+_YEAR_RE = re.compile(r"(?<!\d)(1[5-9]\d\d|20\d\d)(?!\d)")
+# "30 April 1975" / "April 30, 1975" / "1 July 1962"
+_FULL_DATE_RE = re.compile(
+    r"(?i)\b(?:"
+    r"(?P<d1>\d{1,2})\s+(?P<m1>january|february|march|april|may|june|july|august|"
+    r"september|october|november|december)\s+(?P<y1>1[5-9]\d\d|20\d\d)"
+    r"|(?P<m2>january|february|march|april|may|june|july|august|september|october|"
+    r"november|december)\s+(?P<d2>\d{1,2}),?\s+(?P<y2>1[5-9]\d\d|20\d\d)"
+    r")\b")
+
+
+def source_full_date(text: str) -> Optional[Dict[str, int]]:
+    """The first full (day, month, year) date in ``text`` as {'day','month','year'},
+    or None. Used so the survival check and the regeneration prompt keep a story's
+    exact date (the wave-39 Palace lost '30 April 1975')."""
+    m = _FULL_DATE_RE.search(text or "")
+    if not m:
+        return None
+    if m.group("y1"):
+        return {"day": int(m.group("d1")), "month": _MONTH_IDX[m.group("m1").lower()],
+                "year": int(m.group("y1"))}
+    return {"day": int(m.group("d2")), "month": _MONTH_IDX[m.group("m2").lower()],
+            "year": int(m.group("y2"))}
+
+
+def _date_tokens(d: Dict[str, int]) -> List[str]:
+    """['30', 'april', '1975'] forms a body must carry to keep a full date."""
+    month = _MONTHS[d["month"] - 1]
+    return [str(d["day"]), month, str(d["year"])]
+
+
+def body_keeps_date(body: str, d: Optional[Dict[str, int]]) -> bool:
+    """When the story's source has a full date, the delivered body must carry its
+    MONTH and YEAR (the day may be dropped). True when no full date to keep."""
+    if not d:
+        return True
+    low = _fold(body)
+    month = _MONTHS[d["month"] - 1]
+    year = str(d["year"])
+    return (year in low) and (month in low or month[:3] in low)
+
+
+def _stop_name_tokens(stop_title: str, aliases: Optional[List[str]] = None) -> set:
+    """Distinctive tokens that NAME this stop: its title + aliases, minus the
+    generic venue vocabulary (so "Opera House" contributes nothing, but "Saigon",
+    "Bạch Đằng", "Nguyễn Văn Bình" do). Used to test whether a source sentence
+    names the stop as the place of an event."""
+    toks: set = set()
+    for s in [stop_title] + list(aliases or []):
+        toks |= _content_tokens(s or "")
+    return {t for t in toks if t not in _GENERIC_VENUE}
+
+
+def _distinctive_name_phrases(stop_title: str,
+                              aliases: Optional[List[str]] = None) -> List[str]:
+    """The folded distinctive-name PHRASE of the stop and each alias: the title
+    with generic venue words removed, kept in order ("nguyen van binh" from
+    "Nguyễn Văn Bình Book Street", "bach dang" from "Bạch Đằng Pier"). Used so a
+    coincidental single shared token (the common surname "Nguyễn" in "Nguyễn Văn
+    Lém") does not count as naming the stop — the ordered name must appear."""
+    out: List[str] = []
+    for s in [stop_title] + list(aliases or []):
+        toks = [t for t in re.findall(r"[a-z0-9]+", _fold(s or ""))
+                if t not in _GENERIC_VENUE and t not in _STOP and len(t) >= 2]
+        if toks:
+            out.append(" ".join(toks))
+    return out
+
+
+def source_names_stop(source_sentence: str, stop_title: str,
+                      aliases: Optional[List[str]] = None,
+                      *, min_overlap: int = 1) -> bool:
+    """True when the source sentence NAMES this stop as the place.
+
+    A stop with a MULTI-token distinctive name ("Nguyễn Văn Bình", "Bạch Đằng")
+    must appear as its ORDERED phrase — so the Loan/Lém fact ("Nguyễn Ngọc Loan …
+    Nguyễn Văn Lém on a Saigon street"), which shares only the common tokens
+    "nguyễn"/"văn", does NOT count as naming the Book Street. A stop whose
+    distinctive name is a single token is matched on that token."""
+    phrases = _distinctive_name_phrases(stop_title, aliases)
+    if not phrases:
+        return False
+    folded_src = _fold(source_sentence)
+    multi = [p for p in phrases if " " in p]
+    if multi:
+        return any(p in folded_src for p in multi) or any(
+            " " not in p and p in _content_tokens(source_sentence) for p in phrases)
+    # single-token distinctive names: a token match is enough.
+    want = _stop_name_tokens(stop_title, aliases)
+    have = _content_tokens(source_sentence)
+    return len(want & have) >= min_overlap
+
+
+def location_claim_ok(story: str, source_sentence: str, stop_title: str,
+                      aliases: Optional[List[str]] = None) -> bool:
+    """A location claim ("right here", "on this spot", "in this building") is only
+    allowed when the SOURCE sentence names this stop as the place. A city-wide
+    event pinned to the stop with deixis ("executed … right here on a Saigon
+    street", on a stop the source does not name) fails and the story is dropped.
+
+    A story with no such location claim passes trivially."""
+    blob = f"{story} {source_sentence}"
+    if not _LOCATION_CLAIM_RE.search(blob):
+        return True
+    return source_names_stop(source_sentence, stop_title, aliases)
+
+
+def evidence_flags_myth(story: str, source_sentence: str,
+                        own_evidence: str) -> bool:
+    """True when the stop's OWN evidence flags a myth / misattribution that the
+    story would repeat as fact. Two triggers, both generic:
+
+      (a) the source sentence ITSELF carries a myth marker (so telling it straight
+          launders a flagged myth — "designed by Eiffel" where the source reads
+          "often attributed to Eiffel … actually by Foulhoux"); or
+      (b) a DIFFERENT sentence in the evidence carries a myth marker that shares a
+          distinctive subject token with the story (the evidence corrects the very
+          claim the story makes).
+    """
+    if _MYTH_MARKER_RE.search(source_sentence or ""):
+        return True
+    story_tok = _content_tokens(story) | _content_tokens(source_sentence)
+    story_tok = {t for t in story_tok if t not in _GENERIC_VENUE and not t.isdigit()}
+    if not story_tok:
+        return False
+    for sent in _sentences(own_evidence or ""):
+        if not _MYTH_MARKER_RE.search(sent):
+            continue
+        if len(story_tok & _content_tokens(sent)) >= 2:
+            return True
+    return False
+
+
+def relative_time_consistent(sentence: str, *, extra_dates: str = "") -> bool:
+    """A phrase relating two dated events ("months/years before/after X") must
+    agree with the actual gap between the dates in the sentence (plus any
+    ``extra_dates`` from evidence/body). True when there is no relative-time
+    phrase, or when the stated magnitude matches the real gap.
+
+    Generic: it compares the phrase's unit (day/week/month vs. year/decade)
+    against the number of years between the two earliest full-year dates found.
+    The wave-39 "months before … 31 October 1966" with a Nov 1963 event (a
+    three-year gap) is rejected."""
+    m = _REL_TIME_RE.search(sentence or "")
+    if not m:
+        return True
+    years = sorted({int(y) for y in _YEAR_RE.findall(
+        f"{sentence} {extra_dates}")})
+    if len(years) < 2:
+        return True              # only one date present: nothing to contradict
+    gap_years = max(years) - min(years)
+    unit = m.group("unit").lower().rstrip("s")
+    # "months/weeks/days" claim a gap under a year; "years/decades" a year or more.
+    if unit in ("day", "week", "month"):
+        return gap_years < 1
+    if unit == "year":
+        # "X years": if a number is given, it should be within 1 of the real gap;
+        # a bare "years" just needs a multi-year gap.
+        num = (m.group("num") or "").strip().lower()
+        want = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                "seven": 7, "eight": 8, "nine": 9, "ten": 10, "a": 1, "an": 1}.get(num)
+        if want is None and num.isdigit():
+            want = int(num)
+        if want is None:
+            return gap_years >= 1
+        return abs(gap_years - want) <= 1
+    if unit == "decade":
+        return gap_years >= 8
+    return True
+
+
+def story_from_own_source(source_sentence: str, own_evidence: str,
+                          page_facts: Optional[List[Dict]] = None,
+                          stop_title: str = "",
+                          aliases: Optional[List[str]] = None) -> bool:
+    """True when the story's source sentence comes from the stop's OWN source:
+
+      * it is supported by ``own_evidence`` (the stop's own Wikipedia article —
+        name-matched + geo-gated upstream, LOCAL-878/881); OR
+      * it is supported by one of ``page_facts`` (873 thin-stop pages) AND that
+        page fact NAMES the stop. A 873 page may add detail, but it may only be
+        the SIGNATURE source when its sentence names the stop (D881).
+    """
+    if _quote_in_evidence(source_sentence, own_evidence or ""):
+        return True
+    for f in (page_facts or []):
+        txt = f.get("text", "") if isinstance(f, dict) else str(f)
+        if not txt:
+            continue
+        if _quote_in_evidence(source_sentence, txt):
+            # a 873 page fact is an acceptable signature source only if it names
+            # the stop (so a city-wide fact pinned to this stop is rejected).
+            return source_names_stop(source_sentence, stop_title, aliases) \
+                or source_names_stop(txt, stop_title, aliases)
+    return False
+
+
 def _build_user_prompt(title: str, evidence_text: str, location: str) -> str:
     ev = (evidence_text or "")[:MAX_INPUT_CHARS]
     return (
@@ -205,6 +478,9 @@ def select_signature_stories(
         title: str, evidence_text: str, *, location: str = "",
         narrate_fn: Optional[Callable] = None, model: str = MODEL,
         max_stories: int = 2, log: Optional[Callable] = None,
+        own_evidence_text: Optional[str] = None,
+        page_facts: Optional[List[Dict]] = None,
+        aliases: Optional[List[str]] = None,
         ) -> Tuple[List[Dict[str, str]], Dict]:
     """Pick 1–2 signature stories for one stop from its own evidence.
 
@@ -213,11 +489,30 @@ def select_signature_stories(
     when its ``source_sentence`` is supported by the evidence and the story reads
     like a story (not a lone dimension). ``report`` carries ``cost_usd`` and
     counts. Never raises.
+
+    LOCAL-881 — the story must come from the stop's OWN source, and must not be a
+    myth, an off-site event, or a mis-dated claim:
+      * ``own_evidence_text`` is the stop's OWN article (name-matched + geo-gated
+        upstream). When given, the source sentence must come from it, OR from a
+        ``page_facts`` (873 thin-stop page) entry that NAMES the stop. The 873
+        page facts may add detail but may not be the signature source on their own.
+        When ``own_evidence_text`` is None, ``evidence_text`` is treated as the
+        own evidence (backward-compatible).
+      * a story whose own evidence FLAGS a myth / misattribution about it is
+        rejected (it may be told only as a myth correction, D760);
+      * a location claim ("right here", "on this spot") is dropped unless the
+        source sentence NAMES this stop as the place;
+      * a relative-time phrase ("months before X") that disagrees with the dates
+        is rejected;
+      * each kept story carries ``source_date`` (day/month/year) when its source
+        has a full date, so the survival check and regeneration keep it.
     """
     rep = {"title": title, "cost_usd": 0.0, "returned": 0, "kept": 0,
-           "dropped_unsourced": 0}
+           "dropped_unsourced": 0, "dropped_off_source": 0, "dropped_myth": 0,
+           "dropped_location": 0, "dropped_rel_time": 0}
     if not (title and (evidence_text or "").strip()):
         return [], rep
+    own_ev = own_evidence_text if own_evidence_text is not None else evidence_text
     fn = narrate_fn or _default_narrate
     user = _build_user_prompt(title, evidence_text, location)
     try:
@@ -252,8 +547,43 @@ def select_signature_stories(
                 log(f"  [LOCAL-880] signature story for {title}: DROPPED "
                     f"(source_sentence not in evidence): {story[:60]}")
             continue
-        kept.append({"story": story, "why_memorable": why,
-                     "source_sentence": src})
+        # [LOCAL-881 §1] The story's source must be the stop's OWN source: its own
+        # article, or a 873 page fact that NAMES the stop. A 873 page fact that
+        # does not name the stop is detail only, never the signature source.
+        if not story_from_own_source(src, own_ev, page_facts, title, aliases):
+            rep["dropped_off_source"] += 1
+            if log:
+                log(f"  [LOCAL-881] signature story for {title}: DROPPED "
+                    f"(not from the stop's own source): {story[:60]}")
+            continue
+        # [LOCAL-881 §3] The evidence must not flag this as a myth / misattribution.
+        if evidence_flags_myth(story, src, own_ev):
+            rep["dropped_myth"] += 1
+            if log:
+                log(f"  [LOCAL-881] signature story for {title}: DROPPED "
+                    f"(evidence flags a myth / misattribution): {story[:60]}")
+            continue
+        # [LOCAL-881 §2] A location claim needs a source that names the stop.
+        if not location_claim_ok(story, src, title, aliases):
+            rep["dropped_location"] += 1
+            if log:
+                log(f"  [LOCAL-881] signature story for {title}: DROPPED "
+                    f"(location claim not named in source): {story[:60]}")
+            continue
+        # [LOCAL-881 §5] A relative-time phrase must agree with the dates.
+        if not (relative_time_consistent(story, extra_dates=src)
+                and relative_time_consistent(src, extra_dates=own_ev)):
+            rep["dropped_rel_time"] += 1
+            if log:
+                log(f"  [LOCAL-881] signature story for {title}: DROPPED "
+                    f"(relative-time phrase contradicts the dates): {story[:60]}")
+            continue
+        entry = {"story": story, "why_memorable": why, "source_sentence": src}
+        # [LOCAL-881 §6] keep the story's exact date so survival/regen preserve it.
+        _d = source_full_date(src) or source_full_date(story)
+        if _d:
+            entry["source_date"] = _d
+        kept.append(entry)
     rep["kept"] = len(kept)
     if log:
         for k in kept:
@@ -284,6 +614,12 @@ def required_element_block(stories: List[Dict[str, str]]) -> str:
             lines.append(f"     (why it lands: {s['why_memorable']})")
         if s.get("source_sentence"):
             lines.append(f"     (source: {s['source_sentence']})")
+        # [LOCAL-881 §6] name the exact date so the narrator keeps it in full.
+        _d = s.get("source_date") if isinstance(s, dict) else None
+        if _d:
+            lines.append(
+                f"     (state this date in full: {_d['day']} "
+                f"{_MONTHS[_d['month'] - 1].capitalize()} {_d['year']})")
     lines.append(
         "Do not reduce the story to a bare date or dimension. Do not drop it for "
         "a generic description. Tell it.")
@@ -391,7 +727,15 @@ def body_tells_story(body: str, story: Dict[str, str], *,
     own derived place words (``generic_extra``) do not count. Deliberately lenient
     on wording (the narrator rephrases) but strict on the story's distinctive
     nouns/years being present.
+
+    [LOCAL-881 §6] When the story carries a full ``source_date`` (day/month/year),
+    the body must ALSO keep its MONTH and YEAR — the wave-39 Palace kept "a tank
+    broke through the gates" but lost "30 April 1975", so it would have passed the
+    token check yet failed the date. The date is re-required here.
     """
+    _d = story.get("source_date") if isinstance(story, dict) else None
+    if _d and not body_keeps_date(body, _d):
+        return False
     want = story_key_tokens(story, generic_extra=generic_extra)
     if len(want) < min_overlap:
         # a tiny story: require its source quote to be (fuzzily) present
@@ -465,9 +809,23 @@ def regenerate_body_with_story(
         "present tense). You use ONLY the facts given, never invent, and you make "
         "the required signature story the emotional centre of the stop."
     )
+    # [LOCAL-881 §6] Pass the story's EXACT full date so the rewrite keeps it. The
+    # wave-39 Palace regeneration dropped "30 April 1975"; naming the date as a
+    # required element makes the survival check (which now re-requires the month
+    # and year) pass.
+    _date_lines = []
+    for s in stories:
+        _d = s.get("source_date") if isinstance(s, dict) else None
+        if _d:
+            _date_lines.append(
+                f"- {_d['day']} {_MONTHS[_d['month'] - 1].capitalize()} {_d['year']}")
+    _date_block = ("\nYou MUST state this exact date, in full (day, month and "
+                   "year):\n" + "\n".join(dict.fromkeys(_date_lines)) + "\n"
+                   ) if _date_lines else ""
     user = (
         f"STOP: {title}\nCITY/AREA: {location or '(unspecified)'}\n\n"
-        f"REQUIRED SIGNATURE STORY (must be told):\n{story_lines}\n\n"
+        f"REQUIRED SIGNATURE STORY (must be told):\n{story_lines}\n"
+        f"{_date_block}\n"
         f"FACTS YOU MAY USE (the only source):\n{facts_blob}\n\n"
         f"EXISTING BODY (keep the correct, on-topic parts):\n{current_body_prose}\n\n"
         f"TASK: write {min_sentences}-{max_sentences} spoken sentences for this "
