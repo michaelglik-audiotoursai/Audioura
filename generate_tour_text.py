@@ -34880,10 +34880,12 @@ RULES:
             import spoken_text_hygiene as _sth880
             import re as _re880e
             _b4 = complete_tour
-            complete_tour, _n1 = _sth880.strip_contradicted_former_use(complete_tour)
-            complete_tour, _n10 = _sth880.fix_opera_house_government_use(complete_tour)
-            # Opera House evidence for the capacity audit: the stop's sourced facts.
-            _opera_ev = ""
+            # Per-stop evidence map ({stop_title: "<joined sourced facts>"}), built
+            # from the thin-fact map and its process-global sink. This is what the
+            # generic, evidence-driven scrubs read: §1 former-use contradiction and
+            # §9 magnitude-number sourcing are decided per stop against ITS OWN
+            # evidence, in any city. No venue, date or claim is hard-coded.
+            _stop_ev = {}
             try:
                 _facts_all = dict(_J._THIN_FACTS_PER_STOP or {})
                 try:
@@ -34896,15 +34898,18 @@ RULES:
                 except Exception:
                     pass
                 for _k, _v in _facts_all.items():
-                    if "opera" in str(_k).lower():
-                        _opera_ev = " ".join(str(x) for x in _v)
-                        break
+                    _stop_ev[str(_k)] = " ".join(str(x) for x in (_v or []))
             except Exception:
-                _opera_ev = ""
+                _stop_ev = {}
+            complete_tour, _n1 = _sth880.strip_contradicted_former_use(
+                complete_tour, stop_evidence=_stop_ev)
             complete_tour, _cap_rep = _sth880.audit_seating_capacity(
-                complete_tour, _opera_ev)
+                complete_tour, stop_evidence=_stop_ev)
             complete_tour, _n2 = _sth880.strip_truncated_tail_sentences(complete_tour)
-            complete_tour, _n3 = _sth880.disclose_or_drop_folklore(complete_tour)
+            # folklore disclosure: the date, if any, comes from the stop's evidence
+            _folk_ev = " ".join(_stop_ev.values()) if _stop_ev else ""
+            complete_tour, _n3 = _sth880.disclose_or_drop_folklore(
+                complete_tour, evidence_text=_folk_ev)
             complete_tour, _n4 = _sth880.strip_orientation_filler(complete_tour)
             complete_tour, _n8 = _sth880.strip_promotional_sentences(complete_tour)
             complete_tour, _n5 = _sth880.fix_intro_grammar(complete_tour)
@@ -34914,15 +34919,14 @@ RULES:
             complete_tour, _n6 = _sth880.fix_orphan_closing(complete_tour, _st_titles)
             complete_tour, _n7 = _sth880.strip_empty_current_affairs_note(complete_tour)
             if _cap_rep.get("kept"):
-                print(f"  [LOCAL-880 §9] Opera House capacity {_cap_rep['kept']} "
+                print(f"  [LOCAL-880 §9] magnitude {_cap_rep['kept']} "
                       f"KEPT (sourced): \"{_cap_rep.get('source_sentence','')}\"")
             elif _cap_rep.get("removed"):
-                print(f"  [LOCAL-880 §9] Opera House capacity {_cap_rep['removed']} "
+                print(f"  [LOCAL-880 §9] magnitude {_cap_rep['removed']} "
                       f"REMOVED (not found in the stop's evidence)")
             print(f"  [LOCAL-880] defect pass: §1 former-use={_n1}, §2 truncation="
                   f"{_n2}, §3 folklore={_n3}, §4 orientation-filler={_n4}, §5 intro="
-                  f"{_n5}, §6 closing={_n6}, §7 current-affairs={_n7}, §8 promo={_n8},"
-                  f" §10 opera-govt={_n10}")
+                  f"{_n5}, §6 closing={_n6}, §7 current-affairs={_n7}, §8 promo={_n8}")
             if complete_tour != _b4 and output_file:
                 try:
                     with open(output_file, "w", encoding="utf-8") as _d880:
