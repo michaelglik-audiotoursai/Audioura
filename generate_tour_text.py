@@ -23921,6 +23921,79 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
             except Exception as _w_err:
                 print(f"  [LOCAL-872C] narrator evidence skipped (non-fatal): {_w_err}")
 
+        # [LOCAL-873 / D766] THIN-STOP ESCALATION. Michael: "when stop comes up small
+        # we should always try to find other sources." After the normal research
+        # (Wikipedia evidence above + any direct snippets / lore already on the poi),
+        # count the SOURCED specifics for this stop. Fewer than 3 is thin — escalate
+        # to a real web search + page fetch (name variants incl. kind-word synonyms
+        # pier/wharf/quay/bến, geo-gated at the pin), extract facts with source URLs,
+        # and feed them to BOTH the narrator (description_prompt) and the LOCAL-872
+        # claim gate (via poi['_lore'], which the gate reads). User and normal stops
+        # alike. Non-museum tours only (museum stops have their own enrichment).
+        if tour_category != 'museum' and os.environ.get('THIN_STOP_SEARCH', '1').strip() != '0' and poi_name:
+            try:
+                import thin_stop_search as _ts873
+                # Assemble the material ALREADY gathered for this stop so thin
+                # detection measures the real state before escalating.
+                _ts_existing = []
+                try:
+                    for _it in (poi.get('_wiki_evidence') or []):
+                        _ts_existing.append(str(_it))
+                except Exception:
+                    pass
+                try:
+                    _ts_sn = (_J._DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
+                              or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{idx}__", [])) \
+                             if _J._DIRECT_SNIPPETS_PER_STOP else []
+                    for _s in _ts_sn:
+                        if isinstance(_s, dict):
+                            _ts_existing.append(f"{_s.get('title','')} {_s.get('snippet','')}")
+                        else:
+                            _ts_existing.append(str(_s))
+                except Exception:
+                    pass
+                try:
+                    for _lf in (poi.get('_lore') or []):
+                        _ts_existing.append(_lf.get('fact', '') if isinstance(_lf, dict) else str(_lf))
+                except Exception:
+                    pass
+                if _ts873.is_thin(_ts_existing):
+                    try:
+                        from pin_snap import _parse_coord as _pc873
+                        _ts_pin = _pc873(poi.get('coordinates') or '')
+                    except Exception:
+                        _ts_pin = None
+                    try:
+                        _ts_al = _J._USER_STOP_ALIASES.get(poi_name)
+                    except Exception:
+                        _ts_al = None
+                    _ts_al = [_ts_al] if isinstance(_ts_al, str) else list(_ts_al or [])
+                    _ts_rep = _ts873.escalate_thin_stop(
+                        poi_name, location or '', existing_facts=_ts_existing,
+                        poi=poi, pin=_ts_pin, aliases=_ts_al,
+                        places_type=poi.get('type_specialty') or '',
+                        wikidata_instance_of=poi.get('_wikidata_instance_of') or '')
+                    if _ts_rep.get('facts'):
+                        # (a) feed the NARRATOR
+                        description_prompt += _ts_rep.get('narrator_block', '')
+                        # (b) feed the LOCAL-872 claim gate: _lore dicts are read by
+                        #     the gate as per-stop evidence (stop_evidence[_si]).
+                        _ts_lore = poi.get('_lore') or []
+                        for _f in _ts_rep['facts']:
+                            _ts_lore.append({'fact': _f.get('text', ''),
+                                             'source': _f.get('url', ''),
+                                             '_thin_search': True})
+                        poi['_lore'] = _ts_lore
+                        poi['_thin_evidence'] = _ts_rep['evidence']
+                        print(f"  [LOCAL-873] Stop {stop_num} '{poi_name[:40]}' was thin "
+                              f"({_ts_rep['specifics_before']} specifics): escalated -> "
+                              f"{len(_ts_rep['facts'])} sourced fact(s) from "
+                              f"{_ts_rep['pages_fetched']} page(s), "
+                              f"{_ts_rep['serper_queries']} queries, "
+                              f"cost ${_ts_rep['cost_usd']:.4f}")
+            except Exception as _ts_err:
+                print(f"  [LOCAL-873] thin-stop escalation skipped (non-fatal): {_ts_err}")
+
         # [LOCAL-402/403] Direct snippet injection — bypasses the extract/score pipeline.
         # When _DIRECT_SNIPPETS_PER_STOP has material for this stop, inject raw
         # search snippets as reference material with grounded-story instructions.
