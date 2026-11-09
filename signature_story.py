@@ -296,6 +296,12 @@ def required_element_block(stories: List[Dict[str, str]]) -> str:
 # does NOT prove the story was told. "The opera house is elegant" must not count
 # as telling "Allied bombing in 1944". Distinctive tokens (1944, allied, bombing,
 # Greene, quiet, american) do.
+#
+# D769: this set names NO proof tour's city, country or demonym. Place words are
+# generic only *relative to the tour* — "saigon"/"vietnam"/"vietnamese" for a
+# Saigon tour, "paris"/"france"/"french" for a Paris tour — so they are derived
+# at run time from the tour's location and the stop title (see
+# ``derive_generic_tokens``) and unioned in by the caller, never hard-coded here.
 _GENERIC_VENUE = {
     "opera", "house", "building", "theatre", "theater", "cathedral", "basilica",
     "church", "palace", "hall", "museum", "street", "pier", "wharf", "quay",
@@ -304,31 +310,89 @@ _GENERIC_VENUE = {
     "tower", "towers", "gate", "gates", "monument", "landmark", "place", "site",
     "venue", "visitors", "visitor", "today", "stands", "located", "stop",
     "guide", "tour", "walk", "walking", "street", "road", "boulevard", "avenue",
-    "colonial", "french", "vietnamese", "vietnam", "saigon", "chi", "minh",
+    "colonial",
 }
 
 
-def story_key_tokens(story: Dict[str, str]) -> set:
+# Country/major-city -> demonym, for deriving a tour's own place words. Small and
+# additive: an unlisted place simply contributes its own name (and a suffix-based
+# demonym guess), never another tour's. D769: nothing here is specific to one
+# proof tour — it is a general gazetteer fragment.
+_DEMONYMS = {
+    "vietnam": "vietnamese", "france": "french", "italy": "italian",
+    "spain": "spanish", "germany": "german", "china": "chinese",
+    "japan": "japanese", "thailand": "thai", "cambodia": "cambodian",
+    "england": "english", "britain": "british", "scotland": "scottish",
+    "ireland": "irish", "portugal": "portuguese", "greece": "greek",
+    "turkey": "turkish", "russia": "russian", "poland": "polish",
+    "sweden": "swedish", "norway": "norwegian", "denmark": "danish",
+    "netherlands": "dutch", "belgium": "belgian", "austria": "austrian",
+    "switzerland": "swiss", "mexico": "mexican", "brazil": "brazilian",
+    "argentina": "argentine", "australia": "australian", "india": "indian",
+    "korea": "korean", "egypt": "egyptian", "morocco": "moroccan",
+    "america": "american", "canada": "canadian", "usa": "american",
+    "paris": "parisian", "rome": "roman", "london": "londoner",
+    "vienna": "viennese", "naples": "neapolitan", "venice": "venetian",
+}
+
+
+def _location_words(location: str) -> List[str]:
+    """Split a location string ('Ho Chi Minh City, Vietnam') into folded word
+    tokens, dropping generic geography words ('city', 'province')."""
+    skip = {"city", "province", "region", "district", "state", "county",
+            "area", "centre", "center", "greater", "metropolitan"}
+    words = re.findall(r"[a-z]+", _fold(location))
+    return [w for w in words if len(w) >= 3 and w not in skip]
+
+
+def derive_generic_tokens(location: str = "", title: str = "") -> set:
+    """The place words that are generic *for this tour*: the folded tokens of the
+    tour's location and the stop title, plus any demonym of a location token
+    (vietnam -> vietnamese, france -> french). These are generic only relative to
+    the tour, so they are derived at run time and never stored in _GENERIC_VENUE
+    (D769). A Paris tour yields {paris, france, french, parisian, …}; a Saigon
+    tour {ho, chi, minh, saigon, vietnam, vietnamese, …}."""
+    toks: set = set()
+    loc_words = _location_words(location)
+    for w in loc_words:
+        toks.add(w)
+        dem = _DEMONYMS.get(w)
+        if dem:
+            toks.add(dem)
+    # the stop title's own words are generic (they name the venue, which cannot
+    # prove its story was told).
+    for w in re.findall(r"[a-z]+", _fold(title)):
+        if len(w) >= 3:
+            toks.add(w)
+    return toks
+
+
+def story_key_tokens(story: Dict[str, str], *,
+                     generic_extra: Optional[set] = None) -> set:
     """The DISTINCTIVE tokens that identify the story in a delivered body: the
-    union of the story and its source sentence, minus stopwords AND minus generic
-    venue vocabulary. A 4-digit year always counts as distinctive."""
+    union of the story and its source sentence, minus stopwords, minus generic
+    venue vocabulary AND minus the tour's own derived place words
+    (``generic_extra``). A 4-digit year always counts as distinctive."""
     toks = _content_tokens(story.get("story", ""))
     toks |= _content_tokens(story.get("source_sentence", ""))
     years = {t for t in toks if re.fullmatch(r"(1[5-9]|20)\d\d", t)}
-    distinctive = {t for t in toks if t not in _GENERIC_VENUE and not t.isdigit()}
+    generic = _GENERIC_VENUE | (generic_extra or set())
+    distinctive = {t for t in toks if t not in generic and not t.isdigit()}
     return distinctive | years
 
 
 def body_tells_story(body: str, story: Dict[str, str], *,
-                     min_overlap: int = 2) -> bool:
+                     min_overlap: int = 2,
+                     generic_extra: Optional[set] = None) -> bool:
     """Post-narration check: does the delivered body actually tell the story?
 
     True when the body shares at least ``min_overlap`` DISTINCTIVE tokens with the
-    story (names, places, events, years) — generic venue vocabulary does not
-    count. Deliberately lenient on wording (the narrator rephrases) but strict on
-    the story's distinctive nouns/years being present.
+    story (names, places, events, years) — generic venue vocabulary and the tour's
+    own derived place words (``generic_extra``) do not count. Deliberately lenient
+    on wording (the narrator rephrases) but strict on the story's distinctive
+    nouns/years being present.
     """
-    want = story_key_tokens(story)
+    want = story_key_tokens(story, generic_extra=generic_extra)
     if len(want) < min_overlap:
         # a tiny story: require its source quote to be (fuzzily) present
         return _quote_in_evidence(story.get("source_sentence", ""), body,
@@ -427,8 +491,11 @@ def regenerate_body_with_story(
     if len(sents) < min_sentences:
         return None, rep
     joined = " ".join(sents)
-    # the rewrite must actually tell EVERY required story, else reject it
-    if not all(body_tells_story(joined, s) for s in stories):
+    # the rewrite must actually tell EVERY required story, else reject it. Place
+    # words of this tour (from the location + stop title) are generic, not story
+    # evidence, so they are excluded from the match (D769, derived at run time).
+    _gx = derive_generic_tokens(location, title)
+    if not all(body_tells_story(joined, s, generic_extra=_gx) for s in stories):
         if log:
             log(f"  [LOCAL-880] regen for {title}: result still missing the "
                 f"signature story — keeping original body")
@@ -477,7 +544,10 @@ def ensure_signature_in_tour(
             continue
         rep["checked"] += 1
         body_prose = _block_body_prose(block)
-        if all(body_tells_story(body_prose, s) for s in stories):
+        # place words of this tour (location + this stop's title) are generic and
+        # must not count as telling the story (D769, derived at run time).
+        _gx = derive_generic_tokens(location, title)
+        if all(body_tells_story(body_prose, s, generic_extra=_gx) for s in stories):
             continue
         rep["missing"] += 1
         if regens >= max_regens:

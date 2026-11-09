@@ -31496,6 +31496,21 @@ RULES:
                             if _test_gram in _prolog_8grams:
                                 _has_overlap = True
                                 break
+                    # [LOCAL-880C] The prolog is a high-level preview; the body is
+                    # where a concrete sourced figure belongs ("the twin bell towers
+                    # reach 58 metres high"). Never drop a body sentence that carries
+                    # a magnitude number just because it echoes the preview — doing
+                    # so deletes the one precise, sourced detail and leaves the vaguer
+                    # preview. (The §9 scrub still removes the figure later if it is
+                    # unsourced — but then without an orphan unit.)
+                    if _has_overlap:
+                        try:
+                            from derepetition_guard import _carries_magnitude_number as _cmn880c
+                            _keep_for_number = _cmn880c(_d_sent)
+                        except Exception:
+                            _keep_for_number = False
+                        if _keep_for_number:
+                            _has_overlap = False
                     if _has_overlap:
                         _removed_in_stop += 1
                         print(f"    Stop {_di+1} '{_dpoi.get('name', '')[:30]}': "
@@ -34901,6 +34916,31 @@ RULES:
                     _stop_ev[str(_k)] = " ".join(str(x) for x in (_v or []))
             except Exception:
                 _stop_ev = {}
+            # [LOCAL-880C] The thin-facts map is not the only evidence the narrator
+            # had: the DIRECT SNIPPETS injected as "reference material" are the very
+            # source the narrator drew numbers from (e.g. the cathedral's "58
+            # metres" from a Wikipedia snippet). §9 judged that figure unsourced
+            # only because its evidence omitted those snippets. Fold each stop's
+            # snippet title+text into its evidence so a figure the narrator took
+            # from a published snippet is recognised as sourced, in any city.
+            try:
+                _snip_map = dict(getattr(_J, "_DIRECT_SNIPPETS_PER_STOP", {}) or {})
+                for _k, _snips in _snip_map.items():
+                    if not _snips:
+                        continue
+                    _texts = []
+                    for _s in _snips:
+                        if isinstance(_s, dict):
+                            _texts.append(str(_s.get("title", "")))
+                            _texts.append(str(_s.get("snippet", "")))
+                        else:
+                            _texts.append(str(_s))
+                    _blob = " ".join(t for t in _texts if t)
+                    if _blob.strip():
+                        _key = str(_k)
+                        _stop_ev[_key] = (_stop_ev.get(_key, "") + " " + _blob).strip()
+            except Exception:
+                pass
             complete_tour, _n1 = _sth880.strip_contradicted_former_use(
                 complete_tour, stop_evidence=_stop_ev)
             complete_tour, _cap_rep = _sth880.audit_seating_capacity(

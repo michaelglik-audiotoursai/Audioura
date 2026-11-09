@@ -629,9 +629,13 @@ def audit_seating_capacity(text: str, evidence_text: str = "",
     def _nums_in(ev: str) -> set:
         # figures the evidence attaches to a magnitude unit (digits only, commas
         # stripped) — the only figures a §9 number may be kept against.
+        # Separator- and spelling-tolerant: the number and its unit may be joined
+        # by a space, a hyphen, or nothing ("58 metres", "58-metre", "58m"), and
+        # the unit list already carries both spellings (metre/meter, …), so an
+        # evidence "reaching to a height of 58 metres" keeps a body "58 meters".
         found = set()
         for m in re.finditer(
-                r"(?i)(\d[\d,]{1,6})\s*(?:" + _MAGNITUDE_UNIT +
+                r"(?i)(\d[\d,]{1,6})[\-\s]*(?:" + _MAGNITUDE_UNIT +
                 r"|people|persons|capacity)", ev):
             found.add(m.group(1).replace(",", ""))
         for m in re.finditer(
@@ -672,15 +676,24 @@ def audit_seating_capacity(text: str, evidence_text: str = "",
                             break
                 return m.group(0)
             rep["removed"].append(bare)
-            # Drop the number. For a seating figure the remaining phrase would read
-            # "a -seat venue" / "seated"; normalise to a clean "venue".
-            whole = m.group(0)
-            if _SEATING_WORD_RE.search(whole):
+            # Drop the number without leaving a broken phrase.
+            unit_l = unit.lower()
+            if unit_l in ("seat", "seats", "seater", "seating"):
+                # attributive noun form: "a 500-seat venue" / "a 500 seater" ->
+                # "a venue" (the venue-venue collapse below tidies "a venue venue").
                 return "venue"
-            # For a measured magnitude ("95 metres") drop just the "<num> ", keep
-            # the unit if it still reads ("tall"); simplest safe repair: drop whole
-            # measured phrase to the unit word, leaving the sentence grammatical.
-            return unit if unit and not unit.isdigit() else ""
+            if m.group(3):
+                # verbal form: "seated 500 guests" / "seats 500" -> drop just the
+                # figure, keep the verb and the rest ("seated guests").
+                return re.sub(r"\s*" + re.escape(num) + r"\s*$", " ",
+                              m.group(0)).rstrip()
+            # Measured magnitude ("58 metres"): removing the number alone would
+            # strand the unit — "rise 58 meters high" -> "rise meters high".
+            # Remove the whole measurement phrase (number AND unit), leaving the
+            # sentence grammatical: "rise 58 meters high" -> "rise high". A sentinel
+            # marks the gap so the post-pass can also mop up a now-dangling
+            # measurement verb if nothing descriptive is left.
+            return "\x00MAG\x00"
 
         # Scrub line by line so structural/label lines are left untouched. An
         # Orientation: line's label is kept and only its prose is scrubbed.
@@ -695,6 +708,19 @@ def audit_seating_capacity(text: str, evidence_text: str = "",
                 continue
             new_lines.append(_MAGNITUDE_RE.sub(_repl, ln))
         new_body = "\n".join(new_lines)
+        # Mop up the measurement-phrase sentinel left by a dropped measured
+        # magnitude, so no orphan unit or dangling measurement verb remains.
+        if "\x00MAG\x00" in new_body:
+            # a measurement verb + sentinel + sentence end, with nothing
+            # descriptive after it ("The tower stands \x00MAG\x00.") — the whole
+            # measurement claim is gone, so drop the dangling verb too.
+            new_body = re.sub(
+                r"(?i)\s*\b(?:is|was|are|were|stands?|stood|rises?|rose|reach(?:es|ed)?|"
+                r"measures?|measured|soars?|towers?)\s+\x00MAG\x00\s*(?=[.!?]|$)",
+                "", new_body)
+            # otherwise just remove the sentinel, keeping any comparative/descriptive
+            # word that followed it ("rise \x00MAG\x00 high" -> "rise high").
+            new_body = re.sub(r"\s*\x00MAG\x00\s*", " ", new_body)
         new_body = re.sub(r"(?i)\ba\s+venue\s+venue\b", "a venue", new_body)
         new_body = re.sub(r"(?i)\bvenue\s+venue\b", "venue", new_body)
         new_body = re.sub(r"[ \t]{2,}", " ", new_body)
