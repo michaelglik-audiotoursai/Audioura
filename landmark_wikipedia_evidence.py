@@ -496,7 +496,11 @@ def _pick(name: str, raw: Optional[Dict], pin: Optional[Tuple[float, float]] = N
         # article must really name THIS venue, not merely its kind. An article WITH
         # a coordinate is unaffected — its geo (within GEO_GATE_KM, checked above)
         # already proves it is the right place.
-        if _art_coord is None:
+        # [LOCAL-885B] A TRUSTED page (reached by following the already-accepted
+        # English article's interlanguage link) is exempt: its local-script title
+        # (艋舺龍山寺) can never share a Latin token with the English stop name, so
+        # the strict token test rejected every coordinate-less local-edition page.
+        if _art_coord is None and not (raw or {}).get("trusted"):
             if not _shares_distinctive_token_strict(mn, _title, city):
                 continue
         # [LOCAL-882] carry the article's own coordinate into the cached payload so

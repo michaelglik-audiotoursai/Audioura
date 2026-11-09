@@ -95,8 +95,12 @@ def test_stale_version_row_is_a_miss():
 def test_current_version_valid_row_is_a_hit():
     store = {}
     _install_fake_db(store)
+    # [LOCAL-885B] a CURRENT-version row carries full_text (LOCAL-885) and, being
+    # coordinate-bearing, its own coord (LOCAL-884 §3 rejects a coord-less payload
+    # unless it shares a distinctive token and names the city).
     good = {"title": "Ho Chi Minh City Hall", "lead": "The Ho Chi Minh City Hall ...",
-            "infobox": ""}
+            "infobox": "", "full_text": "Ho Chi Minh City Hall is a building ...",
+            "coord": [10.77647, 106.70097]}
     _seed_row(store, "City Hall", "en", CITY_HALL_PIN, good, lw.RULES_VERSION)
     got = lw._cache_get("City Hall", "en", CITY_HALL_PIN, city=CITY, match_name="City Hall")
     assert got == (True, good), "a current-version, still-valid row must be served"
@@ -119,7 +123,8 @@ def test_gia_long_palace_payload_rejected_for_city_hall():
 def test_revalidate_payload_direct():
     # name-matching title: accepted.
     assert lw._revalidate_payload(
-        {"title": "Saigon Opera House", "lead": "", "infobox": ""},
+        {"title": "Saigon Opera House", "lead": "", "infobox": "",
+         "coord": [10.77639, 106.70278]},   # [LOCAL-885B] coord-bearing payload
         "Saigon Opera House", pin=(10.77639, 106.70278), city=CITY,
         match_name="Opera House")
     # Gia Long Palace for a City Hall stop in a dense centre: rejected (no shared
@@ -152,8 +157,10 @@ def test_revalidate_payload_direct():
 def test_put_then_get_roundtrip_stamps_current_version():
     store = {}
     _install_fake_db(store)
+    # [LOCAL-885B] what fetch_article stores today: full_text + coord included.
     art = {"title": "War Remnants Museum", "lead": "The War Remnants Museum ...",
-           "infobox": ""}
+           "infobox": "", "full_text": "The War Remnants Museum is a museum ...",
+           "coord": [10.7795, 106.692]}
     lw._cache_put("War Remnants Museum", "en", art, (10.7795, 106.692))
     got = lw._cache_get("War Remnants Museum", "en", (10.7795, 106.692),
                         city=CITY, match_name="War Remnants Museum")
@@ -161,6 +168,18 @@ def test_put_then_get_roundtrip_stamps_current_version():
     # the stored row carries the current RULES_VERSION.
     key = lw._key("War Remnants Museum", "en", (10.7795, 106.692))
     assert store[key][3] == lw.RULES_VERSION
+
+
+def test_same_version_row_without_full_text_is_a_miss():
+    # [LOCAL-885B] documents the LOCAL-885 contract: a current-version row with no
+    # full_text key is re-fetched (and overwritten), never served.
+    store = {}
+    _install_fake_db(store)
+    art = {"title": "War Remnants Museum", "lead": "The War Remnants Museum ...",
+           "infobox": "", "coord": [10.7795, 106.692]}
+    _seed_row(store, "War Remnants Museum", "en", (10.7795, 106.692), art, lw.RULES_VERSION)
+    assert lw._cache_get("War Remnants Museum", "en", (10.7795, 106.692),
+                         city=CITY, match_name="War Remnants Museum") is None
 
 
 if __name__ == "__main__":
