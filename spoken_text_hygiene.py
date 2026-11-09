@@ -34,7 +34,8 @@ __all__ = ['clean_spoken_text', 'MISSING_SPACE_RE', 'TEMPLATE_SEAM_RE',
            'strip_promotional_sentences', 'PROMOTIONAL_SENTENCE_RE',
            'strip_truncated_tail_sentences', 'disclose_or_drop_folklore',
            'strip_contradicted_former_use',
-           'audit_seating_capacity', 'strip_orientation_filler',
+           'audit_seating_capacity', 'strip_orphan_capacity_clause',
+           'strip_orientation_filler',
            'fix_intro_grammar', 'fix_orphan_closing',
            'strip_empty_current_affairs_note']
 
@@ -612,6 +613,73 @@ _MAGNITUDE_RE = re.compile(
 _SEATING_WORD_RE = re.compile(r"(?i)seat(?:ed|s|ing)?")
 
 
+# [LOCAL-882B §2] Orphan capacity clause with NO number. LOCAL-880C removes an
+# unsourced seating/capacity figure, but when the number is already gone upstream
+# (the narrator wrote "to seat guests" with no figure, or a prior pass stripped
+# just the digit) a purpose clause is stranded: "Designed by … Olivier to seat
+# guests" (tour 547 Opera House), "with a capacity to seat", "seating guests".
+# A capacity clause exists only to carry the number; with the number gone the
+# WHOLE clause must go, never a bare "to seat guests". Generic: no venue, no city.
+#
+# Each pattern matches a numberless capacity clause and the connective that
+# attaches it, so the sentence reads cleanly once removed:
+#   "…Olivier to seat guests."            -> "…Olivier."
+#   "…a venue with a capacity to seat."   -> "…a venue."
+#   "…hall, seating guests, opened…"      -> "…hall, opened…"
+#   "…with a capacity of guests."         -> "…."
+_ORPHAN_CAPACITY_RES = [
+    # "to seat [the] guests/visitors/people/audience/spectators" (no number)
+    re.compile(r"(?i)[,;]?\s*\b(?:in order\s+)?to\s+seat\s+"
+               r"(?:the\s+|its\s+|around\s+|about\s+|up\s+to\s+)?"
+               r"(?:guests|visitors|people|persons|patrons|audience|audiences|"
+               r"spectators|members|worshippers|passengers)\b"),
+    # "with a capacity to seat" / "with a seating capacity (for guests)"
+    re.compile(r"(?i)[,;]?\s*\bwith\s+a\s+(?:seating\s+)?capacity\s+"
+               r"(?:to\s+seat|of|for)\b(?:\s+(?:the\s+|around\s+|about\s+|up\s+to\s+)?"
+               r"(?:guests|visitors|people|persons|patrons|audience|spectators))?"
+               r"(?=[\s.,;:]|$)"),
+    # "with a capacity to seat" trailing with nothing after it
+    re.compile(r"(?i)[,;]?\s*\bwith\s+a\s+capacity\s+to\s+seat\b"),
+    # "seating guests/visitors/people" as a dangling participial clause (no number)
+    re.compile(r"(?i)[,;]?\s*\bseating\s+"
+               r"(?:the\s+|around\s+|about\s+|up\s+to\s+)?"
+               r"(?:guests|visitors|people|persons|patrons|audience|spectators)\b"),
+    # "designed/built/intended to seat" with the object gone: "…to seat ."
+    re.compile(r"(?i)[,;]?\s*\bto\s+seat\s*(?=[.,;:!?]|$)"),
+]
+
+
+def strip_orphan_capacity_clause(text: str) -> tuple:
+    """Remove a capacity/seating clause left with NO number ("to seat guests",
+    "with a capacity to seat", "seating guests"). Returns (cleaned, n_removed).
+    Structural/label lines (Coordinates, Directions, Address…) are never touched.
+    Deterministic and idempotent."""
+    if not text:
+        return text or "", 0
+    _STRUCT = re.compile(
+        r"(?i)^\s*(coordinates|type/specialty|specific examples|directions|"
+        r"address|sources?|museum information|operational details)\s*:")
+    n = 0
+    out_lines = []
+    for ln in text.split("\n"):
+        if _STRUCT.match(ln):
+            out_lines.append(ln)
+            continue
+        new = ln
+        for rx in _ORPHAN_CAPACITY_RES:
+            new, k = rx.subn("", new)
+            n += k
+        if new != ln:
+            # tidy spacing and punctuation left by the removal
+            new = re.sub(r"\s+([.,;:!?])", r"\1", new)
+            new = re.sub(r"[ \t]{2,}", " ", new)
+            new = re.sub(r"\(\s*\)", "", new)         # empty parens
+            new = re.sub(r",\s*\.", ".", new)          # stray ", ."
+            new = re.sub(r"\s+\.", ".", new)
+        out_lines.append(new)
+    return "\n".join(out_lines), n
+
+
 def audit_seating_capacity(text: str, evidence_text: str = "",
                            stop_evidence=None) -> tuple:
     """[LOCAL-880 §9] Keep a magnitude number (capacity, height, count, …) only
@@ -623,8 +691,15 @@ def audit_seating_capacity(text: str, evidence_text: str = "",
     stop when no per-stop map is given (back-compat with the single-blob caller).
     Returns (cleaned, report) with 'kept'/'removed' lists and 'source_sentence'."""
     rep = {"kept": [], "removed": [], "source_sentence": ""}
-    if not text or not _MAGNITUDE_RE.search(text):
+    if not text:
         return text or "", rep
+    # [LOCAL-882B §2] A numberless orphan capacity clause is cleaned even when the
+    # text has no magnitude number at all (the digit was stripped upstream), so
+    # "to seat guests" never ships. Run it first, then the number pass below may
+    # produce more orphan clauses which we clean again at the end.
+    if not _MAGNITUDE_RE.search(text):
+        cleaned, _k = strip_orphan_capacity_clause(text)
+        return cleaned, rep
 
     def _nums_in(ev: str) -> set:
         # figures the evidence attaches to a magnitude unit (digits only, commas
@@ -728,6 +803,9 @@ def audit_seating_capacity(text: str, evidence_text: str = "",
         out.append(new_body)
     cleaned = re.sub(r"[ \t]{2,}", " ", "".join(out))
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    # [LOCAL-882B §2] the number-removal above (verbal "seated 500 guests" ->
+    # "seated guests") can itself strand a capacity clause; clean any orphan now.
+    cleaned, _ko = strip_orphan_capacity_clause(cleaned)
     # back-compat scalar aliases: first kept/removed figure (older callers/tests
     # read rep['kept']/rep['removed'] as a single value).
     rep["kept"] = rep["kept"][0] if rep["kept"] else None

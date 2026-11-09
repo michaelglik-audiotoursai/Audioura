@@ -23582,6 +23582,14 @@ one clause of explanation. If you cannot explain it in a clause, cut the referen
 The stop's own subject needs no gloss. But anything mentioned in passing that most
 visitors won't know MUST get one explanatory clause or be cut entirely.
 
+FOREIGN-NAME RULE (critical): A name in another language must NEVER be explained by
+its literal word-for-word translation unless the reference material states that
+meaning. Many institutional names are false friends: "Hôtel de Ville" is French for
+"city hall", not a hotel; "Rathaus" is a town hall, not a house of rats;
+"ayuntamiento", "mairie", "palazzo comunale" and "câmara municipal" all mean the
+town/city hall. Describe what the place IS (per the evidence), not what its name
+sounds like in English. If the source does not give the meaning, do not guess it.
+
 NO UNSUPPORTED PRAISE: Do not end paragraphs with evaluative claims unless the preceding
 sentences contain the specific evidence that earns them. Delete praise that isn't earned
 by evidence immediately before it.
