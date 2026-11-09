@@ -1586,6 +1586,30 @@ def _template_thematic_body(
     meaning = common.get("meaning") or (
         "Taken together, the stops add up to more than any one of them seen alone.")
 
+    # [LOCAL-880 §6] A USER-STOPS close must NAME 2–3 real threads from the stops,
+    # not restate that the listener chose them. LOCAL-879 removed the circular
+    # "one thread" lead-in and left the bare "Each was picked by you, and together
+    # they trace your own route through the city." — an orphan that says nothing.
+    # Replace it with a close that names real stop titles (first, last, and a
+    # middle one on a long route), or a clean one-line close when no titles.
+    if user_stops:
+        _real = [t.strip() for t in (titles or []) if t and t.strip()]
+        _picked = []
+        if len(_real) >= 2:
+            _picked = [_real[0], _real[-1]]
+            if len(_real) >= 5:
+                _picked.insert(1, _real[len(_real) // 2])
+        if _picked:
+            if len(_picked) == 1:
+                _names = _picked[0]
+            else:
+                _names = ", ".join(_picked[:-1]) + f" and {_picked[-1]}"
+            meaning = (f"From {_names}, this route is the one you chose through "
+                       f"the city — your own path, in your own order.")
+        else:
+            meaning = ("This route is the one you chose through the city — your "
+                       "own path, in your own order.")
+
     # (a) THREAD — "This tour drew together …". No From→to, no roll-call.
     if theme:
         thread_sentence = f"This tour followed one thread: {thread_phrase}."
