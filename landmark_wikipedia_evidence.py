@@ -48,6 +48,31 @@ GEO_GATE_KM = float(os.environ.get("LANDMARK_WIKI_GEO_GATE_KM", "2.0"))
 # distinctive name token with the stop must therefore sit within this tighter
 # radius, or it is a different venue and is rejected.
 DENSE_CENTRE_KM = float(os.environ.get("LANDMARK_WIKI_DENSE_CENTRE_KM", "0.3"))
+
+# LOCAL-882: a cached article is re-validated against the CURRENT acceptance rules
+# on every read, so a rule change (a new gate, a tighter radius) can never be
+# bypassed by an article cached under the OLD rules. Two mechanisms, together:
+#
+#   1. RULES_VERSION is stamped on every cache row. A read whose row carries a
+#      DIFFERENT version is ignored (treated as a miss) and re-fetched — the new
+#      row overwrites the old via ON CONFLICT, so NOTHING is ever DELETEd. BUMP
+#      this string whenever the _pick acceptance rules change (a new gate, a new
+#      radius, a new name test), and every stale entry drops out on next read.
+#
+#   2. Even for a same-version row, the cached payload's TITLE is re-checked with
+#      the CURRENT name + dense-centre rules against the stop pin on every read
+#      (``_revalidate_payload``). This is the belt-and-braces guard: it catches a
+#      row that is the current version but whose stored article the present rules
+#      would no longer pick (e.g. a different nearby venue the title does not name).
+#
+# Wave 40 (LOCAL-882): the Gia Long Palace article, cached for the "City Hall" pin
+# in waves 36-39 (before LOCAL-881's 300 m dense-centre rule), was returned on a
+# cache HIT without re-running _pick, so it bypassed the new rule and the City
+# Hall stop shipped the Gia Long Palace again. Bumping RULES_VERSION to the
+# LOCAL-881 value retires that row; the payload re-check rejects it even if the
+# version matched.
+RULES_VERSION = os.environ.get("LANDMARK_WIKI_RULES_VERSION", "local881-dense300")
+
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 _MAX_LEAD = 6000
 _MAX_INFOBOX = 2500
@@ -402,15 +427,78 @@ def _pick(name: str, raw: Optional[Dict], pin: Optional[Tuple[float, float]] = N
         # stop. Such a title must ALSO sit within 300 m AND share a distinctive
         # name token with the stop; otherwise it is a different nearby venue and is
         # rejected (the caller then retries with a city-qualified name).
+        _art_coord = p.get("coord") or _p625_for_qid(p.get("qid", ""))
         if pin is not None and not _title_name_match:
-            coord = p.get("coord") or _p625_for_qid(p.get("qid", ""))
+            coord = _art_coord
             within_300 = coord is not None and _haversine_km(pin, coord) <= DENSE_CENTRE_KM
             shares_token = _titles_share_distinctive_token(mn, _title, city)
             if not (within_300 and shares_token):
                 continue
-        return {"title": _title, "lead": (p.get("lead") or "")[:_MAX_LEAD],
+        # [LOCAL-882] carry the article's own coordinate into the cached payload so
+        # a later cache HIT can re-run the EXACT dense-centre distance check on
+        # re-validation (the payload otherwise keeps only title/lead/infobox).
+        # Consumers read only title/lead/infobox, so this extra key is inert there.
+        _out = {"title": _title, "lead": (p.get("lead") or "")[:_MAX_LEAD],
                 "infobox": parse_infobox(p.get("wikitext", ""))}
+        if _art_coord is not None:
+            _out["coord"] = [round(_art_coord[0], 6), round(_art_coord[1], 6)]
+        return _out
     return None
+
+
+def _revalidate_payload(art: Optional[Dict[str, str]], name: str,
+                        pin: Optional[Tuple[float, float]] = None, city: str = "",
+                        match_name: str = "") -> bool:
+    """[LOCAL-882] Re-apply the CURRENT name + dense-centre acceptance rules to a
+    CACHED article payload (``{title, lead, infobox}``), returning True when the
+    present rules would still accept it, False when they would now reject it.
+
+    A cached payload has already been through ``_pick`` under the rules in force
+    when it was stored. Since LOCAL-882 the payload also carries the article's own
+    ``coord`` (when it had one), so this re-runs the FULL name + dense-centre check:
+
+      * The stored title (or its lead alias) must still NAME-MATCH the stop under
+        the current ``name_matches`` rule.
+      * In a dense centre, LOCAL-881 requires a title that does not itself
+        name-match to ALSO sit within 300 m of the pin AND share a distinctive
+        token. With the stored ``coord`` the 300 m test is exact; without it (a
+        pre-LOCAL-882 payload or a coordinate-less article) a shared distinctive
+        token is required. The Gia Long Palace shares no distinctive token with
+        "City Hall" / "Ho Chi Minh City Hall", so the stale row is rejected and
+        the article re-fetched under the current gate.
+
+    A found=False (negative) row carries no payload and is re-validated trivially
+    (there is nothing to re-pick); its freshness is handled by expiry + version.
+    """
+    if not art:
+        return True
+    mn = (match_name or name or "").strip()
+    title = (art.get("title") or "").strip()
+    if not title:
+        return False
+    title_name_match = _name_ok(mn, title)
+    name_match = title_name_match or _lead_names(mn, art.get("lead", ""))
+    if not name_match:
+        return False
+    # Dense-centre: a title that does not itself name-match the stop must share a
+    # distinctive token AND sit within 300 m. The stored ``coord`` (LOCAL-882)
+    # lets us re-run the EXACT distance check; when it is absent (a pre-LOCAL-882
+    # payload or a coordinate-less article) we fall back to requiring a shared
+    # distinctive token, so a different nearby venue the title does not name is
+    # still rejected.
+    if pin is not None and not title_name_match:
+        coord = art.get("coord")
+        shares_token = _titles_share_distinctive_token(mn, title, city)
+        if coord is not None:
+            try:
+                within_300 = _haversine_km(pin, (float(coord[0]), float(coord[1]))) <= DENSE_CENTRE_KM
+            except (TypeError, ValueError, IndexError):
+                within_300 = False
+            if not (within_300 and shares_token):
+                return False
+        elif not shares_token:
+            return False
+    return True
 
 
 # ---- cache (venue-cache DB, like landmark_coord_cache) -------------------------
@@ -450,6 +538,13 @@ def _ensure(conn) -> bool:
                 payload TEXT, found BOOLEAN NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 expires_at TIMESTAMP NOT NULL)""")
+            # [LOCAL-882] rules_version: the acceptance-rule revision that stored
+            # this row. Added idempotently so an existing cache table (and its
+            # rows) is upgraded in place — no DROP, no DELETE. A pre-LOCAL-882 row
+            # has NULL here, which never equals the current RULES_VERSION, so it is
+            # treated as stale on read and re-fetched (overwritten via ON CONFLICT).
+            cur.execute("ALTER TABLE landmark_wiki_cache "
+                        "ADD COLUMN IF NOT EXISTS rules_version TEXT")
         try:
             conn.commit()
         except Exception:
@@ -460,8 +555,20 @@ def _ensure(conn) -> bool:
     return True
 
 
-def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None):
-    """(found, article|None) for a live row, else None."""
+def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None,
+               city: str = "", match_name: str = ""):
+    """(found, article|None) for a live row that PASSES re-validation, else None.
+
+    [LOCAL-882] A hit is honoured only when BOTH hold:
+      * its ``rules_version`` equals the current ``RULES_VERSION`` (a row from an
+        older rule set is ignored — treated as a miss — and re-fetched, never
+        DELETEd); and
+      * the stored payload still passes the CURRENT name + dense-centre rules for
+        this stop (``_revalidate_payload``) — so even a current-version row whose
+        article the present rules would no longer pick is re-fetched.
+    Returning None here makes ``fetch_article`` re-fetch and overwrite the row via
+    ON CONFLICT, so the cache self-heals without any deletion.
+    """
     conn = _conn()
     if not conn:
         return None
@@ -469,12 +576,20 @@ def _cache_get(name: str, lang: str, pin: Optional[Tuple[float, float]] = None):
         if not _ensure(conn):
             return None
         with conn.cursor() as cur:
-            cur.execute("SELECT payload, found FROM landmark_wiki_cache "
+            cur.execute("SELECT payload, found, rules_version FROM landmark_wiki_cache "
                         "WHERE cache_key = %s AND expires_at > NOW()", (_key(name, lang, pin),))
             row = cur.fetchone()
         if not row:
             return None
-        return (True, json.loads(row[0])) if row[1] else (False, None)
+        payload, found, row_ver = row[0], row[1], (row[2] if len(row) > 2 else None)
+        if row_ver != RULES_VERSION:
+            return None                       # stale rule set: re-fetch (no DELETE)
+        if not found:
+            return (False, None)              # negative row: version + expiry suffice
+        art = json.loads(payload)
+        if not _revalidate_payload(art, name, pin=pin, city=city, match_name=match_name):
+            return None                       # current rules would reject it: re-fetch
+        return (True, art)
     except Exception:
         return None
 
@@ -491,13 +606,14 @@ def _cache_put(name: str, lang: str, art: Optional[Dict[str, str]],
             return
         with conn.cursor() as cur:
             cur.execute("""INSERT INTO landmark_wiki_cache
-                (cache_key, name, language, payload, found, expires_at)
-                VALUES (%s,%s,%s,%s,%s,%s)
+                (cache_key, name, language, payload, found, expires_at, rules_version)
+                VALUES (%s,%s,%s,%s,%s,%s,%s)
                 ON CONFLICT (cache_key) DO UPDATE SET payload = EXCLUDED.payload,
                 found = EXCLUDED.found, created_at = CURRENT_TIMESTAMP,
-                expires_at = EXCLUDED.expires_at""",
+                expires_at = EXCLUDED.expires_at,
+                rules_version = EXCLUDED.rules_version""",
                         (_key(name, lang, pin), name, lang, json.dumps(art) if art else None,
-                         bool(art), datetime.utcnow() + timedelta(days=ttl)))
+                         bool(art), datetime.utcnow() + timedelta(days=ttl), RULES_VERSION))
         try:
             conn.commit()
         except Exception:
@@ -521,7 +637,7 @@ def fetch_article(name: str, lang: str = "en", fetch_fn: Optional[Callable] = No
         return None
     live = fetch_fn is None
     if use_cache and live:
-        c = _cache_get(nm, lang, pin)
+        c = _cache_get(nm, lang, pin, city=city, match_name=match_name)
         if c is not None:
             return c[1]
     try:

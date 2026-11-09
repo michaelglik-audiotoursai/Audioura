@@ -152,8 +152,11 @@ class Fake:
         def ln(raw):
             self.calls["link"].append(raw)
             return self._ln(raw) if self._ln else {}
+        # [LOCAL-882] canonical is injectable; the offline Fake disables it (returns
+        # None) so a preview test never reaches the live Wikidata-around call and the
+        # matched_name falls back to the authority's own name, as before.
         return ii.Resolvers(wikidata=wd, nominatim=nom, serper=sp, link=ln,
-                            city_fetch=nom)
+                            city_fetch=nom, canonical=lambda *a, **k: None)
 
 
 def test_city_required_never_guessed():

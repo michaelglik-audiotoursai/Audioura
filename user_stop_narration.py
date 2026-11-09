@@ -627,6 +627,28 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
     # so only the unconditional always-drop tiers fire.
     has_dsrc = True if not source_gated else has_dated_source(poi, outdoor_facts)
 
+    # [LOCAL-882] Is this stop a LANDMARK/monument/historical-site (as opposed to
+    # a bar / spa / street)? The military-history and national-figure always-drop
+    # tiers below exist for a nightlife street or a café, where war history or a
+    # statesman's biography is a genuine digression. But for a landmark WHOSE OWN
+    # IDENTITY IS that event — the Independence Palace is the site of the Fall of
+    # Saigon (a tank through its gates on 30 April 1975) — that event is the stop's
+    # defining content, not a digression. On the quick path the Palace's own tank
+    # sentence was dropped as an "off-venue military-history digression", losing the
+    # 30 April 1975 event (wave 40). So for a landmark stop we DO NOT always-drop a
+    # military / national-figure sentence that NAMES the venue (its distinctive
+    # name words appear in the sentence): such a sentence is anchored to this place.
+    # A bar/spa/street keeps the full protection; an UNRELATED war digression on a
+    # landmark (no venue name) is still dropped by the (not on_topic) path.
+    _stop_is_landmark = False
+    try:
+        from user_stop_enrichment import classify_stop_kind as _csk882
+        _stop_is_landmark = _csk882(name, type_specialty) in ("landmark", "both")
+    except Exception:
+        _stop_is_landmark = False
+    # Distinctive venue name tokens (not city / kind / stop words) — a sentence is
+    # "about this venue" when it carries one of them. Built below once anchors are.
+
     # On-topic anchor tokens: distinctive venue-name words, venue-kind words, and
     # the city/place tokens (so a sentence grounding the listener in the city is
     # kept). Generic/stop words are excluded so they never falsely anchor —
@@ -650,6 +672,20 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
     for w in _fold(location).split():
         if len(w) >= 3 and w not in _ANCHOR_STOPWORDS:
             anchors.add(w)
+
+    # [LOCAL-882] The venue's DISTINCTIVE name tokens: its own name words, minus
+    # the city's words and the generic kind words. A sentence that carries one of
+    # these is genuinely ABOUT this venue (the Fall-of-Saigon tank sentence names
+    # "Independence Palace"), so a landmark's own pivotal event is not mistaken for
+    # a far-off war digression.
+    _city_toks = {w for w in _fold(location).split() if len(w) >= 3}
+    _kind_toks = set(venue_kind_words(type_specialty))
+    for w in _fold(type_specialty).split():
+        if len(w) >= 3:
+            _kind_toks.add(w)
+    _venue_name_toks = {w for w in _fold(name).split()
+                        if len(w) >= 3 and w not in _ANCHOR_STOPWORDS
+                        and w not in _city_toks and w not in _kind_toks}
 
     kept, dropped = [], []
     _flags860 = []
@@ -683,6 +719,17 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
         national_figure = bool(_NATIONAL_FIGURE_RE.search(sent))
         firsts_claim = bool(_FIRSTS_CLAIM_RE.search(sent))
 
+        # [LOCAL-882] This sentence is ABOUT this venue when it carries one of the
+        # venue's distinctive name tokens. For a LANDMARK/monument/historical-site
+        # whose own identity IS a historical event (the Independence Palace is the
+        # site of the Fall of Saigon), such a sentence is the stop's defining
+        # content, not a military / national-figure digression — so the always-drop
+        # for those two tiers is lifted. A bar / spa / street (not a landmark) keeps
+        # the full protection; a war/figure sentence that does NOT name the venue is
+        # still off-topic and dropped by the (not on_topic) path below.
+        _names_venue = bool(stoks & _venue_name_toks)
+        _own_event = _stop_is_landmark and _names_venue
+
         drop_reason = None
         # ── ALWAYS-drop tier ──────────────────────────────────────────────
         if hedge:
@@ -692,12 +739,16 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
             # superlative for a small private venue is a fabrication (Thi Bar's
             # "first-ever drag show"); dropped regardless of sourcing.
             drop_reason = "unsupported claim-of-firsts"
-        elif national_figure:
+        elif national_figure and not _own_event:
             # A national figure's biography (the city is NAMED for Hồ Chí Minh,
-            # so city tokens falsely anchor it on-topic) is never a venue's story.
+            # so city tokens falsely anchor it on-topic) is never a venue's story
+            # — UNLESS this is a landmark whose own identity involves the figure
+            # and the sentence names the venue (LOCAL-882).
             drop_reason = "off-venue national-figure biography"
-        elif military:
-            # War/military campaign history is never a bar/spa/street's content.
+        elif military and not _own_event:
+            # War/military campaign history is never a bar/spa/street's content —
+            # but a landmark whose OWN event it is (the Fall of Saigon at the
+            # Independence Palace), named in the sentence, keeps it (LOCAL-882).
             drop_reason = "off-venue military-history digression"
         elif art_prov:
             # An artwork's museum provenance ("… now housed at the Art Institute
@@ -714,7 +765,7 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
         elif (not on_topic) and off_marker:
             drop_reason = "off-venue (far place / history / figure)"
         # ── THIN-only tier (no retrieved/research source dates this venue) ─
-        elif not has_dsrc and dated:
+        elif not has_dsrc and dated and not _own_event:
             drop_reason = "unsourced dated claim"
         elif not has_dsrc and anecdote:
             drop_reason = "fabricated anecdote / claim-of-firsts"

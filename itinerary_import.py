@@ -385,12 +385,26 @@ class Resolvers:
     """Network edges, injectable. Every method fails SOFT (returns empty/None)."""
 
     def __init__(self, wikidata=None, nominatim=None, serper=None, link=None,
-                 city_fetch=None):
+                 city_fetch=None, canonical=None):
         self.wikidata = wikidata or _default_wikidata
         self.nominatim = nominatim or _default_nominatim
         self.serper = serper or _default_serper
         self.link = link or _default_link
         self.city_fetch = city_fetch or _default_nominatim
+        # [LOCAL-882 task C] canonical(user_name, pin, city, local_lang) -> dict|None
+        # The RUNTIME canonical-venue-at-the-pin resolver. Injectable (offline
+        # tests pass a stub); the live default is venue_canonical_resolver.
+        self.canonical = canonical if canonical is not None else _default_canonical
+
+
+def _default_canonical(user_name, pin, city="", local_lang=""):
+    """Live canonical-venue resolution (Wikidata within 300 m of the pin, then
+    Places). Fails soft to None so pin resolution is never blocked by it."""
+    try:
+        import venue_canonical_resolver as _vcr
+        return _vcr.resolve_canonical(user_name, pin, city=city, local_lang=local_lang)
+    except Exception:
+        return None
 
 
 _NOM_LOCK = threading.Lock()
@@ -708,10 +722,41 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
                 if a:
                     alias_title = a["title"]
                     break
+            # [LOCAL-882 task C] Derive the CANONICAL venue at the resolved pin at
+            # RUNTIME (Wikidata within 300 m of the pin, then Places), so the
+            # name carried to generation as the research match_name/alias comes
+            # from the pin, not from a hand-written place-name table (D769). The
+            # user's own wording stays the spoken title (stop_name); the canonical
+            # English + local labels become match_name and aliases for evidence
+            # and signature stories. A None result keeps the existing behaviour.
+            _canon = None
+            _canon_aliases: List[str] = []
+            try:
+                _local_lang = ""
+                try:
+                    import wikidata_landmark_lookup as _wll882
+                    _local_lang = _wll882.local_lang_for_scope(
+                        f"{c.get('name','')}, {c.get('country_code','')}")
+                except Exception:
+                    _local_lang = ""
+                _canon = res.canonical(s["name"], (r["lat"], r["lng"]),
+                                       c.get("name", ""), _local_lang)
+            except Exception as _ce882:
+                log(f"[LOCAL-882] canonical resolve skipped for {s['name']!r}: {_ce882}")
+                _canon = None
+            if _canon and _canon.get("canonical_en"):
+                _matched = _canon["canonical_en"]
+                _canon_aliases = list(_canon.get("aliases") or [])
+                log(f"[LOCAL-882] canonical for {s['name']!r} @pin -> "
+                    f"{_matched!r} ({_canon.get('source')}, "
+                    f"{_canon.get('distance_m')} m, tier {_canon.get('match_tier')})")
+            else:
+                _matched = r.get("matched_name")
             item.update(stop_name=alias_title or s["name"],
                         resolved_name=r.get("resolved_name") or alias_title
                         or s["name"],
-                        matched_name=r.get("matched_name"),
+                        matched_name=_matched or r.get("matched_name"),
+                        canonical_aliases=_canon_aliases,
                         lat=r["lat"], lng=r["lng"], source=r["source"],
                         confidence=r["confidence"], unresolved=False)
         out.append(item)
