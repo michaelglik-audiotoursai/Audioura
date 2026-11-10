@@ -409,6 +409,34 @@ def _criteria(text, log, require_ten=True):
     return results
 
 
+def evaluate_888(text, evidence_chars=None):
+    """[LOCAL-888] The checklist additions: every stop >= 4 content sentences, no
+    orphan openers, Palace states 30 April 1975 plainly, Cafe evidence > 0."""
+    import stop_coherence as sc
+    out = []
+    blocks = _blocks(text)
+    short = [(n, t, len(_content_sentences(_prose((n, t, b)))))
+             for n, t, b in blocks if len(_content_sentences(_prose((n, t, b)))) < 4]
+    out.append(("every stop >= 4 content sentences", not short, short or "all >= 4"))
+    orphans = []
+    for n, t, b in blocks:
+        sents = _content_sentences(_prose((n, t, b)))
+        for i, k, frag in sc.dangling_reference_issues(sents, t, CITY):
+            orphans.append((n, t, k, frag))
+    out.append(("no orphan openers", not orphans, orphans or "none"))
+    pal = next((b for b in blocks if "palace" in b[1].lower()), None)
+    pl = _prose(pal).lower() if pal else ""
+    plain = [s for s in re.split(r"(?<=[.!?])\s+", pl)
+             if "30 april 1975" in s or "april 30, 1975" in s]
+    out.append(("Palace states 30 April 1975 plainly", bool(plain), plain[:1] or "absent"))
+    if evidence_chars is not None:
+        cafe = {k: v for k, v in evidence_chars.items() if "caf" in k.lower()}
+        out.append(("Cafe evidence > 0", any(v > 0 for v in cafe.values()), cafe or "no key"))
+    for label, ok, detail in out:
+        _check(label, ok, detail)
+    return out
+
+
 # ── seed with the PREVIOUS subscribed commit (a31ead22) ──────────────────────
 def seed_with_base(cap_usd):
     """Run a31ead22's generator ONCE against the same DB so the cache holds
@@ -669,6 +697,7 @@ def snapshot_main(snap_dir):
         audit["used_cloud_snapshot"] = True
         with open(os.path.join(_ART_DIR, "saigon_warm_audit.json"), "w", encoding="utf-8") as f:
             json.dump(audit, f, ensure_ascii=False, indent=2)
+        _e888 = evaluate_888(warm_text, audit.get("evidence_chars") or {})
         uns = audit.get("unsupported")
         print(f"   audit unsupported={len(uns) if isinstance(uns, list) else 'ERROR'}", flush=True)
         for u in (uns or []):
