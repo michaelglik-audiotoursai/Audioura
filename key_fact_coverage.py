@@ -554,6 +554,15 @@ def _event_fact(evidence: str, lead_sents: List[str], title: str = "",
     except Exception:
         pass
     cands += [x for x in lead_sents if _FAMOUS.search(x) and _YEAR.search(x)]  # whole article text
+    # a physical event to the building (bombed, damaged, burned, a tank at the gate) is
+    # the stop's defining event before a political "After the Fall of ..." aftermath;
+    # a full-dated signature sentence (first candidate) still leads
+    _PHYS = re.compile(r"(?i)\b(bomb\w*|damag\w+|destroy\w*|burn(?:ed|t)|collaps\w+|earthquake|shell(?:ed|ing)|"
+                       r"tanks?|crashed|stormed|massacre|siege|sank|shipwreck\w*|fire)\b")
+    head, tail = cands[:1], cands[1:]
+    if head and not _PHYS.search(head[0]) and not _DMY.search(head[0]) and not _MDY.search(head[0]):
+        head, tail = [], cands
+    cands = head + sorted(tail, key=lambda c: 0 if _PHYS.search(c) else 1)
     for c in cands:
         c = _clean_ev_sentence(c)
         if not (25 <= len(c) <= 420) or not _FAMOUS.search(c):
@@ -831,7 +840,9 @@ def strip_title_prefix(sentence: str, title: str) -> Tuple[str, bool]:
 
 
 _PREVIEW = re.compile(
-    r"(?i)^(?:as|when|once|after)\s+you\s+(?:move|walk|continue|head|leave|go|proceed|make\s+your\s+way|"
+    r"(?i)^from\s+here,?\s+(?:the\s+(?:tour|walk|route)|you|we)\s+(?:can|could|will|may|should|continue|head|walk|go)\b|"
+    r"^(?:the\s+(?:tour|walk|route))\s+(?:continues|moves|heads|leads)\s+(?:on\s+)?(?:to|toward|towards)\b|"
+    r"^(?:as|when|once|after)\s+you\s+(?:move|walk|continue|head|leave|go|proceed|make\s+your\s+way|"
     r"set\s+off|travel)\s+(?:on|onward|onwards|along|ahead|forward|from\s+here|away|to)\b|"
     r"\bnext\s+(?:stop|up|on\s+(?:the|your)\s+(?:tour|route|walk))\b|"
     r"^(?:in\s+a\s+(?:few|short)\s+(?:minutes|steps)|a\s+short\s+walk\s+(?:from\s+here|away))\b[^.]{0,80}\b"

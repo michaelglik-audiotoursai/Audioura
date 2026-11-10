@@ -217,6 +217,8 @@ def test_tacked_on_also_sentence_is_restated_deterministically_with_the_stop_as_
 def test_next_stop_preview_is_dropped():
     assert kfc.is_preview("As you move on, a nearby museum preserves the memories of conflict.")
     assert kfc.is_preview("When you continue along the river, the next stop awaits.")
+    assert kfc.is_preview("From here, the tour can continue toward the lively charm of the Cafe Apartments nearby, "
+                          "where everyday life pulses.")
     assert not kfc.is_preview("As the legislature later split into two chambers, the hall hosted both.")
     body = ["You stand before the cathedral on the old square.",
             "It was built between 1877 and 1880 under architect Henri Varnier.",
@@ -403,3 +405,11 @@ def test_replay_is_idempotent():
     i = LEAD889.index("\n\nFrom Cathedral, Opera House")
     again, _ = kfc.finalize_tour(out, {}, classify_fn=all_supported)       # no evidence: nothing may change
     assert again.count("Stop ") == out.count("Stop ")
+
+
+def test_physical_event_to_the_building_outranks_a_political_aftermath():
+    ev = art("Saint Rowan Theatre", "Saint Rowan Theatre is an opera house in the capital. It was completed in 1900.",
+             ["After the fall of the capital in 1975, the ministry started holding sessions at the theatre.",
+              "In 1944, the theatre was damaged by air raids and it stopped functioning."])
+    f = {x["kind"]: x for x in kfc.key_facts(ev, "Opera House")}
+    assert f["event"]["year"] == "1944"

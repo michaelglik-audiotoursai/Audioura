@@ -1,0 +1,32 @@
+{
+  "unsupported": [],
+  "_model": "gpt-4.1",
+  "_usage": {
+    "prompt_tokens": 19782,
+    "completion_tokens": 7,
+    "total_tokens": 19789,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "evidence_chars": {
+    "Book Street": 1223,
+    "City Hall": 12903,
+    "Thi Bar": 1453,
+    "Café Apartments 42": 968,
+    "Independence Palace": 5431,
+    "War Remnants Museum": 5563,
+    "Cathedral": 9844,
+    "Post Office": 5971,
+    "Opera House": 11907,
+    "Bạch Đằng Pier": 10410
+  },
+  "used_cloud_snapshot": true
+}
