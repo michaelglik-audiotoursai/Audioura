@@ -14082,6 +14082,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             for p, raw in zip(_us_parsed, forced_stops)]
         else:
             _clean_names = list(forced_stops)
+        # [LOCAL-893] Wave-40 title cleaning on the generator too, so a request
+        # that arrives with RAW strings (preview unreachable / direct caller) never
+        # yields "Opera House_Đồng Khởi" or "(tour-bus + waterbus)" as a title.
+        # Stops carrying a link/pin are untouched; offline; never raises.
+        try:
+            from itinerary_import import clean_raw_stop_titles as _crst893
+            _cn893 = _crst893(_clean_names, (location or "").split(",")[0].strip())
+            for _a893, _b893 in zip(_clean_names, _cn893):
+                if _a893 != _b893:
+                    print(f"  [LOCAL-893] raw stop title {_a893!r} -> {_b893!r}")
+            _clean_names = _cn893
+        except Exception as _c893:
+            print(f"  [LOCAL-893] title cleaning skipped (non-fatal): {_c893}")
 
         # [LOCAL-554] Present the listener's own words properly. Matching and
         # protection still key on what they typed; only the DISPLAY title changes.

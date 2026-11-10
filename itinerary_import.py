@@ -39,16 +39,19 @@ from __future__ import annotations
 
 import html
 import math
+import os
 import re
 import threading
 import time
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import quote
 from typing import Callable, Dict, List, Optional, Tuple
 
 __all__ = [
     "parse_itinerary",
     "preview_stops",
+    "clean_raw_stop_titles",
     "Resolvers",
     "stop_to_generation_string",
     "stops_for_generation",
@@ -680,6 +683,34 @@ def _resolve_stop(stop: Dict, city: Dict, res: Resolvers, st: _State,
                       "Nominatim or one Serper /places lookup"}
 
 
+def _canonical_lookup(s: Dict, r: Dict, c: Dict, res: "Resolvers", log) -> Optional[Dict]:
+    """[LOCAL-882 task C] Derive the CANONICAL venue at the resolved pin at
+    RUNTIME (Wikidata within 300 m of the pin, then Places), so the name carried
+    to generation as the research match_name/alias comes from the pin, not from a
+    hand-written table (D769). Fails soft to None. [LOCAL-893] Split out of
+    preview_stops so the per-stop lookups can run concurrently."""
+    try:
+        _local_lang = ""
+        try:
+            import wikidata_landmark_lookup as _wll882
+            _local_lang = _wll882.local_lang_for_scope(
+                f"{c.get('name','')}, {c.get('country_code','')}")
+        except Exception:
+            _local_lang = ""
+        _user_link882 = str(s.get("url") or "")
+        try:
+            return res.canonical(s["name"], (r["lat"], r["lng"]),
+                                 c.get("name", ""), _local_lang,
+                                 user_link=_user_link882)
+        except TypeError:
+            # an injected resolver without the LOCAL-883 user_link kwarg
+            return res.canonical(s["name"], (r["lat"], r["lng"]),
+                                 c.get("name", ""), _local_lang)
+    except Exception as _ce882:
+        log(f"[LOCAL-882] canonical resolve skipped for {s['name']!r}: {_ce882}")
+        return None
+
+
 def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] = None,
                   max_serper_calls: int = 10, max_stops: int = 50,
                   log: Callable[[str], None] = print) -> Dict:
@@ -706,12 +737,41 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
                          "\"Ho Chi Minh City\") or name it in the text"}
 
     st = _State(max_serper_calls)
-    out = []
+    t_all = time.time()
+    # [LOCAL-893] Phase 1: pin resolution, sequential (shared Serper cap and the
+    # 1 req/s Nominatim limiter make this the part that cannot fan out).
+    resolved: List[Tuple[Dict, Optional[Dict], float]] = []
     for i, s in enumerate(stops):
+        t0 = time.time()
         try:
             r = _resolve_stop(s, c, res, st, log)
         except Exception as e:  # one bad item must not sink the preview
             r = {"unresolved": True, "reason": f"lookup error: {type(e).__name__}"}
+        resolved.append((s, r, time.time() - t0))
+    t_pins = time.time() - t_all
+
+    # [LOCAL-893] Phase 2: the LOCAL-882 canonical-venue lookups were run one
+    # after another inside the loop and took /preview-stops from ~6 s to ~18 s
+    # for ten stops (past the orchestrator's 20 s read timeout). They are
+    # independent per stop, so run them on a bounded pool.
+    workers = max(1, int(os.environ.get("PREVIEW_CANON_WORKERS", "5") or 5))
+    canon: Dict[int, Tuple[Optional[Dict], float]] = {}
+    pending = [i for i, (_s, r, _t) in enumerate(resolved) if not r.get("unresolved")]
+
+    def _canon_job(i: int):
+        t0 = time.time()
+        s, r, _t = resolved[i]
+        return i, _canonical_lookup(s, r, c, res, log), time.time() - t0
+
+    t_c0 = time.time()
+    if pending:
+        with ThreadPoolExecutor(max_workers=min(workers, len(pending))) as pool:
+            for i, cn, dt in pool.map(_canon_job, pending):
+                canon[i] = (cn, dt)
+    t_canon = time.time() - t_c0
+
+    out = []
+    for i, (s, r, t_pin) in enumerate(resolved):
         item = {"index": i, "name": s["name"], "alt_names": s["alt_names"],
                 "note": s["note"], "url": s["url"]}
         if r.get("unresolved"):
@@ -726,35 +786,8 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
                 if a:
                     alias_title = a["title"]
                     break
-            # [LOCAL-882 task C] Derive the CANONICAL venue at the resolved pin at
-            # RUNTIME (Wikidata within 300 m of the pin, then Places), so the
-            # name carried to generation as the research match_name/alias comes
-            # from the pin, not from a hand-written place-name table (D769). The
-            # user's own wording stays the spoken title (stop_name); the canonical
-            # English + local labels become match_name and aliases for evidence
-            # and signature stories. A None result keeps the existing behaviour.
-            _canon = None
+            _canon, _ = canon.get(i, (None, 0.0))
             _canon_aliases: List[str] = []
-            try:
-                _local_lang = ""
-                try:
-                    import wikidata_landmark_lookup as _wll882
-                    _local_lang = _wll882.local_lang_for_scope(
-                        f"{c.get('name','')}, {c.get('country_code','')}")
-                except Exception:
-                    _local_lang = ""
-                _user_link882 = str(s.get("url") or "")
-                try:
-                    _canon = res.canonical(s["name"], (r["lat"], r["lng"]),
-                                           c.get("name", ""), _local_lang,
-                                           user_link=_user_link882)
-                except TypeError:
-                    # an injected resolver without the LOCAL-883 user_link kwarg
-                    _canon = res.canonical(s["name"], (r["lat"], r["lng"]),
-                                           c.get("name", ""), _local_lang)
-            except Exception as _ce882:
-                log(f"[LOCAL-882] canonical resolve skipped for {s['name']!r}: {_ce882}")
-                _canon = None
             if _canon and _canon.get("canonical_en"):
                 _matched = _canon["canonical_en"]
                 _canon_aliases = list(_canon.get("aliases") or [])
@@ -772,7 +805,11 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
                         confidence=r["confidence"], unresolved=False)
         out.append(item)
         log(f"[LOCAL-867] preview {i + 1}/{len(stops)} {s['name']!r} -> "
-            f"{item['source'] or 'UNRESOLVED'}")
+            f"{item['source'] or 'UNRESOLVED'} "
+            f"(pin {t_pin:.2f}s, canonical {canon.get(i, (None, 0.0))[1]:.2f}s)")
+    log(f"[LOCAL-893] preview timing: {len(stops)} stops, pins {t_pins:.2f}s "
+        f"(sequential), canonical {t_canon:.2f}s ({workers} workers), "
+        f"total {time.time() - t_all:.2f}s")
 
     rate = 0.002
     try:
@@ -906,7 +943,43 @@ def expand_pasted_lists(raw_stops, city_hint: str = "", resolve: bool = False):
         return raw_stops, 0
 
 
+def clean_raw_stop_titles(raw_stops, city_hint: str = ""):
+    """[LOCAL-893] Offline title cleaning for plain-name user stops, identical to
+    what /preview-stops applies (it IS ``parse_itinerary``): ``Opera House_Đồng
+    Khởi`` / ``Opera House/Đồng Khởi`` -> ``Opera House``, ``City Hall & Nguyễn
+    Huệ`` -> ``City Hall``, ``Bạch Đằng Pier (tour-bus + waterbus)`` -> ``Bạch
+    Đằng Pier``. No network. Items with a link or pin, objects, and anything the
+    parser does not reduce to exactly one stop pass through unchanged. Never
+    raises. Used when the preview could not be reached, so the generator never
+    receives the raw wording."""
+    if not isinstance(raw_stops, list):
+        return raw_stops
+    out = list(raw_stops)
+    for i, s in enumerate(raw_stops):
+        try:
+            if not (isinstance(s, str) and s.strip()) or "http" in s \
+                    or any(m in s for m in _LIST_MARKERS):
+                continue
+            # the "_" street qualifier the app sends for "/" (wave 40)
+            probe = re.sub(r"(?<=\S)_(?=\S)", "/", s.strip())
+            got = parse_itinerary(probe, city_hint)
+            if len(got) == 1 and got[0].get("name"):
+                out[i] = got[0]["name"]
+        except Exception:
+            continue
+    return out
+
+
 def resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn=None):
+    """Pins via the preview; on ANY failure the stops still leave with cleaned
+    titles (LOCAL-893), never raw. See ``_resolve_user_stop_pins``."""
+    out, n = _resolve_user_stop_pins(raw_stops, city_hint, log, preview_fn)
+    if n == 0 and isinstance(out, list) and not any(isinstance(x, dict) for x in out):
+        out = clean_raw_stop_titles(out, city_hint)
+    return out, n
+
+
+def _resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn=None):
     """[LEAD wave-30 finding] Give every plain-name user stop a checked pin, with the
     same free resolvers as /preview-stops (no LLM; Serper /places only for leftovers).
     This covers the pasted list AND the app's already-split stops. Items that already
