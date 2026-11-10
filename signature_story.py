@@ -404,11 +404,43 @@ def story_from_own_source(source_sentence: str, own_evidence: str,
     return False
 
 
+def famous_event_hints(evidence_text: str, n: int = 3) -> List[str]:
+    """[LOCAL-887] Sentences from the WHOLE evidence that read as the place's defining
+    event (tank through the gates, fall of a city, a coup, a bombing ...), found by
+    generic cues + a date, wherever they sit. Never raises."""
+    try:
+        import landmark_wikipedia_evidence as _lwe
+        return _lwe.event_sentences(evidence_text or "", n)
+    except Exception:
+        return []
+
+
+def _fit_evidence(evidence_text: str, hints: List[str]) -> str:
+    """Evidence cut to MAX_INPUT_CHARS WITHOUT losing the famous-event sentences: when
+    the text is longer than the cap, a hint sentence that falls past the cut is
+    kept (pulled to the front) instead of being truncated away."""
+    ev = evidence_text or ""
+    if len(ev) <= MAX_INPUT_CHARS:
+        return ev
+    room = MAX_INPUT_CHARS - sum(len(h) + 2 for h in hints)
+    head = ev[:max(room, MAX_INPUT_CHARS // 2)]
+    extra = [h for h in hints if h not in head]
+    return (head + ("\n" + "\n".join(extra) if extra else ""))[:MAX_INPUT_CHARS + 900]
+
+
 def _build_user_prompt(title: str, evidence_text: str, location: str) -> str:
-    ev = (evidence_text or "")[:MAX_INPUT_CHARS]
+    hints = famous_event_hints(evidence_text)
+    ev = _fit_evidence(evidence_text, hints)
+    hint_block = ""
+    if hints:
+        hint_block = (
+            "EVENTS THIS ARTICLE DESCRIBES THAT MAY BE WHAT THE PLACE IS BEST KNOWN FOR "
+            "(all quoted from the evidence; if one of them is a famous moment at THIS "
+            "building or site, rank it first):\n- " + "\n- ".join(hints) + "\n\n")
     return (
         f"STOP: {title}\n"
         f"CITY/AREA: {location or '(unspecified)'}\n\n"
+        + hint_block +
         "EVIDENCE (the only source you may use):\n"
         f"{ev}\n\n"
         "TASK: choose the 1 or 2 MOST MEMORABLE true stories a guide could tell "

@@ -483,14 +483,28 @@ def escalate_thin_stop(
         if _esc is None:
             import local_language as _ll
             _esc = _ll.escalate_local_language
-        local = _esc(
-            name, scope, places_type=places_type,
-            wikidata_instance_of=wikidata_instance_of,
-            country_code="", local_name=(aliases[0] if aliases else ""),
-            wiki_fetch_fn=wiki_fetch_fn, use_cache=use_cache) or {}
+        _kw = dict(places_type=places_type,
+                   wikidata_instance_of=wikidata_instance_of,
+                   country_code="", local_name=(aliases[0] if aliases else ""),
+                   wiki_fetch_fn=wiki_fetch_fn, use_cache=use_cache)
+        try:
+            local = _esc(name, scope, pin=pin, **_kw) or {}   # [LOCAL-887] geo-gate
+        except TypeError:
+            local = _esc(name, scope, **_kw) or {}
     except Exception as e:
         log(f"[LOCAL-873] local-language escalation skipped ({name!r}): {e}")
         local = {}
+    # [LOCAL-887] the geo/name-gated LOCAL-language article(s), rendered as evidence
+    # items, for the caller to use as the narrator's AND the gate's evidence when no
+    # English article was accepted.
+    report["local_wikipedia_items"] = []
+    try:
+        import landmark_wikipedia_evidence as _lwe887
+        for _lg, _art in (local.get("wikipedia") or {}).items():
+            if _lg != "en" and _art:
+                report["local_wikipedia_items"].append(_lwe887.format_item(_art, _lg))
+    except Exception:
+        pass
     report["local"] = {k: local.get(k) for k in
                        ("dominant", "country_code", "local_alias", "serper")
                        if k in local}

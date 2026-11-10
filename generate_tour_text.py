@@ -24236,6 +24236,22 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         poi=poi, pin=_ts_pin, aliases=_ts_al,
                         places_type=poi.get('type_specialty') or '',
                         wikidata_instance_of=poi.get('_wikidata_instance_of') or '')
+                    # [LOCAL-887] No English article was accepted for this stop but its
+                    # geo/name-gated LOCAL-language article was: it is the narrator's
+                    # AND the gate's evidence (it used to reach neither).
+                    try:
+                        _ll_items = list(_ts_rep.get('local_wikipedia_items') or [])
+                        _has_en887 = any("Wikipedia (en)" in str(_x)[:200]
+                                         for _x in (poi.get('_wiki_evidence') or []))
+                        if _ll_items and not _has_en887 and not poi.get('_wiki_evidence'):
+                            import landmark_wikipedia_evidence as _lwe887
+                            poi['_wiki_evidence'] = _ll_items
+                            description_prompt += _lwe887.narrator_block(poi_name, _ll_items)
+                            _wiki_evidence_sink_record(_J._THIN_SINK_KEY, poi_name, _ll_items)
+                            print(f"  [LOCAL-887] Stop {stop_num} '{poi_name[:40]}': no en article; "
+                                  f"local-language article ({len(_ll_items)}) fed to narrator + gate")
+                    except Exception as _ll887_err:
+                        print(f"  [LOCAL-887] local-language evidence skipped (non-fatal): {_ll887_err}")
                     if _ts_rep.get('facts'):
                         # (a) feed the NARRATOR
                         description_prompt += _ts_rep.get('narrator_block', '')

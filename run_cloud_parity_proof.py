@@ -488,10 +488,11 @@ def phase(tag, cap_usd):
 
 # ── LOCAL-886: load the CLOUD cache snapshot, run ONLY the warm phase ─────────
 SNAPSHOT_GLOB = "cloud_*_cache_*.csv.gz"
-_SNAP_PORT = os.environ.get("LOCAL886_DB_PORT", "55986")
+_SNAP_TAG = os.environ.get("LOCAL_SNAPSHOT_TAG", "887")      # [LOCAL-887] task number
+_SNAP_PORT = os.environ.get("LOCAL886_DB_PORT", f"559{_SNAP_TAG[-2:]}")
 _SNAP_DB = os.environ.get(
     "LOCAL886_DB_URL", f"postgresql://admin:password123@localhost:{_SNAP_PORT}/audiotours")
-_SNAP_BUDGET_ID = "LOCAL-886"
+_SNAP_BUDGET_ID = f"LOCAL-{_SNAP_TAG}"
 
 
 def _ensure_snapshot_tables(conn, log=print):
@@ -606,8 +607,8 @@ def snapshot_main(snap_dir):
     (:55986), own budget ledger (LOCAL-886, default dir), at most one paid run per
     call; the spend is recorded into the ledger even if the run crashes."""
     global _OWN_DB, _METER_DIR, _ART_DIR
-    _OWN_DB, _METER_DIR = _SNAP_DB, os.path.join(_HERE, "_local886_meterlogs")
-    _ART_DIR = os.path.join(_HERE, "submission_artifacts", "local886")
+    _OWN_DB, _METER_DIR = _SNAP_DB, os.path.join(_HERE, f"_local{_SNAP_TAG}_meterlogs")
+    _ART_DIR = os.path.join(_HERE, "submission_artifacts", f"local{_SNAP_TAG}")
     os.makedirs(_ART_DIR, exist_ok=True)
     os.makedirs(_METER_DIR, exist_ok=True)
     if os.environ.get("TASK_BUDGET_ID") != _SNAP_BUDGET_ID:

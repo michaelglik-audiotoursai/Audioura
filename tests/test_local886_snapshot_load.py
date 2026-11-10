@@ -5,6 +5,7 @@ Skips when the snapshot or the proof DB is unavailable."""
 import os, sys, unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+os.environ.setdefault("LOCAL_SNAPSHOT_TAG", "886")
 import run_cloud_parity_proof as h  # noqa: E402
 
 SNAP = os.path.expanduser("~/Audioura/cloud_cache_snapshot")
