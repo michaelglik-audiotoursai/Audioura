@@ -29066,13 +29066,6 @@ REWRITE RULES (all mandatory):
                       f"{len(_removed)} sentence(s) removed")
                 for _rm in _removed:
                     print(f"    removed: \"{_rm[:100]}\"")
-                    # [LOCAL-889] a removed claim stays removed: later passes
-                    # (refill, coherence, coverage) drop it again.
-                    try:
-                        import key_fact_coverage as _kfc889a
-                        _kfc889a.deny_record(_stop_label, _rm, "phase5.17-gates")
-                    except Exception:
-                        pass
 
             _spine_stop, _fact_sheet, _story_type = _regen_args_by_idx.get(
                 _ri, (None, None, None))

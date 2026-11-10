@@ -136,19 +136,61 @@ def deny_claims(title: str) -> List[Dict]:
         return list(_DENY.get(_fold(title), []))
 
 
-def is_denied(title: str, sentence: str) -> Optional[Dict]:
-    """The recorded claim ``sentence`` repeats, else None. A match needs >= 2 shared
-    specific tokens and >= 60% of the smaller key (so 'military' + 'intelligence'
-    match, one shared place name does not)."""
+# Removal sources that are a VERDICT on the claim. Regeneration / style removals
+# (Phase 5.17 "removed by gates", off-pin, foreign-entity, filler) are not: the 889
+# live run showed them carrying the stop's sourced 30 April 1975 event and its
+# architect credit, which a deny-set must never block.
+_HARD = ("gate:deterministic", "contested", "880-scrub-former-use")
+_SOFT = ("gate:CONTRADICTED", "gate:UNSUPPORTED")
+
+
+def _near_verbatim(sentence: str, evidence: str, title: str) -> bool:
+    """>= 85% of the sentence's specific tokens sit in ONE prose sentence of the
+    stop's own article (a restatement of the article, not of a narrator claim)."""
+    key = claim_key(sentence, title)
+    if len(key) < 2 or not evidence:
+        return False
+    d = _date_tuple(sentence)
+    nums = set(re.findall(r"\b\d+\b", sentence))
+    for x in prose_sentences(evidence, title):
+        if len(key & claim_key(x, title)) < math.ceil(0.85 * len(key)):
+            continue
+        # every date and number must be the article's own (1 May != 30 April)
+        if d and _date_tuple(x) != d:
+            continue
+        if not nums <= set(re.findall(r"\b\d+\b", x)):
+            continue
+        return True
+    return False
+
+
+def is_denied(title: str, sentence: str, evidence: str = "") -> Optional[Dict]:
+    """The recorded removed claim ``sentence`` repeats, else None. A match needs >= 2
+    shared specific tokens, >= 60% of the recorded key and >= 50% of the new one, and
+    a shared lower-case (predicate) token. An LLM-verdict entry (soft) does not block
+    a near-verbatim sentence of the stop's own article: the article outranks a judge
+    that flaked on it (889: the gate CONTRADICTED the article's own 30 April 1975
+    sentence). Deterministic / contested / scrub entries (hard) always block."""
     cands = deny_claims(title)
     if not cands:
         return None
     key = claim_key(sentence, title)
+    low = _lower_toks(sentence)
+    verbatim = None
     for e in cands:
+        if e.get("source") not in _HARD + _SOFT:
+            continue
         shared = key & e["key"]
-        need = max(2, math.ceil(0.6 * min(len(key), len(e["key"]))))
-        if len(shared) >= need and (shared & e["lower"]) and (shared & _lower_toks(sentence)):
-            return e
+        if len(shared) < 2 or not (shared & e["lower"]) or not (shared & low):
+            continue
+        if len(shared) < math.ceil(0.6 * len(e["key"])) or len(shared) < math.ceil(0.5 * len(key)):
+            continue
+        if e.get("source") in _SOFT:
+            if verbatim is None:
+                verbatim = _near_verbatim(sentence, evidence, title)
+            if verbatim:
+                continue
+        return e
     return None
 
 
@@ -177,7 +219,7 @@ def strip_denied(title: str, sentences: List[str], evidence: str = "",
     """Drop every sentence repeating a recorded removed claim. Returns (kept, dropped)."""
     kept, dropped = [], []
     for s in sentences:
-        hit = is_denied(title, s)
+        hit = is_denied(title, s, evidence)
         if hit:
             dropped.append(s)
             if log:
@@ -232,22 +274,70 @@ _FAMOUS = re.compile(
 _WIKI_HEAD = re.compile(r"(?i)\s-\s*Wikipedia\s*\([a-z-]+\)\.?\s")
 
 
-def _lead_text(evidence: str, title: str, width: int = 1400) -> str:
-    """The lead of the stop's own article: the article whose header shares the most
-    tokens with the stop title (else the first), else the head of the blob."""
+_HEAD_RE = re.compile(r"([A-ZÀ-Ỹ0-9][^.\n]{1,90}?) - Wikipedia \(([A-Za-z-]+)\)\.\s")
+
+
+def articles(evidence: str) -> List[Dict]:
+    """The Wikipedia items inside a stop's evidence blob, each split into title, lang,
+    lead, infobox and passages (landmark_wikipedia_evidence.format_item shape)."""
     ev = evidence or ""
-    heads = list(_WIKI_HEAD.finditer(ev))
-    if not heads:
-        return ev[:width]
+    heads = list(_HEAD_RE.finditer(ev))
+    out = []
+    for i, m in enumerate(heads):
+        seg = ev[m.start():heads[i + 1].start() if i + 1 < len(heads) else len(ev)]
+        try:
+            import landmark_wikipedia_evidence as lwe
+            p = lwe.split_item(seg)
+        except Exception:
+            p = {"title": m.group(1), "lang": m.group(2), "lead": seg[m.end() - m.start():],
+                 "infobox": "", "passages": ""}
+        p["title"] = p.get("title") or m.group(1).strip()
+        out.append(p)
+    return out
+
+
+def stop_article(evidence: str, title: str) -> Optional[Dict]:
+    """The stop's OWN article: most title tokens shared with the article title (an
+    English article wins a tie), else the first article of the bundle."""
+    arts = articles(evidence)
+    if not arts:
+        return None
     ttoks = {t for t in _fold(title).split() if len(t) >= 3}
-    best, best_n = heads[0], -1
-    for m in heads:
-        pre = ev[max(0, m.start() - 90):m.start()]
-        pre = re.split(r"[\n.]\s", pre)[-1]
-        n = len(ttoks & set(_fold(pre).split()))
-        if n > best_n:
-            best, best_n = m, n
-    return ev[best.end():best.end() + width]
+
+    def score(i_a):
+        i, a = i_a
+        return (len(ttoks & set(_fold(a["title"]).split())), a.get("lang") == "en", -i)
+    return max(enumerate(arts), key=score)[1]
+
+
+def _strip_markers(t: str) -> str:
+    t = re.sub(r"\[[^\]\n]{1,60}\]\s*", " ", t or "")            # [History] section tags
+    t = re.sub(r"={2,}[^=\n]{1,60}={2,}", " ", t)
+    return t
+
+
+def prose_sentences(evidence: str, title: str = "") -> List[str]:
+    """Prose sentences of the stop's own article (lead first, then passages). Infobox
+    field lists are NOT prose and never become narration. With no article in the
+    blob, the blob's own sentences (minus any Infobox line)."""
+    art = stop_article(evidence, title)
+    if art is None:
+        blob = re.sub(r"(?m)^\s*Infobox:.*$", " ", evidence or "")
+        texts = [blob]
+    else:
+        texts = [art.get("lead", ""), art.get("passages", "")]
+    out = []
+    for t in texts:
+        for x in _sents(_strip_markers(t)):
+            x = _clean_ev_sentence(x)
+            if 25 <= len(x) <= 420 and not re.search(r"(?i)\binfobox\b|;\s*[a-z ]{2,25}:\s", x):
+                out.append(x)
+    return out
+
+
+def evidence_prose(evidence: str) -> str:
+    """The whole evidence minus Infobox field lists (for mechanical support checks)."""
+    return re.sub(r"(?m)^\s*Infobox:.*$", " ", evidence or "")
 
 
 def _date_tuple(s: str) -> Optional[Tuple[int, str, int]]:
@@ -278,11 +368,10 @@ def key_facts(evidence: str, title: str = "") -> List[Dict]:
     facts: List[Dict] = []
     if not (evidence or "").strip():
         return facts
-    art = _lead_text(evidence, title, width=4200)
-    art_sents = [_clean_ev_sentence(x) for x in _sents(art)]
-    art_sents = [x for x in art_sents if 25 <= len(x) <= 420]
+    art_sents = prose_sentences(evidence, title)
     lead_sents = art_sents
-    _NOT_BUILD = re.compile(r"(?i)\b(prize|born|died|award\w*|won|degree|graduat\w+)\b")
+    _NOT_BUILD = re.compile(r"(?i)\b(prize|born|died|award\w*|won|degree|graduat\w+|"
+                            r"renovat\w+|restor\w+|refurbish\w+|rebuil\w+|repair\w*)\b")
     built = [x for x in art_sents if _BUILD_VERB.search(x) and _YEAR.search(x)
              and not _NOT_BUILD.search(x)] \
         or [x for x in art_sents if _BUILD_WEAK.search(x) and _YEAR.search(x)
@@ -291,15 +380,25 @@ def key_facts(evidence: str, title: str = "") -> List[Dict]:
         ys = list(dict.fromkeys(_YEAR.findall(built[0])))
         sent = built[0]
         if len(ys) == 1:                       # start year + completion year
-            for x in built[1:4]:
-                extra = [y for y in dict.fromkeys(_YEAR.findall(x)) if y not in ys]
+            _near = re.compile(r"(?i)\b(?:completed|completion|inaugurated|opened|finished|"
+                               r"built|constructed)\b[^.;]{0,45}?\b(1[0-9]{3}|20[0-9]{2})\b")
+            for x in built[1:6]:
+                extra = [m.group(1) for m in _near.finditer(x) if m.group(1) not in ys]
+                extra = list(dict.fromkeys(extra))
                 if extra and len(ys) + len(extra) <= 3:
                     ys = sorted(ys + extra)
                     sent = x
                     break
         facts.append({"kind": "years", "years": ys[:3], "sentence": sent,
                       "sentences": [built[0], sent]})
+    built_years = [int(y) for f in facts if f["kind"] == "years" for y in f["years"]]
     for s in lead_sents:
+        # a later redesign/extension ("In 2018 ... rear blocks ... designed by X") is
+        # not the building's architect
+        if built_years and any(int(y) > max(built_years) + 20 for y in _YEAR.findall(s)):
+            continue
+        if re.search(r"(?i)\b(renovat\w+|restor\w+|extension|annex\w*|rear\s+blocks?|new\s+design)\b", s):
+            continue
         for m in _ARCH_RE.finditer(s):
             name = (m.group(1) or m.group(2) or "").strip(" .,'’")
             toks = [t for t in name.split() if t]
@@ -318,7 +417,7 @@ def key_facts(evidence: str, title: str = "") -> List[Dict]:
                 break
         if any(f["kind"] == "architect" for f in facts):
             break
-    ev_fact = _event_fact(evidence, lead_sents)
+    ev_fact = _event_fact(" ".join(art_sents), lead_sents)
     if ev_fact:
         facts.append(ev_fact)
     return facts
@@ -397,8 +496,12 @@ _REFLECTIVE = re.compile(
     r"\bweight\s+of\b|\bconceals?\s+more\b|\bmore\s+than\s+(?:its|a|an)\b[^.]{0,60}\bsuggests?\b|"
     r"\btestament\s+to\b|\bspeaks?\s+(?:volumes|to\s+the)\b|\bechoes?\s+of\s+(?:the\s+)?(?:past|history)\b|"
     r"\bwhisper\w*\s+(?:of|stories)\b|\bidentity\s+as\s+a\s+place\b|\ba\s+threshold\s+between\b|"
-    r"\blinking\s+people\b|\bconnect\w*\s+the\s+present\b|\bbridging\b|"
-    r"\bpersonal\s+and\s+(?:the\s+)?political\b)")
+    r"\blinking\s+(?:people|the\s+rhythms)\b|\bconnect\w*\s+the\s+present\b|\bbridging\b|"
+    r"\bpersonal\s+and\s+(?:the\s+)?political\b|\bnot\s+merely\b|\bsymbolic\s+\w+\b|"
+    r"\breflects?\s+the\s+(?:sharp\s+|complex\s+|layered\s+)?(?:intersection|interplay|story|spirit|"
+    r"journey|legacy|essence|tension)\b|\bstands?\s+in\s+(?:stark\s+)?contrast\s+to\b|"
+    r"\b(?:tells|holds|carries)\s+a\s+(?:vivid\s+)?story\s+of\b|\bstory\s+of\s+reinvention\b|"
+    r"\bcaptures?\s+a\s+moment\b|\bthe\s+pulse\s+of\b)")
 _TAIL = re.compile(
     r"(?i),\s*(?:serving\s+as\s+|standing\s+as\s+|acting\s+as\s+|a\s+|an\s+|bridging\b|linking\b|"
     r"connecting\b|uniting\b|blending\b|anchoring\b|symboli[sz]ing\b)[^.!?]*"
@@ -478,15 +581,54 @@ _DEPART = re.compile(r"(?i)\b(?:fled|flee|flees|left|leaves|departed|escaped|wen
 _RESIGN = re.compile(r"(?i)\b(?:resign\w*|stepped\s+down|step\w*\s+down|abdicat\w*)\b")
 
 
-def deterministic_unsupported(sentence: str, evidence: str) -> Optional[str]:
+_ID_FORMER = re.compile(
+    r"(?i)\b(?:located|housed|situated|based)\s+in\s+the\s+former\s+([^.,;()]{3,80}?)\s+"
+    r"(?:building|compound|premises|site)\b")
+_ID_WAS = re.compile(
+    r"(?i)\b(?:the|this)\s+(?:building|structure|site)\s+(?:was|had\s+been|served\s+as|"
+    r"once\s+housed|was\s+once|formerly\s+housed)\s+(?:the\s+|an?\s+)?([^.,;()]{3,80}?)"
+    r"(?=\s+(?:during|in|from|until|before|after|for)\b|[.,;]|$)")
+_FORMER_CUE = re.compile(
+    r"(?i)\b(?:once|former(?:ly)?|previously|originally|served\s+as|used\s+to\s+be|"
+    r"had\s+been|housed\s+in|was\s+the)\b")
+_ID_STOP = frozenset({"former", "building", "united", "states", "vietnam", "american"})
+
+
+def _id_toks(phrase: str) -> frozenset:
+    out = set()
+    for w in _fold(phrase).split():
+        if len(w) >= 4 and w not in _GENERIC and w not in _ID_STOP:
+            out.add(w[:-1] if w.endswith("s") and len(w) > 5 else w)
+    return frozenset(out)
+
+
+def contested_identities(evidence: str, title: str = "") -> List[Tuple[str, frozenset]]:
+    """Former identities of the BUILDING that the stop's evidence gives, when it gives
+    two or more that share no specific token (e.g. 'located in the former X building'
+    and 'the building was the Y headquarters'). [] when the evidence is consistent."""
+    ids: List[Tuple[str, frozenset]] = []
+    for x in prose_sentences(evidence, title) or _sents(evidence_prose(evidence)):
+        for rx in (_ID_FORMER, _ID_WAS):
+            for m in rx.finditer(x):
+                ph = m.group(1).strip()
+                tk = _id_toks(ph)
+                if len(tk) >= 2 and not any(tk & t for _p, t in ids):
+                    ids.append((ph, tk))
+    return ids if len(ids) >= 2 else []
+
+
+def deterministic_unsupported(sentence: str, evidence: str, title: str = "") -> Optional[str]:
     """A reason when ``sentence`` is NOT supported by ``evidence`` on purely
     mechanical grounds (None otherwise):
       * a year the evidence never states;
-      * a year RANGE (between X and Y / X-Y) with no single evidence sentence that
-        states both ends;
+      * a year RANGE (between X and Y / X-Y) with an end that the evidence PROSE never
+        states (an infobox field list such as 'years built: *1860-1863 (Former
+        building)' is not a narrative statement);
       * a departure (fled/left) bound to a full date on which the evidence records a
-        resignation and no departure: the sources disagree on what happened that day.
-    Years are only judged when the evidence is non-empty."""
+        resignation and no departure: the sources disagree on what happened that day;
+      * a former identity of the building that the stop's own evidence CONTESTS (it
+        names two different former identities): the narration states neither.
+    Only judged when the evidence is non-empty."""
     ev = evidence or ""
     if not ev.strip():
         return None
@@ -497,39 +639,56 @@ def deterministic_unsupported(sentence: str, evidence: str) -> Optional[str]:
     ev_sents = None
     for m in _RANGE.finditer(sentence):
         a, b = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
-        if ev_sents is None:
-            ev_sents = _sents(ev)
-        if not any(a in x and b in x for x in ev_sents):
-            return f"no evidence sentence states both {a} and {b}"
+        prose_years = set(_YEAR.findall(evidence_prose(ev)))
+        for y in (a, b):
+            if y not in prose_years:
+                return (f"range {a}-{b}: {y} is stated only in an infobox field list, "
+                        f"not in the evidence prose")
     d = _date_tuple(sentence)
     if d and _DEPART.search(sentence):
         if ev_sents is None:
-            ev_sents = _sents(ev)
+            ev_sents = _sents(evidence_prose(ev))
         same_day = [x for x in ev_sents if _date_tuple(x) == d]
         if same_day and any(_RESIGN.search(x) for x in same_day) and \
                 not any(_DEPART.search(x) and _RESIGN.search(x) for x in same_day):
             return (f"departure dated {d[0]} {d[1]} {d[2]} but the evidence records a "
                     f"resignation on that date (a different act)")
+    if _FORMER_CUE.search(sentence):
+        ids = contested_identities(ev, title)
+        if ids:
+            st = _id_toks(sentence)
+            for ph, tk in ids:
+                if len(st & tk) >= max(2, math.ceil(0.6 * len(tk))):
+                    others = "; ".join(p for p, t in ids if t != tk)
+                    return (f"contested former identity: the evidence says both '{ph}' "
+                            f"and '{others}'")
     return None
 
 
 # ═════════════ the finishing pass ═════════════
-def _insert_pos(sentences: List[str], fact: Dict) -> int:
-    if fact.get("kind") == "architect":
-        ys = []
-    elif fact.get("kind") == "years":
+def _insert_pos(sentences: List[str], fact: Dict, text: str = "") -> int:
+    """Chronological slot: before the first kept sentence whose earliest year is later,
+    after the last one whose years are not later; construction facts default to
+    second place, others to the end."""
+    ys = [int(y) for y in _YEAR.findall(text)] if text else []
+    if not ys and fact.get("kind") == "years":
         ys = [int(y) for y in fact["years"]]
-    else:
-        ys = [int(fact["year"])] if str(fact.get("year", "")).isdigit() else []
+    elif not ys and str(fact.get("year", "")).isdigit():
+        ys = [int(fact["year"])]
     if not ys:
         return 1 if len(sentences) > 1 else len(sentences)
+    y = min(ys)
+    last_le = -1
     for i, s in enumerate(sentences):
-        sy = [int(y) for y in _YEAR.findall(s)]
-        if sy and min(sy) > min(ys):
+        sy = [int(v) for v in _YEAR.findall(s)]
+        if sy and min(sy) > y:
             return i
-    if fact.get("kind") == "years":                 # construction facts come early
-        return 1 if len(sentences) > 1 else len(sentences)
-    return len(sentences)
+        if sy:
+            last_le = i
+    if last_le >= 0:
+        return last_le + 1
+    return (1 if len(sentences) > 1 else len(sentences)) if fact.get("kind") == "years" \
+        else len(sentences)
 
 
 def _plain_sentences(fact: Dict, title: str, evidence: str) -> List[str]:
@@ -560,6 +719,9 @@ def _plain_sentence(fact: Dict, title: str, evidence: str) -> Optional[str]:
     return s if s.endswith((".", "!", "?")) else s + "."
 
 
+_RAW_FIELD = re.compile(r"(?i)\b(?:infobox|passages)\s*:|(?:;\s*[a-z][a-z ]{1,24}:\s*[^;]{1,80}){2,}|\s\*[A-Z]")
+
+
 def finalize_stop(title: str, sentences: List[str], evidence: str, *,
                   classify_fn=None, model: Optional[str] = None,
                   log: Optional[Callable] = None, where: str = "final",
@@ -568,15 +730,23 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
     missing fact). Returns (sentences, report)."""
     rep = {"title": title, "denied": 0, "filler": {}, "K": 0, "k_before": 0, "k": 0,
            "injected": [], "refused": [], "cost_usd": 0.0}
-    cur = list(sentences)
+    cur = []
+    for x in sentences:                   # raw evidence fields are never narration
+        if _RAW_FIELD.search(x):
+            rep.setdefault("raw_dropped", 0)
+            rep["raw_dropped"] = rep.get("raw_dropped", 0) + 1
+            if log:
+                log(f"  [LOCAL-889] {where} dropped raw evidence field in '{title[:40]}': \"{x[:90]}\"")
+            continue
+        cur.append(x)
     cur, dropped = strip_denied(title, cur, evidence, log, where)
     rep["denied"] = len(dropped)
     keep_ok = []
     for x in cur:                         # mechanical UNSUPPORTED rules (free)
-        why = deterministic_unsupported(x, evidence)
+        why = deterministic_unsupported(x, evidence, title)
         if why:
             rep["denied"] += 1
-            deny_record(title, x, "gate:deterministic")
+            deny_record(title, x, "contested" if why.startswith("contested") else "gate:deterministic")
             if log:
                 log(f"  [LOCAL-889] {where} dropped unsupported claim in '{title[:40]}': {why}: \"{x[:100]}\"")
         else:
@@ -599,11 +769,10 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
         cands: List[Tuple[Dict, str]] = []
         for f in cov["missing"]:
             for ps in _plain_sentences(f, title, evidence):
-                hit = is_denied(title, ps)
-                # a claim the judge only found UNSUPPORTED in a narrow window may be
-                # restored from the stop's own LEAD sentence; one that was
-                # CONTRADICTED, scrubbed or removed by an earlier regeneration may not.
-                if not hit or hit.get("source") == "gate:UNSUPPORTED":
+                # the plain sentence IS the stop's own article sentence, so only a
+                # hard (mechanical / contested / scrub) denial blocks it
+                hit = is_denied(title, ps, evidence)
+                if not hit:
                     cands.append((f, ps))
                 else:
                     rep["refused"].append(f"{f['kind']}: matches a removed claim "
@@ -611,6 +780,7 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
         # one sentence can carry several missing facts (years + architect): inject once
         seen_s = set()
         cands = [(f, x) for f, x in cands if not (x in seen_s or seen_s.add(x))]
+        cands.sort(key=lambda fx: min([int(y) for y in _YEAR.findall(fx[1])] or [9999]))
         if cands:
             gate_kw = {"classify_fn": classify_fn, "log": log, "deny_check": False}
             if model:
@@ -623,12 +793,15 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
                 if _fold(x) not in ok:
                     rep["refused"].append(f"{f['kind']}: gate dropped the plain sentence")
                     continue
-                if fact_present(cur, f) and f["kind"] != "years":
+                if fact_present(cur, f):
                     continue
                 if _fold(x) in {_fold(c) for c in cur}:
                     continue
-                cur.insert(_insert_pos(cur, {**f, "years": [y for y in _YEAR.findall(x)] or f.get("years")}
-                                       if f["kind"] == "years" else f), x)
+                if f["kind"] == "years":
+                    have = set(_YEAR.findall(" ".join(cur)))
+                    if not (set(_YEAR.findall(x)) & (set(f["years"]) - have)):
+                        continue                 # adds no missing year
+                cur.insert(_insert_pos(cur, f, x), x)
                 rep["injected"].append(f"{f['kind']}: {x[:90]}")
     # the filler cap must not leave the stop below the floor: top up with plain,
     # evidence-stated sentences (gated once), never with filler
@@ -636,11 +809,11 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
         import stop_coherence as _sc
         have = [claim_key(x, title) for x in cur]
         extra = []
-        for fs in _sc.evidence_fact_sentences(evidence, limit=14):
+        for fs in _sc.evidence_fact_sentences(" ".join(prose_sentences(evidence, title)), limit=14):
             fs = _clean_ev_sentence(fs)
             k2 = claim_key(fs, title)
-            if (not fs.endswith((".", "!", "?")) or len(fs) > 300 or is_denied(title, fs)
-                    or deterministic_unsupported(fs, evidence) or is_sensory(fs)
+            if (not fs.endswith((".", "!", "?")) or len(fs) > 300 or is_denied(title, fs, evidence)
+                    or deterministic_unsupported(fs, evidence, title) or is_sensory(fs)
                     or is_reflective(fs) or _plain_sentence({"sentence": fs}, title, evidence) is None
                     or any(len(k2 & h) >= max(2, int(0.5 * len(k2))) for h in have)):
                 continue

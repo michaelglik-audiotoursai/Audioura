@@ -25,16 +25,16 @@ PALACE_FLED = ("The Independence Hall served as Thiệu's home and office from O
                "swept southwards in the decisive Ho Chi Minh Campaign.")
 
 
-def _lead(key):
-    v = REC[key]
-    lead = re.sub(r"\s+", " ", v["lead"])
-    cut = max(lead.rfind(". "), 0)
-    return lead[:cut + 1] if cut else lead
-
-
 def ev(key, extra=()):
+    """The stop's evidence in the generator's format_item shape."""
     v = REC[key]
-    return f"{v['title']} - Wikipedia (en). " + " ".join([_lead(key)] + list(v["relevant"]) + list(extra))
+    txt = f"{v['title']} - Wikipedia (en). {v['lead']}"
+    if v.get("infobox"):
+        txt += f"\nInfobox: {v['infobox']}"
+    psg = list(v["passages"]) + list(extra)
+    if psg:
+        txt += "\nPassages: [History] " + " ".join(psg)
+    return txt
 
 
 def stop_sents(title_part):
@@ -91,7 +91,8 @@ def test_city_hall_888_lost_its_years_and_they_are_restored():
     assert rep["k"] == rep["K"] >= 1 and rep["k_before"] < rep["k"]
     # one plain evidence sentence per missing fact; a start+completion year pair that
     # no single evidence sentence states needs its two evidence sentences
-    assert 1 <= len(rep["injected"]) <= 2
+    assert 1 <= len(rep["injected"]) <= 3
+    assert not any("Infobox" in i or "Passages" in i for i in rep["injected"])
     assert any("[LOCAL-889] coverage City Hall" in l and f"{rep['k']}/{rep['K']} key facts" in l
                for l in logs)
 
@@ -140,34 +141,79 @@ CAME_BACK = "The building was once the US military's intelligence headquarters d
 
 
 def test_claim_key_matches_fragment_and_restatement():
-    assert kfc.deny_record(WRM, REMOVED_517, "phase5.17-gates")
+    # a hard (scrub) removal of the 888 fragment blocks the restatement, not other claims
+    assert kfc.deny_record(WRM, REMOVED_517, "880-scrub-former-use")
     assert kfc.is_denied(WRM, CAME_BACK)
     assert not kfc.is_denied(WRM, "Inside, you find exhibits about the First Indochina War and the "
                                   "Vietnam War, covering events from 1946 to 1975.")
 
 
+def test_regeneration_removals_are_not_a_deny_source():
+    """889 live run: Phase 5.17 'removed by gates' carried the Palace's sourced tank
+    event; a 5.17 removal must never block it."""
+    kfc.deny_record("Independence Palace", "A tank from the Liberation Army of South Vietnam "
+                    "thundered through the palace gates, ending the Viet", "phase5.17-gates")
+    s = ("It was also the site of the Fall of Saigon on 30 April 1975 that ended the Vietnam "
+         "War, when a Liberation Army of South Vietnam tank crashed through its gates.")
+    assert kfc.is_denied("Independence Palace", s, ev("palace")) is None
+
+
+def test_judge_flake_on_the_articles_own_sentence_does_not_block_it():
+    """889 live run: the mini judge CONTRADICTED the article's own 30 April sentence."""
+    s = ("It was also the site of the Fall of Saigon on 30 April 1975 that ended the Vietnam "
+         "War, when a Liberation Army of South Vietnam tank crashed through its gates.")
+    kfc.deny_record("Independence Palace", s, "gate:CONTRADICTED")
+    assert kfc.is_denied("Independence Palace", s, ev("palace")) is None
+    # ... but a narrator claim the judge contradicted stays blocked
+    bad = "A Liberation Army tank crashed through the palace gates on 1 May 1975 at dawn."
+    kfc.deny_record("Independence Palace", bad, "gate:CONTRADICTED")
+    assert kfc.is_denied("Independence Palace",
+                         "At dawn on 1 May 1975 a Liberation Army tank crashed the gates.", ev("palace"))
+
+
+def test_where_the_intelligence_claim_comes_from():
+    """Diagnosis: the claim is in the stop's OWN article, which also says the building
+    is the former US Information Agency building -- the evidence contests the
+    building's former identity, so the narration states neither."""
+    e = ev("wrm")
+    assert "The building was the US military's intelligence headquarters" in e
+    assert "former United States Information Agency building" in e
+    assert len(kfc.contested_identities(e, WRM)) == 2
+    why = kfc.deterministic_unsupported(CAME_BACK, e, WRM)
+    assert why and why.startswith("contested")
+    live = ("This museum was originally established on 4 September 1975 as the Exhibition House "
+            "for US and Puppet Crimes, housed in the former US military intelligence headquarters.")
+    assert kfc.deterministic_unsupported(live, e, WRM)            # the 889 live sentence
+    assert kfc.contested_identities("The museum is located in the former Union Bank building. "
+                                    "It opened in 1975.") == []
+
+
 def test_888_final_wrm_sentence_is_dropped_again():
     title, sents = stop_sents("War Remnants")
     assert any("intelligence headquarters" in s for s in sents)       # the 888 defect
-    kfc.deny_record(title, REMOVED_517, "phase5.17-gates")
     logs = []
     out, rep = kfc.finalize_stop(title, sents, ev("wrm"), classify_fn=all_supported, log=logs.append)
     assert not any("intelligence headquarters" in s for s in out)
-    assert rep["denied"] >= 1      # (+ years the TRUNCATED test evidence never states)
-    # the log says which evidence line backs it: the stop's OWN article body
-    assert any("War Remnants Museum - Wikipedia (en)" in l and "intelligence headquarters" in l
-               for l in logs)
+    assert rep["denied"] >= 1
+    assert any("contested former identity" in l for l in logs)
+    again = "Back then this was the US military's intelligence headquarters."
+    assert kfc.is_denied(title, again, ev("wrm"))                    # hard entry recorded
 
 
 def test_gate_drops_it_even_when_the_judge_says_supported():
-    kfc.deny_record(WRM, REMOVED_517, "phase5.17-gates")
     body = CAME_BACK + " Inside, you find exhibits about the First Indochina War."
     logs = []
     out, rep = sgg.apply_grounding_gate(WRM, body, ev("wrm"), classify_fn=all_supported,
                                         log=logs.append)
     assert "intelligence" not in out and "First Indochina" in out
     assert rep["unsupported"] == 1
-    assert any("came back" in l for l in logs)
+    assert any("contested" in l for l in logs)
+    logs = []
+    out, _ = sgg.apply_grounding_gate(WRM, "The site once served as the US military's intelligence "
+                                      "headquarters. The museum has a tank.", ev("wrm"),
+                                      classify_fn=all_supported, log=logs.append)
+    assert "intelligence" not in out
+    assert any("came back" in l and "War Remnants Museum - Wikipedia (en)" in l for l in logs)
 
 
 def test_gate_drops_are_recorded_and_block_a_later_refill():
@@ -180,20 +226,20 @@ def test_gate_drops_are_recorded_and_block_a_later_refill():
     assert out == [] and rep == [again]
 
 
-def test_coverage_cannot_reinject_a_contradicted_claim():
+def test_coverage_cannot_reinject_a_mechanically_unsupported_claim():
+    title, sents = stop_sents("City Hall")
+    fact = [x for x in kfc.key_facts(ev("city_hall"), title) if x["kind"] == "years"][0]
+    for lead in fact["sentences"]:
+        kfc.deny_record(title, lead, "gate:deterministic")
+    out, rep = kfc.finalize_stop(title, sents, ev("city_hall"), classify_fn=all_supported)
+    assert "1909" not in " ".join(out) and rep["refused"]
+
+
+def test_a_soft_verdict_does_not_block_the_articles_own_sentence():
     title, sents = stop_sents("City Hall")
     fact = [x for x in kfc.key_facts(ev("city_hall"), title) if x["kind"] == "years"][0]
     for lead in fact["sentences"]:
         kfc.deny_record(title, lead, "gate:CONTRADICTED")
-    out, rep = kfc.finalize_stop(title, sents, ev("city_hall"), classify_fn=all_supported)
-    assert "1898" not in " ".join(out) and rep["refused"]
-
-
-def test_unsupported_in_a_narrow_window_may_be_restored_from_the_lead():
-    title, sents = stop_sents("City Hall")
-    fact = [x for x in kfc.key_facts(ev("city_hall"), title) if x["kind"] == "years"][0]
-    for lead in fact["sentences"]:
-        kfc.deny_record(title, lead, "gate:UNSUPPORTED")
     out, _ = kfc.finalize_stop(title, sents, ev("city_hall"), classify_fn=all_supported)
     assert "1909" in " ".join(out)
 
@@ -201,7 +247,7 @@ def test_unsupported_in_a_narrow_window_may_be_restored_from_the_lead():
 def test_record_removed_between_texts():
     before = "Stop 1: Hall\n\nA long tale of the hall was told by the guild in 1800 here. Keep this one fact too.\n"
     after = "Stop 1: Hall\n\nKeep this one fact too.\n"
-    assert kfc.record_removed_between(before, after, "scrub") == 1
+    assert kfc.record_removed_between(before, after, "880-scrub-former-use") == 1
     assert kfc.is_denied("Hall", "The tale of the hall was told by the guild in 1800.")
 
 
@@ -268,26 +314,41 @@ THIEU = ("Thiệu stayed here until 21 April 1975, when he fled as North Vietnam
 
 def test_eiffel_saigon_1860_1863_is_unsupported_by_the_recorded_evidence():
     e = ev("post_office")
-    assert "1860" not in e and "erroneously credited" in e            # evidence only says that
+    # the ONLY 1860-1863 in the evidence is the infobox field list (former building);
+    # the prose says only that Eiffel is erroneously credited
+    assert "1860-1863 (Former building)" in e and "erroneously credited" in e
+    assert "1860" not in kfc.evidence_prose(e)
     assert "1860" in kfc.deterministic_unsupported(EIFFEL, e)
     # the 888 delivered sentence is exactly this claim
     assert any("between 1860 and 1863" in s for s in stop_sents("Post Office")[1])
 
 
-def test_year_range_needs_one_evidence_sentence_with_both_ends():
-    e = "The hall was built in 1801. A fire in 1850 damaged the roof. The hall closed."
-    assert kfc.deterministic_unsupported("It stood between 1801 and 1850.", e)
+def test_year_range_ends_must_be_stated_in_prose():
+    e = ("Hall - Wikipedia (en). The hall was built in 1801. A fire in 1850 damaged the roof."
+         "\nInfobox: years built: 1801-1820")
+    assert kfc.deterministic_unsupported("It stood between 1801 and 1820.", e)      # infobox-only end
+    assert kfc.deterministic_unsupported("It stood between 1801 and 1850.", e) is None
+    # City Hall: 1898 and 1909 come from two prose sentences -> the range is supported
+    assert kfc.deterministic_unsupported("The hall was built between 1898 and 1909.",
+                                         ev("city_hall")) is None
     assert kfc.deterministic_unsupported("It was constructed between 1886 and 1891.",
                                          ev("post_office")) is None
 
 
-def test_thieu_fled_on_the_resignation_date_is_unsupported():
-    e = ev("palace", extra=[PALACE_FLED] + [x for x in REC["thieu"]["relevant"] if "21 April 1975" in x])
-    assert "resigned" in e
-    why = kfc.deterministic_unsupported(THIEU, e)
+def test_thieu_claim_against_the_recorded_evidence():
+    """§4: the Palace's OWN article says 'served as Thiệu's home and office from
+    October 1967 to 21 April 1975, when he fled the country' -- the 888 sentence is a
+    near-verbatim restatement, so on that evidence alone it is SUPPORTED and the gate
+    must not invent a drop. Thiệu's own article records a RESIGNATION on 21 April
+    1975; when that is in the evidence, 'fled on 21 April' is UNSUPPORTED."""
+    e_palace = ev("palace")
+    assert "21 April 1975, when he fled the country" in e_palace
+    assert kfc.deterministic_unsupported(THIEU, e_palace) is None
+    resign = [x for x in REC["thieu"]["passages"] if x.startswith("On 21 April 1975")]
+    assert resign and "resigned" in resign[0]
+    e_both = (e_palace + "\n" + f"{REC['thieu']['title']} - Wikipedia (en). " + resign[0])
+    why = kfc.deterministic_unsupported(THIEU, e_both)
     assert why and "resignation" in why
-    # evidence that records only the resignation does not make the departure claim true;
-    # evidence that records BOTH on that day does
     ok = "On 21 April 1975 he resigned and fled the country."
     assert kfc.deterministic_unsupported(THIEU, ok) is None
 
@@ -316,7 +377,6 @@ def test_finalize_tour_end_to_end_on_the_888_text():
              "City Hall": ev("city_hall"), "Opera House": ev("opera"),
              "War Remnants Museum": ev("wrm"), "Post Office": ev("post_office"),
              "Independence Palace": ev("palace")}
-    kfc.deny_record(WRM, REMOVED_517, "phase5.17-gates")
     out, rep = kfc.finalize_tour(T888, evmap, classify_fn=all_supported)
     blocks = {t: sgg._content_sentences(sgg._block_body_prose(b)) for _n, t, b in sgg._split_blocks(out)}
     assert "intelligence headquarters" not in " ".join(blocks["War Remnants Museum"])
@@ -325,6 +385,9 @@ def test_finalize_tour_end_to_end_on_the_888_text():
     assert all(_filler_count(b) <= 1 for b in blocks.values())
     assert all(r["k"] == r["K"] for r in rep["stops"] if r["K"])
     assert len(blocks) == 10
+    body = " ".join(" ".join(b) for b in blocks.values())
+    assert "Infobox" not in body and "Passages:" not in body
+    assert "between 1860 and 1863" not in body                      # §4 Eiffel claim dropped
 
 
 def test_harness_checks_city_hall_years_not_the_name():
@@ -348,3 +411,43 @@ def test_evaluate_889_reports_coverage():
     assert d["no 'intelligence headquarters'"] is False
     assert d["Opera House has 1944 if its evidence has it"] is False
     assert d["<= 1 sensory sentence per stop"] is False
+
+
+def test_raw_evidence_fields_never_ship():
+    """889 live run: coverage injected 'Infobox: ...; architect: *Gustave Eiffel ...'."""
+    live = ("Infobox: former names: Sở dây thép Sài Gòn; years built: *1860-1863 *1886-1891; "
+            "architect: *Gustave Eiffel * Auguste Henri Vildieu.")
+    _t, sents = stop_sents("Post Office")
+    out, rep = kfc.finalize_stop("Post Office", [live] + sents, ev("post_office"),
+                                 classify_fn=all_supported)
+    assert not any("Infobox" in s or "*Gustave" in s for s in out)
+    assert rep.get("raw_dropped") == 1
+    # no key-fact or floor sentence is ever drawn from the infobox
+    for key, t in (("post_office", "Post Office"), ("city_hall", "City Hall")):
+        for f in kfc.key_facts(ev(key), t):
+            assert "Infobox" not in f["sentence"] and ":" not in f["sentence"][:40]
+
+
+def test_replay_on_the_889_live_text():
+    """Offline replay of the fixed finishing pass on the text the 889 live run shipped
+    (pre-fix code). Same recorded evidence as above; not a live measurement."""
+    t889 = open(os.path.join(ROOT, "submission_artifacts", "local889", "saigon_warm.txt"),
+                encoding="utf-8").read()
+    generic = "Generic recorded evidence about this place and its surroundings. " * 3
+    evmap = {"Cathedral": ev("cathedral"), "Book Street": generic, "Bạch Đằng Pier": generic,
+             "City Hall": ev("city_hall"), "Opera House": ev("opera"),
+             "War Remnants Museum": ev("wrm"), "Post Office": ev("post_office"),
+             "Independence Palace": ev("palace")}
+    out, rep = kfc.finalize_tour(t889, evmap, classify_fn=all_supported)
+    blocks = {t: " ".join(sgg._content_sentences(sgg._block_body_prose(b)))
+              for _n, t, b in sgg._split_blocks(out)}
+    assert "intelligence headquarters" not in blocks["War Remnants Museum"]
+    assert "Infobox" not in out and "Passages:" not in out
+    assert "30 April 1975" in blocks["Independence Palace"]          # restored
+    assert "1944" in blocks["Opera House"]
+    assert "1898" in blocks["City Hall"] and "1909" in blocks["City Hall"]
+    assert "built between 1898 and 1909" in blocks["City Hall"]       # narrator's range kept
+    assert blocks["Independence Palace"].count("31 October 1966") == 1
+    assert "not merely" not in blocks["Independence Palace"]
+    assert "reflects the sharp intersection" not in blocks["Independence Palace"]
+    assert all(r["k"] == r["K"] for r in rep["stops"] if r["K"])

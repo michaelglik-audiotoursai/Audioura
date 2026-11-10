@@ -569,8 +569,8 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
             if v is not None and v["verdict"] in ("CONTRADICTED", "UNSUPPORTED") \
                     and not v.get("legend"):
                 raise LookupError("the judge already drops it")
-            _hit = _kfc.is_denied(title, s) if deny_check else None
-            _why = None if _hit else _kfc.deterministic_unsupported(s, evidence)
+            _hit = _kfc.is_denied(title, s, evidence) if deny_check else None
+            _why = None if _hit else _kfc.deterministic_unsupported(s, evidence, title)
         except Exception:
             pass
         if _hit or _why:
@@ -580,7 +580,8 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
                 "UNSUPPORTED(removed-earlier)" if _hit else f"UNSUPPORTED({_why})", s[:80]))
             if _why:
                 try:
-                    _kfc.deny_record(title, s, "gate:deterministic")
+                    _kfc.deny_record(title, s, "contested" if _why.startswith("contested")
+                                     else "gate:deterministic")
                 except Exception:
                     pass
                 if log:
