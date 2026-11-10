@@ -272,6 +272,7 @@ def test_underscore_inside_a_protected_url_is_untouched():
 
 def test_slow_canonical_is_abandoned_at_the_deadline_loudly(monkeypatch):
     monkeypatch.setenv("PREVIEW_CANON_DEADLINE_S", "0.6")
+    monkeypatch.setenv("PREVIEW_CANON_MIN_GRACE_S", "0.5")
     lines = []
     t0 = time.time()
     out = ii.preview_stops("\n".join(CLEAN), CITY, resolvers=_stub_resolvers(5.0),
@@ -283,3 +284,27 @@ def test_slow_canonical_is_abandoned_at_the_deadline_loudly(monkeypatch):
     assert resolved and all(s["canonical_aliases"] == [] for s in resolved)
     assert any("abandoned at the 0.6s preview deadline" in x for x in lines)
     assert any("[LOCAL-893] preview timing" in x and "abandoned" in x for x in lines)
+
+
+def test_last_stop_after_a_slow_pin_phase_still_gets_its_grace(monkeypatch):
+    """Live finding: pins took > the deadline, so the LAST stop's canonical lookup
+    got ~0.05 s and was always abandoned. It now gets a minimum grace."""
+    monkeypatch.setenv("PREVIEW_CANON_DEADLINE_S", "0.3")
+    monkeypatch.setenv("PREVIEW_CANON_MIN_GRACE_S", "1.6")
+    monkeypatch.setenv("PREVIEW_CANON_WORKERS", "10")   # isolate grace from pool queueing
+    res = _stub_resolvers(1.0)               # each canonical lookup takes 1.0 s
+    _wd = res.wikidata
+
+    def slow_pin(name, scope, center, bbox):
+        time.sleep(0.15)                     # pins alone exceed the 0.3 s deadline
+        return _wd(name, scope, center, bbox)
+    res.wikidata = slow_pin
+    lines = []
+    out = ii.preview_stops("\n".join(CLEAN), CITY, resolvers=res, log=lines.append)
+    last = [s for s in out["stops"] if not s["unresolved"]][-1]
+    assert last["matched_name"].endswith("(canonical)"), lines
+    # and without the grace the same stop IS abandoned (the bug this pins down)
+    monkeypatch.setenv("PREVIEW_CANON_MIN_GRACE_S", "0")
+    out0 = ii.preview_stops("\n".join(CLEAN), CITY, resolvers=res, log=lambda *_: None)
+    last0 = [s for s in out0["stops"] if not s["unresolved"]][-1]
+    assert not (last0["matched_name"] or "").endswith("(canonical)")

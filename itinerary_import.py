@@ -762,6 +762,7 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
     deadline_s = float(os.environ.get("PREVIEW_CANON_DEADLINE_S", "6.5") or 6.5)
     pool = ThreadPoolExecutor(max_workers=workers)
     futures: Dict[int, "object"] = {}
+    submitted: Dict[int, float] = {}
     resolved: List[Tuple[Dict, Optional[Dict], float]] = []
 
     def _canon_job(s_, r_):
@@ -777,12 +778,19 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
         resolved.append((s, r, time.time() - t0))
         if not r.get("unresolved"):
             futures[i] = pool.submit(_canon_job, s, r)
+            submitted[i] = time.time()
     t_pins = time.time() - t_all
 
     canon: Dict[int, Tuple[Optional[Dict], float]] = {}
     timed_out: List[int] = []
+    # [LOCAL-893 live finding] With a deadline measured only from the start, the
+    # LAST stop's lookup (submitted after a slow pin phase) got ~0.05 s and was
+    # always abandoned (Thi Bar, 3 of 3 cloud-snapshot calls). Every lookup also
+    # gets a minimum grace from its own submit time.
+    grace_s = float(os.environ.get("PREVIEW_CANON_MIN_GRACE_S", "2.0") or 2.0)
     for i, fut in futures.items():
-        remaining = max(0.05, deadline_s - (time.time() - t_all))
+        remaining = max(0.05, deadline_s - (time.time() - t_all),
+                        grace_s - (time.time() - submitted[i]))
         try:
             canon[i] = fut.result(timeout=remaining)
         except Exception as e:      # FutureTimeout (deadline) or a lookup error

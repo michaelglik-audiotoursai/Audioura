@@ -1,0 +1,58 @@
+{
+ "preview_timing_lines_generator": [
+  "[LOCAL-893] preview timing: 10 stops, pins 3.68s (sequential), canonical tail 0.93s after the last pin (5 workers, deadline 6.5s, 0 abandoned), total 4.61s",
+  "[LOCAL-893] preview timing: 10 stops, pins 3.56s (sequential), canonical tail 0.98s after the last pin (5 workers, deadline 6.5s, 0 abandoned), total 4.54s",
+  "[LOCAL-893] preview timing: 10 stops, pins 7.72s (sequential), canonical tail 0.05s after the last pin (5 workers, deadline 6.5s, 1 abandoned), total 7.77s",
+  "[LOCAL-893] preview timing: 10 stops, pins 14.58s (sequential), canonical tail 0.05s after the last pin (5 workers, deadline 6.5s, 1 abandoned), total 14.63s",
+  "[LOCAL-893] preview timing: 10 stops, pins 5.22s (sequential), canonical tail 1.28s after the last pin (5 workers, deadline 6.5s, 1 abandoned), total 6.51s"
+ ],
+ "preview_per_stop_lines_last_call": [
+  "[LOCAL-867] preview 1/10 'Cathedral' -> landmark_table (pin 0.00s, canonical 1.83s)",
+  "[LOCAL-867] preview 2/10 'Post Office' -> landmark_table (pin 0.00s, canonical 0.08s)",
+  "[LOCAL-867] preview 3/10 'Book Street' -> nominatim (pin 0.06s, canonical 0.84s)",
+  "[LOCAL-867] preview 4/10 'Independence Palace' -> wikidata_p625 (pin 0.30s, canonical 0.08s)",
+  "[LOCAL-867] preview 5/10 'War Remnants Museum' -> wikidata_p625 (pin 0.30s, canonical 0.09s)",
+  "[LOCAL-867] preview 6/10 'Opera House' -> landmark_table (pin 0.00s, canonical 0.08s)",
+  "[LOCAL-867] preview 7/10 'City Hall' -> landmark_table (pin 0.00s, canonical 2.10s)",
+  "[LOCAL-867] preview 8/10 'Café Apartments 42' -> serper_places (pin 2.56s, canonical 1.64s)",
+  "[LOCAL-867] preview 9/10 'Bạch Đằng Pier' -> nominatim (pin 0.06s, canonical 0.08s)",
+  "[LOCAL-867] preview 10/10 'Thi Bar' -> serper_places (pin 1.93s, canonical 6.50s)"
+ ],
+ "abandoned_canonical": [
+  "[LOCAL-893] canonical lookup for 'Thi Bar' abandoned at the 6.5s preview deadline — keeping the pin resolver's name (the lookup finishes in the background)",
+  "[LOCAL-893] canonical lookup for 'Thi Bar' abandoned at the 6.5s preview deadline — keeping the pin resolver's name (the lookup finishes in the background)",
+  "[LOCAL-893] canonical lookup for 'Thi Bar' abandoned at the 6.5s preview deadline — keeping the pin resolver's name (the lookup finishes in the background)"
+ ],
+ "orchestrator_d762": [
+  "[D762] /preview-stops OK in 7.8s (try 1)",
+  "[D762] user-stop pins resolved 10/10 (city Ho Chi Minh City)",
+  "[D762] /preview-stops OK in 6.5s (try 1)",
+  "[D762] user-stop pins resolved 10/10 (city Ho Chi Minh City)"
+ ],
+ "name_only_lines": 0,
+ "trace_city_hall_post_office": [
+  "    [LOCAL-652] REMOVED foreign work/artist sentence stop='Post Office' entities=['Gustave Eiffel', 'Governor General'] (2 sentence(s)) in: \"Constructed over five years, from 1886 to 1891, this building was erected while Vietnam was still part of French Indochi\"",
+  "    [LOCAL-652] REMOVED foreign work/artist sentence stop='Post Office' entities=['Southern Vietnam'] (1 sentence(s)) in: \"Behind the counters, two painted maps from 1892 remain: one detailing telegraphic lines of Southern Vietnam and Cambodia\"",
+  "    [LOCAL-652] REMOVED foreign work/artist sentence stop='City Hall' entities=['On April'] (1 sentence(s)) in: \"The grand building before you was completed in 1908 after a decade of construction that began in 1898. It was designed b\"",
+  "    [LOCAL-472] UNGROUNDED entity stop='Post Office' entity='Gustave Eiffel' reason='No concrete link between Gustave Eiffel and the Post Office is established.' in: \"Constructed over five years, from 1886 to 1891, this building was erected while Vietnam was still pa\"",
+  "    [LOCAL-472] UNGROUNDED entity stop='Post Office' entity='Governor General' reason='No concrete link to the Governor General is established.' in: \"Constructed over five years, from 1886 to 1891, this building was erected while Vietnam was still pa\"",
+  "    [LOCAL-472] UNGROUNDED entity stop='Post Office' entity='Southern Vietnam' reason='No specific person or work is mentioned with a concrete link to the stop.' in: \"Behind the counters, two painted maps from 1892 remain: one detailing telegraphic lines of Southern \"",
+  "    removed: \"Contrary to popular belief, the architect was Alfred Foulhoux, not Gustave Eiffel, whose name is oft\"",
+  "  [LOCAL-889] coverage Post Office: 2/2 key facts (before 1; injected 2; denied-dropped 0; filler trimmed 0, reflective -0, sensory -0)",
+  "  [LOCAL-890] final dropped an orphan opener in 'City Hall': \"The grand building before you was completed in 1908, after a decade of construction that began in 18\"",
+  "  [LOCAL-889] coverage City Hall: 1/2 key facts (before 2; injected 0; denied-dropped 0; filler trimmed 0, reflective -0, sensory -0)",
+  "      [LOCAL-889] still missing years: The building was opened in 1909 by the French Indochina governors-general to celebrate 50 "
+ ],
+ "evidence_chars_per_stop": {
+  "Independence Palace": 4639,
+  "Book Street": 1355,
+  "Post Office": 3208,
+  "Cathedral": 14538,
+  "War Remnants Museum": 5596,
+  "Café Apartments 42": 1527,
+  "Opera House": 5604,
+  "City Hall": 12901,
+  "Thi Bar": 1075,
+  "Bạch Đằng Pier": 11289
+ }
+}

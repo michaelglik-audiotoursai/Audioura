@@ -1,0 +1,62 @@
+
+=== ORCHESTRATOR LOG (D762) ===
+  [PASS] D762 log shows `pins resolved 10/10`  — [D762] user-stop pins resolved 10/10
+  [PASS] no preview failure / fallback in the orchestrator log  — none
+  [PASS] orchestrator's own /preview-stops call finished  — 7.8s
+
+=== GENERATOR LOG ===
+  [PASS] no `name_only` fallback in the generator log  — none
+  [PASS] no raw title reached the generator  — none
+  [PASS] [LOCAL-883] grounding gate ran on 10 stops
+  [PASS] [LOCAL-889] coverage total logged
+   [PASS] 10/10 stops delivered: 10
+   [FAIL] every stop ≥ 5 content sentences: short: [(1, 'Cathedral', 4), (2, 'Post Office', 4), (8, 'Café Apartments 42', 4)]
+   [PASS] no banned wave-40 strings: absent
+   [PASS] Palace states 30 April 1975 tank event: You are standing in front of the Independence Palace, a historic landmark and government-owned public hall in Ho Chi Minh City, Vietnam. This building is also o
+   [PASS] Diệm named in full (Ngô Đình Diệm), no bare Đình Diệm: ok
+   [FAIL] City Hall states 1898 AND 1909 (not just the Hôtel de Ville name), not Gia Long Palace: Designed by the French architect Fernand Gardè, it draws directly from the classic town halls of Paris, blending Renaissance, Baroque, and Beaux-Arts styles int
+   [FAIL] Post Office credited Foulhoux/Vildieu, Eiffel only as myth/earlier building: The Post Office was constructed between 1886 and 1891 and is now a tourist attraction. The Saigon Central Post Office, completed in 1891 after five years of con
+   [PASS] Opera House does not credit Ferret alone: The Municipal Theatre owes its specific characteristics to the work of architect Félix Olivier, while construction was under supervision of architects Ernest Gu
+   [PASS] Stop 1 Directions is a real next-stop direction, not just 'Enjoy the stroll!': Enjoy the stroll! Continue to Post Office — it is about a minute's walk away.
+   [PASS] every stop >= 4 content sentences: all >= 4
+   [FAIL] no orphan openers: [(10, 'Thi Bar', 'demonstrative', 'this route')]
+   [PASS] Palace states 30 April 1975 plainly: ['the independence palace was the site of the fall of saigon on 30 april 1975 that ended the vietnam war, when a liberation army of south vietnam tank crashed through its gates.']
+   [PASS] Cafe evidence > 0: {'Café Apartments 42': 1527}
+
+=== TOUR ===
+  [PASS] clean titles (no `_street`, `& street`, `(…)`)  — ['Cathedral', 'Post Office', 'Book Street', 'Independence Palace', 'War Remnants Museum', 'Opera House', 'City Hall', 'Café Apartments 42', 'Bạch Đằng Pier', 'Thi Bar']
+  [PASS] Opera pin within 50 m of 10.776390,106.702780  — 0 m
+  [PASS] Café Coordinates present  — (10.774089, 106.704056)
+  [PASS] wave-43 checklist: 10/10 stops delivered
+  [FAIL] wave-43 checklist: every stop ≥ 5 content sentences
+  [PASS] wave-43 checklist: no banned wave-40 strings
+  [PASS] wave-43 checklist: Palace states 30 April 1975 tank event
+  [PASS] wave-43 checklist: Diệm named in full (Ngô Đình Diệm), no bare Đình Diệm
+  [FAIL] wave-43 checklist: City Hall states 1898 AND 1909 (not just the Hôtel de Ville name), not Gia Long Palace
+  [FAIL] wave-43 checklist: Post Office credited Foulhoux/Vildieu, Eiffel only as myth/earlier building
+  [PASS] wave-43 checklist: Opera House does not credit Ferret alone
+  [PASS] wave-43 checklist: Stop 1 Directions is a real next-stop direction, not just 'Enjoy the stroll!'
+  [PASS] 888: every stop >= 4 content sentences  — all >= 4
+  [FAIL] 888: no orphan openers  — [(10, 'Thi Bar', 'demonstrative', 'this route')]
+  [PASS] 888: Palace states 30 April 1975 plainly  — ['the independence palace was the site of the fall of saigon on 30 april 1975 that ended the vietnam war, when a liberation army of south vietnam tank crashed through its gates.']
+  [PASS] 888: Cafe evidence > 0  — {'Café Apartments 42': 1527}
+  orch: [D762] /preview-stops OK in 7.8s (try 1)
+  orch: [D762] user-stop pins resolved 10/10 (city Ho Chi Minh City)
+  orch: [D762] /preview-stops OK in 6.5s (try 1)
+  orch: [D762] user-stop pins resolved 10/10 (city Ho Chi Minh City)
+  gen: [LOCAL-893] preview timing: 10 stops, pins 3.68s (sequential), canonical tail 0.93s after the last pin (5 workers, deadline 6.5s, 0 abandoned), total 4.61s
+  gen: [LOCAL-893] preview timing: 10 stops, pins 3.56s (sequential), canonical tail 0.98s after the last pin (5 workers, deadline 6.5s, 0 abandoned), total 4.54s
+  gen: [LOCAL-893] preview timing: 10 stops, pins 7.72s (sequential), canonical tail 0.05s after the last pin (5 workers, deadline 6.5s, 1 abandoned), total 7.77s
+  gen: [LOCAL-893] preview timing: 10 stops, pins 14.58s (sequential), canonical tail 0.05s after the last pin (5 workers, deadline 6.5s, 1 abandoned), total 14.63s
+  gen: [LOCAL-893] preview timing: 10 stops, pins 5.22s (sequential), canonical tail 1.28s after the last pin (5 workers, deadline 6.5s, 1 abandoned), total 6.51s
+evidence chars: {'Independence Palace': 4639, 'Book Street': 1355, 'Post Office': 3208, 'Cathedral': 14538, 'War Remnants Museum': 5596, 'Café Apartments 42': 1527, 'Opera House': 5604, 'City Hall': 12901, 'Thi Bar': 1075, 'Bạch Đằng Pier': 11289}
+1 Cathedral (10.779722, 106.699167)
+2 Post Office (10.78, 106.7)
+3 Book Street (10.780573, 106.699695)
+4 Independence Palace (10.77705, 106.69537)
+5 War Remnants Museum (10.7795, 106.692)
+6 Opera House (10.77639, 106.70278)
+7 City Hall (10.77647, 106.70097)
+8 Café Apartments 42 (10.774089, 106.704056)
+9 Bạch Đằng Pier (10.77524, 106.707002)
+10 Thi Bar (10.76766, 106.69396)
