@@ -383,7 +383,9 @@ def focus_evidence(evidence: str, sentences, cap: int = EVIDENCE_WINDOW,
 
 def classify_sentences(title: str, factual_sentences: List[str], evidence: str,
                        *, classify_fn: Optional[Callable] = None,
-                       model: str = GROUNDING_MODEL, _no_focus: bool = False
+                       model: str = GROUNDING_MODEL, _no_focus: bool = False,
+                       items: Optional[List[Dict]] = None,
+                       exclude_ids: Optional[set] = None
                        ) -> Tuple[Dict[int, Dict], Dict]:
     """Classify each factual sentence against the evidence with ONE LLM call.
     Returns ({index: {"verdict", "evidence", "legend"}}, cost_report). A missing
@@ -394,10 +396,23 @@ def classify_sentences(title: str, factual_sentences: List[str], evidence: str,
         return {}, rep
     fn = classify_fn or _default_classify
     numbered = "\n".join(f"{i}. {s}" for i, s in enumerate(factual_sentences, 1))
-    user = (f"STOP: {title}\n\nEVIDENCE:\n{(evidence or '').strip() if _no_focus else focus_evidence(evidence, factual_sentences)}\n\n"
-            f"FACTUAL SENTENCES:\n{numbered}\n\n"
-            f"Return the JSON verdicts now.")
-    parsed, in_tok, out_tok = fn(_SYSTEM, user, model)
+    system = _SYSTEM
+    if items:
+        # [LOCAL-891] every evidence item carries an id and about_stop=true/false; the judge names the
+        # item that supports each sentence, so "supported" can be checked for aboutness.
+        import aboutness as _ab
+        block, shown = _ab.render_items(items, factual_sentences, cap=EVIDENCE_WINDOW,
+                                        exclude_ids=exclude_ids)
+        rep["shown_ids"] = shown
+        system = _SYSTEM + _ab.JUDGE_ADDENDUM
+        user = (f"STOP: {title}\n\nEVIDENCE:\n{block}\n\n"
+                f"FACTUAL SENTENCES:\n{numbered}\n\n"
+                f"Return the JSON verdicts now.")
+    else:
+        user = (f"STOP: {title}\n\nEVIDENCE:\n{(evidence or '').strip() if _no_focus else focus_evidence(evidence, factual_sentences)}\n\n"
+                f"FACTUAL SENTENCES:\n{numbered}\n\n"
+                f"Return the JSON verdicts now.")
+    parsed, in_tok, out_tok = fn(system, user, model)
     rep["called"] = True
     rep["in_tokens"], rep["out_tokens"] = in_tok, out_tok
     rep["cost_usd"] = _estimate_cost(model, in_tok, out_tok)
@@ -413,7 +428,8 @@ def classify_sentences(title: str, factual_sentences: List[str], evidence: str,
                 continue
             out[idx] = {"verdict": verdict,
                         "evidence": str(v.get("evidence", "") or "")[:300],
-                        "legend": bool(v.get("legend", False))}
+                        "legend": bool(v.get("legend", False)),
+                        "source": str(v.get("source", "") or "").strip()}
     return out, rep
 
 
@@ -443,7 +459,7 @@ def _disclose_legend(sentence: str) -> str:
 
 
 def _second_look(title, factual_sentences, verdicts, evidence, *, classify_fn,
-                 model, rep):
+                 model, rep, items=None, shown_ids=None):
     """Re-check UNSUPPORTED (non-legend) verdicts against evidence chunks the first
     window left out. Returns the (possibly upgraded) verdict map; one extra call at
     most, only when such chunks exist."""
@@ -452,15 +468,23 @@ def _second_look(title, factual_sentences, verdicts, evidence, *, classify_fn,
              and 1 <= i <= len(factual_sentences)]
     if not drops:
         return verdicts
-    first = focus_evidence(evidence, factual_sentences)
-    if len((evidence or "").strip()) <= len(first):
-        return verdicts                    # the judge already saw everything
     sents = [factual_sentences[i - 1] for i in drops]
-    more = focus_evidence(evidence, sents, cap=EVIDENCE_WINDOW, exclude=first)
-    if not more.strip():
-        return verdicts
-    v2, crep = classify_sentences(title, sents, more, classify_fn=classify_fn,
-                                  model=model, _no_focus=True)
+    if items:
+        # [LOCAL-891] same items, same ids: only the items the first window left out
+        left = [it for it in items if it["id"] not in set(shown_ids or [])]
+        if not left:
+            return verdicts
+        v2, crep = classify_sentences(title, sents, "x", classify_fn=classify_fn, model=model,
+                                      items=left)
+    else:
+        first = focus_evidence(evidence, factual_sentences)
+        if len((evidence or "").strip()) <= len(first):
+            return verdicts                    # the judge already saw everything
+        more = focus_evidence(evidence, sents, cap=EVIDENCE_WINDOW, exclude=first)
+        if not more.strip():
+            return verdicts
+        v2, crep = classify_sentences(title, sents, more, classify_fn=classify_fn,
+                                      model=model, _no_focus=True)
     rep["cost_usd"] = rep.get("cost_usd", 0.0) + crep.get("cost_usd", 0.0)
     out = dict(verdicts)
     for k, i in enumerate(drops, 1):
@@ -505,6 +529,15 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
         return body_prose, rep
 
     factual_idx = [i for i, s in enumerate(sents) if is_factual_sentence(s)]
+    # [LOCAL-891] an event/person claim the old cue missed ("Thích Quảng Đức's heart was seized ...")
+    # is a claim too: it is judged and aboutness-checked.
+    try:
+        import aboutness as _abc
+        if _abc.ENABLED:
+            factual_idx = [i for i, s in enumerate(sents)
+                           if i in set(factual_idx) or (not _NAV_CUE_RE.search(s) and _abc.is_claim(s))]
+    except Exception:
+        pass
     if not factual_idx:
         # no factual claim at all: nothing to ground, keep the atmospheric body.
         rep["kept"] = len(sents)
@@ -538,8 +571,22 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
         return new_prose, rep
 
     factual_sentences = [sents[i] for i in factual_idx]
+    # [LOCAL-891] aboutness: the evidence as flagged items (own article / names the stop = about_stop;
+    # city, neighbour, person = context), the same items the audit reads.
+    _items, _aref = None, None
+    try:
+        import aboutness as _ab
+        if _ab.ENABLED:
+            _items = _ab.build_items(evidence, title) or None
+            if _items:
+                import key_fact_coverage as _kfa
+                _own = _kfa.own_article(evidence, title)
+                _aref = _ab.Referent(title, (), (_own or {}).get("title", ""), (_own or {}).get("lead", ""))
+    except Exception:
+        _items, _aref = None, None
+    rep["offtopic"] = []
     verdicts, crep = classify_sentences(
-        title, factual_sentences, evidence, classify_fn=classify_fn, model=model)
+        title, factual_sentences, evidence, classify_fn=classify_fn, model=model, items=_items)
     rep["cost_usd"] = crep.get("cost_usd", 0.0)
     rep["called"] = crep.get("called", False)
 
@@ -548,11 +595,13 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
     # not contain are shown to the judge once more, for those sentences only.
     try:
         verdicts = _second_look(title, factual_sentences, verdicts, evidence,
-                                classify_fn=classify_fn, model=model, rep=rep)
+                                classify_fn=classify_fn, model=model, rep=rep,
+                                items=_items, shown_ids=crep.get("shown_ids"))
     except Exception:
         pass
 
     out = []
+    _other_used = 0
     for i, s in enumerate(sents):
         if i not in factual_idx:
             out.append(s)                 # non-factual: always kept
@@ -590,6 +639,29 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
                 log(f"      [LOCAL-889] removed claim came back in '{title[:40]}' -> dropped again; "
                     f"evidence line backing it: {_kfc.support_source(s, evidence, title) or '(none)'}")
             continue
+        # [LOCAL-891] SUPPORTED must also mean ABOUT THIS STOP: a sentence carried only by a CONTEXT
+        # item (the city, a neighbouring place, a person) is UNSUPPORTED (off-topic).
+        if _items and (v is None or v["verdict"] == "SUPPORTED"):
+            try:
+                _a = _ab.assess(s, _items, judge_source=(v or {}).get("source"), ref=_aref,
+                                other_place_used=_other_used)
+            except Exception:
+                _a = {"ok": True}
+            if _a.get("other_place"):
+                _other_used += 1
+            if not _a.get("ok", True):
+                rep["labelled"] += 1
+                rep["unsupported"] += 1
+                rep["dropped"].append(("UNSUPPORTED(off-topic)", s[:80]))
+                rep["offtopic"].append({"claim": s, "why": _a.get("why", ""), "source": _a.get("source")})
+                try:
+                    import key_fact_coverage as _kfc
+                    _kfc.deny_record(title, s, "gate:off-topic")
+                except Exception:
+                    pass
+                if log:
+                    log(f"      [LOCAL-891] off-topic in '{title[:40]}': {_a.get('why', '')}: {s[:100]}")
+                continue
         if v is None:
             out.append(s)                 # unjudged (LLM silent): keep
             rep["kept"] += 1
@@ -867,6 +939,15 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
             # [LOCAL-888] 873C did not run because most stops have NO thin-fact
             # list (their evidence is an article / snippets): the rebuild got [].
             # Feed it the evidence's own fact sentences.
+            if len(facts) < 6 and not _evidence_is_thin(ev or ""):
+                # [LOCAL-891] the stop's OWN article's passages first (richest, about the stop)
+                try:
+                    import aboutness as _ab891
+                    for _fs in _ab891.refill_facts(ev or "", title, limit=18):
+                        if _fs not in facts:
+                            facts.append(_fs)
+                except Exception:
+                    pass
             if len(facts) < 6 and not _evidence_is_thin(ev or ""):
                 try:
                     from stop_coherence import evidence_fact_sentences

@@ -740,6 +740,17 @@ def snapshot_main(snap_dir):
         audit["used_cloud_snapshot"] = True
         with open(os.path.join(_ART_DIR, "saigon_warm_audit.json"), "w", encoding="utf-8") as f:
             json.dump(audit, f, ensure_ascii=False, indent=2)
+        # [LOCAL-891] persist the REAL per-stop evidence bundle with its about_stop items (the 890
+        # evidence json held only claim provenance: landmarks was {} and no evidence text), so a later
+        # task can replay offline.
+        try:
+            import aboutness as _ab891
+            _bundle = {t: {"chars": len(e or ""), "evidence": e,
+                           "items": _ab891.build_items(e, t)} for t, e in ev.items()}
+            with open(os.path.join(_ART_DIR, "saigon_warm_evidence_bundle.json"), "w", encoding="utf-8") as f:
+                json.dump(_bundle, f, ensure_ascii=False, indent=1)
+        except Exception as _be:
+            print(f"   [LOCAL-891] could not persist the evidence bundle: {_be}", flush=True)
         _e888 = evaluate_888(warm_text, audit.get("evidence_chars") or {})
         _e889 = evaluate_889(warm_text, ev)
         uns = audit.get("unsupported")

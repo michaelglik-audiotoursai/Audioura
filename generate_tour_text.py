@@ -24169,7 +24169,16 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                                                         pin=_w_pin)
                     if _w_items:
                         poi['_wiki_evidence'] = _w_items
-                        description_prompt += _lwe872c.narrator_block(poi_name, _w_items)
+                        # [LOCAL-891] the narrator gets the stop's own article and the paragraphs
+                        # that are ABOUT the stop; city/neighbour/person material never arrives as
+                        # this stop's history (dropped, or a separate labelled background block).
+                        try:
+                            import aboutness as _ab891
+                            _n_items891, _n_ctx891 = _ab891.narrator_items(poi_name, _w_items, _w_al)
+                        except Exception:
+                            _n_items891, _n_ctx891 = _w_items, ""
+                        description_prompt += (_lwe872c.narrator_block(poi_name, _n_items891 or _w_items)
+                                               + _n_ctx891)
                         # [LOCAL-884 §1] record the SAME evidence the narrator saw
                         # into the per-job sink, so the post-narration strict
                         # grounding gate grounds this stop against it (and does not

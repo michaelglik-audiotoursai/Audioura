@@ -288,7 +288,13 @@ _AUDIT_SYSTEM = (
     "legend/myth/story, and an honest 'we could not confirm verified history' "
     "disclosure, are acceptable and must NOT be listed. Return STRICT JSON: "
     "{\"unsupported\": [{\"stop\": \"<title>\", \"claim\": \"<sentence>\", "
-    "\"why\": \"<reason>\"}]}. An empty list means every factual claim is grounded."
+    "\"why\": \"<reason>\"}]}. An empty list means every factual claim is grounded. "
+    "[LOCAL-891] Each evidence item is tagged about_stop=true/false. A claim is SUPPORTED only when an "
+    "about_stop=true item states it (the stop's own article, or a passage whose subject is the stop). "
+    "A claim that only an about_stop=false item states (the city, a neighbouring place, a person - e.g. "
+    "an event that happened elsewhere in the city) is UNSUPPORTED: list it with why 'off-topic', unless the "
+    "sentence itself ties the event to a different place ('a few blocks away, at ...') - at most one such "
+    "sentence per stop."
 )
 
 
@@ -306,9 +312,20 @@ def independent_audit(warm_text, evidence_by_stop, model=_AUDIT_MODEL):
     if not api_key:
         return {"error": "no OPENAI_API_KEY", "unsupported": None,
                 "evidence_chars": ev_counts}, False
-    ev_blob = "\n\n".join(
-        f"### {t}  [{len((e or '').strip())} evidence chars]\n{(e or '').strip()}"
-        for t, e in (evidence_by_stop or {}).items() if e)
+    # [LOCAL-891] the SAME flagged items the gate reads (about_stop true/false); a claim supported only
+    # by an about_stop=false item is UNSUPPORTED (off-topic).
+    import aboutness as _ab
+    _items_by_stop = {}
+    _blobs = []
+    for t, e in (evidence_by_stop or {}).items():
+        if not e:
+            continue
+        its = _ab.build_items(e, t)
+        _items_by_stop[t] = its
+        body = "\n".join(f"[{i['id']} | about_stop={'true' if i['about_stop'] else 'false'} | {i['kind']}] {i['text']}"
+                         for i in its)
+        _blobs.append(f"### {t}  [{len((e or '').strip())} evidence chars]\n{body}")
+    ev_blob = "\n\n".join(_blobs)
     user = (f"TOUR TEXT:\n{warm_text[:16000]}\n\n"
             f"PER-STOP EVIDENCE (with char counts):\n{ev_blob[:150000]}\n\n"
             f"List every unsupported factual claim as JSON now.")
@@ -335,6 +352,20 @@ def independent_audit(warm_text, evidence_by_stop, model=_AUDIT_MODEL):
         parsed["_usage"] = body.get("usage", {}) or {}
         parsed["evidence_chars"] = ev_counts
         unsupported = parsed.get("unsupported")
+        # [LOCAL-891] the same aboutness rule, mechanically, over the same items
+        try:
+            ab = _ab.audit_tour(warm_text, evidence_by_stop)
+            parsed["offtopic_mechanical"] = ab["offtopic"]
+            parsed["items_by_stop"] = {t: [{k: i[k] for k in ("id", "about_stop", "kind", "source", "why")}
+                                           for i in its] for t, its in _items_by_stop.items()}
+            if isinstance(unsupported, list):
+                have = {(u.get("claim") or "").strip() for u in unsupported if isinstance(u, dict)}
+                for o in ab["offtopic"]:
+                    if o["claim"].strip() not in have:
+                        unsupported.append({"stop": o["stop"], "claim": o["claim"],
+                                            "why": o["why"], "by": "aboutness-rule"})
+        except Exception as _ae:
+            parsed["offtopic_error"] = f"{type(_ae).__name__}: {_ae}"
         ok = isinstance(unsupported, list) and len(unsupported) == 0
         return parsed, ok
     except Exception as e:
