@@ -1,0 +1,1385 @@
+{
+  "unsupported": [],
+  "_model": "gpt-4.1",
+  "_usage": {
+    "prompt_tokens": 21682,
+    "completion_tokens": 7,
+    "total_tokens": 21689,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "evidence_chars": {
+    "Post Office": 6674,
+    "Book Street": 1555,
+    "Cathedral": 9983,
+    "War Remnants Museum": 5600,
+    "Opera House": 12335,
+    "City Hall": 12815,
+    "Bạch Đằng Pier": 11289,
+    "Independence Palace": 4785,
+    "Café Apartments 42": 1448,
+    "Thi Bar": 1407
+  },
+  "offtopic_mechanical": [],
+  "items_by_stop": {
+    "Post Office": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Saigon Central Post Office",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Saigon Central Post Office",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Saigon Central Post Office",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Saigon Central Post Office",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Saigon Central Post Office",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Saigon Central Post Office",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Saigon Central Post Office",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Saigon Central Post Office",
+        "why": "own-article infobox"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bưu điện Sài Gòn",
+        "why": "own-article infobox"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (8x)"
+      },
+      {
+        "id": "E22",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (9x)"
+      }
+    ],
+    "Book Street": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (7x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (2x)"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (13x)"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (5x)"
+      }
+    ],
+    "Cathedral": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "passage",
+        "source": "Paris Commune Square",
+        "why": "names the stop 3x"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "passage",
+        "source": "Paris Commune Square",
+        "why": "names the stop in its first sentence (3x)"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "passage",
+        "source": "Paris Commune Square",
+        "why": "names the stop in its first sentence (3x)"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "passage",
+        "source": "Paris Commune Square",
+        "why": "names the stop in its first sentence (3x)"
+      },
+      {
+        "id": "E5",
+        "about_stop": false,
+        "kind": "context",
+        "source": "Paris Commune Square",
+        "why": "infobox: never names the stop"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E22",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E23",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Nhà thờ chính tòa Đức Bà Sài Gòn",
+        "why": "its lead's subject is the stop (infobox)"
+      },
+      {
+        "id": "E24",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (6x)"
+      },
+      {
+        "id": "E25",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (7x)"
+      },
+      {
+        "id": "E26",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (1x)"
+      }
+    ],
+    "War Remnants Museum": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "War Remnants Museum",
+        "why": "own-article infobox"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (12x)"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (4x)"
+      }
+    ],
+    "Opera House": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Opera House",
+        "why": "own-article infobox"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E22",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E23",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E24",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E25",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E26",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E27",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E28",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E29",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E30",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Nhà hát Thành phố Hồ Chí Minh",
+        "why": "own-article infobox"
+      },
+      {
+        "id": "E31",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (11x)"
+      },
+      {
+        "id": "E32",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 7x"
+      }
+    ],
+    "City Hall": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E22",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E23",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Ho Chi Minh City Hall",
+        "why": "own-article infobox"
+      },
+      {
+        "id": "E24",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E25",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E26",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E27",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E28",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E29",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E30",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E31",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E32",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E33",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E34",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E35",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Trụ sở Ủy ban nhân dân Thành phố Hồ Chí Minh",
+        "why": "own-article infobox"
+      },
+      {
+        "id": "E36",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 8x"
+      },
+      {
+        "id": "E37",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (9x)"
+      },
+      {
+        "id": "E38",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 4x"
+      }
+    ],
+    "Bạch Đằng Pier": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bạch Đằng Quay",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bạch Đằng Quay",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bạch Đằng Quay",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bạch Đằng Quay",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bạch Đằng Quay",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bạch Đằng Quay",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bạch Đằng Quay",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bạch Đằng Quay",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bạch Đằng Quay",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E22",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E23",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E24",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E25",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E26",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E27",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Bến Bạch Đằng",
+        "why": "own-article infobox"
+      },
+      {
+        "id": "E28",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (13x)"
+      },
+      {
+        "id": "E29",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 8x"
+      },
+      {
+        "id": "E30",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (4x)"
+      }
+    ],
+    "Independence Palace": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Independence Palace",
+        "why": "own-article infobox"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 6x"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (4x)"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 6x"
+      }
+    ],
+    "Café Apartments 42": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (8x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 14x"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (13x)"
+      }
+    ],
+    "Thi Bar": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "never names the stop but its subject is a generic noun phrase (undecided)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 3x"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 4x"
+      },
+      {
+        "id": "E4",
+        "about_stop": false,
+        "kind": "context",
+        "source": "snippet",
+        "why": "never names the stop"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 2x"
+      }
+    ]
+  },
+  "used_cloud_snapshot": true
+}
