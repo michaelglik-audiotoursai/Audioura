@@ -821,7 +821,8 @@ def local_alias(name: str, lang: str, *, label_fetch=None) -> str:
 
 
 def local_wikipedia_evidence(name: str, lang: str, *, fetch_fn=None,
-                             use_cache: bool = True) -> Optional[Dict[str, str]]:
+                             use_cache: bool = True, pin=None, city: str = ""
+                             ) -> Optional[Dict[str, str]]:
     """The stop's Wikipedia LOCAL-edition article (``lang``), reusing
     ``landmark_wikipedia_evidence.fetch_article`` (its DB cache + name-match).
     Returns ``{title, lead, infobox}`` or None. Offline when ``fetch_fn`` is
@@ -834,7 +835,7 @@ def local_wikipedia_evidence(name: str, lang: str, *, fetch_fn=None,
         return None
     try:
         return lwe.fetch_article(name, lang=lang, fetch_fn=fetch_fn,
-                                 use_cache=use_cache)
+                                 use_cache=use_cache, pin=pin, city=city)
     except Exception:
         return None
 
@@ -880,7 +881,7 @@ def escalate_local_language(name: str, scope: str, *, places_type: str = "",
                             languages: Optional[Sequence[str]] = None,
                             country_code: str = "", local_name: str = "",
                             fetch=None, wiki_fetch_fn=None, llm=None,
-                            use_cache: bool = True) -> Dict:
+                            use_cache: bool = True, pin=None) -> Dict:
     """The ONE helper LOCAL-873's thin-stop escalation calls.
 
     Given a stop ``name`` and the tour ``scope`` string, it:
@@ -915,11 +916,23 @@ def escalate_local_language(name: str, scope: str, *, places_type: str = "",
 
     city = (scope or "").split(",")[-1].strip() or scope or ""
     wiki: Dict[str, Optional[Dict[str, str]]] = {}
+    # [LOCAL-887] try the stop's own name, the name without a "(qualifier)", and the
+    # LOCAL name (Wikidata label) -- every candidate is still name-matched and
+    # geo-gated (pin + city) by fetch_article, so a wrong-place article is never kept.
+    try:
+        import landmark_wikipedia_evidence as _lwe887
+        _stripped = _lwe887.strip_qualifier(name)
+        _geo_city = _lwe887._city_of(scope)
+    except Exception:
+        _stripped, _geo_city = "", ""
+    _cands = [c for c in dict.fromkeys([name, _stripped, local_name]) if c]
     for lg in dict.fromkeys(["en"] + list(langs)):
-        art = local_wikipedia_evidence(name, lg, fetch_fn=wiki_fetch_fn,
-                                       use_cache=use_cache)
-        if art:
-            wiki[lg] = art
+        for cand in _cands:
+            art = local_wikipedia_evidence(cand, lg, fetch_fn=wiki_fetch_fn,
+                                           use_cache=use_cache, pin=pin, city=(_geo_city if pin else ""))
+            if art:
+                wiki[lg] = art
+                break
 
     serper = serper_local_queries(
         name, city, dominant, cc, local_name=local_name, words=kw_map,

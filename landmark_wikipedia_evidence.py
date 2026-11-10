@@ -651,10 +651,53 @@ def split_paragraphs(full_text: str) -> List[Tuple[str, str]]:
     return out
 
 
+# [LOCAL-887] The event a place is MOST famous for: a military/political/violent
+# turning point or a "crashed through the gates" moment. Generic cues only.
+_FAMOUS_RE = re.compile(
+    r"(?i)\b(tanks?|crashed\s+through|smashed\s+through|stormed|fall\s+of|"
+    r"captured|seized|surrender\w*|assassinat\w+|coup|bomb(?:ed|ing)|"
+    r"massacre|siege|uprising|riots?|executed|escaped|burn(?:ed|t)\s+down|"
+    r"destroyed\s+by|collapsed|earthquake|hurricane|sank|shipwreck\w*|"
+    r"xe\s+tăng|húc\s+đổ|thất\s+thủ|đảo\s+chính|ném\s+bom)\b")
+
+
+def _famous_event_score(text: str) -> float:
+    """0..N: how strongly ``text`` reads as the place's defining event -- a famous-event
+    cue sharing a sentence with an exact date or a year."""
+    sc = 0.0
+    for sent in re.split(r"(?<=[.!?])\s+", text or ""):
+        cues = len(_FAMOUS_RE.findall(sent))
+        if not cues:
+            continue
+        s1 = 2.0 * min(cues, 3)
+        if _DATE_FULL_RE.search(sent):
+            s1 += 4.0
+        elif _YEAR_RE2.search(sent):
+            s1 += 2.0
+        sc = max(sc, s1)
+    return sc
+
+
+def event_sentences(text: str, n: int = 3) -> List[str]:
+    """The ``n`` sentences of ``text`` that most look like the place's famous event
+    (best first). Works on the whole article, so an event buried deep in it is found."""
+    scored = []
+    for i, sent in enumerate(re.split(r"(?<=[.!?])\s+", re.sub(r"\s*\n\s*", " ", text or ""))):
+        sent = sent.strip()
+        if len(sent) < 40 or len(sent) > 600:
+            continue
+        sc = _famous_event_score(sent)
+        if sc >= 4.0:
+            scored.append((-sc, i, sent))
+    scored.sort()
+    return [t for _, _, t in scored[:n]]
+
+
 def _score_paragraph(par: str) -> float:
     years = set(_YEAR_RE2.findall(par))
     sc = 2.0 * min(len(years), 4)
     sc += 3.0 * min(len(_DATE_FULL_RE.findall(par)), 2)          # exact dates (30 April 1975)
+    sc += 2.5 * _famous_event_score(par)                           # [LOCAL-887] defining event
     sc += 1.5 * min(len(_STORY_RE.findall(par)), 5)
     sc += 0.7 * min(len(_NAME_RE.findall(par)), 5)               # named people / places
     if len(par) > 1200:                                            # a wall of text is diluted
@@ -946,6 +989,12 @@ def _city_of(location: str) -> str:
     return parts[0] if parts else ""
 
 
+def strip_qualifier(name: str) -> str:
+    """The name without a trailing '(...)' qualifier; '' when nothing was stripped."""
+    out = re.sub(r"\s*[\(\[][^)\]]*[\)\]]\s*$", "", name or "").strip()
+    return out if out and out != (name or "").strip() else ""
+
+
 def evidence_for(name: str, location: str = "", langs: Optional[Sequence[str]] = None,
                  fetch_fn: Optional[Callable] = None, use_cache: bool = True,
                  extra_names: Sequence[str] = (),
@@ -961,6 +1010,12 @@ def evidence_for(name: str, location: str = "", langs: Optional[Sequence[str]] =
     city = city or _city_of(location)
     out: List[str] = []
     bases = [n for n in ([name] + [x for x in extra_names if x and x != name]) if n]
+    # [LOCAL-887] "Bạch Đằng Pier (tour-bus + waterbus)": the parenthetical is a Places
+    # qualifier, not part of the article title, and breaks the search. Try it stripped.
+    for b in list(bases):
+        sb = strip_qualifier(b)
+        if sb and sb not in bases:
+            bases.append(sb)
     for lang in (langs or local_languages(location)):
         art = None
         # (search_query, match_name): the plain names first, then each name qualified
@@ -981,15 +1036,21 @@ def evidence_for(name: str, location: str = "", langs: Optional[Sequence[str]] =
             if art:
                 break
         if art:
-            txt = f"{art['title']} - Wikipedia ({lang}). {art['lead']}"
-            if art.get("infobox"):
-                txt += f"\nInfobox: {art['infobox']}"
-            # [LOCAL-885] relevance-ranked passages from the FULL article (<= 6 KB)
-            psg = select_passages(art.get("full_text", ""), art.get("lead", ""))
-            if psg:
-                txt += f"\nPassages: {psg}"
-            out.append(txt)
+            out.append(format_item(art, lang))
     return out
+
+
+def format_item(art: Dict[str, str], lang: str) -> str:
+    """One evidence string for an accepted article: '<title> - Wikipedia (<lang>). <lead>
+    Infobox: ... Passages: ...' (the shape every consumer parses)."""
+    txt = f"{art['title']} - Wikipedia ({lang}). {art['lead']}"
+    if art.get("infobox"):
+        txt += f"\nInfobox: {art['infobox']}"
+    # [LOCAL-885] relevance-ranked passages from the FULL article (<= 6 KB)
+    psg = select_passages(art.get("full_text", ""), art.get("lead", ""))
+    if psg:
+        txt += f"\nPassages: {psg}"
+    return txt
 
 
 # ---- LOCAL-872C: the evidence feeds the NARRATOR, and is the authority ---------
@@ -1147,6 +1208,8 @@ def narrator_block(name: str, items: Sequence[str]) -> str:
     # but not its passages.
     def _render(i):
         if "Wikipedia (en)" in i[:200]:
+            return i[:3200 + PASSAGE_CAP + 400]
+        if not en:                  # [LOCAL-887] the local article is the ONLY source
             return i[:3200 + PASSAGE_CAP + 400]
         return i.partition("\nPassages:")[0][:3200]
     body = "\n\n".join(_render(i) for i in pick)

@@ -159,6 +159,22 @@ _NAV_CUE_RE = re.compile(
     r"it\s+is\s+(?:a\s+)?(?:short|brief|\d)[\w\s-]*walk)")
 
 
+# [LOCAL-887] A sentence asserting what happens AT or FROM the stop ("Parties leaving
+# from here set out to explore the tunnels", "Boats depart from this pier") is a
+# checkable claim about the stop. The generic "from here" navigation cue must not
+# exempt it.
+_DEPARTURE_CUE_RE = re.compile(
+    r"(?i)\b(?:(?:parties|groups?|tours?|trips?|cruises?|boats?|ferr(?:y|ies)|"
+    r"buses|coaches|visitors|travell?ers|passengers|tourists|excursions?|"
+    r"services?|speedboats?|waterbus(?:es)?|trains?)\b[^.!?]{0,60}?"
+    r"\b(?:leav\w+|depart\w*|set(?:s|ting)?\s+(?:out|off|sail)|"
+    r"embark\w*|board\w*|start\w*|begin\w*|sail\w*|run\w*|operate\w*)\b"
+    r"[^.!?]{0,40}?\b(?:from|at|on)\s+(?:here|this\s+\w+)\b"
+    r"|\bdepartures?\s+(?:from|at)\s+(?:here|this)\b"
+    r"|\bfrom\s+here,?\s+(?:you\s+can\s+)?(?:take|catch|board|sail|"
+    r"tours?|boats?|ferr(?:y|ies)|trips?|cruises?)\b)")
+
+
 def _content_sentences(prose: str) -> List[str]:
     return [s for s in split_sentences(prose or "")
             if len(s.strip()) >= _MIN_CONTENT_LEN]
@@ -172,6 +188,9 @@ def is_factual_sentence(sentence: str) -> bool:
     s = (sentence or "").strip()
     if len(s) < _MIN_CONTENT_LEN:
         return False
+    # [LOCAL-887] "what happens from this stop" is a factual assertion.
+    if _DEPARTURE_CUE_RE.search(s):
+        return True
     # A pure navigation line is exempt (D107) even if it mentions a distance.
     if _NAV_CUE_RE.search(s) and not (_PERSON_CUE_RE.search(s)
                                       or _EVENT_FUNCTION_CUE_RE.search(s)
@@ -267,9 +286,103 @@ _SYSTEM = (
 )
 
 
+EVIDENCE_WINDOW = int(os.environ.get("GROUNDING_EVIDENCE_WINDOW", "6000"))
+_TOKEN_RE = re.compile(r"[^\W_]{4,}", re.UNICODE)
+_STOPW = frozenset({
+    "that", "this", "with", "from", "were", "have", "been", "also", "their", "which",
+    "there", "about", "where", "while", "after", "before", "into", "most", "more",
+    "than", "when", "what", "they", "them", "then", "will", "your", "here", "still"})
+
+
+def _fold_tok(s: str) -> str:
+    import unicodedata
+    s = unicodedata.normalize("NFKD", (s or "").replace("đ", "d").replace("Đ", "D"))
+    return "".join(c for c in s if not unicodedata.combining(c)).lower()
+
+
+def key_tokens(sentences) -> set:
+    """Checkable tokens of the sentences: years and content words (diacritics folded).
+    A year or a name is exactly what the evidence must hold for the sentence to stand."""
+    out = set()
+    for sent in sentences or []:
+        for t in _TOKEN_RE.findall(sent or ""):
+            f = _fold_tok(t)
+            if f not in _STOPW:
+                out.add(f)
+    return out
+
+
+def evidence_chunks(evidence: str, max_len: int = 700) -> List[str]:
+    """The evidence split into paragraph-sized chunks (a long line is split on
+    sentence boundaries), in source order."""
+    chunks: List[str] = []
+    for ln in (evidence or "").splitlines():
+        ln = ln.strip()
+        if not ln:
+            continue
+        if len(ln) <= max_len:
+            chunks.append(ln)
+            continue
+        cur = ""
+        for sent in re.split(r"(?<=[.!?])\s+", ln):
+            if cur and len(cur) + len(sent) + 1 > max_len:
+                chunks.append(cur)
+                cur = sent
+            else:
+                cur = (cur + " " + sent).strip()
+        if cur:
+            chunks.append(cur)
+    return chunks
+
+
+def _chunk_score(chunk: str, toks: set) -> float:
+    ctoks = {_fold_tok(t) for t in _TOKEN_RE.findall(chunk)}
+    hit = toks & ctoks
+    years = {t for t in hit if t.isdigit()}
+    return len(hit) + 3.0 * len(years)
+
+
+def focus_evidence(evidence: str, sentences, cap: int = EVIDENCE_WINDOW,
+                   exclude: str = "") -> str:
+    """[LOCAL-887] The evidence window sent to the gate. When the whole bundle fits
+    in ``cap`` it is sent unchanged. Otherwise the HEAD (lead) is kept and the rest
+    of the window is filled with the chunks that share the most year/name tokens with
+    the sentences being judged (kept in source order) -- NOT the first ``cap`` chars.
+    A 17 KB City Hall bundle used to be cut at 6 KB, so the passage with
+    "1898"/"1909"/Gardès never reached the judge. ``exclude`` drops chunks already
+    sent (for the second look)."""
+    ev = (evidence or "").strip()
+    if len(ev) <= cap and not exclude:
+        return ev
+    chunks = evidence_chunks(ev)
+    if exclude:
+        seen = set(evidence_chunks(exclude))
+        chunks = [c for c in chunks if c not in seen]
+        head_n = 0
+    else:
+        head_n = 0
+        used = 0
+        while head_n < len(chunks) and used + len(chunks[head_n]) <= cap // 3:
+            used += len(chunks[head_n]) + 1
+            head_n += 1
+    toks = key_tokens(sentences)
+    chosen = set(range(head_n))
+    used = sum(len(chunks[i]) + 1 for i in chosen)
+    ranked = sorted(range(head_n, len(chunks)),
+                    key=lambda i: (-_chunk_score(chunks[i], toks), i))
+    for i in ranked:
+        if _chunk_score(chunks[i], toks) <= 0:
+            break
+        if used + len(chunks[i]) + 1 > cap:
+            continue
+        chosen.add(i)
+        used += len(chunks[i]) + 1
+    return "\n".join(chunks[i] for i in sorted(chosen))
+
+
 def classify_sentences(title: str, factual_sentences: List[str], evidence: str,
                        *, classify_fn: Optional[Callable] = None,
-                       model: str = GROUNDING_MODEL
+                       model: str = GROUNDING_MODEL, _no_focus: bool = False
                        ) -> Tuple[Dict[int, Dict], Dict]:
     """Classify each factual sentence against the evidence with ONE LLM call.
     Returns ({index: {"verdict", "evidence", "legend"}}, cost_report). A missing
@@ -280,7 +393,7 @@ def classify_sentences(title: str, factual_sentences: List[str], evidence: str,
         return {}, rep
     fn = classify_fn or _default_classify
     numbered = "\n".join(f"{i}. {s}" for i, s in enumerate(factual_sentences, 1))
-    user = (f"STOP: {title}\n\nEVIDENCE:\n{(evidence or '').strip()[:6000]}\n\n"
+    user = (f"STOP: {title}\n\nEVIDENCE:\n{(evidence or '').strip() if _no_focus else focus_evidence(evidence, factual_sentences)}\n\n"
             f"FACTUAL SENTENCES:\n{numbered}\n\n"
             f"Return the JSON verdicts now.")
     parsed, in_tok, out_tok = fn(_SYSTEM, user, model)
@@ -326,6 +439,35 @@ def _disclose_legend(sentence: str) -> str:
         return s
     core = s[0].lower() + s[1:] if s[:1].isupper() else s
     return "According to local legend, " + core
+
+
+def _second_look(title, factual_sentences, verdicts, evidence, *, classify_fn,
+                 model, rep):
+    """Re-check UNSUPPORTED (non-legend) verdicts against evidence chunks the first
+    window left out. Returns the (possibly upgraded) verdict map; one extra call at
+    most, only when such chunks exist."""
+    drops = [i for i, v in verdicts.items()
+             if v.get("verdict") == "UNSUPPORTED" and not v.get("legend")
+             and 1 <= i <= len(factual_sentences)]
+    if not drops:
+        return verdicts
+    first = focus_evidence(evidence, factual_sentences)
+    if len((evidence or "").strip()) <= len(first):
+        return verdicts                    # the judge already saw everything
+    sents = [factual_sentences[i - 1] for i in drops]
+    more = focus_evidence(evidence, sents, cap=EVIDENCE_WINDOW, exclude=first)
+    if not more.strip():
+        return verdicts
+    v2, crep = classify_sentences(title, sents, more, classify_fn=classify_fn,
+                                  model=model, _no_focus=True)
+    rep["cost_usd"] = rep.get("cost_usd", 0.0) + crep.get("cost_usd", 0.0)
+    out = dict(verdicts)
+    for k, i in enumerate(drops, 1):
+        nv = v2.get(k)
+        if nv and nv["verdict"] == "SUPPORTED":
+            out[i] = nv
+            rep["second_look_saved"] = rep.get("second_look_saved", 0) + 1
+    return out
 
 
 # ── the gate over one body ────────────────────────────────────────────────────
@@ -398,6 +540,15 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
         title, factual_sentences, evidence, classify_fn=classify_fn, model=model)
     rep["cost_usd"] = crep.get("cost_usd", 0.0)
     rep["called"] = crep.get("called", False)
+
+    # [LOCAL-887] SECOND LOOK. Before an UNSUPPORTED sentence is dropped, search the
+    # FULL evidence for its key tokens (years, names): chunks the first window did
+    # not contain are shown to the judge once more, for those sentences only.
+    try:
+        verdicts = _second_look(title, factual_sentences, verdicts, evidence,
+                                classify_fn=classify_fn, model=model, rep=rep)
+    except Exception:
+        pass
 
     out = []
     for i, s in enumerate(sents):
