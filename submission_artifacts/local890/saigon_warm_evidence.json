@@ -1,0 +1,569 @@
+{
+  "landmarks": {},
+  "claim_provenance": {
+    "counts": {
+      "sourced": 3,
+      "unsourced": 68,
+      "total": 71,
+      "corpus": 3,
+      "grounded": 0,
+      "parametric": 68
+    },
+    "per_stop": {
+      "": {
+        "sourced": 0,
+        "unsourced": 1,
+        "total": 1
+      },
+      "Cathedral": {
+        "sourced": 1,
+        "unsourced": 9,
+        "total": 10
+      },
+      "Post Office": {
+        "sourced": 0,
+        "unsourced": 4,
+        "total": 4
+      },
+      "Book Street": {
+        "sourced": 0,
+        "unsourced": 4,
+        "total": 4
+      },
+      "Independence Palace": {
+        "sourced": 1,
+        "unsourced": 4,
+        "total": 5
+      },
+      "War Remnants Museum": {
+        "sourced": 0,
+        "unsourced": 6,
+        "total": 6
+      },
+      "Opera House": {
+        "sourced": 0,
+        "unsourced": 10,
+        "total": 10
+      },
+      "City Hall": {
+        "sourced": 0,
+        "unsourced": 7,
+        "total": 7
+      },
+      "Café Apartments 42": {
+        "sourced": 0,
+        "unsourced": 6,
+        "total": 6
+      },
+      "Bạch Đằng Pier": {
+        "sourced": 1,
+        "unsourced": 7,
+        "total": 8
+      },
+      "Thi Bar": {
+        "sourced": 0,
+        "unsourced": 10,
+        "total": 10
+      }
+    },
+    "claims": [
+      {
+        "stop": "",
+        "text": "Step-by-step audio guided tour of Ho Chi Minh City, Vietnam, is a walking tour.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cathedral",
+        "text": "This five-kilometer route will take you from the iconic Cathedral to the lively Thi Bar, winding through the heart of a bustling metropolis where the streets offer a vibrant blend of urban life and historical significance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cathedral",
+        "text": "You may notice the vibrant street life and colonial buildings along the way.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cathedral",
+        "text": "Standing on Paris Commune Square, the open space encircling the Cathedral, your view sweeps across the cathedral’s soaring red-brick towers.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cathedral",
+        "text": "The square’s gentle hum carries conversations, footsteps on smooth paving stones, and the occasional ring of a bicycle bell from the nearby bustling streets of Ho Chi Minh City’s central district.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cathedral",
+        "text": "The Notre-Dame Cathedral Basilica of Saigon rises before you, its red bricks imported entirely from France—a vivid marker of colonial history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cathedral",
+        "text": "Completed in 1880, the cathedral stands as a central landmark, its quiet strength contrasting with the dynamic life bustling through the streets.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cathedral",
+        "text": "This square was once named Place de la Cathédrale during French rule, and later became Hòa Bình Square when a statue of Our Lady of Peace was placed here in 1959, reflecting the city’s complex layers of change.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cathedral",
+        "text": "The air carries a faint scent of incense from inside, where worshippers gather in daily rhythms that echo through the city’s largest financial center, a place contributing roughly a quarter of Vietnam’s GDP in 2025.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Cathedral",
+        "text": "Following the self-immolation of Thích Quảng Đức, Diệm promised reforms to ease Buddhist tensions but failed to deliver, prompting further protests and violent raids on Buddhist pagodas.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "Following Thích Quảng Đức's self-immolation, Diệm promised reforms to appease Buddhists, but these were not implemented, leading to further protests and violent raids on Buddhist pagodas by forces loy"
+      },
+      {
+        "stop": "Cathedral",
+        "text": "His sacrifice inspired other monks to follow his example, escalating unrest that eventually contributed to the US-backed coup that toppled Diệm on 2 November 1963.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Post Office",
+        "text": "This eclectic structure, built during the era when Vietnam was incorporated into French Indochina, is often mistakenly credited to Gustave Eiffel.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Post Office",
+        "text": "In fact, it was Foulhoux whose architectural vision brought together Gothic, Renaissance, and French influences.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Post Office",
+        "text": "The large painted maps on the walls, created shortly after the building’s completion, chart telegraphic lines and the layout of Saigon and its surroundings in 1892, showing how this hub connected people and places beyond the immediate streets.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Post Office",
+        "text": "The building was begun in 1860 and completed in 1891.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Book Street",
+        "text": "Standing near the shaded entrance to Book Street on Nguyen Van Binh, you notice a narrow pedestrian path lined with leafy trees.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Book Street",
+        "text": "Book Street was created as a community devoted to books and reading, making it the only pedestrian street in Saigon dedicated to this purpose.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Book Street",
+        "text": "The initiative transformed a section of Nguyễn Văn Bình Street into a tranquil haven where booksellers and readers come together, promoting a culture of literacy in the city.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Book Street",
+        "text": "Nearby, the historic building that once served as the Saigon Chamber of Commerce now houses the Ho Chi Minh Stock Exchange, linking commerce and culture in this area.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Independence Palace",
+        "text": "Standing on the wide avenue facing the Independence Palace, the building’s modernist lines and pale facade rise calmly above the bustling city sounds.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Independence Palace",
+        "text": "Diệm wanted a fresh start, replacing the old palace badly damaged when two dissident pilots of the South Vietnamese Air Force bombed Construction began on 1 July 1962, but Diệm never saw its completion.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Independence Palace",
+        "text": "The palace officially opened on 31 October 1966, inaugurated by General Nguyễn Văn Thiệu, who used it as his home and office until April 1975.",
+        "class": "corpus",
+        "source": "knowledge_fallback:gemini",
+        "evidence": "The completed palace was inaugurated on 31 October 1966 by General Nguyễn Văn Thiệu, who used it as his home and office until he fled on 21 April 1975 as North Vietnamese forces advanced."
+      },
+      {
+        "stop": "Independence Palace",
+        "text": "This place connects the everyday pulse of Ho Chi Minh City with a past shaped by conflict and change, a powerful companion to the cultural threads you saw earlier on Book Street.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Independence Palace",
+        "text": "As the sounds of the city continue, the palace remains a steadfast symbol of an era that reshaped Vietnam’s future.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "War Remnants Museum",
+        "text": "Standing just beyond the bustle of Võ Văn Tần Street, the weathered walls of the War Remnants Museum rise ahead.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "War Remnants Museum",
+        "text": "The museum’s yard, scattered with relics of war — a battered tank, a Huey helicopter — invites a closer look before you enter the building that once served as the United States Information Agency during the conflict.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "War Remnants Museum",
+        "text": "This museum first opened its doors on 4 September 1975, under the name Exhibition House for U.S. and Puppet Crimes.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "War Remnants Museum",
+        "text": "Its founding marked a deliberate choice to confront visitors with the stark realities of the Vietnam War.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "War Remnants Museum",
+        "text": "This approach continued a North Vietnamese tradition of exhibitions that began with French colonial war crimes and then shifted focus to American actions starting in 1954.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "War Remnants Museum",
+        "text": "Leaving with a heavy heart, the Opera House offers a stark contrast just a short walk away.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "Standing on Lam Son Square, your gaze is drawn to the elegant façade facing you—a delicate lacework of cream and ochre that cuts a sharp silhouette against the urban bustle.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "The Opera House’s entrance sits just ahead, framed by graceful columns and arched windows.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "This building opened its doors on January 1, 1900.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "It was designed by Félix Olivier, with construction supervised by Ernest Guichard and Eugène Ferret—a trio of French architects who shaped a distinctly French colonial presence here.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "The architecture borrows directly from Paris, echoing styles completed for the 1900 Paris Exposition, which gives the façade its flamboyant curves and sculpted reliefs.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "Originally, the Opera House could seat 500 guests, creating an intimate space where the city’s French colonial elite gathered for opera and theater performances.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "The decoration, including inscriptions and furnishings, was designed by a French artist and shipped here, so every detail carries a shade of Parisian origin.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "When the legislature split into two chambers, it became home to both the Lower House and the Senate, serving as a political center as well as a cultural one.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "The Opera House became the venue for the Assembly, reflecting a pivotal moment as the city’s political life shifted dramatically.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Opera House",
+        "text": "The façade you see today was restored in 1998 for Saigon’s 300th anniversary, bringing back some of the original ornamentation that had been removed during wartime.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "City Hall",
+        "text": "This building was completed in 1908 after a decade-long construction that began in 1898, designed by Fernand Gardè.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "City Hall",
+        "text": "It was officially opened in 1909 by the French Indochina governors-general to mark fifty years of French presence in Saigon.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "City Hall",
+        "text": "At that moment, it took the name L'hôtel de ville, or Municipal Hall, standing as a symbol of colonial administration.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "City Hall",
+        "text": "Locals, however, simply called it Dinh xã Tây, meaning \"French municipal palace,\" or Dinh đốc lý, \"mayor’s palace.\" These names reveal how the building was woven into the daily lives and language of the city’s residents, reflecting its role as a seat of power in a time of foreign governance.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "City Hall",
+        "text": "The City Hall’s solid walls, the rhythmic clatter of motorbikes passing, and the rustle of leaves in the gardens outside are all part of the city’s ongoing story, where past and present convene.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "City Hall",
+        "text": "In a recent chapter, on April 29 and 30, 2023, the building opened its doors to the public for the first time during Reunification Day celebrations.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "City Hall",
+        "text": "From here, the tour can continue toward the lively charm of Café Apartments 42 nearby, where everyday Saigon pulses in a different rhythm.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Café Apartments 42",
+        "text": "Standing on Nguyen Hue Boulevard, face the building marked with the number 42, its narrow façade rising above the street.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Café Apartments 42",
+        "text": "The building at 42 Nguyen Hue was constructed in the 1960s, when Saigon’s skyline was modest and this block served as a residential structure.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Café Apartments 42",
+        "text": "Landmark 81, which rises 461.2 meters above the city, holds the title of the tallest building in Vietnam and the second-tallest in Southeast Asia.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Café Apartments 42",
+        "text": "It stands where the Newport logistics base once operated on the Saigon River’s western banks, marking the city’s rapid transformation from wartime logistics hub to modern metropolis.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Café Apartments 42",
+        "text": "The contrast between this soaring tower and the modest block at number 42 is stark: one speaks of global commerce and ambitious urban development, the other of intimate human stories embedded in wartime necessity and postwar reinvention.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Café Apartments 42",
+        "text": "As you absorb the layered textures of this place, the memory of those American officers lingers, a quiet echo beneath the lively pulse of the city’s present.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bạch Đằng Pier",
+        "text": "Stand along the edge of the Saigon River where the wide promenade of Bạch Đằng Pier unfolds for about 1.3 kilometres.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bạch Đằng Pier",
+        "text": "Bạch Đằng Pier was established at the beginning of the 19th century, marking its role as a key boat quay along the Saigon River.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bạch Đằng Pier",
+        "text": "Its position here, adjacent to the Ba Son Shipyard site now integrated into the Saigon – Ba Son complex, speaks to its longstanding connection to river-based commerce and transport.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bạch Đằng Pier",
+        "text": "One distinct chapter in the pier’s story is its role as a ferry terminal connecting this side of the Saigon River with the Thủ Thiêm Pier across the water.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bạch Đằng Pier",
+        "text": "This service mirrored the older Thủ Thiêm Ferry line, maintaining a vital public link between districts separated by the river’s flow.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bạch Đằng Pier",
+        "text": "Another episode anchors Bạch Đằng Pier in the context of Vietnam’s recent history.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Bạch Đằng Pier",
+        "text": "It serves as a departure point for tours to the Củ Chi Tunnels, the extensive underground network used during the Vietnam War.",
+        "class": "corpus",
+        "source": "https://www.instagram.com/p/DRrJqvTEUp0/",
+        "evidence": "Bạch Đằng Pier serves as a departure point for tours to the Củ Chi Tunnels, a significant historical site related to the Vietnam War."
+      },
+      {
+        "stop": "Bạch Đằng Pier",
+        "text": "From this pier, visitors embark on journeys to a site that reveals the resilience and ingenuity of Vietnamese fighters, linking this waterfront to a narrative far beyond commerce—a narrative of survival and strategy.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "Standing on the lively 224 Đề Thám street, your attention is drawn to an unassuming doorway marked by a neon sign glowing softly at night.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "This is Thi Bar, a venue where the pulse of Saigon’s nightlife beats strong amid the backpacker buzz of Phạm Ngũ Lão, one of Ho Chi Minh City’s busiest and most diverse districts.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "Thi Bar stands out for its regular spotlight on Filipino bands and singers.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "These performers bring a distinct sound from across the South China Sea, their music threading through the clinking glasses and laughter.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "The presence of Filipino artists connects the bar to a broader Southeast Asian rhythm, enriching the local scene with melodies shaped by a different culture yet warmly embraced in Saigon’s vibrant backpacker area of Bui Vien.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "Beyond music, Thi Bar is known as one of the city’s few venues that openly welcomes the LGBTQ+ community.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "This inclusiveness is vividly illustrated by events like the “Live Band + Drag Show” held on October 30th, when performers took the small stage in flamboyant costumes and with confident voices, fusing live music with drag artistry.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "Near the Saigon River and not far from Bạch Đằng Pier, where river life flows visibly, Thi Bar channels a different current — one of people coming together after dark.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "From Cathedral, Opera House and Thi Bar, this route is the one you chose through the city — your own path, in your own order.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      },
+      {
+        "stop": "Thi Bar",
+        "text": "That's 10 stops in all.",
+        "class": "parametric",
+        "source": null,
+        "evidence": null
+      }
+    ]
+  }
+}
