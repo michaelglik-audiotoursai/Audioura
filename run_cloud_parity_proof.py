@@ -295,6 +295,18 @@ def evaluate(text, log, require_ten=True):
     return bool(ok)
 
 
+# [LOCAL-888] A sentence that credits Eiffel only to NEGATE it. The old pattern
+# needed "not" BEFORE design/build, so "designed not by Eiffel but by Alfred
+# Foulhoux" (the correct statement) was reported as crediting Eiffel.
+_EIFFEL_CORRECTION_RE = (
+    r"mistaken|wrongly|myth|legend|rumou?r|misattribut\w*|"
+    r"not .*(design|build)|"
+    r"not\s+(?:by|the\s+work\s+of|from|designed\s+by|built\s+by)\s+(?:\w+\s+)?eiffel|"
+    r"eiffel[^.]{0,40}\b(?:did\s+not|didn't|never|was\s+not|wasn't)\b|"
+    r"\b(?:rather\s+than|instead\s+of|and\s+not|but\s+by|but\s+rather)\b|"
+    r"often (?:attribut|credit)|contrary|attributed to|actually|popular(?:ly)?\s+(?:belief|believed)")
+
+
 def _criteria(text, log, require_ten=True):
     """Return [(label, passed), ...] for every PASS criterion. ``require_ten``
     toggles the 10-stop count check (off for trimmed selfcheck samples)."""
@@ -356,9 +368,7 @@ def _criteria(text, log, require_ten=True):
                 continue
             if not re.search(r"design|built|architect|engineer", _sl):
                 continue
-            _corrected = bool(re.search(
-                r"mistaken|wrongly|myth|not .*(design|build)|often (attribut|credit)|"
-                r"contrary|attributed to|actually", _sl))
+            _corrected = bool(re.search(_EIFFEL_CORRECTION_RE, _sl))
             _earlier = bool(re.search(
                 r"earlier|former|previous|original|replaced|preceding|stood before|"
                 r"18[56]\d", _sl))
@@ -622,7 +632,13 @@ def snapshot_main(snap_dir):
     print(f"[LOCAL-886] ledger spent_so_far={spent} of cap ${hard_cap:.2f}", flush=True)
     if spent + audit_reserve + 0.10 > hard_cap:
         sys.exit("refusing: not enough ledger headroom for one more run (unproven, hand to LEAD)")
-    os.environ.setdefault("PAID_API_LOG", os.path.join(_METER_DIR, "paid_api_calls.jsonl"))
+    # [LOCAL-888] sitecustomize may already have imported paid_api_meter with the
+    # default /meterlogs path; export the harness log AND re-point the live module,
+    # or the run is metered into the void and recorded as $0.
+    import meter_guard
+    _log_path = os.environ.get("PAID_API_LOG") or os.path.join(_METER_DIR, "paid_api_calls.jsonl")
+    _repointed = meter_guard.repoint_meter_log(_log_path)
+    print(f"[LOCAL-888] meter log {_log_path} (live meter re-pointed={_repointed})", flush=True)
 
     _apply_live_env()
     os.environ["DB_PORT"] = _SNAP_PORT
@@ -636,7 +652,9 @@ def snapshot_main(snap_dir):
     sys.modules.setdefault("run_cloud_parity_proof", sys.modules[__name__])
     import run_cloud_parity_proof_884 as h884
     meter_before = _meter_total()
+    rows_before = meter_guard.count_rows(_log_path)
     rc, run_usd = 1, 0.0
+    warm_log, audit_ran = "", False
     try:
         warm_cap = meter_before + (hard_cap - spent - audit_reserve)
         warm_text, warm_log = phase("warm", warm_cap)
@@ -647,6 +665,7 @@ def snapshot_main(snap_dir):
               flush=True)
         ev = h884._build_evidence_by_stop()
         audit, audit_ok = h884.independent_audit(warm_text, ev)
+        audit_ran = True
         audit["used_cloud_snapshot"] = True
         with open(os.path.join(_ART_DIR, "saigon_warm_audit.json"), "w", encoding="utf-8") as f:
             json.dump(audit, f, ensure_ascii=False, indent=2)
@@ -657,7 +676,15 @@ def snapshot_main(snap_dir):
         rc = 0 if (warm_ok and audit_ok) else 1
     finally:
         run_usd = max(0.0, _meter_total() - meter_before)
-        task_budget.record_run(_SNAP_BUDGET_ID, run_usd, note="snapshot warm run + audit")
+        rows_run = meter_guard.count_rows(_log_path) - rows_before
+        verdict = meter_guard.check_meter(rows_run, run_usd, warm_log, audit_ran)
+        if not verdict["ok"]:
+            print("\n" + "!" * 78 + "\n" + verdict["message"] + "\n" + "!" * 78, flush=True)
+            rc = 3                      # a mis-metered run never reports success
+        run_usd = verdict["record_usd"]
+        task_budget.record_run(_SNAP_BUDGET_ID, run_usd, note="snapshot warm run + audit"
+                               + ("" if verdict["ok"] else " (ESTIMATE: meter undercount)"))
+        print(f"\n[LOCAL-888] meter rows this run: {rows_run}; {verdict['message']}", flush=True)
         print(f"\n[LOCAL-886] run metered ${run_usd:.4f}; ledger now "
               f"${task_budget.spent_so_far(_SNAP_BUDGET_ID)} of ${hard_cap:.2f}", flush=True)
     return rc

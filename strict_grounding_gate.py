@@ -666,6 +666,90 @@ def _replace_block_body(tour_text: str, stop_num: int, new_sentences: List[str]
     return "\n".join(lines[:hdr_idx] + new_block + lines[end_idx:])
 
 
+
+# [LOCAL-888] Minimum sentences for a stop with no evidence: the disclosure plus
+# non-factual sensory sentences. Nothing here states a date, a name or an event.
+MIN_NO_EVIDENCE_SENTENCES = int(os.environ.get("GROUNDING_MIN_NO_EVIDENCE_SENTENCES", "4"))
+_SENSORY_TEMPLATES = (
+    "Take a moment at {t} and look around you at the street, the people and the "
+    "pace of the place.",
+    "Listen for the sounds that belong to this spot, and notice how the light "
+    "falls across the buildings and the pavement.",
+    "Stay a while if you can, and let the atmosphere here tell you what the "
+    "records do not.",
+    "Watch how people move through this part of the city, and notice what they "
+    "stop to look at.",
+)
+
+
+def sensory_body(title: str, kept: List[str], target: int) -> List[str]:
+    """Pad ``kept`` with non-factual sensory sentences until it holds ``target``
+    content sentences. The disclosure (if present) stays last. Pure, free."""
+    out = list(kept)
+    disc = [s for s in out if _fold(NO_HISTORY_DISCLOSURE)[:30] in _fold(s)]
+    base = [s for s in out if s not in disc]
+    i = 0
+    while len(base) + len(disc) < target and i < len(_SENSORY_TEMPLATES):
+        cand = _SENSORY_TEMPLATES[i].format(t=title)
+        i += 1
+        if not any(_fold(cand)[:30] == _fold(b)[:30] for b in base):
+            base.append(cand)
+    return base + disc
+
+
+def _issue_score(iss: Dict) -> int:
+    return (len(iss.get("dangling") or []) + len(iss.get("bare_surname") or [])
+            + (1 if iss.get("missing_event") else 0))
+
+
+def _coherence_pass(title, sents, evidence, location, *, classify_fn, narrate_fn,
+                    model, log):
+    """[LOCAL-888] Returns (new_sentences|None, report). One re-narration from the
+    KEPT sentences + evidence, gated once more, accepted only when it has fewer
+    coherence defects and is not shorter than 4 sentences (or the original). Any
+    defect left over is repaired deterministically: the evidence's own dated event
+    sentence is inserted; a still-dangling opener is dropped if >= 4 remain."""
+    import stop_coherence as sc
+    rep = {"issues_before": 0, "issues_after": 0, "renarrated": False,
+           "event_inserted": False, "dropped_dangling": 0, "cost_usd": 0.0}
+    iss = sc.coherence_issues(sents, title, location, evidence)
+    rep["issues_before"] = _issue_score(iss)
+    if not sc.has_issues(iss):
+        return None, rep
+    cur = list(sents)
+    out, r = sc.renarrate_from_kept(title, cur, evidence, location, issues=iss,
+                                    narrate_fn=narrate_fn, log=log)
+    rep["cost_usd"] += r.get("cost_usd", 0.0)
+    if out:
+        reg, rg = apply_grounding_gate(title, " ".join(out), evidence,
+                                       classify_fn=classify_fn, model=model, log=log)
+        rep["cost_usd"] += rg.get("cost_usd", 0.0)
+        cand = _content_sentences(reg)
+        ciss = sc.coherence_issues(cand, title, location, evidence)
+        if (_issue_score(ciss) < _issue_score(iss)
+                and len(cand) >= min(4, max(len(cur), 1)) and len(cand) >= 1):
+            cur, iss = cand, ciss
+            rep["renarrated"] = True
+    ev_missing = iss.get("missing_event")
+    if ev_missing:
+        cur = sc.insert_event_sentence(cur, ev_missing)
+        rep["event_inserted"] = True
+    # still-dangling openers: drop them only when the stop keeps >= 4 sentences
+    dang = sorted({i for i, _k, _f in sc.dangling_reference_issues(cur, title, location)},
+                  reverse=True)
+    for i in dang:
+        if len(cur) - 1 >= 4:
+            cur.pop(i)
+            rep["dropped_dangling"] += 1
+    rep["issues_after"] = _issue_score(sc.coherence_issues(cur, title, location, evidence))
+    if log:
+        log(f"  [LOCAL-888] coherence {title[:40]}: issues {rep['issues_before']} -> "
+            f"{rep['issues_after']} (renarrated={rep['renarrated']}, "
+            f"event_inserted={rep['event_inserted']}, "
+            f"dropped_dangling={rep['dropped_dangling']})")
+    return cur, rep
+
+
 # ── the tour-level gate ───────────────────────────────────────────────────────
 def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                      *, location: str = "",
@@ -674,8 +758,16 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                      facts_by_title: Optional[Dict] = None,
                      model: str = GROUNDING_MODEL,
                      max_cost_usd: Optional[float] = None,
+                     coherence: bool = False,
+                     narrate_fn: Optional[Callable] = None,
                      log: Optional[Callable] = None) -> Tuple[str, Dict]:
     """Run the strict grounding gate over every 'Stop N:' block.
+
+    [LOCAL-888] The shortfall rebuild is fed the stop's EVIDENCE sentences when it
+    has no thin-fact list (it used to receive an empty list and silently do
+    nothing), and ``coherence=True`` adds the post-gate coherence pass: dangling
+    openers / bare surnames / a missing dated defining event trigger ONE
+    re-narration from the kept sentences + evidence, gated once more.
 
     ``evidence_by_title`` maps a stop title (as it appears in the header, or a
     foldable variant) to that stop's joined evidence text (article + 873 facts +
@@ -729,7 +821,18 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
         rebuilt_ok = False
         if (after < MIN_CONTENT_SENTENCES and rebuild_fn is not None
                 and (max_cost_usd is None or rep["cost_usd"] < max_cost_usd)):
-            facts = _lookup(norm_facts, title) or []
+            facts = list(_lookup(norm_facts, title) or [])
+            # [LOCAL-888] 873C did not run because most stops have NO thin-fact
+            # list (their evidence is an article / snippets): the rebuild got [].
+            # Feed it the evidence's own fact sentences.
+            if len(facts) < 6 and not _evidence_is_thin(ev or ""):
+                try:
+                    from stop_coherence import evidence_fact_sentences
+                    for _fs in evidence_fact_sentences(ev or "", limit=14):
+                        if _fs not in facts:
+                            facts.append(_fs)
+                except Exception:
+                    pass
             try:
                 rebuilt_sents = rebuild_fn(title, facts) or []
             except Exception:
@@ -748,6 +851,27 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                     rebuilt_ok = True
                     after = rgrep.get("sentences_after", 0)
 
+        # [LOCAL-888] COHERENCE after drops: the kept sentences must read as prose.
+        if (coherence and not grep.get("no_evidence")
+                and not _evidence_is_thin(ev or "")
+                and (max_cost_usd is None or rep["cost_usd"] < max_cost_usd)):
+            try:
+                _cur_block = _block_for(new_text, stop_num)
+                _cur = _content_sentences(_block_body_prose(_cur_block or ""))
+                _new, _crep = _coherence_pass(
+                    title, _cur, ev or "", location, classify_fn=classify_fn,
+                    narrate_fn=narrate_fn, model=model, log=log)
+                rep["cost_usd"] += _crep.get("cost_usd", 0.0)
+                if _new is not None and _new != _cur:
+                    new_text = _replace_block_body(new_text, stop_num, _new)
+                    rep["coherence_fixed"] = rep.get("coherence_fixed", 0) + 1
+                rep.setdefault("coherence", []).append(
+                    {"stop": stop_num, "title": title, **{
+                        k: v for k, v in _crep.items() if k != "cost_usd"}})
+            except Exception as _e:
+                if log:
+                    log(f"  [LOCAL-888] coherence pass skipped (non-fatal): {_e}")
+
         # [LOCAL-884 §1] A stop with NO evidence whose factual sentences were all
         # dropped, and which the evidence-only rebuild could not refill (there was
         # no evidence to rebuild from), must NOT be left with a bare or empty
@@ -761,6 +885,9 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
             disclosure = NO_HISTORY_DISCLOSURE
             if not any(_fold(disclosure)[:30] in _fold(s) for s in kept_sents):
                 kept_sents = kept_sents + [disclosure]
+            # [LOCAL-888] a no-evidence stop is not left a 2-sentence fragment: pad
+            # with NON-FACTUAL sensory sentences (no date, name or claim) up to 4.
+            kept_sents = sensory_body(title, kept_sents, MIN_NO_EVIDENCE_SENTENCES)
             new_text = _replace_block_body(new_text, stop_num, kept_sents)
             rep["no_history_stops"] += 1
             if log:
