@@ -128,7 +128,8 @@ _EVENT_FUNCTION_CUE_RE = re.compile(
     r"designed|commissioned|inaugurated|renovat\w+|restored|destroyed|"
     r"demolished|rebuilt|named after|named for|dedicated|consecrated|"
     r"serves? as|served as|housed?|houses|used as|became|functioned|"
-    r"war|battle|siege|coup|revolution|independence|surrender|liberation|"
+    r"wars?|battles?|sieges?|coups?|revolutions?|independence|surrender|liberation|"  # [LOCAL-887] plurals
+    r"invad\w+|invasions?|defeat\w*|victor(?:y|ies)|"
     r"assassinat\w+|proclamation|declaration|signed|capital|headquarters|"
     r"dynasty|colonial|reign|reunification)\b")
 _RECORD_CUE_RE = re.compile(

@@ -274,3 +274,10 @@ class EponymCoverage(unittest.TestCase):
         self.assertTrue(lwe.title_covers_name("Saigon Opera House", "Saigon Opera House"))
         self.assertTrue(lwe.title_covers_name("Longshan Temple", "艋舺龍山寺"))
         self.assertTrue(lwe.title_covers_name("Bạch Đằng Pier", "Bến Bạch Đằng"))
+
+
+class PluralEventCue(unittest.TestCase):
+    def test_battles_sentence_is_factual(self):
+        self.assertTrue(g.is_factual_sentence(
+            "The name Bạch Đằng recalls the historic Bạch Đằng River, famous for legendary "
+            "battles where Vietnamese forces defeated invaders."))
