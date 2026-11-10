@@ -475,7 +475,8 @@ def _second_look(title, factual_sentences, verdicts, evidence, *, classify_fn,
 def apply_grounding_gate(title: str, body_prose: str, evidence: str,
                          *, classify_fn: Optional[Callable] = None,
                          model: str = GROUNDING_MODEL,
-                         log: Optional[Callable] = None
+                         log: Optional[Callable] = None,
+                         deny_check: bool = True
                          ) -> Tuple[str, Dict]:
     """Ground ONE stop's body prose against its evidence. Returns (new_prose,
     report). report carries kept/contradicted/unsupported/labelled counts, the
@@ -558,6 +559,36 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
             continue
         one_based = factual_idx.index(i) + 1
         v = verdicts.get(one_based)
+        # [LOCAL-889] a claim an earlier pass REMOVED stays removed, and a sentence
+        # the evidence cannot state mechanically (a year it never gives, a range with
+        # no sentence for both ends, a departure on a resignation date) is UNSUPPORTED
+        # even when the judge said SUPPORTED. Both are logged with their reason.
+        _hit, _why = None, None
+        try:
+            import key_fact_coverage as _kfc
+            if v is not None and v["verdict"] in ("CONTRADICTED", "UNSUPPORTED") \
+                    and not v.get("legend"):
+                raise LookupError("the judge already drops it")
+            _hit = _kfc.is_denied(title, s) if deny_check else None
+            _why = None if _hit else _kfc.deterministic_unsupported(s, evidence)
+        except Exception:
+            pass
+        if _hit or _why:
+            rep["labelled"] += 1
+            rep["unsupported"] += 1
+            rep["dropped"].append((
+                "UNSUPPORTED(removed-earlier)" if _hit else f"UNSUPPORTED({_why})", s[:80]))
+            if _why:
+                try:
+                    _kfc.deny_record(title, s, "gate:deterministic")
+                except Exception:
+                    pass
+                if log:
+                    log(f"      [LOCAL-889] deterministic UNSUPPORTED in '{title[:40]}': {_why}: {s[:90]}")
+            if _hit and log:
+                log(f"      [LOCAL-889] removed claim came back in '{title[:40]}' -> dropped again; "
+                    f"evidence line backing it: {_kfc.support_source(s, evidence, title) or '(none)'}")
+            continue
         if v is None:
             out.append(s)                 # unjudged (LLM silent): keep
             rep["kept"] += 1
@@ -570,6 +601,11 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
         elif verdict == "CONTRADICTED":
             rep["contradicted"] += 1
             rep["dropped"].append(("CONTRADICTED", s[:80]))
+            try:
+                import key_fact_coverage as _kfc
+                _kfc.deny_record(title, s, "gate:CONTRADICTED")
+            except Exception:
+                pass
         else:  # UNSUPPORTED
             if v.get("legend"):
                 out.append(_disclose_legend(s))
@@ -578,6 +614,11 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
             else:
                 rep["unsupported"] += 1
                 rep["dropped"].append(("UNSUPPORTED", s[:80]))
+                try:
+                    import key_fact_coverage as _kfc
+                    _kfc.deny_record(title, s, "gate:UNSUPPORTED")
+                except Exception:
+                    pass
 
     new_prose = " ".join(out).strip()
     rep["sentences_after"] = len(_content_sentences(new_prose))
