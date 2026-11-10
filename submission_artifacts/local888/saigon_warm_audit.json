@@ -1,0 +1,48 @@
+{
+  "unsupported": [
+    {
+      "stop": "Cathedral",
+      "claim": "Its neo-Romanesque style is most visible in the twin towers that rise symmetrically above the square, crafted from bricks imported from France.",
+      "why": "The evidence confirms the neo-Romanesque style and twin towers, but does not state or imply that the towers were crafted from bricks imported from France."
+    },
+    {
+      "stop": "Cathedral",
+      "claim": "The square itself, now known as Paris Commune Square, has changed names and identities alongside Saigon’s evolving history.",
+      "why": "The evidence lists the square's name changes but does not explicitly state that these changes were 'alongside Saigon’s evolving history.'"
+    },
+    {
+      "stop": "Cathedral",
+      "claim": "It once held a bronze statue of Pierre Pigneau de Béhaine, a French Catholic priest who supported the young Prince Nguyễn Phúc Cảnh during the late 18th century.",
+      "why": "The evidence confirms the statue and the priest's name, but does not state that Pierre Pigneau de Béhaine supported Prince Nguyễn Phúc Cảnh during the late 18th century."
+    }
+  ],
+  "_model": "gpt-4.1",
+  "_usage": {
+    "prompt_tokens": 19219,
+    "completion_tokens": 263,
+    "total_tokens": 19482,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "evidence_chars": {
+    "Book Street": 1632,
+    "Thi Bar": 1413,
+    "Independence Palace": 4216,
+    "Post Office": 6109,
+    "Cathedral": 9744,
+    "War Remnants Museum": 5033,
+    "Opera House": 11596,
+    "Café Apartments 42": 299,
+    "City Hall": 11799,
+    "Bạch Đằng Pier": 10410
+  },
+  "used_cloud_snapshot": true
+}
