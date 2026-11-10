@@ -42,6 +42,11 @@ def snippets_as_evidence_texts(snippets) -> List[str]:
     """Flatten the per-stop direct snippets (dicts with title/snippet, or plain
     strings) into evidence strings. Pure; never raises."""
     out: List[str] = []
+    try:
+        import llm_evidence as _le892
+        snippets = _le892.filter_records(snippets)      # [LOCAL-892] an LLM's output is never evidence
+    except Exception:
+        pass
     for s in snippets or []:
         try:
             if isinstance(s, dict):

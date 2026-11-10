@@ -751,6 +751,26 @@ def snapshot_main(snap_dir):
                 json.dump(_bundle, f, ensure_ascii=False, indent=1)
         except Exception as _be:
             print(f"   [LOCAL-891] could not persist the evidence bundle: {_be}", flush=True)
+        # [LOCAL-892] LLM-sourced snippets the stops held (leads, never evidence) and the count of shipped
+        # sentences whose ONLY support is one of them (must be 0 per stop).
+        try:
+            import aboutness as _ab892
+            _leads = h884.llm_leads_by_stop()
+            _only = _ab892.llm_only_supported(warm_text, ev, _leads)
+            print("\n=== [LOCAL-892] shipped sentences supported ONLY by an LLM-sourced item (per stop) ===",
+                  flush=True)
+            for _t in _only:
+                print(f"   {_t[:40]:40} llm_leads={len(_leads.get(_t, [])):2d}  llm_only_supported={len(_only[_t])}",
+                      flush=True)
+                for _x in _only[_t]:
+                    print(f"        !! {_x[:140]}", flush=True)
+            with open(os.path.join(_ART_DIR, "saigon_warm_llm_only_support.json"), "w", encoding="utf-8") as f:
+                json.dump({"llm_leads_excluded_from_evidence": _leads,
+                           "llm_only_supported": _only,
+                           "count_per_stop": {k: len(v) for k, v in _only.items()},
+                           "total": sum(len(v) for v in _only.values())}, f, ensure_ascii=False, indent=1)
+        except Exception as _le:
+            print(f"   [LOCAL-892] llm-only-support report failed: {_le}", flush=True)
         _e888 = evaluate_888(warm_text, audit.get("evidence_chars") or {})
         _e889 = evaluate_889(warm_text, ev)
         uns = audit.get("unsupported")

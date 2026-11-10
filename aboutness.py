@@ -96,11 +96,50 @@ def split_sentences(text: str) -> List[str]:
 
 
 # ═════════════════════ the stop's referent ═════════════════════
+# [LOCAL-892 / D769] The place words that carry no weight as a stop's NAME are the TOUR'S OWN location
+# tokens ("Ho Chi Minh City, Vietnam" -> ho/chi/minh/city/vietnam), set by the pipeline for the tour
+# being generated. No city is hard-coded here. "city" stays as the one generic place noun.
+_GENERIC_PLACE = frozenset(("city",))
+_LOCATION_TOKS: frozenset = frozenset()
+
+
+def location_tokens(location: str) -> frozenset:
+    return frozenset(w for w in re.findall(r"[^\W_]+", _fold(location or "")) if len(w) >= 3
+                     and w not in _GENERIC)
+
+
+def regional_tokens(evidence_by_title: Dict[str, str], min_share: float = 0.6, min_stops: int = 3) -> frozenset:
+    """Proper nouns that run through most of the TOUR's own evidence (\"Saigon\" in a tour of Ho Chi Minh City
+    articles): the city/region names the evidence uses for the tour's location. Derived from the tour, not
+    hard-coded. Needs >= ``min_stops`` stops; a token must be capitalised wherever it is counted."""
+    blobs = [e for e in (evidence_by_title or {}).values() if e and len(e) > 200]
+    if len(blobs) < min_stops:
+        return frozenset()
+    cnt: Dict[str, int] = {}
+    for e in blobs:
+        seen = {_fold(w) for w in re.findall(r"(?<![.!?]\s)\b[A-ZÀ-ỸĐ][^\W\d_]{3,}\b", e)}
+        for w in seen:
+            cnt[w] = cnt.get(w, 0) + 1
+    return frozenset(w for w, n in cnt.items()
+                     if n >= min_share * len(blobs) and w not in KIND and w not in _STOPW)
+
+
+def set_location(location: str, evidence_by_title: Optional[Dict[str, str]] = None) -> frozenset:
+    """Set the tour's location tokens (process-wide; one tour is generated at a time per process): the
+    tokens of its location string plus the regional proper nouns its own evidence runs on."""
+    global _LOCATION_TOKS
+    toks = set(location_tokens(location))
+    if evidence_by_title:
+        toks |= set(regional_tokens(evidence_by_title))
+    _LOCATION_TOKS = frozenset(toks)
+    return _LOCATION_TOKS
+
+
 class Referent:
     """How the evidence can name the stop: distinctive name tokens, aliases, kind nouns."""
 
     def __init__(self, title: str, aliases: Sequence[str] = (), art_title: str = "",
-                 art_lead: str = ""):
+                 art_lead: str = "", location: Optional[str] = None):
         names = [title] + list(aliases or [])
         self.title = title
         # a street number in the name ("Cafe Apartments 42"): "the building at 42 Nguyen Hue" names the stop
@@ -140,7 +179,13 @@ class Referent:
         self.count_kinds = (set() if self.name_toks else
                             {k for k in self.kinds if k not in _GENERIC_KIND})
         # a single-token name that is only a generic place word, e.g. "city": no distinctive token
-        self.name_toks -= {"city", "saigon"} if len(self.name_toks) > 1 else set()
+        # (D769) drop the tour's own location tokens and the generic place noun, keeping at least one
+        # distinctive token: a stop called "Saigon Opera House" in a Saigon tour is named by "opera".
+        loc = location_tokens(location) if location is not None else _LOCATION_TOKS
+        drop_toks = {_stem(t) for t in loc} | set(_GENERIC_PLACE) | set(loc)
+        if len(self.name_toks) > 1:
+            kept = self.name_toks - drop_toks
+            self.name_toks = kept if kept else self.name_toks - set(_GENERIC_PLACE)
 
     def mentions(self, text: str) -> int:
         """Count of times ``text`` names the stop."""
@@ -182,6 +227,14 @@ def lead_aliases(lead: str) -> List[str]:
 
 
 # ═════════════════════ evidence items ═════════════════════
+def _scrub_llm(ev: str) -> str:
+    try:
+        import llm_evidence as _le
+        return _le.scrub(ev)
+    except Exception:
+        return ev
+
+
 def _split_item_text(text: str) -> List[str]:
     """Paragraph-sized pieces <= ITEM_MAX, split on sentence boundaries."""
     out = []
@@ -283,7 +336,7 @@ def build_items(evidence: str, title: str, aliases: Sequence[str] = (),
     ``geo`` maps an article title (folded) or a snippet prefix to its distance in metres from the
     stop's pin, when the caller knows it."""
     import key_fact_coverage as kfc
-    ev = evidence or ""
+    ev = _scrub_llm(evidence or "")          # [LOCAL-892] an LLM's output is never evidence
     own = None
     try:
         own = kfc.own_article(ev, title)
@@ -610,6 +663,58 @@ def tangent_reason(sentence: str, ref: Referent, own_sentences: Sequence[str] = 
     return f"subject '{subj[:50]}' is neither the stop nor one of its parts, people or events"
 
 
+# ═════════════════════ [LOCAL-892] an unanchored person is a tangent ═════════════════════
+_ROLE = frozenset((
+    "colonel general captain lieutenant sergeant major admiral commander officer soldier veteran pilot "
+    "president premier minister ambassador governor mayor chairman director curator founder owner chef "
+    "emperor king queen prince princess duke bishop archbishop cardinal pope priest father monk nun "
+    "missionary architect engineer sculptor painter artist designer builder contractor photographer "
+    "journalist reporter writer author poet novelist scholar historian anthropologist professor doctor "
+    "physician surgeon nurse lawyer judge general secretary diplomat merchant trader explorer sailor "
+    "navigator inventor scientist physicist curator guide survivor witness prisoner activist leader").split())
+_SPEECH = (r"expressed|said|says|stated|states|wrote|writes|recalled|recalls|remarked|declared|described|"
+           r"told|admitted|reported|noted|felt|saw|witnessed|reacted|exclaimed|insisted|confessed|"
+           r"wondered|marvelled|marveled|lamented|reflected|observed|commented|argued|claimed|swore|vowed")
+_PERSON_SUBJ = re.compile(
+    r"(?:^|[,;:]\s+|\bthat\s+)((?:[A-ZÀ-ỸĐ][\wÀ-ÿ'’-]+)(?:\s+(?:[A-ZÀ-ỸĐ][\wÀ-ÿ'’-]+)){0,2})\s+(" + _SPEECH + r")\b")
+
+
+def _role_near(text: str, name: str) -> bool:
+    """A role noun within a short window of ``name`` in ``text`` (\"Colonel William Wilson\", \"Wilson, a
+    combat veteran,\", \"the architect Foulhoux\")."""
+    f, n = _fold(text), _fold(name)
+    for m in re.finditer(r"\b" + re.escape(n.split()[-1]) + r"\b", f):
+        win = f[max(0, m.start() - 40): m.end() + 70]
+        if any(w in _ROLE for w in re.findall(r"[^\W_]+", win)):
+            return True
+    return False
+
+
+def unanchored_person(sentence: str, ref: Optional[Referent], items: Sequence[Dict]) -> Optional[str]:
+    """A sentence whose subject is a named person doing a speaking/feeling verb ("William Wilson expressed
+    disbelief") when NEITHER the sentence NOR the stop's own text/evidence gives that person a role: the
+    listener is handed a stranger. Returns the reason, or None (not a person subject, or a role is stated).
+    Drop the sentence or add the role from the evidence (the caller drops)."""
+    m = _PERSON_SUBJ.search(sentence or "")
+    if not m:
+        return None
+    name = m.group(1).strip()
+    first = _fold(name.split()[0])
+    if first in _ART_WORDS or first in _STARTERS or (ref is not None and ref.mentions(name)):
+        return None
+    if any(_fold(w) in KIND for w in name.split()):
+        return None                              # "The Museum said ..." / an institution
+    if _role_near(sentence, name):
+        return None
+    pre = sentence[:m.start(1)]
+    if re.search(r"(?i)\b(?:" + "|".join(sorted(_ROLE)) + r")\s*$", pre.strip()):
+        return None
+    for it in items or []:
+        if it.get("about_stop") and _role_near(it.get("text", ""), name):
+            return None
+    return f"person '{name}' has no role in the stop's own text or evidence"
+
+
 _REL = {
     "host": re.compile(r"(?i)\b(?:venue|home\s+to|hosted?|hosting|holding|held|housed?|seat\s+of|meeting|"
                        r"assembly|met\s+(?:here|at))\b"),
@@ -733,6 +838,7 @@ def clean_stop(title: str, sentences: List[str], evidence: str, *, items: Option
     if not ENABLED:
         return list(sentences), rep
     import key_fact_coverage as kfc
+    evidence = _scrub_llm(evidence)          # [LOCAL-892]
     own = None
     try:
         own = kfc.own_article(evidence, title)
@@ -783,6 +889,10 @@ def clean_stop(title: str, sentences: List[str], evidence: str, *, items: Option
                 why = None                 # the stop's own text carries it: not a tangent
             if why:
                 drop(i, "tangent", why)
+    for i in range(len(cur) - 1, -1, -1):          # [LOCAL-892] a person with no stated role is a tangent
+        why = unanchored_person(cur[i], ref, about_items)
+        if why:
+            drop(i, "tangent", why)
     for d, k, why in sorted(near_repeats(cur, ref), key=lambda x: -x[0]):
         if d < len(cur):
             drop(d, "repeat", why + f" (kept: \"{cur[min(k, len(cur) - 1)][:60]}\")")
@@ -924,6 +1034,45 @@ def audit_tour(tour_text: str, evidence_by_title: Dict[str, str], *,
                        other_place_used=used)
             if r.get("other_place"):
                 used += 1
+            if r["ok"]:
+                _up = unanchored_person(s, ref, items)
+                if _up:
+                    r = {"ok": False, "why": _up, "source": None}
             if not r["ok"]:
                 out["offtopic"].append({"stop": title, "claim": s, "why": r["why"], "source": r["source"]})
+    return out
+
+
+def llm_only_supported(tour_text: str, evidence_by_title: Dict[str, str],
+                       llm_by_title: Dict[str, Sequence[str]], *, thr: float = 0.5) -> Dict[str, List[str]]:
+    """[LOCAL-892] Shipped factual sentences whose ONLY support is an LLM-sourced passage: the sentence is
+    carried (coverage >= ``thr``) by a passage in ``llm_by_title`` and by NO item of the stop's real
+    evidence. Returns {stop: [sentence, ...]}; the live criterion is that every list is empty."""
+    import strict_grounding_gate as sgg
+    out: Dict[str, List[str]] = {}
+    norm_llm = {sgg._fold(k): v for k, v in (llm_by_title or {}).items()}
+    norm_ev = {sgg._fold(k): v for k, v in (evidence_by_title or {}).items()}
+    for num, title, _b in sgg._split_blocks(tour_text or ""):
+        blk = sgg._block_for(tour_text, num)
+        out[title] = []
+        if blk is None:
+            continue
+        leads = sgg._lookup(norm_llm, title) or []
+        ev = sgg._lookup(norm_ev, title) or ""
+        try:
+            import llm_evidence as _le
+            ev = _le.scrub(ev, extra=leads)            # the leads are exactly what must not count
+        except Exception:
+            pass
+        its = build_items(ev, title) if ev.strip() else []
+        for s in sgg._content_sentences(sgg._block_body_prose(blk)):
+            if not (sgg.is_factual_sentence(s) or is_claim(s)) or _is_navigation(s):
+                continue
+            st = _distinct_toks(s)
+            if len(st) < 2:
+                continue
+            in_llm = max((_coverage(st, p) for p in leads), default=0.0)
+            in_ev = max((_coverage(st, it["text"]) for it in its), default=0.0)
+            if in_llm >= thr and in_ev < thr:
+                out[title].append(s)
     return out

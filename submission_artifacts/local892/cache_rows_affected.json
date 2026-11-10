@@ -1,0 +1,30 @@
+{
+ "snapshot": "cloud_work_story_research_cache_20261109.csv.gz",
+ "rows": 26,
+ "rows_with_passages": 16,
+ "rows_evidence": 14,
+ "rows_nonevidence_on_read": 2,
+ "passages_total": 104,
+ "passages_nonevidence": 3,
+ "detail": [
+  {
+   "cache_key": "k:9ce24913611615314b15586c:v1",
+   "title": "Composition 10 in Black and White (Compositie 10 in zwart wit)",
+   "passages": 2,
+   "reason": "no QID: only the LLM fallback can fill it"
+  },
+  {
+   "cache_key": "qid:Q1115514:v1",
+   "title": "The Story of Lucretia",
+   "passages": 1,
+   "reason": "< MIN_PASSAGES (2): serper fallback fired, may be mixed"
+  }
+ ],
+ "venue_works_cache": {
+  "rows": 27,
+  "sources": [
+   "sparql"
+  ],
+  "llm_rows": 0
+ }
+}

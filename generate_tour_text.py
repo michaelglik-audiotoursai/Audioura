@@ -24217,7 +24217,8 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     _ts_sn = (_J._DIRECT_SNIPPETS_PER_STOP.get(poi_name, [])
                               or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{idx}__", [])) \
                              if _J._DIRECT_SNIPPETS_PER_STOP else []
-                    for _s in _ts_sn:
+                    import llm_evidence as _le892e
+                    for _s in _le892e.filter_records(_ts_sn):       # [LOCAL-892] LLM facts are not "sourced"
                         if isinstance(_s, dict):
                             _ts_existing.append(f"{_s.get('title','')} {_s.get('snippet','')}")
                         else:
@@ -24226,6 +24227,8 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     pass
                 try:
                     for _lf in (poi.get('_lore') or []):
+                        if not _le892e.lore_is_evidence(_lf):       # [LOCAL-892]
+                            continue
                         _ts_existing.append(_lf.get('fact', '') if isinstance(_lf, dict) else str(_lf))
                 except Exception:
                     pass
@@ -24342,8 +24345,11 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 _own_ev = "\n".join(p for p in _own_ev_parts if p and p.strip())
                 # 873 page facts, normalised to {text,url} for the provenance test.
                 _page_facts = []
+                import llm_evidence as _le892f
                 for _lf in (poi.get('_lore') or []):
                     try:
+                        if not _le892f.lore_is_evidence(_lf):       # [LOCAL-892]
+                            continue
                         if isinstance(_lf, dict):
                             _pf_txt = str(_lf.get('text') or _lf.get('fact')
                                           or _lf.get('snippet') or '')
@@ -25418,7 +25424,16 @@ satisfy this requirement. Your text will be REJECTED if "{_414_artist_surname}" 
                             # Additive and bounded: on any failure the key is left
                             # as whatever it was, and an empty list is a no-op gate
                             # side (judged exactly as before).
-                            poi['_wsr_passages'] = _wsr_passages
+                            # [LOCAL-892] only the verbatim-Wikipedia passages are evidence; passages
+                            # an LLM extractor wrote (serper fallback / legacy cache rows) stay narrator
+                            # leads and are registered so no gate or audit reads them as support.
+                            try:
+                                import llm_evidence as _le892h
+                                _le892h.register(_wsr.get('llm_passages') or [])
+                                poi['_wsr_passages'] = [p_ for p_ in _wsr_passages
+                                                        if p_ not in set(_wsr.get('llm_passages') or [])]
+                            except Exception:
+                                poi['_wsr_passages'] = _wsr_passages
                             print(f"  [LOCAL-840] Stop {stop_num} work research: "
                                   f"{len(_wsr_passages)} passage(s) "
                                   f"(source={_wsr.get('source')}, qid={_wsr.get('qid') or '-'}, "
@@ -28218,8 +28233,9 @@ REWRITE RULES (all mandatory):
         _org_corpus = getattr(_exhibition_checklist_result, 'page_text', '') or ''
         try:
             _org_extra = []
+            import llm_evidence as _le892g
             for _osn in (_J._DIRECT_SNIPPETS_PER_STOP or {}).values():
-                for _os in (_osn or []):
+                for _os in _le892g.filter_records(_osn):            # [LOCAL-892]
                     if isinstance(_os, dict):
                         _org_extra.append(f"{_os.get('title','')} {_os.get('snippet','')}")
             for _oe in (_stop_corpus_data or {}).values():
@@ -33073,8 +33089,9 @@ RULES:
                 if _J._DIRECT_SNIPPETS_PER_STOP:
                     _sn = (_J._DIRECT_SNIPPETS_PER_STOP.get(_nm, [])
                            or _J._DIRECT_SNIPPETS_PER_STOP.get(f"__stop_{_si-1}__", []))
-                _lc_ev[_si] = [f"{x.get('title','')} {x.get('snippet','')}" for x in _sn
-                               if isinstance(x, dict)]
+                import llm_evidence as _le892c
+                _lc_ev[_si] = [f"{x.get('title','')} {x.get('snippet','')}" for x in _le892c.filter_records(_sn)
+                               if isinstance(x, dict)]      # [LOCAL-892] LLM output is never evidence
                 # The walking path's other research: the LOCAL-47 retrieval facts and
                 # the Wikipedia/historic context the narrator was given (the
                 # "[LOCAL-47] <stop>: tier=..., facts=N" log line).
@@ -33087,6 +33104,8 @@ RULES:
                         if isinstance(_cv, str) and _cv.strip():
                             _lc_ev[_si].append(_cv)
                     for _lf in (_sp.get('_lore') or []):
+                        if not _le892c.lore_is_evidence(_lf):       # [LOCAL-892]
+                            continue
                         _lc_ev[_si].append(_lf.get('fact', '') if isinstance(_lf, dict) else str(_lf))
                 except Exception:
                     pass
@@ -34005,7 +34024,10 @@ RULES:
                 _ev.append(str(_desc))
             if _p876.get('_thin_evidence'):
                 _ev.append(str(_p876.get('_thin_evidence')))
+            import llm_evidence as _le892d
             for _lf in (_p876.get('_lore') or []):
+                if not _le892d.lore_is_evidence(_lf):               # [LOCAL-892]
+                    continue
                 _ev.append(_lf.get('fact', '') if isinstance(_lf, dict) else str(_lf))
             if _ev:
                 _stop_evidence_876[_sn] = _ev
@@ -34212,7 +34234,8 @@ RULES:
         except Exception:
             pass
         _prov_pool = _SourcePool(
-            snippets_per_stop=(_J._DIRECT_SNIPPETS_PER_STOP or {}),
+            snippets_per_stop={_k: __import__('llm_evidence').filter_records(_v)
+                               for _k, _v in (_J._DIRECT_SNIPPETS_PER_STOP or {}).items()},
             grounded_supports=None,          # per-sentence grounded supports are not
                                              # retained to this point in the pipeline
             provenance_names=_prov_names,
@@ -35217,7 +35240,9 @@ RULES:
                 _ev883, _facts883 = {}, {}
             try:
                 _snip883 = dict(getattr(_J, "_DIRECT_SNIPPETS_PER_STOP", {}) or {})
+                import llm_evidence as _le892a
                 for _k, _snips in _snip883.items():
+                    _snips = _le892a.filter_records(_snips)      # [LOCAL-892] LLM output is never evidence
                     if not _snips:
                         continue
                     _texts = []
@@ -35385,7 +35410,8 @@ RULES:
                 for _sinkname in ("_DIRECT_SNIPPETS_PER_STOP",):
                     for _k, _snips in dict(getattr(_J, _sinkname, {}) or {}).items():
                         _texts = []
-                        for _s in (_snips or []):
+                        import llm_evidence as _le892b
+                        for _s in _le892b.filter_records(_snips):      # [LOCAL-892]
                             if isinstance(_s, dict):
                                 _texts.append(str(_s.get("title", "")))
                                 _texts.append(str(_s.get("snippet", "")))

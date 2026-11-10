@@ -202,6 +202,14 @@ def _source_is_real(rec: Dict[str, Any]) -> Optional[str]:
     """
     if not isinstance(rec, dict):
         return None
+    # [LOCAL-892] an LLM's output is never a source: a knowledge-fallback record carries a link of its
+    # own (or the provider name) but is the narrator's memory, so the sentence stays `parametric`.
+    try:
+        import llm_evidence as _le892
+        if not _le892.is_evidence_record(rec):
+            return None
+    except Exception:
+        pass
     for key in ('url', 'link', 'uri'):
         v = rec.get(key)
         if v and isinstance(v, str) and v.strip():

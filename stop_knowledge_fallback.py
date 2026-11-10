@@ -493,7 +493,16 @@ def facts_as_snippets(result, work):
             'link': (result.get('sources') or [''])[0] if result.get('sources') else '',
             'source': f"knowledge_fallback:{result.get('provider', '')}",
             'confidence': f.get('confidence', 'low'),
+            # [LOCAL-892] an LLM's answer is a LEAD for the narrator, never EVIDENCE: every sink that
+            # builds the gate's/audit's evidence drops records carrying this flag.
+            'llm': True,
         })
+    try:
+        import llm_evidence as _le892
+        _le892.register([s_['snippet'] for s_ in snippets], stop=work)
+        _le892.register([f"{s_['title']} {s_['snippet']}" for s_ in snippets])
+    except Exception:
+        pass
     return snippets
 
 
