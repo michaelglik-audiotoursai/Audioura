@@ -13,6 +13,12 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 43 — 2026-11-10 ~15:20 EST (wdvrdazg94) — DEPLOYED then ROLLED BACK. gen 00045-tfw + orch 00025-9tl (5adabfcd, build d24e9323, bsub51) are idle; traffic is on gen 00039-mtv / orch 00022-m9c (wave 37).
+- Failed: thin Café/Pier; City Hall "1901"; no Post Office architect; Opera House mis-pinned and empty; raw titles.
+- No false claims spotted.
+- 547 hidden; rows 440. Proof spend so far is about $2.15 over 8 runs.
+- Also on 11/09: the cloud evidence-cache snapshot was attached to wdvrdazfdh (read-only export, 8 tables).
+
 # ▶️ WAVE 42 — 2026-11-09 ~14:00 EST (wdvrdazfdh) — DEPLOYED then ROLLED BACK. gen 00044-w2d + orch 00024-tc9 (6fe0577f, build 2f3e2671, bsub50) are idle; traffic is on gen 00039-mtv / orch 00022-m9c (wave 37). Failed:
 - Eiffel credited as designer; no 30 April 1975; City Hall generic.
 - The grounding gate dropped 0 sentences (negative cache rows starve the evidence).
