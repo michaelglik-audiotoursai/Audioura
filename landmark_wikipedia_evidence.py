@@ -231,7 +231,10 @@ def _default_fetch(name: str, lang: str) -> Optional[Dict]:
         if d is None:
             return None
         for p in _pages_from(d):
-            if _name_ok(name, p["title"]) and p["langlinks"]:
+            # [LOCAL-887] the English page must cover the stop's name, not just an
+            # eponym inside it, before its langlink is followed and trusted.
+            if _name_ok(name, p["title"]) and p["langlinks"] \
+                    and title_covers_name(name, p["title"]):
                 got = _pages_from(_http_json(lang, dict(base, titles=p["langlinks"][0], **_CONTENT)))
                 if got:
                     return {"pages": got, "trusted": True}
@@ -337,6 +340,22 @@ def _shares_distinctive_token_strict(stop_name: str, title: str, city: str = "")
     a = _distinctive_name_tokens(stop_name, city)
     b = _distinctive_name_tokens(title, city)
     return bool(a and b and (a & b))
+
+
+def title_covers_name(stop_name: str, title: str, city: str = "") -> bool:
+    """[LOCAL-887] False when a page TITLE names only a FRAGMENT of the stop's name --
+    an eponym inside it: "Ho Chi Minh" (the person) for the stop "Trụ sở Ủy ban Nhân
+    dân Thành phố Hồ Chí Minh" (City Hall). The title's distinctive tokens are then a
+    strict subset covering under half of the stop's distinctive tokens. A title with no
+    Latin/distinctive tokens (a local-script title such as 艋舺龍山寺) is not judged
+    here (True). Generic: no venue or city is named."""
+    a = _distinctive_name_tokens(stop_name, city)
+    b = _distinctive_name_tokens(title, city)
+    if not a or not b:
+        return True
+    if not b < a:
+        return True
+    return len(b) * 2 >= len(a)
 
 
 def _same_canonical_identity(name_a: str, name_b: str, city: str = "") -> bool:
@@ -503,6 +522,11 @@ def _pick(name: str, raw: Optional[Dict], pin: Optional[Tuple[float, float]] = N
         if _art_coord is None and not (raw or {}).get("trusted"):
             if not _shares_distinctive_token_strict(mn, _title, city):
                 continue
+        # [LOCAL-887] a coordinate-less page whose title is only an eponym fragment of
+        # the stop name (a person's biography inside an institution's name) is a
+        # different subject: reject it, trusted langlink or not.
+        if _art_coord is None and not title_covers_name(mn, _title, city):
+            continue
         # [LOCAL-882] carry the article's own coordinate into the cached payload so
         # a later cache HIT can re-run the EXACT dense-centre distance check on
         # re-validation (the payload otherwise keeps only title/lead/infobox).
@@ -582,6 +606,10 @@ def _revalidate_payload(art: Optional[Dict[str, str]], name: str,
         if not (_shares_distinctive_token_strict(mn, title, city)
                 and _city_named(city, title, art.get("lead", ""))):
             return False
+    # [LOCAL-887] an eponym-fragment title (a person's article for an institution
+    # named after them) is never this venue -- cached rows included.
+    if art.get("coord") is None and not title_covers_name(mn, title, city):
+        return False
     return True
 
 
@@ -989,6 +1017,72 @@ def _city_of(location: str) -> str:
     return parts[0] if parts else ""
 
 
+GEO_FALLBACK_KM = float(os.environ.get("LANDMARK_WIKI_GEO_FALLBACK_KM", "0.15"))
+
+
+def _default_geosearch(pin: Tuple[float, float], lang: str,
+                       radius_km: float) -> Optional[List[Dict]]:
+    """Geotagged pages near ``pin`` on <lang>.wikipedia (free MediaWiki geosearch):
+    [{title, dist_m}], nearest first. None on transport failure."""
+    d = _http_json(lang, {"action": "query", "format": "json", "formatversion": "2",
+                          "list": "geosearch", "gscoord": f"{pin[0]}|{pin[1]}",
+                          "gsradius": str(int(max(10, radius_km * 1000))), "gslimit": "15"})
+    if d is None:
+        return None
+    return [{"title": g.get("title", ""), "dist_m": float(g.get("dist", 0) or 0)}
+            for g in ((d.get("query") or {}).get("geosearch") or [])]
+
+
+def _default_fetch_title(title: str, lang: str) -> Optional[Dict]:
+    d = _http_json(lang, {"action": "query", "format": "json", "formatversion": "2",
+                          "titles": title, "redirects": "1", **_CONTENT})
+    if d is None:
+        return None
+    return {"pages": _pages_from(d)}
+
+
+def geo_fallback_article(names: Sequence[str], lang: str, pin: Tuple[float, float],
+                         city: str = "", *, geosearch_fn: Optional[Callable] = None,
+                         fetch_title_fn: Optional[Callable] = None,
+                         radius_km: float = GEO_FALLBACK_KM) -> Optional[Dict[str, str]]:
+    """[LOCAL-887] The <lang> article AT the pin when no name search found one: the
+    nearest geotagged page within ``radius_km`` whose title shares a DISTINCTIVE
+    (non-kind, non-city) token with the stop name or one of its aliases. A local
+    edition titles a venue in the local language ("Bến Bạch Đằng" for "Bạch Đằng
+    Pier"), which an English-name search never reaches. Both gates hold: the page sits
+    at the pin AND it names the venue. Its own coordinate is then re-checked by
+    ``_pick``. Generic; never raises."""
+    if pin is None:
+        return None
+    try:
+        hits = (geosearch_fn or _default_geosearch)(pin, lang, radius_km) or []
+    except Exception:
+        return None
+    variants = [n for n in dict.fromkeys(
+        list(names) + [strip_qualifier(n) for n in names]) if n]
+    for h in sorted(hits, key=lambda x: x.get("dist_m", 1e9)):
+        t = h.get("title", "")
+        if not t or h.get("dist_m", 1e9) > radius_km * 1000:
+            continue
+        if not any(_shares_distinctive_token_strict(n, t, city) for n in variants):
+            continue
+        try:
+            raw = (fetch_title_fn or _default_fetch_title)(t, lang)
+        except Exception:
+            raw = None
+        if not raw:
+            continue
+        art = _pick(t, dict(raw, trusted=True), pin=pin, city=city, match_name=t)
+        if art is None or art.get("coord") is None:
+            continue                      # must carry its own coordinate at the pin
+        if "full_text" not in art and fetch_title_fn is None:
+            ft = fetch_full_text(art.get("title", ""), lang)
+            if ft is not None:
+                art["full_text"] = ft
+        return art
+    return None
+
+
 def strip_qualifier(name: str) -> str:
     """The name without a trailing '(...)' qualifier; '' when nothing was stripped."""
     out = re.sub(r"\s*[\(\[][^)\]]*[\)\]]\s*$", "", name or "").strip()
@@ -998,7 +1092,9 @@ def strip_qualifier(name: str) -> str:
 def evidence_for(name: str, location: str = "", langs: Optional[Sequence[str]] = None,
                  fetch_fn: Optional[Callable] = None, use_cache: bool = True,
                  extra_names: Sequence[str] = (),
-                 pin: Optional[Tuple[float, float]] = None, city: str = "") -> List[str]:
+                 pin: Optional[Tuple[float, float]] = None, city: str = "",
+                 geosearch_fn: Optional[Callable] = None,
+                 fetch_title_fn: Optional[Callable] = None) -> List[str]:
     """Evidence strings for the claim gate: per language, '<title>. <lead> Infobox: ...'.
     ``extra_names`` are alternative names to try when the stop's own title finds none
     (the user's wording, the Places name).
@@ -1035,9 +1131,29 @@ def evidence_for(name: str, location: str = "", langs: Optional[Sequence[str]] =
                                 pin=pin, city=city, match_name=base)
             if art:
                 break
+        # [LOCAL-887] no name search found an article: look AT the pin (geosearch),
+        # name-gated on the stop's own distinctive tokens. Live path only (an
+        # injected fetch_fn means an offline test that did not ask for it).
+        if not art and pin is not None and (fetch_fn is None or geosearch_fn is not None):
+            art = _geo_fallback_cached(bases, lang, pin, city, use_cache=use_cache and fetch_fn is None,
+                                       geosearch_fn=geosearch_fn, fetch_title_fn=fetch_title_fn)
         if art:
             out.append(format_item(art, lang))
     return out
+
+
+def _geo_fallback_cached(bases, lang, pin, city, *, use_cache, geosearch_fn,
+                         fetch_title_fn):
+    key = "geo:" + "|".join(bases)
+    if use_cache:
+        c = _cache_get(key, lang, pin, city=city)
+        if c is not None and c[1] is not None:
+            return c[1]
+    art = geo_fallback_article(bases, lang, pin, city, geosearch_fn=geosearch_fn,
+                               fetch_title_fn=fetch_title_fn)
+    if use_cache and art is not None:
+        _cache_put(key, lang, art, pin)
+    return art
 
 
 def format_item(art: Dict[str, str], lang: str) -> str:

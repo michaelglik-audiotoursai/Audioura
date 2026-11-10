@@ -173,3 +173,104 @@ class DepartureCue(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---- City Hall REPLAY from the recorded 887 warm state ---------------------------
+import json  # noqa: E402
+FIX = json.load(open(os.path.join(os.path.dirname(__file__), "fixtures", "local887_recorded.json"),
+                     encoding="utf-8"))
+
+
+class CityHallRecordedReplay(unittest.TestCase):
+    """Root cause: the accepted 'own article' for City Hall was the biography 'Ho Chi Minh'
+    (coordinate-less; match name 'Trụ sở Ủy ban Nhân dân Thành phố Hồ Chí Minh'), so
+    1898/1909/Gardè were never in the 16.8 KB bundle and the gate was right to say
+    UNSUPPORTED."""
+    MN = FIX["city_hall_match_name"]
+    PIN = tuple(FIX["city_hall_pin"])
+    CITY = FIX["location"]
+
+    def test_recorded_887_article_was_the_biography(self):
+        en = FIX["city_hall_887_accepted_article"]["en"]
+        self.assertEqual(en["title"], "Ho Chi Minh")
+        self.assertNotIn("1898", en["lead"] + en["full_text"])
+
+    def test_biography_rejected_by_pick(self):
+        en = FIX["city_hall_887_accepted_article"]["en"]
+        raw = {"pages": [{"title": en["title"], "lead": en["lead"], "wikitext": "",
+                          "coord": None, "qid": ""}]}
+        lwe._p625_for_qid, orig = (lambda q: None), lwe._p625_for_qid
+        try:
+            self.assertIsNone(lwe._pick(self.MN, raw, pin=self.PIN, city=self.CITY, match_name=self.MN))
+            vi = FIX["city_hall_887_accepted_article"]["vi"]
+            raw_vi = {"pages": [{"title": vi["title"], "lead": vi["lead"], "wikitext": "",
+                                 "coord": None, "qid": ""}], "trusted": True}
+            self.assertIsNone(lwe._pick(self.MN, raw_vi, pin=self.PIN, city=self.CITY, match_name=self.MN))
+        finally:
+            lwe._p625_for_qid = orig
+
+    def test_biography_cache_row_fails_revalidation(self):
+        en = FIX["city_hall_887_accepted_article"]["en"]
+        self.assertFalse(lwe._revalidate_payload(en, self.MN, pin=self.PIN, city=self.CITY))
+
+    def test_geo_fallback_finds_the_building(self):
+        pages = {}
+        for it in FIX["city_hall_fixed_items"]:
+            p = lwe.split_item(it)
+            pages[(p["title"], p["lang"])] = p
+
+        def geos(pin, lang, r):
+            return FIX["city_hall_geosearch"][lang]
+
+        def ft(title, lang):
+            p = pages.get((title, lang))
+            if not p:
+                return {"pages": []}
+            return {"pages": [{"title": title, "lead": p["lead"], "wikitext": "",
+                               "coord": self.PIN, "qid": "", "full_text": p["passages"]}]}
+        art = lwe.geo_fallback_article(["City Hall", self.MN], "en", self.PIN, self.CITY,
+                                       geosearch_fn=geos, fetch_title_fn=ft)
+        self.assertEqual(art["title"], "Ho Chi Minh City Hall")
+        art_vi = lwe.geo_fallback_article(["City Hall", self.MN], "vi", self.PIN, self.CITY,
+                                          geosearch_fn=geos, fetch_title_fn=ft)
+        self.assertIn("1898", art_vi["lead"])
+
+    def test_gate_keeps_1898_1909_garde_sentence_on_fixed_evidence(self):
+        ev = " ".join(FIX["city_hall_fixed_items"])
+        sent = ("Construction of the Hôtel de Ville began in 1898 and it opened in 1909, "
+                "directed by the architect Fernand Gardè.")
+
+        def judge(system, user, model):
+            w = user.split("EVIDENCE:\n", 1)[1].split("\n\nFACTUAL SENTENCES:", 1)[0]
+            ok = all(t in w for t in ("1898", "1909", "Gardè"))
+            return {"verdicts": [{"i": 1, "verdict": "SUPPORTED" if ok else "UNSUPPORTED"}]}, 1, 1
+        out, rep = g.apply_grounding_gate("City Hall", sent, ev, classify_fn=judge)
+        self.assertIn("1898", out)
+        self.assertEqual(rep["unsupported"], 0)
+
+
+class PierRecorded(unittest.TestCase):
+    def test_pier_vi_article_found_at_pin(self):
+        pin = tuple(FIX["pier_pin"])
+        art = lwe.geo_fallback_article(
+            ["Bạch Đằng Pier (tour-bus + waterbus)", "Bach Dang Quay"], "vi", pin, FIX["location"],
+            geosearch_fn=lambda p, lang, r: FIX["pier_geosearch"][lang],
+            fetch_title_fn=lambda t, lang: FIX["pier_vi_page"] if t == "Bến Bạch Đằng" else {"pages": []})
+        self.assertIsNotNone(art)
+        self.assertEqual(art["title"], "Bến Bạch Đằng")
+
+    def test_far_or_unnamed_page_rejected(self):
+        pin = tuple(FIX["pier_pin"])
+        art = lwe.geo_fallback_article(
+            ["Bạch Đằng Pier"], "vi", pin, FIX["location"],
+            geosearch_fn=lambda p, lang, r: [{"title": "Khách sạn Majestic Saigon", "dist_m": 40}],
+            fetch_title_fn=lambda t, lang: {"pages": [{"title": t, "lead": "x", "coord": pin}]})
+        self.assertIsNone(art)
+
+
+class EponymCoverage(unittest.TestCase):
+    def test_title_covers_name(self):
+        self.assertFalse(lwe.title_covers_name("Trụ sở Ủy ban Nhân dân Thành phố Hồ Chí Minh", "Ho Chi Minh"))
+        self.assertTrue(lwe.title_covers_name("Saigon Opera House", "Saigon Opera House"))
+        self.assertTrue(lwe.title_covers_name("Longshan Temple", "艋舺龍山寺"))
+        self.assertTrue(lwe.title_covers_name("Bạch Đằng Pier", "Bến Bạch Đằng"))
