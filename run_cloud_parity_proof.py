@@ -349,8 +349,10 @@ def _criteria(text, log, require_ten=True):
                or "people's committee" in b[1].lower()), None)
     if ch:
         chl = _prose(ch).lower()
-        _add("City Hall is the Hôtel de Ville (1898-1909), not Gia Long Palace",
-             ("1898" in chl or "1908" in chl or "1909" in chl or "ville" in chl)
+        _add("City Hall states 1898 AND 1909 (not just the Hôtel de Ville name), not Gia Long Palace",
+             # [LOCAL-889] the YEARS, not the name: 887 passed a City Hall that had
+             # lost "1898-1909" because "Hôtel de Ville" matched.
+             "1898" in chl and "1909" in chl
              and "gia long" not in chl and "commercial trade" not in chl,
              _prose(ch)[:160])
 
@@ -432,6 +434,47 @@ def evaluate_888(text, evidence_chars=None):
     if evidence_chars is not None:
         cafe = {k: v for k, v in evidence_chars.items() if "caf" in k.lower()}
         out.append(("Cafe evidence > 0", any(v > 0 for v in cafe.values()), cafe or "no key"))
+    for label, ok, detail in out:
+        _check(label, ok, detail)
+    return out
+
+
+def evaluate_889(text, evidence_by_stop=None):
+    """[LOCAL-889] coverage k/K per stop, no 'intelligence headquarters', City Hall has
+    1898 and 1909, the Opera House has 1944 when its evidence does, <= 1 sensory
+    sentence per stop. Returns [(label, ok, detail)]."""
+    import key_fact_coverage as kfc
+    import strict_grounding_gate as sgg
+    out = []
+    blocks = _blocks(text)
+    ev_map = {sgg._fold(k): v for k, v in (evidence_by_stop or {}).items()}
+    cov, sens_bad = [], []
+    for n, t, b in blocks:
+        sents = _content_sentences(_prose((n, t, b)))
+        ev = sgg._lookup(ev_map, t) or ""
+        facts = kfc.key_facts(ev, t)
+        r = kfc.coverage_report(sents, facts)
+        cov.append((n, t, f"{r['k']}/{r['K']}", [f["kind"] for f in r["missing"]]))
+        ns = [s for s in sents if kfc.is_sensory(s)]
+        if len(ns) > 1:
+            sens_bad.append((n, t, len(ns)))
+        print(f"[LOCAL-889] coverage {t}: {r['k']}/{r['K']} key facts"
+              + (f" (missing {[f['kind'] for f in r['missing']]})" if r["missing"] else ""), flush=True)
+    out.append(("every key fact present (k == K per stop)", all(c[2].split('/')[0] == c[2].split('/')[1] for c in cov),
+                [(c[1], c[2], c[3]) for c in cov]))
+    low = (text or "").lower()
+    out.append(("no 'intelligence headquarters'", "intelligence headquarters" not in low, "absent" if "intelligence headquarters" not in low else "PRESENT"))
+    ch = next((b for b in blocks if "city hall" in b[1].lower()), None)
+    chl = _prose(ch).lower() if ch else ""
+    out.append(("City Hall has 1898 and 1909", "1898" in chl and "1909" in chl, chl[:120] or "no City Hall stop"))
+    op = next((b for b in blocks if "opera" in b[1].lower()), None)
+    if op:
+        ev_op = sgg._lookup(ev_map, op[1]) or ""
+        needs = "1944" in ev_op
+        has = "1944" in _prose(op)
+        out.append(("Opera House has 1944 if its evidence has it", (not needs) or has,
+                    f"evidence_has_1944={needs} text_has_1944={has}"))
+    out.append(("<= 1 sensory sentence per stop", not sens_bad, sens_bad or "all <= 1"))
     for label, ok, detail in out:
         _check(label, ok, detail)
     return out
@@ -698,6 +741,7 @@ def snapshot_main(snap_dir):
         with open(os.path.join(_ART_DIR, "saigon_warm_audit.json"), "w", encoding="utf-8") as f:
             json.dump(audit, f, ensure_ascii=False, indent=2)
         _e888 = evaluate_888(warm_text, audit.get("evidence_chars") or {})
+        _e889 = evaluate_889(warm_text, ev)
         uns = audit.get("unsupported")
         print(f"   audit unsupported={len(uns) if isinstance(uns, list) else 'ERROR'}", flush=True)
         for u in (uns or []):

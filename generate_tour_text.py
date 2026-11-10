@@ -35122,8 +35122,14 @@ RULES:
                         _stop_ev[_key] = (_stop_ev.get(_key, "") + " " + _blob).strip()
             except Exception:
                 pass
+            _pre_n1 = complete_tour
             complete_tour, _n1 = _sth880.strip_contradicted_former_use(
                 complete_tour, stop_evidence=_stop_ev)
+            try:                              # [LOCAL-889] remember what §1 removed
+                import key_fact_coverage as _kfc889b
+                _kfc889b.record_removed_between(_pre_n1, complete_tour, "880-scrub-former-use")
+            except Exception:
+                pass
             complete_tour, _cap_rep = _sth880.audit_seating_capacity(
                 complete_tour, stop_evidence=_stop_ev)
             complete_tour, _n2 = _sth880.strip_truncated_tail_sentences(complete_tour)
@@ -35420,6 +35426,34 @@ RULES:
                     pass
     except Exception as _gf_err:
         print(f"  [LOCAL-884] final grounding re-pass skipped (non-fatal): {_gf_err}")
+
+    # [LOCAL-889] KEY-FACT COVERAGE + removed claims stay removed + filler cap, on the
+    # END state (after gate, refill, coherence, signature survival and the final
+    # re-pass). A key fact (construction years, architect, dated defining event) a
+    # pass lost is restored with ONE plain evidence sentence, gated once more.
+    try:
+        if (complete_tour
+                and os.environ.get('GROUNDING_GATE_ENABLED', '1').strip() != '0'
+                and os.environ.get('KEY_FACT_COVERAGE_ENABLED', '1').strip() != '0'):
+            import key_fact_coverage as _kfc889
+            _ev889 = locals().get('_evf') or {}
+            complete_tour, _kf_rep = _kfc889.finalize_tour(
+                complete_tour, _ev889, model=os.environ.get(
+                    "GROUNDING_GATE_MODEL", "gpt-4.1-mini"), log=print)
+            _tot = sum(r.get("K", 0) for r in _kf_rep["stops"])
+            _got = sum(r.get("k", 0) for r in _kf_rep["stops"])
+            print(f"  [LOCAL-889] coverage total: {_got}/{_tot} key facts over "
+                  f"{len(_kf_rep['stops'])} stop(s); injected "
+                  f"{sum(len(r.get('injected', [])) for r in _kf_rep['stops'])}; "
+                  f"added cost ${sum(r.get('cost_usd', 0.0) for r in _kf_rep['stops']):.4f}")
+            if output_file:
+                try:
+                    with open(output_file, "w", encoding="utf-8") as _kf889:
+                        _kf889.write(complete_tour)
+                except Exception:
+                    pass
+    except Exception as _kf_err:
+        print(f"  [LOCAL-889] key-fact coverage skipped (non-fatal): {_kf_err}")
 
     return complete_tour, output_file, first_poi_coordinates
 

@@ -238,3 +238,14 @@ def pytest_unconfigure(config):
     """Restore original psycopg2.connect on session end."""
     psycopg2.connect = _original_connect
     os.environ.pop("_AUDIOURA_PYTEST_SESSION", None)
+
+
+# ─── LOCAL-889: the per-stop deny-set of removed claims is process-global ────
+@pytest.fixture(autouse=True)
+def _local889_reset_deny_set():
+    try:
+        import key_fact_coverage
+        key_fact_coverage.deny_reset()
+    except Exception:
+        pass
+    yield

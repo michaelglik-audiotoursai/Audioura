@@ -1,0 +1,83 @@
+{
+ "note": "LOCAL-889 recorded inputs. lead/passages: English Wikipedia extracts fetched 2026-11-10 (free MediaWiki API), verbatim sentences; infobox: verbatim from the 889 live run log (run_stdout.txt, cloud snapshot), truncated where the log truncates. Assembled in the format_item shape '<title> - Wikipedia (en). <lead>\\nInfobox: ...\\nPassages: [History] ...'. The 888/889 runs did not persist their evidence bundles, so this stands in for them.",
+ "cathedral": {
+  "title": "Saigon Notre-Dame Basilica",
+  "lead": "Notre-Dame Cathedral Basilica of Saigon (Vietnamese: Vương cung thánh đường Chính tòa Đức Bà Sài Gòn or Nhà thờ Đức Bà Sài Gòn; French: Basilique-Cathédrale Notre-Dame de Saïgon), officially the Cathedral Basilica of Our Lady of the Immaculate Conception (Vietnamese: Vương cung thánh đường Chính tòa Đức Mẹ Vô nhiễm Nguyên tội; French: Basilique-Cathédrale Notre-Dame de l'Immaculée Conception) is a cathedral located in the Saigon ward of Ho Chi Minh City, Vietnam. The cathedral, established by French administrators who originally named it the Church of Saigon (French: l'Église de Saïgon), was constructed between 1877 and 1880. The name Notre-Dame Cathedral has been used since 1959, when the statue of Our Lady of Peace was installed in its forecourt. It has two bell towers, reaching a height of 58 meters (190 feet).",
+  "infobox": "",
+  "passages": [
+   "The construction was completed two years later and was called \"Saigon Church\".",
+   "When the wooden church was damaged by termites, all church services were held in the guest-chamber of the French Governor's Palace, which turned into a seminary until the Notre-Dame Cathedral was completed.",
+   "The cathedral foundation was designed to bear ten times the weight of the cathedral."
+  ]
+ },
+ "post_office": {
+  "title": "Saigon Central Post Office",
+  "lead": "The Saigon Central Post Office (Vietnamese: Bưu điện Trung tâm Sài Gòn, French: Poste centrale de Saïgon) is a post office in Paris Commune Square, Saigon ward, Ho Chi Minh City, next to the Saigon Notre-Dame Basilica, the city's cathedral.",
+  "infobox": "former names: Sở dây thép Sài Gòn (Vietnamese; in French colonial period); years built: *1860-1863 (Former building) *1886-1891 (Current building); architect: *Gustave Eiffel (Former building)",
+  "passages": [
+   "The building was constructed when Vietnam was part of French Indochina in the late 19th century.",
+   "It was constructed between 1886 and 1891 and is now a tourist attraction.",
+   "It was designed by Alfred Foulhoux, but is often erroneously credited as being the work of Gustave Eiffel or a collaboration between Foulhoux and Hanoi-based Auguste Henri Vildieu.",
+   "Foulhoux."
+  ]
+ },
+ "palace": {
+  "title": "Independence Palace",
+  "lead": "The Independence Palace (Vietnamese: Dinh Độc Lập), also publicly and officially known as the Reunification Convention Hall or simply Reunification Hall (Vietnamese: Hội trường Thống Nhất), is a historic landmark and government-owned public hall in Ho Chi Minh City (formerly known as Saigon), Vietnam. It was designed by architect Ngô Viết Thụ and was the presidential palace, home and workplace of the president of the Republic of Vietnam (South Vietnam). It was also the site of the Fall of Saigon on 30 April 1975 that ended the Vietnam War, when a Liberation Army of South Vietnam tank crashed through its gates.\nAfter the reunification of Vietnam, the building continued to serve as a government and presidential office until 1976 when the capital of South Vietnam was officially moved to Hanoi, and the government's functions were relocated. The palace is now preserved as a convention hall for state events, and also as a museum that is open to the public, and is a popular tourist attraction in Ho Chi Minh City.",
+  "infobox": "",
+  "passages": [
+   "Construction of the current Independence Palace was ordered by President Ngô Đình Diệm in 1962 to replace the old palace, which was badly damaged due to being bombed by two dissident Republic of Vietnam Air Force pilots.",
+   "It was constructed according to a design by Ngô Viết Thụ, a Vietnamese architect who won the First Grand Prize of Rome (Grand Prix de Rome) in 1955, the highest recognition of the Beaux-Arts school in Paris.",
+   "However, Diệm did not see the completed hall as he and his brother, also his chief adviser, Ngô Đình Nhu were assassinated after a coup d'état led by General Dương Văn Minh in November 1963.",
+   "The completed hall was inaugurated on 31 October 1966 by the chairman of the National Leadership Committee, General Nguyễn Văn Thiệu, who was then the head of a military junta.",
+   "The Independence Hall served as Thiệu's home and office from October 1967 to 21 April 1975, when he fled the country as communist North Vietnamese forces swept southwards in the decisive Ho Chi Minh Campaign.",
+   "On 8 April 1975, Nguyễn Thanh Trung, a pilot of the South Vietnamese air force and an undetected communist spy flew an F-5E aircraft from Biên Hòa Air Base to bomb the palace but caused no significant damage.",
+   "In November 1975, after the negotiation convention between the communist North Vietnam and their colleagues in South Vietnam was completed, the Provisional Revolutionary Government renamed the palace Reunification Hall (Hội trường Thống Nhất) for the government-owned public hall, while the Independence Palace (Dinh Độc Lập) still used as a historic site for tourism."
+  ]
+ },
+ "wrm": {
+  "title": "War Remnants Museum",
+  "lead": "The War Remnants Museum (Vietnamese: Bảo tàng chứng tích chiến tranh, IPA: [ɓâw tàŋ cɯ̌ŋ tǐʲc cǐən ʈ͡ʂāɲ]) is a war museum at 28 Võ Văn Tần Street, Xuân Hòa, Ho Chi Minh City, Vietnam. It contains exhibits relating to the First Indochina War and the Vietnam War.",
+  "infobox": "",
+  "passages": [
+   "Operated by the Ho Chi Minh City government, an earlier version of this museum opened on 4 September 1975, as the Exhibition House for US and Puppet Crimes (Vietnamese: Nhà trưng bày tội ác Mỹ-ngụy).",
+   "It was located in the former United States Information Agency building.",
+   "The building was the US military's intelligence headquarters during the Vietnam War.",
+   "The military equipment includes a Bell UH-1 \"Huey\" helicopter, an Northrop F-5A fighter, a BLU-82 \"Daisy Cutter\" bomb, M48 Patton tank, an Douglas A-1 Skyraider attack bomber, and an Cessna A-37 Dragonfly attack bomber.",
+   "Other exhibits include graphic photography, accompanied by a short text in English, Vietnamese and Japanese, covering the effects of Agent Orange and other chemical defoliant sprays, the use of napalm and phosphorus bombs, and war atrocities such as the My Lai massacre."
+  ]
+ },
+ "opera": {
+  "title": "Saigon Opera House",
+  "lead": "Saigon Opera House (Vietnamese: Nhà hát Thành phố, French: Théâtre Municipal de Saïgon) is a municipal opera house in downtown Saigon, now Ho Chi Minh City, Vietnam.  Like other French-built opera houses during French colonial period, including the ones in Hanoi and Haiphong, it is an example of French colonial architecture in Vietnam.\nDesigned by French architects as the Opéra de Saïgon, the building was completed in 1900. The 500-seat building served as the house of the unicameral National Assembly from 1956 until 1967. After the National Assembly became a bicameral legislature, the Opera House became home to the Lower House (Hạ Nghị Viện) and the Senate or Upper House (Thượng Nghị Viện) of the National Assembly of what was South Vietnam. It later hosted the People's Congress of Deputies (Đại hội đại biểu Nhân dân) of the Provisional Revolutionary Government of the Republic of South Vietnam in 1975. The Opera House was not used again as a theatre until 1976. The façade was restored in 1998.",
+  "infobox": "",
+  "passages": [
+   "In 1898, the construction of the new theatre commenced on the site of the old one, and it was completed by 1 January 1900.",
+   "In 1944, the theatre was damaged by the Allied aerial attacks against Imperial Japanese Army, and it stopped functioning.",
+   "The Municipal Theatre owes its specific characteristics to the work of architect Félix Olivier, while construction was under supervision of architects Ernest Guichard and Eugène Ferret in 1900."
+  ]
+ },
+ "city_hall": {
+  "title": "Ho Chi Minh City Hall",
+  "lead": "Ho Chi Minh City Hall, officially called the Ho Chi Minh City People's Council and People's Committee Head Office (Vietnamese: Trụ sở Hội đồng Nhân dân và Ủy ban Nhân dân Thành phố Hồ Chí Minh), is a city hall and the seat of the government of Ho Chi Minh City, Vietnam. It is located in downtown Ho Chi Minh City's Saigon ward,  between Pasteur, Lý Tự Trọng, Đồng Khởi, and Lê Thánh Tôn Street, with its front facade facing Nguyễn Huệ Boulevard. The building houses the office of the city's Chairman of the People's Committee, People's Council and various other government departments, such as Transportation, Natural Resources & Environment, Industry & Trade and Home Affairs.\nHo Chi Minh City Hall served as an administrative house for past governments during the French colonial period of Vietnam and Vietnam War. The building now also serves as one of Vietnam's national heritage sites and is open for public at the last weekend of each month.",
+  "infobox": "former names: L'hôtel de ville Tòa đô chánh Sài Gòn; completion date: 1908; architect: Fernand Gardè; architectural style: Beaux-Arts; height: 30 m ft",
+  "passages": [
+   "Until 1898, after the canal was covered to be made into Charner Boulevard, the French finally broke ground for the building.",
+   "The building was opened in 1909 by the French Indochina governors-general to celebrate 50 years of French presence in Saigon.",
+   "In 2018, the city introduced a new design for the rear blocks of the building, designed by Gensler.",
+   "Directed by architect Fernand Gardè, the hall design took inspiration from the town hall of Paris and resembles the bell towers of northern France – a rising point-shaped tower accompanied by two adequate symmetrical attic towers and shorter but long blocks on the sides."
+  ]
+ },
+ "thieu": {
+  "title": "Nguyễn Văn Thiệu",
+  "lead": "Nguyễn Văn Thiệu (Vietnamese: [ŋwiən˦ˀ˥ van˧˧ tʰiəw˧˨ˀ] ; 5 April 1923 – 29 September 2001) was a South Vietnamese military officer and politician who was the president of South Vietnam from 1967 to 1975. He was a general in the Republic of Vietnam Armed Forces (RVNAF), became head of a military junta in 1965, and then president after winning a rigged election in 1967. He headed the government of South Vietnam until he resigned and left the nation and relocated to Taipei a few days before the fall of Saigon and the ultimate North Vietnamese victory.\nBorn in Phan Rang in the south central coast of Vietnam, Thiệu joined the communist-dominated Việt Minh of Hồ Chí Minh in 1945 but quit after a year and joined the Vietnamese National Army (VNA) of the French-backed State of Vietnam. He gradually rose up the ranks and, in 1954, led a battalion in expelling the communists from his native village. Following the withdrawal of France, the VNA became the ARVN and Thiệu was the head of the Vietnamese National Military Academy for four years before becoming a division commander and colonel. In November 1960, he helped put down a coup attempt against President Ngô Đình Diệm. During this time, he also converted to Catholicism and joined the regime's Cần Lao Party, which was accused of being a vehicle for political advancement.\nDespite this, Thiệu agreed to join the coup against Ngô Đình Diệm in November 1963 in the midst of the Buddhist crisis, leading the siege on Gia Long Palace. Diệm was captured and executed and Thiệu made a general. Following Diệm's death, there were several short-lived juntas as coups occurred frequently. Thiệu gradually moved up the ranks of the junta by adopting a cautious approach while other officers around him defeated and sidelined one another. In 1965, stability came to South Vietnam when he became the nominal head of state and Air Marshal Nguyễn Cao Kỳ became prime minister, although the men were rivals.\nIn 1967, a transition to elected government was scheduled; and, after a power struggle within the military, Thiệu ran for the presidency with Kỳ as his running mate—both men had wanted the top job. To allow the two to work together, their fellow officers had agreed to have a military body controlled by Kỳ shape policy behind the scenes. Leadership tensions became evident, and Thiệu prevailed, sidelining Kỳ supporters from key military and cabinet posts. Thiệu then passed legislation to restrict candidacy eligibility for the 1971 election, banning almost all would-be opponents, while the rest withdrew as it was obvious that the poll would be a sham; Thiệu won 100% of the vote and the election was uncontested, while Kỳ retired from politics.\nWhile Thiệu has been occasionally described as a dictator in press, in literature his regime is described as military-dominated and marked by a complex relation with pluralistic society and evolving towards authoritarianism from constitutional rule as Thiệu consolidated power, but not as a dictatorship. The government under Thiệu's presidency, at times, championed liberal ideas and oversaw a vibrant civil society and a lively press. The press accused him of turning a blind eye to and indulging in corruption. During the 1971 Operation Lam Sơn 719 and the communists' Easter Offensive, the I Corps in the north of the country was under the command of his confidant, Hoàng Xuân Lãm, whose incompetence led to heavy defeats until Thiệu finally replaced him with Ngô Quang Trưởng. After the signing of the Paris Peace Accords—which Thiệu opposed—and the US withdrawal, South Vietnam resisted the communists for another two years until the communists' final push for victory, which saw the South openly invaded by the entire North Vietnamese army. Thiệu gave contradictory orders to Trưởng to stand and fight or withdraw and consolidate, leading to mass panic and collapse in the south of the country. This allowed the communists to generate much momentum and within a month they were close to Saigon, prompting Thiệu to resign and leave the country. He eventually settled near Boston, Massachusetts, preferring not to talk to the media. He died in 2001.",
+  "infobox": "",
+  "passages": [
+   "According to a Newsweek report on a survey of South Vietnamese residents in Long An province, completed in January 1970, 35% of respondents supported President Nguyễn Văn Thiệu, 20% supported the Việt Cộng, and 45% supported any candidate who opposed both the Viet Cong and the United States.",
+   "Reinforcements were flown in, but were dismantled and fled in chaos.",
+   "As anarchy and looting enveloped Đà Nẵng, with a defense of the city becoming impossible, Trưởng requested permission to evacuate by sea, but Thiệu, baffled, refused to make a decision.",
+   "On 21 April 1975, Thiệu, under intense political pressure, resigned as president after losing the confidence of his closest domestic allies.",
+   "In his farewell speech, Thiệu said, \"I resign, but I do not desert,\" but he fled to Taiwan on a C-118 transport plane four days later."
+  ]
+ }
+}
