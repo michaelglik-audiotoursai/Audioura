@@ -249,9 +249,10 @@ def _build_evidence_by_stop():
         for k, v in facts.items():
             ev[str(k)] = " ".join(str(x) for x in (v or []))
         snips = dict(getattr(g._J, "_DIRECT_SNIPPETS_PER_STOP", {}) or {})
+        import llm_evidence as _le892
         for k, sl in snips.items():
             texts = []
-            for s in sl or []:
+            for s in _le892.filter_records(sl):      # [LOCAL-892] an LLM's output is never evidence
                 if isinstance(s, dict):
                     texts.append(str(s.get("title", "")))
                     texts.append(str(s.get("snippet", "")))
@@ -272,7 +273,27 @@ def _build_evidence_by_stop():
             pass
     except Exception as e:
         print(f"  [audit] could not read evidence sinks: {e}", flush=True)
+    try:                                  # [LOCAL-892] belt and braces: registered LLM passages out
+        import llm_evidence as _le892z
+        ev = _le892z.scrub_map(ev)
+    except Exception:
+        pass
     return ev
+
+
+def llm_leads_by_stop():
+    """[LOCAL-892] The LLM-sourced snippets each stop held (narrator leads, NEVER evidence)."""
+    out = {}
+    try:
+        import generate_tour_text as g
+        import llm_evidence as le
+        for k, sl in dict(getattr(g._J, "_DIRECT_SNIPPETS_PER_STOP", {}) or {}).items():
+            bad = [str(x.get("snippet", "")) for x in (sl or []) if isinstance(x, dict) and not le.is_evidence_record(x)]
+            if bad:
+                out[str(k)] = bad
+    except Exception:
+        pass
+    return out
 
 
 _AUDIT_MODEL = os.environ.get("LOCAL884_AUDIT_MODEL", "gpt-4.1")

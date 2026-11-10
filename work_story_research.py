@@ -770,6 +770,33 @@ def _cache_put(qid: str, title: str, artist: str, passages: List[str],
             pass
 
 
+def classify_cached_row(cache_key: str, passages: List[str]) -> Tuple[List[str], List[str]]:
+    """[LOCAL-892] Split a cache row's passages into (evidence, llm). New rows mark LLM-extracted
+    passages. LEGACY rows (no mark) are classified conservatively by what could have produced them:
+      * a title-hash key (``k:``) has no QID, so there was no Wikipedia article: every passage came from
+        the serper fallback's LLM extractor -> all LLM;
+      * a QID row with fewer than MIN_PASSAGES passages triggered the fallback, which may have added
+        LLM passages we cannot tell apart -> all LLM (non-evidence on read);
+      * a QID row with >= MIN_PASSAGES passages is verbatim Wikipedia -> evidence."""
+    import llm_evidence as _le892
+    ev, llm = _le892.split_cache_marked(passages)
+    if llm:
+        return ev, llm
+    if not passages:
+        return [], []
+    if str(cache_key).startswith('k:') or len(passages) < MIN_PASSAGES:
+        return [], list(ev)
+    return list(ev), []
+
+
+def _apply_cached(out: Dict, cached: List[str], qid: str, key: str) -> None:
+    ev, llm = classify_cached_row(key, cached)
+    out['passages'] = (ev + llm)[:MAX_PASSAGES]
+    out['evidence_passages'] = ev[:MAX_PASSAGES]
+    out['llm_passages'] = llm[:MAX_PASSAGES]
+    out['source'] = 'cache'
+
+
 # ── the entry point ───────────────────────────────────────────────────────────
 
 def museum_work_research(title: str, artist: str = '', location: str = '',
@@ -794,7 +821,11 @@ def museum_work_research(title: str, artist: str = '', location: str = '',
     (url) -> text, and extractor. All injectable so the fixtures test every branch
     with no network and no key.
     """
-    out = {'passages': [], 'qid': '', 'source': 'none', 'cost': 0.0}
+    # [LOCAL-892] 'passages' feed the NARRATOR; 'llm_passages' is the subset an LLM extractor wrote
+    # (serper fallback). Those are leads, never evidence: callers must not put them in a grounding
+    # bundle. 'evidence_passages' is the verbatim-Wikipedia subset.
+    out = {'passages': [], 'qid': '', 'source': 'none', 'cost': 0.0,
+           'llm_passages': [], 'evidence_passages': []}
     title = (title or '').strip()
     if not title:
         return out
@@ -802,8 +833,7 @@ def museum_work_research(title: str, artist: str = '', location: str = '',
     if use_cache:
         cached = _cache_get('', title, artist)
         if cached is not None:
-            out['passages'] = cached[:MAX_PASSAGES]
-            out['source'] = 'cache'
+            _apply_cached(out, cached, '', _cache_key('', title, artist))
             return out
 
     # 1-3. Wikipedia (free): resolve QID, read article(s), keep event passages.
@@ -820,12 +850,12 @@ def museum_work_research(title: str, artist: str = '', location: str = '',
     if use_cache and qid:
         cached = _cache_get(qid, title, artist)
         if cached is not None:
-            out['passages'] = cached[:MAX_PASSAGES]
-            out['source'] = 'cache'
+            _apply_cached(out, cached, qid, _cache_key(qid, title, artist))
             return out
 
     passages = event_passages(sections) if sections else []
     source = 'wikipedia' if passages else 'none'
+    n_wiki = len(passages)
 
     # 4. Optional PAID fallback — ONLY when Wikipedia is thin, and only if it fits
     #    under the per-stop ceiling. Bounded to one Serper query + one extraction.
@@ -845,13 +875,17 @@ def museum_work_research(title: str, artist: str = '', location: str = '',
 
     passages = passages[:MAX_PASSAGES]
     out['passages'] = passages
+    out['evidence_passages'] = passages[:n_wiki]
+    out['llm_passages'] = passages[n_wiki:]
     out['source'] = source if passages else 'none'
 
     # Cache the result (even an empty list — a known-thin work should not be
     # re-fetched every tour). Keyed by QID when we have one, else by title+artist.
     if use_cache:
         try:
-            _cache_put(qid, title, artist, passages)
+            import llm_evidence as _le892
+            _cache_put(qid, title, artist,
+                       passages[:n_wiki] + [_le892.LLM_CACHE_MARK + p for p in passages[n_wiki:]])
         except Exception:
             pass
     return out

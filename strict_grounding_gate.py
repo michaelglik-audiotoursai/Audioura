@@ -523,6 +523,11 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
            "disclosed": 0, "labelled": 0, "dropped": [], "cost_usd": 0.0,
            "called": False, "no_evidence": False,
            "sentences_before": 0, "sentences_after": 0}
+    try:                                     # [LOCAL-892] an LLM's output is never evidence
+        import llm_evidence as _le892
+        evidence = _le892.scrub(evidence)
+    except Exception:
+        pass
     sents = _content_sentences(body_prose)
     rep["sentences_before"] = len(sents)
     if not sents:
@@ -649,6 +654,13 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
                 _a = {"ok": True}
             if _a.get("other_place"):
                 _other_used += 1
+            if _a.get("ok", True):          # [LOCAL-892] a person with no role stated anywhere
+                try:
+                    _up = _ab.unanchored_person(s, _aref, _items)
+                except Exception:
+                    _up = None
+                if _up:
+                    _a = {"ok": False, "why": _up, "source": None}
             if not _a.get("ok", True):
                 rep["labelled"] += 1
                 rep["unsupported"] += 1
@@ -900,6 +912,14 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
     if not tour_text:
         return tour_text or "", rep
     facts_by_title = facts_by_title or {}
+    try:                                     # [LOCAL-892] LLM text out of the evidence; D769 location tokens
+        import llm_evidence as _le892
+        import aboutness as _ab892
+        evidence_by_title = _le892.scrub_map(evidence_by_title)
+        if location or evidence_by_title:
+            _ab892.set_location(location, evidence_by_title)
+    except Exception:
+        pass
     norm_ev = {_fold(k): v for k, v in (evidence_by_title or {}).items()}
     norm_facts = {_fold(k): v for k, v in facts_by_title.items()}
 

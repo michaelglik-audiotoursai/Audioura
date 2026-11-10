@@ -1,0 +1,164 @@
+{
+ "Bạch Đằng Pier": {
+  "shipped_891": [
+   "Once, the French managed the pier under the Compagnies des Messageries fluviales, a company handling river shipping.",
+   "In 1881, Bạch Đằng Pier was transformed into the River port and entrusted to the management of the Compagnies des Messageries fluviales, while the replacement mercantile port was constructed in Khánh Hội.",
+   "During the 1945 August Revolution, this pier was a flashpoint where Vietnamese forces engaged Japanese troops.",
+   "Three decades later, in 1975, Bạch Đằng Pier assumed a different but equally significant role.",
+   "In 1975, during the Fall of Saigon, Bạch Đằng Pier was a significant evacuation point for many South Vietnamese and foreign nationals fleeing the city as North Vietnamese forces approached.",
+   "As the sun lowers beyond the skyline, the pier’s calm invites another kind of journey: from past to present, from movement to stillness."
+  ],
+  "after_gate": [
+   "Once, the French managed the pier under the Compagnies des Messageries fluviales, a company handling river shipping.",
+   "In 1881, Bạch Đằng Pier was transformed into the River port and entrusted to the management of the Compagnies des Messageries fluviales, while the replacement mercantile port was constructed in Khánh Hội.",
+   "As the sun lowers beyond the skyline, the pier’s calm invites another kind of journey: from past to present, from movement to stillness."
+  ],
+  "dropped": [
+   [
+    "UNSUPPORTED",
+    "During the 1945 August Revolution, this pier was a flashpoint where Vietnamese f"
+   ],
+   [
+    "UNSUPPORTED",
+    "Three decades later, in 1975, Bạch Đằng Pier assumed a different but equally sig"
+   ],
+   [
+    "UNSUPPORTED",
+    "In 1975, during the Fall of Saigon, Bạch Đằng Pier was a significant evacuation "
+   ]
+  ]
+ },
+ "Cathedral": {
+  "shipped_891": [
+   "Bishop Isidore Colombert laid the first stone on October 7, 1877, before an audience including the Deputy Commander of Cochinchina and other officials.",
+   "The church was completed in 1880.",
+   "The church’s two towers, added in 1895, rise 57.6 meters and support six large bronze bells, each carefully cast and hung to call worshippers across the growing city.",
+   "In 1959, the Vatican officially elevated this church to the status of a basilica, a recognition that marked its importance to Catholic communities throughout Vietnam."
+  ],
+  "after_gate": [
+   "The church was completed in 1880."
+  ],
+  "dropped": [
+   [
+    "UNSUPPORTED",
+    "Bishop Isidore Colombert laid the first stone on October 7, 1877, before an audi"
+   ],
+   [
+    "UNSUPPORTED",
+    "The church’s two towers, added in 1895, rise 57.6 meters and support six large b"
+   ],
+   [
+    "UNSUPPORTED",
+    "In 1959, the Vatican officially elevated this church to the status of a basilica"
+   ]
+  ]
+ },
+ "Book Street": {
+  "shipped_891": [
+   "You are standing on Nguyen Van Binh Street, home to Book Street in District 1 of Ho Chi Minh City, a narrow pedestrian street lined with numerous book stalls and shops offering a wide variety of printed books, from literature and politics to science and culture.",
+   "This street, nestled near iconic landmarks like Notre Dame Cathedral and the Ho Chi Minh City Post Office, was established to promote a reading culture and provide a gathering space for book lovers.",
+   "Book Street is especially lively in the evenings when locals and tourists explore its book fairs, author signings, and cultural events.",
+   "Just steps away from here, on 1 February 1968, during the Tet Offensive, South Vietnamese police chief Lt. Col. Nguyen Ngoc Loan executed a handcuffed Viet Cong prisoner, Nguyen Van Lem, on a Saigon street near the city center.",
+   "One of the entrances to Book Street is from Hai Ba Trung Street, close to other central spots like Chợ Bến Thành market and the Independence Palace."
+  ],
+  "after_gate": [
+   "You are standing on Nguyen Van Binh Street, home to Book Street in District 1 of Ho Chi Minh City, a narrow pedestrian street lined with numerous book stalls and shops offering a wide variety of printed books, from literature and politics to science and culture.",
+   "This street, nestled near iconic landmarks like Notre Dame Cathedral and the Ho Chi Minh City Post Office, was established to promote a reading culture and provide a gathering space for book lovers.",
+   "Book Street is especially lively in the evenings when locals and tourists explore its book fairs, author signings, and cultural events.",
+   "One of the entrances to Book Street is from Hai Ba Trung Street, close to other central spots like Chợ Bến Thành market and the Independence Palace."
+  ],
+  "dropped": [
+   [
+    "UNSUPPORTED",
+    "Just steps away from here, on 1 February 1968, during the Tet Offensive, South V"
+   ]
+  ]
+ },
+ "War Remnants Museum": {
+  "shipped_891": [
+   "The War Remnants Museum was established on 4 September 1975 as the Exhibition House for US and Puppet Crimes.",
+   "Inside, you will find exhibits spanning the First Indochina War and the Vietnam War, showing stark images and artifacts.",
+   "Faced with the documented horrors, William Wilson expressed disbelief, saying he had prayed to God that this thing was fiction.",
+   "Within the museum are permanent and temporary exhibitions focusing on events dating from when the First Indochina War began in 1946, up until the end of the Vietnam War in 1975.",
+   "Other exhibits include graphic photography, accompanied by a short text in English, Vietnamese and Japanese, covering the effects of Agent Orange and other chemical defoliant sprays, the use of napalm and phosphorus bombs, and war atrocities such as the My Lai massacre."
+  ],
+  "after_gate": [
+   "The War Remnants Museum was established on 4 September 1975 as the Exhibition House for US and Puppet Crimes.",
+   "Within the museum are permanent and temporary exhibitions focusing on events dating from when the First Indochina War began in 1946, up until the end of the Vietnam War in 1975.",
+   "Other exhibits include graphic photography, accompanied by a short text in English, Vietnamese and Japanese, covering the effects of Agent Orange and other chemical defoliant sprays, the use of napalm and phosphorus bombs, and war atrocities such as the My Lai massacre."
+  ],
+  "dropped": [
+   [
+    "UNSUPPORTED",
+    "Inside, you will find exhibits spanning the First Indochina War and the Vietnam "
+   ],
+   [
+    "UNSUPPORTED",
+    "Faced with the documented horrors, William Wilson expressed disbelief, saying he"
+   ]
+  ]
+ },
+ "_llm_only_supported_in_891_text": {
+  "Book Street": [
+   "Just steps away from here, on 1 February 1968, during the Tet Offensive, South Vietnamese police chief Lt. Col. Nguyen Ngoc Loan executed a handcuffed Viet Cong prisoner, Nguyen Van Lem, on a Saigon street near the city center."
+  ],
+  "War Remnants Museum": [
+   "Faced with the documented horrors, William Wilson expressed disbelief, saying he had prayed to God that this thing was fiction."
+  ],
+  "Opera House": [
+   "During World War II, when Saigon was occupied by the Japanese, the opera house suffered damage from Allied bombing in 1944."
+  ],
+  "Café Apartments 42": [
+   "During the Vietnam War, this building housed American military officers and their families.",
+   "It is located at 42 Nguyễn Huệ, right in the heart of Saigon."
+  ],
+  "Bạch Đằng Pier": [
+   "During the 1945 August Revolution, this pier was a flashpoint where Vietnamese forces engaged Japanese troops.",
+   "In 1975, during the Fall of Saigon, Bạch Đằng Pier was a significant evacuation point for many South Vietnamese and foreign nationals fleeing the city as North Vietnamese forces approached."
+  ]
+ },
+ "_reconstructed_llm_passages": {
+  "Bạch Đằng Pier": [
+   "Bạch Đằng Pier In 1975, during the Fall of Saigon, Bạch Đằng Pier was a significant evacuation point for many South Vietnamese and foreign nationals fleeing the city as North Vietnamese forces approached.",
+   "Bạch Đằng Pier In the early 20th century, Bạch Đằng Pier was a bustling hub for trade and transportation, playing a crucial role in the economic development of Saigon under French colonial rule.",
+   "Bạch Đằng Pier In 1945, Bạch Đằng Pier was a site of conflict during the August Revolution, where Vietnamese forces clashed with Japanese troops as part of the broader struggle for independence from colonial powers."
+  ],
+  "Cathedral": [
+   "Cathedral The Notre-Dame Cathedral Basilica of Saigon, located in Ho Chi Minh City, was constructed between 1863 and 1880 by French colonists, serving as a symbol of French colonial influence in Vietnam.",
+   "Cathedral In 1959, the Vatican anointed the Saigon Cathedral as a basilica, marking it as a significant religious site for Catholics in Vietnam.",
+   "Cathedral During the Vietnam War, the Saigon Cathedral served as a place of refuge and solace for many Vietnamese people amidst the conflict."
+  ],
+  "Book Street": [
+   "Book Street On February 1, 1968, during the Tet Offensive, South Vietnamese police chief Lt. Col. Nguyen Ngoc Loan executed a handcuffed Viet Cong prisoner, Nguyen Van Lem, on a Saigon street near the city center.",
+   "Book Street Associated Press photographer Eddie Adams captured the execution of Nguyen Van Lem, producing a Pulitzer Prize-winning photo."
+  ],
+  "War Remnants Museum": [
+   "War Remnants Museum The War Remnants Museum in Saigon was established in 1975 and was originally named the 'Exhibition House for U.S. and Puppet Crimes'.",
+   "War Remnants Museum Colonel William Wilson, a combat veteran who investigated the My Lai massacre, is quoted in the museum expressing disbelief at the horrors witnessed, saying, 'I had prayed to God that this thing was fiction'."
+  ],
+  "Post Office": [
+   "Post Office The Saigon Central Post Office was designed by Gustave Eiffel and constructed between 1886 and 1891 during the French colonial period in Vietnam.",
+   "Post Office During the Vietnam War, the Saigon Central Post Office served as a crucial communication hub for both military and civilian correspondence.",
+   "Post Office The Post Office remains a popular tourist attraction, showcasing French colonial architecture and historical maps of Saigon and Southern Vietnam."
+  ],
+  "Opera House": [
+   "Opera House The Saigon Opera House was constructed between 1898 and 1900, designed by architect Félix Olivier under the supervision of Eugène Ferret and Ernest Guichard.",
+   "Opera House Before the Opera House was built, theatre performances for French soldiers and colonists were held in a wooden hall and later a temporary theatre near the current site, starting from 1863.",
+   "Opera House In 1943, French colonial authorities removed the statues and decorations of the Saigon Opera House to make it appear more modern.",
+   "Opera House The Saigon Opera House was damaged by Allied bombing in 1944 when Saigon was occupied by the Japanese.",
+   "Opera House From 1955 to 1975, the Saigon Opera House served as the parliament building of South Vietnam.",
+   "Opera House The square in front of the Opera House was famously referenced in Graham Greene’s novel *The Quiet American*, which involved a bombing incident."
+  ],
+  "Independence Palace": [
+   "Independence Palace The Independence Palace in Ho Chi Minh City was the site of the Fall of Saigon on 30 April 1975, when a tank from the Liberation Army of South Vietnam crashed through its gates, marking the end of the Vietnam War.",
+   "Independence Palace The current palace was constructed starting 1 July 1962, ordered by President Ngô Đình Diệm to replace the old palace damaged by bombing from dissident Republic of Vietnam Air Force pilots.",
+   "Independence Palace Diệm and his brother Ngô Đình Nhu were assassinated in a coup led by General Dương Văn Minh in November 1963, before the new palace was completed.",
+   "Independence Palace The completed palace was inaugurated on 31 October 1966 by General Nguyễn Văn Thiệu, who used it as his home and office until he fled on 21 April 1975 as North Vietnamese forces advanced.",
+   "Independence Palace On 8 April 1975, Nguyễn Thanh Trung, a South Vietnamese pilot, was involved in a notable incident related to the palace during the final days of the war."
+  ],
+  "Café Apartments 42": [
+   "Café Apartments 42 During the Vietnam War, the building at 42 Nguyễn Huệ served as a residential space for American military officers and their families, reflecting its strategic location in the heart of Saigon."
+  ]
+ },
+ "_note": "Offline replay on the 891 persisted bundle; evidence-faithful stand-in judge; LLM passages reconstructed from their glued-title shape (see tests/test_local892_no_llm_evidence.py docstring)."
+}

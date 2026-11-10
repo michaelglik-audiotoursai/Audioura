@@ -1,0 +1,28 @@
+{
+ "llm_leads_excluded_from_evidence": {},
+ "llm_only_supported": {
+  "Cathedral": [],
+  "Post Office": [],
+  "Book Street": [],
+  "Independence Palace": [],
+  "War Remnants Museum": [],
+  "Opera House": [],
+  "City Hall": [],
+  "Café Apartments 42": [],
+  "Bạch Đằng Pier": [],
+  "Thi Bar": []
+ },
+ "count_per_stop": {
+  "Cathedral": 0,
+  "Post Office": 0,
+  "Book Street": 0,
+  "Independence Palace": 0,
+  "War Remnants Museum": 0,
+  "Opera House": 0,
+  "City Hall": 0,
+  "Café Apartments 42": 0,
+  "Bạch Đằng Pier": 0,
+  "Thi Bar": 0
+ },
+ "total": 0
+}
