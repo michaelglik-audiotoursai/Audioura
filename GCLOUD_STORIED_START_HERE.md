@@ -13,6 +13,19 @@ has lapsed twice and Michael has had to ask twice.
 
 ---
 
+# ▶️ WAVE 44 — 2026-11-10 ~16:40 EST (wdvrdazgcn) — LIVE @ fc31ad75 (build bdc51f17, bsub52).
+- Live revisions: gen 00046-lf9, orch 00026-v47.
+- Rollback: gen 00039-mtv / orch 00022-m9c (wave 37).
+- Proof 547 passed all 5 criteria:
+  - preview OK in 12.7 s, pins 10/10;
+  - clean titles; the Opera House pin is 0 m off;
+  - Foulhoux credited; 30 April 1975 tank;
+  - Thi Bar 224.
+- $0.427 per tour (+85% vs wave 37).
+- 547 hidden; share 2SER1Npc NOT for Michael until LEAD evaluates. Rows 440.
+- Root cause of the waves 42/43 cloud failures: the orchestrator's D762 /preview-stops 20 s timeout (fixed by LOCAL-893).
+- Michael's own 10-stop regen is still held for LEAD.
+
 # ▶️ WAVE 43 — 2026-11-10 ~15:20 EST (wdvrdazg94) — DEPLOYED then ROLLED BACK. gen 00045-tfw + orch 00025-9tl (5adabfcd, build d24e9323, bsub51) are idle; traffic is on gen 00039-mtv / orch 00022-m9c (wave 37).
 - Failed: thin Café/Pier; City Hall "1901"; no Post Office architect; Opera House mis-pinned and empty; raw titles.
 - No false claims spotted.
