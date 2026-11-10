@@ -39,16 +39,20 @@ from __future__ import annotations
 
 import html
 import math
+import os
 import re
 import threading
 import time
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from urllib.parse import quote
 from typing import Callable, Dict, List, Optional, Tuple
 
 __all__ = [
     "parse_itinerary",
     "preview_stops",
+    "clean_raw_stop_titles",
     "Resolvers",
     "stop_to_generation_string",
     "stops_for_generation",
@@ -183,6 +187,13 @@ def parse_itinerary(text: str, city_hint: str = "") -> List[Dict]:
         if new == s:
             break
         s = new
+
+    # [LOCAL-893] The app sends "Opera House/Đồng Khởi" as "Opera House_Đồng Khởi"
+    # (the same underscore it uses for "/" in a mangled URL). URLs are protected
+    # above, so an underscore BETWEEN two word characters here is that qualifier:
+    # treat it as the "/" combine so the title is "Opera House" and the street an
+    # alt name, not part of the venue lookup ("Dong Khoi Street", 850 m off).
+    s = re.sub(r"(?<=[^\W_])_(?=[^\W_])", "/", s)
 
     # 2. inline "1) A 2) B" numbering -> newlines (only with >= 2 markers).
     if len(_INLINE_NUM_RE.findall(s)) >= 2:
@@ -680,6 +691,34 @@ def _resolve_stop(stop: Dict, city: Dict, res: Resolvers, st: _State,
                       "Nominatim or one Serper /places lookup"}
 
 
+def _canonical_lookup(s: Dict, r: Dict, c: Dict, res: "Resolvers", log) -> Optional[Dict]:
+    """[LOCAL-882 task C] Derive the CANONICAL venue at the resolved pin at
+    RUNTIME (Wikidata within 300 m of the pin, then Places), so the name carried
+    to generation as the research match_name/alias comes from the pin, not from a
+    hand-written table (D769). Fails soft to None. [LOCAL-893] Split out of
+    preview_stops so the per-stop lookups can run concurrently."""
+    try:
+        _local_lang = ""
+        try:
+            import wikidata_landmark_lookup as _wll882
+            _local_lang = _wll882.local_lang_for_scope(
+                f"{c.get('name','')}, {c.get('country_code','')}")
+        except Exception:
+            _local_lang = ""
+        _user_link882 = str(s.get("url") or "")
+        try:
+            return res.canonical(s["name"], (r["lat"], r["lng"]),
+                                 c.get("name", ""), _local_lang,
+                                 user_link=_user_link882)
+        except TypeError:
+            # an injected resolver without the LOCAL-883 user_link kwarg
+            return res.canonical(s["name"], (r["lat"], r["lng"]),
+                                 c.get("name", ""), _local_lang)
+    except Exception as _ce882:
+        log(f"[LOCAL-882] canonical resolve skipped for {s['name']!r}: {_ce882}")
+        return None
+
+
 def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] = None,
                   max_serper_calls: int = 10, max_stops: int = 50,
                   log: Callable[[str], None] = print) -> Dict:
@@ -706,12 +745,66 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
                          "\"Ho Chi Minh City\") or name it in the text"}
 
     st = _State(max_serper_calls)
-    out = []
+    t_all = time.time()
+    # [LOCAL-893] The LOCAL-882 canonical-venue lookups (a WDQS "around" query and
+    # sometimes a Places call per stop) ran one after another AFTER each pin and
+    # took /preview-stops from ~6 s to ~18-25 s for ten stops, past the
+    # orchestrator's read timeout. They are independent per stop, so:
+    #   * each stop's lookup is submitted to a bounded pool (default 5 workers) the
+    #     moment its pin resolves, overlapping with the remaining sequential pin
+    #     resolution (shared Serper cap + 1 req/s Nominatim limiter);
+    #   * every lookup shares one deadline measured from the start of the call
+    #     (PREVIEW_CANON_DEADLINE_S, default 6.5 s). A lookup still running at the
+    #     deadline is ABANDONED LOUDLY and that stop keeps the pin resolver's own
+    #     name (the documented no-canonical behaviour); it finishes in the
+    #     background and warms its caches.
+    workers = max(1, int(os.environ.get("PREVIEW_CANON_WORKERS", "5") or 5))
+    deadline_s = float(os.environ.get("PREVIEW_CANON_DEADLINE_S", "6.5") or 6.5)
+    pool = ThreadPoolExecutor(max_workers=workers)
+    futures: Dict[int, "object"] = {}
+    submitted: Dict[int, float] = {}
+    resolved: List[Tuple[Dict, Optional[Dict], float]] = []
+
+    def _canon_job(s_, r_):
+        t0_ = time.time()
+        return _canonical_lookup(s_, r_, c, res, log), time.time() - t0_
+
     for i, s in enumerate(stops):
+        t0 = time.time()
         try:
             r = _resolve_stop(s, c, res, st, log)
         except Exception as e:  # one bad item must not sink the preview
             r = {"unresolved": True, "reason": f"lookup error: {type(e).__name__}"}
+        resolved.append((s, r, time.time() - t0))
+        if not r.get("unresolved"):
+            futures[i] = pool.submit(_canon_job, s, r)
+            submitted[i] = time.time()
+    t_pins = time.time() - t_all
+
+    canon: Dict[int, Tuple[Optional[Dict], float]] = {}
+    timed_out: List[int] = []
+    # [LOCAL-893 live finding] With a deadline measured only from the start, the
+    # LAST stop's lookup (submitted after a slow pin phase) got ~0.05 s and was
+    # always abandoned (Thi Bar, 3 of 3 cloud-snapshot calls). Every lookup also
+    # gets a minimum grace from its own submit time.
+    grace_s = float(os.environ.get("PREVIEW_CANON_MIN_GRACE_S", "2.0") or 2.0)
+    for i, fut in futures.items():
+        remaining = max(0.05, deadline_s - (time.time() - t_all),
+                        grace_s - (time.time() - submitted[i]))
+        try:
+            canon[i] = fut.result(timeout=remaining)
+        except Exception as e:      # FutureTimeout (deadline) or a lookup error
+            canon[i] = (None, time.time() - t_all)
+            if isinstance(e, FutureTimeout):
+                timed_out.append(i)
+                log(f"[LOCAL-893] canonical lookup for {resolved[i][0]['name']!r} "
+                    f"abandoned at the {deadline_s:.1f}s preview deadline — keeping "
+                    f"the pin resolver's name (the lookup finishes in the background)")
+    pool.shutdown(wait=False)
+    t_canon = time.time() - t_all - t_pins if time.time() - t_all > t_pins else 0.0
+
+    out = []
+    for i, (s, r, t_pin) in enumerate(resolved):
         item = {"index": i, "name": s["name"], "alt_names": s["alt_names"],
                 "note": s["note"], "url": s["url"]}
         if r.get("unresolved"):
@@ -726,35 +819,8 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
                 if a:
                     alias_title = a["title"]
                     break
-            # [LOCAL-882 task C] Derive the CANONICAL venue at the resolved pin at
-            # RUNTIME (Wikidata within 300 m of the pin, then Places), so the
-            # name carried to generation as the research match_name/alias comes
-            # from the pin, not from a hand-written place-name table (D769). The
-            # user's own wording stays the spoken title (stop_name); the canonical
-            # English + local labels become match_name and aliases for evidence
-            # and signature stories. A None result keeps the existing behaviour.
-            _canon = None
+            _canon, _ = canon.get(i, (None, 0.0))
             _canon_aliases: List[str] = []
-            try:
-                _local_lang = ""
-                try:
-                    import wikidata_landmark_lookup as _wll882
-                    _local_lang = _wll882.local_lang_for_scope(
-                        f"{c.get('name','')}, {c.get('country_code','')}")
-                except Exception:
-                    _local_lang = ""
-                _user_link882 = str(s.get("url") or "")
-                try:
-                    _canon = res.canonical(s["name"], (r["lat"], r["lng"]),
-                                           c.get("name", ""), _local_lang,
-                                           user_link=_user_link882)
-                except TypeError:
-                    # an injected resolver without the LOCAL-883 user_link kwarg
-                    _canon = res.canonical(s["name"], (r["lat"], r["lng"]),
-                                           c.get("name", ""), _local_lang)
-            except Exception as _ce882:
-                log(f"[LOCAL-882] canonical resolve skipped for {s['name']!r}: {_ce882}")
-                _canon = None
             if _canon and _canon.get("canonical_en"):
                 _matched = _canon["canonical_en"]
                 _canon_aliases = list(_canon.get("aliases") or [])
@@ -772,7 +838,12 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
                         confidence=r["confidence"], unresolved=False)
         out.append(item)
         log(f"[LOCAL-867] preview {i + 1}/{len(stops)} {s['name']!r} -> "
-            f"{item['source'] or 'UNRESOLVED'}")
+            f"{item['source'] or 'UNRESOLVED'} "
+            f"(pin {t_pin:.2f}s, canonical {canon.get(i, (None, 0.0))[1]:.2f}s)")
+    log(f"[LOCAL-893] preview timing: {len(stops)} stops, pins {t_pins:.2f}s "
+        f"(sequential), canonical tail {t_canon:.2f}s after the last pin "
+        f"({workers} workers, deadline {deadline_s:.1f}s, {len(timed_out)} abandoned), "
+        f"total {time.time() - t_all:.2f}s")
 
     rate = 0.002
     try:
@@ -906,7 +977,41 @@ def expand_pasted_lists(raw_stops, city_hint: str = "", resolve: bool = False):
         return raw_stops, 0
 
 
+def clean_raw_stop_titles(raw_stops, city_hint: str = ""):
+    """[LOCAL-893] Offline title cleaning for plain-name user stops, identical to
+    what /preview-stops applies (it IS ``parse_itinerary``): ``Opera House_Đồng
+    Khởi`` / ``Opera House/Đồng Khởi`` -> ``Opera House``, ``City Hall & Nguyễn
+    Huệ`` -> ``City Hall``, ``Bạch Đằng Pier (tour-bus + waterbus)`` -> ``Bạch
+    Đằng Pier``. No network. Items with a link or pin, objects, and anything the
+    parser does not reduce to exactly one stop pass through unchanged. Never
+    raises. Used when the preview could not be reached, so the generator never
+    receives the raw wording."""
+    if not isinstance(raw_stops, list):
+        return raw_stops
+    out = list(raw_stops)
+    for i, s in enumerate(raw_stops):
+        try:
+            if not (isinstance(s, str) and s.strip()) or "http" in s \
+                    or any(m in s for m in _LIST_MARKERS):
+                continue
+            got = parse_itinerary(s.strip(), city_hint)
+            if len(got) == 1 and got[0].get("name"):
+                out[i] = got[0]["name"]
+        except Exception:
+            continue
+    return out
+
+
 def resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn=None):
+    """Pins via the preview; on ANY failure the stops still leave with cleaned
+    titles (LOCAL-893), never raw. See ``_resolve_user_stop_pins``."""
+    out, n = _resolve_user_stop_pins(raw_stops, city_hint, log, preview_fn)
+    if n == 0 and isinstance(out, list) and not any(isinstance(x, dict) for x in out):
+        out = clean_raw_stop_titles(out, city_hint)
+    return out, n
+
+
+def _resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn=None):
     """[LEAD wave-30 finding] Give every plain-name user stop a checked pin, with the
     same free resolvers as /preview-stops (no LLM; Serper /places only for leftovers).
     This covers the pasted list AND the app's already-split stops. Items that already

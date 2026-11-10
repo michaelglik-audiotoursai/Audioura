@@ -14082,6 +14082,19 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                             for p, raw in zip(_us_parsed, forced_stops)]
         else:
             _clean_names = list(forced_stops)
+        # [LOCAL-893] Wave-40 title cleaning on the generator too, so a request
+        # that arrives with RAW strings (preview unreachable / direct caller) never
+        # yields "Opera House_Đồng Khởi" or "(tour-bus + waterbus)" as a title.
+        # Stops carrying a link/pin are untouched; offline; never raises.
+        try:
+            from itinerary_import import clean_raw_stop_titles as _crst893
+            _cn893 = _crst893(_clean_names, (location or "").split(",")[0].strip())
+            for _a893, _b893 in zip(_clean_names, _cn893):
+                if _a893 != _b893:
+                    print(f"  [LOCAL-893] raw stop title {_a893!r} -> {_b893!r}")
+            _clean_names = _cn893
+        except Exception as _c893:
+            print(f"  [LOCAL-893] title cleaning skipped (non-fatal): {_c893}")
 
         # [LOCAL-554] Present the listener's own words properly. Matching and
         # protection still key on what they typed; only the DISPLAY title changes.
@@ -35308,6 +35321,19 @@ RULES:
             _ground_cap883 = float(os.environ.get(
                 "GROUNDING_GATE_MAX_USD",
                 f"{max(1, _n_stops883) * 0.008:.4f}"))
+
+            # [LOCAL-893] Proof hook, OFF unless EVIDENCE_BUNDLE_DUMP names a file:
+            # the generator runs in its own container on the real orchestrator
+            # path, so the in-process sinks the independent audit used to read are
+            # not reachable. Write the per-stop evidence the gate sees instead.
+            _dump893 = os.environ.get("EVIDENCE_BUNDLE_DUMP")
+            if _dump893:
+                try:
+                    with open(_dump893, "w", encoding="utf-8") as _df893:
+                        json.dump({str(k): v for k, v in _ev883.items()}, _df893,
+                                  ensure_ascii=False)
+                except Exception as _de893:
+                    print(f"  [LOCAL-893] evidence dump failed (non-fatal): {_de893}")
 
             complete_tour, _g883_rep = _sgg883.ground_tour_text(
                 complete_tour, _ev883, location=location or "",

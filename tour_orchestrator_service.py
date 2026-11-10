@@ -282,6 +282,48 @@ def _get_auth_headers(target_url):
     return {}
 
 
+def _d762_gen_preview(_text, _city):
+    """[LOCAL-893] POST the generator's /preview-stops for the D762 pin resolve.
+    Module-level so the timeout/retry/ERROR behaviour is unit-testable."""
+    # [LOCAL-893] The read timeout was 20 s; with LOCAL-882's canonical
+    # lookups the preview took ~18 s on Cloud Run and wave 43 timed out
+    # 0.9 s early, so every stop reached the generator as a RAW string.
+    # 60 s, one retry on timeout, and NEVER a silent fallback.
+    _pv_timeout = float(os.getenv("D762_PREVIEW_TIMEOUT_S", "60"))
+    _pv_err = None
+    for _pv_try in (1, 2):
+        _t_pv = time.time()
+        try:
+            _r = _authenticated_request(
+                "POST", f"{TOUR_GENERATOR_URL}/preview-stops",
+                json={"text": _text, "city": _city}, timeout=_pv_timeout)
+        except Exception as _pv_exc:
+            _r = None
+            _pv_err = f"{type(_pv_exc).__name__}: {_pv_exc}"
+            _timed_out = "timed out" in _pv_err.lower() or "Timeout" in _pv_err
+            if _timed_out and _pv_try == 1:
+                print(f"[D762] /preview-stops timed out after "
+                      f"{time.time() - _t_pv:.1f}s (limit {_pv_timeout:.0f}s) "
+                      f"— retrying once")
+                continue
+            break
+        if _r is not None and _r.status_code == 200:
+            print(f"[D762] /preview-stops OK in {time.time() - _t_pv:.1f}s "
+                  f"(try {_pv_try})")
+            return _r.json()
+        _pv_err = f"preview HTTP {getattr(_r, 'status_code', None)}"
+        break
+    _msg = (f"[D762] PREVIEW FAILED — generating from raw strings "
+            f"({_pv_err}); titles cleaned offline, pins left to the generator")
+    print(f"ERROR {_msg}")
+    try:
+        import logging as _lg893
+        _lg893.getLogger(__name__).error(_msg)
+    except Exception:
+        pass
+    return {"ok": False, "error": _pv_err or "preview failed"}
+
+
 def _authenticated_request(method, url, **kwargs):
     """Wrapper for requests that adds identity token for Cloud Run service-to-service calls."""
     # Extract base URL for audience (scheme + netloc)
@@ -4006,10 +4048,7 @@ def generate_complete_tour():
                 # [LEAD wave-31 finding] Resolve on the GENERATOR's /preview-stops:
                 # it already has the resolver modules and the Serper key; the
                 # orchestrator image has neither (No module named 'city_scope').
-                _r = _authenticated_request("POST", f"{TOUR_GENERATOR_URL}/preview-stops",
-                                            json={"text": _text, "city": _city}, timeout=20)
-                return _r.json() if _r is not None and _r.status_code == 200 else {
-                    "ok": False, "error": f"preview HTTP {getattr(_r, 'status_code', None)}"}
+                return _d762_gen_preview(_text, _city)
 
             _raw_stops, _pin_n = _rusp(_raw_stops, data.get('location') or '',
                                        preview_fn=_gen_preview)
