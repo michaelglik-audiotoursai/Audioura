@@ -554,7 +554,7 @@ _REL = {
                        r"assembly|met\s+(?:here|at))\b"),
     "build": re.compile(r"(?i)\b(?:built|constructed?|construction|completed|designed|opened|erected|"
                         r"founded|established|inaugurated)\b"),
-    "rename": re.compile(r"(?i)\b(?:renamed|named|known\s+as|called)\b"),
+    "rename": re.compile(r"(?i)\brenamed\b"),
     "damage": re.compile(r"(?i)\b(?:bombed|bombing|damaged|destroyed|burn\w*|demolished|attacked|shelled)\b"),
 }
 _ENTITY = re.compile(r"\b(?:[A-ZÀ-ỸĐ][\wÀ-ÿ'’-]+)(?:\s+(?:of|de|the|and)?\s*[A-ZÀ-ỸĐ][\wÀ-ÿ'’-]+)+")
@@ -592,7 +592,9 @@ def near_repeats(sentences: Sequence[str], ref: Referent) -> List[Tuple[int, int
             same_rel = [r for r, rx in _REL.items() if rx.search(sentences[i]) and rx.search(sentences[j])]
             jac = len(ct[i] & ct[j]) / max(1, min(len(ct[i]), len(ct[j])))
             why = None
-            if shared and same_rel:
+            if len(shared) >= 2 and jac >= 0.3:
+                why = "names " + " and ".join(sorted(shared)[:2]) + " again"
+            elif shared and same_rel and (jac >= 0.3 or any(r in ("host", "damage") for r in same_rel)):
                 why = f"states the same {same_rel[0]} fact about {sorted(shared)[0]!r} twice"
             elif jac >= 0.7:
                 why = f"{int(jac * 100)}% of its content repeats another sentence"
@@ -632,6 +634,9 @@ def is_raw_lead(sentence: str, ref: Referent) -> bool:
     s = sentence.strip()
     if not _LEAD_FORM.search(s):
         return False
+    if (not _YEARNUM.search(s) and re.search(r"\b(?:in|at|on|near|next\s+to)\s+(?:the\s+)?[A-ZÀ-Ỹ]", s)
+            and len(s) < 220):
+        return True                       # "X is a post office in Y Square, Z ward, City, next to ..."
     return bool(_ADDRESS.search(s)) or bool(re.search(r"(?i),\s*(?:vietnam|france|italy|spain|usa|"
                                                        r"united\s+states|england|germany|japan|china)\.?$", s))
 
