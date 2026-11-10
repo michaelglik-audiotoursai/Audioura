@@ -1,6 +1,6 @@
 # docker-compose.local887-proof.yml: LOCAL-887 OWN isolated database (D753).
 #
-# Separate compose project (-p local887), OWN postgres volume, spare port 55986.
+# Separate compose project (-p local887), OWN postgres volume, spare port 55987.
 # NEVER touches the shared audioura-* containers, the shared dev postgres
 # (development-postgres-2-1 on :5433), or the live DB. Schema/seed are the repo's
 # local821-initdb (same as the LOCAL-821/872c/878/879/880/881/882/883 stacks).
@@ -24,7 +24,7 @@ services:
       POSTGRES_INITDB_ARGS: "--auth-host=md5 --auth-local=md5"
       POSTGRES_HOST_AUTH_METHOD: md5
     ports:
-      - "55986:5432"
+      - "55987:5432"
     volumes:
       - local887_pg:/var/lib/postgresql/data
       - ./local821-initdb:/docker-entrypoint-initdb.d:ro
