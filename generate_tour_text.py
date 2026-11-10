@@ -24437,6 +24437,19 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                     if _normalize(_skey) == _norm_poi:
                         _stop_snippets = _sval
                         break
+            # [LOCAL-888] The narrator was fed these snippets, but they live in the
+            # job-scoped map, invisible to the MAIN-thread grounding gate (the
+            # gate then saw "no evidence" and dropped the stop's whole history —
+            # the Café regression). Record them in the process-global sink the gate
+            # merges, so it grounds against what the narrator actually saw.
+            if _stop_snippets:
+                try:
+                    from stop_coherence import snippets_as_evidence_texts
+                    _wiki_evidence_sink_record(
+                        _J._THIN_SINK_KEY, poi_name,
+                        snippets_as_evidence_texts(_stop_snippets))
+                except Exception:
+                    pass
             if _stop_snippets:
                 # [LOCAL-411] Rank and cap snippets — top 5, not all 30.
                 # Score by story quality (named person + verb of consequence + date).
@@ -35022,6 +35035,14 @@ RULES:
                 complete_tour, location,
                 facts_by_title=_facts_map_873b, fact_filter=_fact_ok_873b,
                 claim_gate_fn=_claim_gate_873c, log=print)
+            # [LOCAL-888] facts the rebuild escalated NOW (Book Street) were kept in
+            # a local map only; the grounding gate then saw the stop as having no
+            # evidence. Record them in the process-global sink the gate merges.
+            try:
+                for _ek, _ev in (_tsd_rep.get("facts_by_title") or {}).items():
+                    _thin_sink_record(_J._THIN_SINK_KEY, _ek, _ev)
+            except Exception:
+                pass
             if _tsd_rep.get("rebuilt"):
                 print(f"  [LOCAL-873B] post-narration thin check: "
                       f"{_tsd_rep.get('rebuilt', 0)} stop(s) rebuilt from facts "
@@ -35226,10 +35247,16 @@ RULES:
                                 location=_loc or "")
                         except Exception:
                             return []
-                    _sents, _r = _tsd883.narrate_stop_body(
-                        _title, _facts or [], location=location or "",
-                        claim_gate_fn=_claim_gate_883, log=print)
-                    return _sents or []
+                    # [LOCAL-888] 5 sentences first, then 4: a stop with a short
+                    # but real evidence base still gets refilled (>= 4 floor).
+                    for _min_n in (5, 4):
+                        _sents, _r = _tsd883.narrate_stop_body(
+                            _title, _facts or [], location=location or "",
+                            claim_gate_fn=_claim_gate_883, min_sentences=_min_n,
+                            log=print)
+                        if _sents:
+                            return _sents
+                    return []
                 except Exception:
                     return []
 
@@ -35240,12 +35267,12 @@ RULES:
                 _n_stops883 = 10
             _ground_cap883 = float(os.environ.get(
                 "GROUNDING_GATE_MAX_USD",
-                f"{max(1, _n_stops883) * 0.003:.4f}"))
+                f"{max(1, _n_stops883) * 0.008:.4f}"))
 
             complete_tour, _g883_rep = _sgg883.ground_tour_text(
                 complete_tour, _ev883, location=location or "",
                 rebuild_fn=_rebuild_from_facts_883, facts_by_title=_facts883,
-                max_cost_usd=_ground_cap883, log=print)
+                max_cost_usd=_ground_cap883, coherence=True, log=print)
             print(f"  [LOCAL-883] grounding gate: "
                   f"{_g883_rep.get('stops', 0)} stop(s), "
                   f"{_g883_rep.get('grounded', 0)} edited, "

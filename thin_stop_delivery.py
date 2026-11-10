@@ -735,6 +735,7 @@ def rebuild_thin_delivered_stops(
                 if rep and rep.get("facts"):
                     facts = rep["facts"]
                     facts_by_title[title] = facts
+                    report.setdefault("facts_by_title", {})[title] = facts
                     report["escalated"] += 1
                     report["added_cost_usd"] += float(rep.get("cost_usd", 0.0) or 0.0)
 
