@@ -242,87 +242,90 @@ def cmd_run():
 
     rows = []
     meter0 = _meter_total()      # profile + tour both count toward this run
-    # 1. profile /preview-stops on the 10 raw strings
-    secs, pv = profile_preview()
-    print(f"\n/preview-stops direct: {secs:.2f}s ({pv.get('count')} stops, "
-          f"{pv.get('unresolved_count')} unresolved)")
-    rows.append((f"/preview-stops under {PREVIEW_TARGET_S:.0f}s for 10 stops",
-                 secs < PREVIEW_TARGET_S, f"{secs:.2f}s"))
-    gen_pv_log = _logs("tour-generator")
-    pv_timing = re.findall(r"\[LOCAL-893\] preview timing:.*", gen_pv_log)
-    for l in pv_timing[-1:]:
-        print("  ", l)
-    # 2. ONE full tour through the real orchestrator path (the profile above spends
-    #    pennies of Places/Serper; it is part of this run's metered total)
-    marker = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
-    t0 = time.time()
-    job = _post(f"{ORCH}/generate-complete-tour",
-                {"location": LOCATION, "tour_type": "walking", "total_stops": 10,
-                 "user_id": "local893-tester", "stops": RAW_STOPS, "is_test": True}, 120)
-    jid = job.get("job_id")
-    print(f"\njob {jid} submitted: {json.dumps(job)[:200]}")
-    status = None
-    while time.time() - t0 < 1800:
-        time.sleep(20)
-        try:
-            st = json.loads(urllib.request.urlopen(f"{ORCH}/status/{jid}", timeout=30).read())
-        except Exception as e:
-            print("  status err", str(e)[:80])
-            continue
-        status = st.get("status")
-        print(f"  [{int(time.time() - t0):4d}s] {status} {st.get('progress', '')[:80]}")
-        if status in ("completed", "failed", "error"):
-            break
-    secs_total = time.time() - t0
-    import psycopg2
-    conn = psycopg2.connect(DB_URL)
-    cur = conn.cursor()
-    cur.execute("SELECT tour_content FROM audio_tours WHERE is_test ORDER BY id DESC LIMIT 1")
-    row = cur.fetchone()
-    conn.close()
-    text = (row[0] if row else "") or ""
-    open(os.path.join(ART_DIR, "saigon_real_path.txt"), "w", encoding="utf-8").write(text)
-    orch_log = _logs("tour-orchestrator")
-    gen_log = _logs("tour-generator")
-    open(os.path.join(METER_DIR, "orch.log"), "w", encoding="utf-8").write(orch_log)
-    open(os.path.join(METER_DIR, "gen.log"), "w", encoding="utf-8").write(gen_log)
-    rows.append(("job completed", status == "completed", f"{status} in {secs_total:.0f}s"))
-    ok = report(rows, "PREVIEW + JOB")
-    ok &= report(assess_orch_log(orch_log), "ORCHESTRATOR LOG (D762)")
-    ok &= report(assess_gen_log(gen_log), "GENERATOR LOG")
-    ev_chars = None
-    ev_path = os.path.join(METER_DIR, "evidence_bundle.json")
-    ev = {}
-    if os.path.exists(ev_path):
-        ev = json.load(open(ev_path, encoding="utf-8"))
-        ev_chars = {k: len((v or "").strip()) for k, v in ev.items()}
-    ok &= report(assess_tour(text, ev_chars), "TOUR (titles / pins / wave-43 checklist)")
-    # 3. independent audit on the same evidence
-    audit_ran = False
+    gen_log, audit_ran, ok = "", False, False
     try:
-        import run_cloud_parity_proof_884 as h884
-        audit, audit_ok = h884.independent_audit(text, ev)
-        audit_ran = True
-        json.dump(audit, open(os.path.join(ART_DIR, "saigon_real_path_audit.json"), "w",
-                              encoding="utf-8"), ensure_ascii=False, indent=2)
-        uns = audit.get("unsupported")
-        n = len(uns) if isinstance(uns, list) else None
-        print(f"\n  audit unsupported = {n}")
-        ok &= bool(audit_ok)
-    except Exception as e:
-        print(f"  audit failed to run: {type(e).__name__}: {e}")
-        ok = False
-    # 4. meter -> cumulative ledger (always)
-    import meter_guard
-    usd = max(0.0, _meter_total() - meter0)
-    rows_n = meter_guard.count_rows(os.path.join(METER_DIR, "paid_api_calls.jsonl"))
-    verdict = meter_guard.check_meter(rows_n, usd, gen_log, audit_ran)
-    rec = verdict["record_usd"]
-    task_budget.record_run(TASK, rec, note="real orchestrator path, 1 full tour"
-                           + ("" if verdict["ok"] else " (ESTIMATE: meter undercount)"))
-    print(f"\n[LOCAL-893] {verdict['message']}")
-    print(f"[LOCAL-893] run metered ${rec:.4f}; ledger now "
-          f"${task_budget.spent_so_far(TASK)} of ${cap:.2f}")
+        # 1. profile /preview-stops on the 10 raw strings
+        secs, pv = profile_preview()
+        print(f"\n/preview-stops direct: {secs:.2f}s ({pv.get('count')} stops, "
+              f"{pv.get('unresolved_count')} unresolved)")
+        rows.append((f"/preview-stops under {PREVIEW_TARGET_S:.0f}s for 10 stops",
+                     secs < PREVIEW_TARGET_S, f"{secs:.2f}s"))
+        gen_pv_log = _logs("tour-generator")
+        pv_timing = re.findall(r"\[LOCAL-893\] preview timing:.*", gen_pv_log)
+        for l in pv_timing[-1:]:
+            print("  ", l)
+        # 2. ONE full tour through the real orchestrator path (the profile above spends
+        #    pennies of Places/Serper; it is part of this run's metered total)
+        marker = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())
+        t0 = time.time()
+        job = _post(f"{ORCH}/generate-complete-tour",
+                    {"location": LOCATION, "tour_type": "walking", "total_stops": 10,
+                     "user_id": "local821-tester", "stops": RAW_STOPS, "is_test": True}, 120)
+        jid = job.get("job_id")
+        print(f"\njob {jid} submitted: {json.dumps(job)[:200]}")
+        status = None
+        while time.time() - t0 < 1800:
+            time.sleep(20)
+            try:
+                st = json.loads(urllib.request.urlopen(f"{ORCH}/status/{jid}", timeout=30).read())
+            except Exception as e:
+                print("  status err", str(e)[:80])
+                continue
+            status = st.get("status")
+            print(f"  [{int(time.time() - t0):4d}s] {status} {st.get('progress', '')[:80]}")
+            if status in ("completed", "failed", "error"):
+                break
+        secs_total = time.time() - t0
+        import psycopg2
+        conn = psycopg2.connect(DB_URL)
+        cur = conn.cursor()
+        cur.execute("SELECT tour_content FROM audio_tours WHERE is_test ORDER BY id DESC LIMIT 1")
+        row = cur.fetchone()
+        conn.close()
+        text = (row[0] if row else "") or ""
+        open(os.path.join(ART_DIR, "saigon_real_path.txt"), "w", encoding="utf-8").write(text)
+        orch_log = _logs("tour-orchestrator")
+        gen_log = _logs("tour-generator")
+        open(os.path.join(METER_DIR, "orch.log"), "w", encoding="utf-8").write(orch_log)
+        open(os.path.join(METER_DIR, "gen.log"), "w", encoding="utf-8").write(gen_log)
+        rows.append(("job completed", status == "completed", f"{status} in {secs_total:.0f}s"))
+        ok = report(rows, "PREVIEW + JOB")
+        ok &= report(assess_orch_log(orch_log), "ORCHESTRATOR LOG (D762)")
+        ok &= report(assess_gen_log(gen_log), "GENERATOR LOG")
+        ev_chars = None
+        ev_path = os.path.join(METER_DIR, "evidence_bundle.json")
+        ev = {}
+        if os.path.exists(ev_path):
+            ev = json.load(open(ev_path, encoding="utf-8"))
+            ev_chars = {k: len((v or "").strip()) for k, v in ev.items()}
+        ok &= report(assess_tour(text, ev_chars), "TOUR (titles / pins / wave-43 checklist)")
+        # 3. independent audit on the same evidence
+        audit_ran = False
+        try:
+            import run_cloud_parity_proof_884 as h884
+            audit, audit_ok = h884.independent_audit(text, ev)
+            audit_ran = True
+            json.dump(audit, open(os.path.join(ART_DIR, "saigon_real_path_audit.json"), "w",
+                                  encoding="utf-8"), ensure_ascii=False, indent=2)
+            uns = audit.get("unsupported")
+            n = len(uns) if isinstance(uns, list) else None
+            print(f"\n  audit unsupported = {n}")
+            ok &= bool(audit_ok)
+        except Exception as e:
+            print(f"  audit failed to run: {type(e).__name__}: {e}")
+            ok = False
+    finally:
+        # 4. meter -> cumulative ledger (always)
+        import meter_guard
+        usd = max(0.0, _meter_total() - meter0)
+        rows_n = meter_guard.count_rows(os.path.join(METER_DIR, "paid_api_calls.jsonl"))
+        verdict = meter_guard.check_meter(rows_n, usd, gen_log, audit_ran)
+        rec = verdict["record_usd"]
+        task_budget.record_run(TASK, rec, note="real orchestrator path, 1 full tour"
+                               + ("" if verdict["ok"] else " (ESTIMATE: meter undercount)"))
+        print(f"\n[LOCAL-893] {verdict['message']}")
+        print(f"[LOCAL-893] run metered ${rec:.4f}; ledger now "
+              f"${task_budget.spent_so_far(TASK)} of ${cap:.2f}")
     print(f"\n=== {'ALL PASS' if ok else 'SOME FAILED (report as-is, do not re-run)'} ===")
     return 0 if ok else 1
 
