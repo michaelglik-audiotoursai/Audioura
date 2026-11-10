@@ -35322,6 +35322,19 @@ RULES:
                 "GROUNDING_GATE_MAX_USD",
                 f"{max(1, _n_stops883) * 0.008:.4f}"))
 
+            # [LOCAL-893] Proof hook, OFF unless EVIDENCE_BUNDLE_DUMP names a file:
+            # the generator runs in its own container on the real orchestrator
+            # path, so the in-process sinks the independent audit used to read are
+            # not reachable. Write the per-stop evidence the gate sees instead.
+            _dump893 = os.environ.get("EVIDENCE_BUNDLE_DUMP")
+            if _dump893:
+                try:
+                    with open(_dump893, "w", encoding="utf-8") as _df893:
+                        json.dump({str(k): v for k, v in _ev883.items()}, _df893,
+                                  ensure_ascii=False)
+                except Exception as _de893:
+                    print(f"  [LOCAL-893] evidence dump failed (non-fatal): {_de893}")
+
             complete_tour, _g883_rep = _sgg883.ground_tour_text(
                 complete_tour, _ev883, location=location or "",
                 rebuild_fn=_rebuild_from_facts_883, facts_by_title=_facts883,

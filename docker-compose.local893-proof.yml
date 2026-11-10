@@ -110,6 +110,19 @@ services:
       - PYTHONPATH=/opt/meter
       - PAID_API_LOG=/meterlogs/paid_api_calls.jsonl
       - METER_SERVICE=LOCAL-893
+      - EVIDENCE_BUNDLE_DUMP=/meterlogs/evidence_bundle.json
+      - GROUNDING_GATE_ENABLED=1
+      - GROUNDING_GATE_MODEL=gpt-4.1-mini
+      - LANDMARK_LIVE_LOOKUP=1
+      - CHEAP_ARM_CATEGORIES=museum,walking,restaurant,facility,specialized
+      - NARRATION_MODEL=gpt-4.1-mini
+      - SIGNATURE_STORY_ENABLED=1
+      - SIGNATURE_STORY_MODEL=gpt-4.1-mini
+      - RESEARCH_BACKEND=serper
+      - STORY_PASS_MODEL=gpt-4.1-mini
+      - TOUR_STORY_MODEL=gpt-4o-mini
+      - TOUR_SCOPE_COMPARE_MODEL=gpt-4o-mini
+      - STOP_EXISTENCE_GATE_MODE=log_only
     volumes:
       - ./_local893_tours:/app/tours
       - ./_meter:/opt/meter:ro

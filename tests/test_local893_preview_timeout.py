@@ -242,3 +242,17 @@ def test_clean_leaves_links_pins_objects_and_odd_items_alone():
 def test_generator_cleaning_hook_is_wired():
     src = open(os.path.join(ROOT, "generate_tour_text.py"), encoding="utf-8").read()
     assert "clean_raw_stop_titles as _crst893" in src
+
+
+# ── 5. the real-path harness's own assertions ────────────────────────────────
+def test_harness_log_assertions():
+    import run_local893_real_path as h
+    ok = h.assess_orch_log("[D762] /preview-stops OK in 5.2s (try 1)\n"
+                           "[D762] user-stop pins resolved 10/10 (city X)\n")
+    assert all(p for _, p, _ in ok)
+    wave43 = h.assess_orch_log("[D762] user-stop pin resolve error: Read timed out "
+                               "(read timeout=20)\n")
+    assert not any(p for _, p, _ in wave43)
+    g = h.assess_gen_log("[LOCAL-852] user stop resolved 'Opera House_Đồng Khởi' "
+                         "(no coord — geocode by name) via name_only\n")
+    assert not g[0][1] and not g[1][1]
