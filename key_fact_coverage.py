@@ -1195,6 +1195,16 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
         else:
             keep_ok.append(x)
     cur = keep_ok
+    # [LOCAL-891] tangent / near-repeat / empty filler / raw-lead-at-the-end / pronoun-only opener
+    try:
+        import aboutness as _ab891
+        import strict_grounding_gate as _sgt
+        if _sgt._evidence_is_thin(evidence):          # the honest non-factual body stays as it is
+            rep["aboutness"] = {}
+        else:
+            cur, rep["aboutness"] = _ab891.clean_stop(title, cur, evidence, log=log, where=where)
+    except Exception as _e891:
+        rep["aboutness"] = {"error": str(_e891)}
     import strict_grounding_gate as _sgg
     if _sgg._evidence_is_thin(evidence):
         rep["filler"] = {"skipped": "no evidence (honest non-factual body)"}
@@ -1257,11 +1267,22 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
                 rep["injected"].append(f"{f['kind']}: {x[:90]}")
     # the filler cap must not leave the stop below the floor: top up with plain,
     # evidence-stated sentences (gated once), never with filler
+    # [LOCAL-891] a stop with a rich OWN article reaches 5 sentences, from that article's passages
+    # (885 select_passages), richest first -- not just its first 14 sentences
+    if art is not None:
+        min_sentences = max(min_sentences, 5)
     if len(cur) < min_sentences:
         import stop_coherence as _sc
         have = [claim_key(x, title) for x in cur]
         extra = []
-        for fs in _sc.evidence_fact_sentences(" ".join(own_prose_sentences(evidence, title)), limit=14):
+        try:
+            import aboutness as _ab891b
+            _pool = _ab891b.refill_facts(evidence, title, limit=30)
+        except Exception:
+            _pool = []
+        if not _pool:
+            _pool = _sc.evidence_fact_sentences(" ".join(own_prose_sentences(evidence, title)), limit=14)
+        for fs in _pool:
             fs = _clean_ev_sentence(fs)
             k2 = claim_key(fs, title)
             if (not fs.endswith((".", "!", "?")) or len(fs) > 300 or is_denied(title, fs, evidence)
@@ -1285,6 +1306,16 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
                 if _fold(fs) in ok:
                     cur.append(fs)
                     rep["injected"].append(f"floor: {fs[:90]}")
+    # [LOCAL-891] the refill/top-up must not leave a raw lead sentence at the end or filler
+    try:
+        import aboutness as _ab891c
+        cur, _r2 = _ab891c.clean_stop(title, cur, evidence, log=log, where=where)
+        for _k2, _v2 in _r2.items():
+            if isinstance(_v2, list) and _v2:
+                rep.setdefault("aboutness", {}).setdefault(_k2, [])
+                rep["aboutness"][_k2] = list(rep["aboutness"].get(_k2, [])) + _v2
+    except Exception:
+        pass
     # [LOCAL-890] end-state hygiene on the refill/coverage output
     fixed = []
     for x in cur:
