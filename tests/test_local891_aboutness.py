@@ -137,9 +137,9 @@ def test_judge_naming_a_context_item_is_overridden_by_an_about_item_that_carries
 
 def test_sentence_that_ties_the_event_to_a_different_place_is_kept_once():
     items = ab.build_items(CHURCH_OWN + "\n" + CITY_EVENT, "Some Church")
-    s1 = ("A few blocks away, at the old crossroads, Brother Anselm's relic was seized and became a grim "
+    s1 = ("A few blocks away, at Old Crossroads, Brother Anselm's relic was seized and became a grim "
           "symbol of the unrest.")
-    s2 = ("A few blocks away, the governor promised reforms but failed to deliver, prompting riots and raids "
+    s2 = ("A few blocks away, at the Governor House, the governor promised reforms but failed to deliver, prompting riots and raids "
           "on monasteries.")
     r1 = ab.assess(s1, items)
     assert r1["ok"] and r1["other_place"]
@@ -336,3 +336,84 @@ def test_replay_city_hall_and_opera_unchanged_by_the_new_rules_where_clean():
         ev = rec(R889[key])
         out, rep = sgg.apply_grounding_gate(title, " ".join(sents), ev, classify_fn=overlap_judge)
         assert len(out) > 0
+
+
+# ═════════ 7. the REAL 891 live bundles (submission_artifacts/local891/saigon_warm_evidence_bundle.json) ═════════
+LIVE_B = os.path.join(ROOT, "submission_artifacts", "local891", "saigon_warm_evidence_bundle.json")
+LIVE_T = os.path.join(ROOT, "submission_artifacts", "local891", "saigon_warm.txt")
+TET = ("Just steps away from here, on 1 February 1968, during the Tet Offensive, South Vietnamese police chief "
+       "Nguyen Ngoc Loan executed a handcuffed Viet Cong prisoner, Nguyen Van Lem, on a Saigon street near the "
+       "city center.")
+
+
+def _live():
+    return json.load(open(LIVE_B, encoding="utf-8"))
+
+
+def test_title_glued_snippet_segment_is_context_not_about():
+    """The Book Street snippet glued the page title to a Tet sentence ('Book Street On February 1, 1968 ...'),
+    and the 600-char item packed it with real Book Street sentences."""
+    its = ab.build_items(_live()["Book Street"]["evidence"], "Book Street")
+    tet = [i for i in its if "Tet Offensive" in i["text"] or "Eddie Adams" in i["text"]]
+    assert tet and not any(i["about_stop"] for i in tet)
+    assert sum(i["about_stop"] for i in its) >= 3
+    r = ab.assess(TET, its, ref=ab.Referent("Book Street"))
+    assert not r["ok"] and "off-topic" in r["why"]
+
+
+def test_glued_title_is_stripped_only_before_a_non_verb():
+    ref = ab.Referent("Some Street")
+    assert ab.strip_glued_title("Some Street On 3 May 1944 the city was bombed.", ref).startswith("On 3 May")
+    assert ab.strip_glued_title("Some Street is a pedestrian lane.", ref).startswith("Some Street is")
+
+
+def test_local_language_edition_whose_lead_subject_is_the_stop_is_about():
+    """The Cathedral's own article in the bundle was the Vietnamese edition; its body and infobox
+    ('architect: Jules Bourard; year completed: 1880') must be about the stop, the square's infobox not."""
+    its = ab.build_items(_live()["Cathedral"]["evidence"], "Cathedral")
+    vi = [i for i in its if i["kind"] == "local_edition"]
+    assert len(vi) >= 10 and all(i["about_stop"] for i in vi)
+    assert any("1880" in i["text"] and i["about_stop"] for i in its)
+    sq_info = [i for i in its if "former names" in i["text"]]
+    assert sq_info and not sq_info[0]["about_stop"]
+    assert ab.assess("The church was completed in 1880.", its, ref=ab.Referent("Cathedral"))["ok"]
+
+
+def test_neighbour_square_lead_is_not_the_subject():
+    ref = ab.Referent("Some Church")
+    assert ab.lead_subject_names_stop("Some Church is a church in Riverton.", ref)
+    assert not ab.lead_subject_names_stop("Old Square is a small square that surrounds Some Church.", ref)
+
+
+def test_mechanical_audit_of_the_live_text_flags_exactly_the_tet_sentence():
+    live = open(LIVE_T, encoding="utf-8").read()
+    ev = {t: v["evidence"] for t, v in _live().items()}
+    res = ab.audit_tour(live, ev)
+    claims = [o["claim"] for o in res["offtopic"]]
+    assert any("Tet Offensive" in c for c in claims), claims
+    assert not any("Thích" in c or "Diệm" in c for c in claims)
+    assert not any("completed in 1880" in c for c in claims)
+
+
+def test_live_text_has_no_city_event_but_the_book_street_one():
+    live = open(LIVE_T, encoding="utf-8").read()
+    for k in ("Thích Quảng Đức", "self-immolation", "stork", "From here, the tour can continue"):
+        assert k not in live
+
+
+def test_gate_replay_on_the_live_book_street_bundle_drops_the_tet_sentence():
+    live = open(LIVE_T, encoding="utf-8").read()
+    title, sents = stop_sents("Book Street", live)
+    ev = _live()["Book Street"]["evidence"]
+    out, rep = sgg.apply_grounding_gate(title, " ".join(sents), ev, classify_fn=overlap_judge)
+    assert "Tet Offensive" not in out and "Eddie Adams" not in out
+    assert "reading culture" in out
+    assert any("Tet" in o["claim"] for o in rep["offtopic"])
+
+
+def test_business_stop_named_by_its_street_number_is_about():
+    its = ab.build_items(_live()["Café Apartments 42"]["evidence"], "Café Apartments 42")
+    assert all(i["about_stop"] for i in its), [(i["id"], i["why"]) for i in its]
+    ref = ab.Referent("Café Apartments 42")
+    assert ref.mentions("the building at 42 Nguyen Hue served as a residence") >= 1
+    assert ref.mentions("it is 42 metres long") == 0

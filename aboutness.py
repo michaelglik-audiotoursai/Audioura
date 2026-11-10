@@ -102,6 +102,10 @@ class Referent:
     def __init__(self, title: str, aliases: Sequence[str] = (), art_title: str = "",
                  art_lead: str = ""):
         names = [title] + list(aliases or [])
+        self.title = title
+        # a street number in the name ("Cafe Apartments 42"): "the building at 42 Nguyen Hue" names the stop
+        self.nums = sorted({w for n in names for w in re.findall(r"\b\d{1,4}[A-Za-z]?\b", n or "")
+                            if not re.fullmatch(r"1[0-9]{3}|20[0-9]{2}", w)})
         self.phrases = []                    # folded multi-word names
         self.name_toks = set()               # distinctive (non-kind, non-generic) tokens
         self.kinds = set()
@@ -142,6 +146,9 @@ class Referent:
         """Count of times ``text`` names the stop."""
         f = _fold(text)
         n = 0
+        for num in self.nums:
+            n += len(re.findall(r"\b" + re.escape(num.lower()) + r"\s+(?!(?:meters?|metres?|km|years?|stops?|"
+                                r"minutes?|floors?|storeys?|rooms?|seats?)\b)[^\W\d_]{3,}", f))
         for ph in self.phrases:
             n += len(re.findall(r"\b" + re.escape(ph) + r"\b", f))
         # "The bar / The cafe / This street ..." opening a sentence is the stop for a snippet or review
@@ -201,10 +208,57 @@ def _paragraphs(text: str) -> List[str]:
     return [re.sub(r"^\s*\[[^\]]{1,60}\]\s*", "", p).strip() for p in re.split(r"\n+", text or "") if p.strip()]
 
 
+_BE_VERB = re.compile(r"(?i)^(?:is|was|are|were|has|had|have|hosts?|offers?|features?|stands?|lies|sits|"
+                      r"remains?|became|serves?|houses?|opened|opens|runs|links|connects|attracts|"
+                      r"welcomes|sells?|draws|boasts|retains|contains|includes)\b")
+
+
+def strip_glued_title(para: str, ref: "Referent") -> str:
+    """A scraped snippet often starts with the page TITLE glued to its first sentence ('Book Street
+    Associated Press photographer ... captured the execution ...'). The stop name there is a heading, not
+    a mention: strip it when the word after it is not a verb ('Book Street is a ...' stays)."""
+    p = (para or "").lstrip()
+    for name in sorted({ref.title} | {ph for ph in ref.phrases}, key=len, reverse=True):
+        if not name or len(name) < 4:
+            continue
+        m = re.match(r"(?i)^" + r"\s+".join(re.escape(w) for w in name.split()) + r"\s+(?=\S)", p)
+        if m and not _BE_VERB.match(p[m.end():]):
+            return p[m.end():]
+    return para
+
+
+def split_glued(text: str, ref: "Referent") -> str:
+    """Put a line break before every title-glued snippet segment ('... Hai Ba Trung Street. Book Street
+    On February 1, 1968, during ...'), so each scraped segment is judged on its own."""
+    names = sorted({ref.title} | set(ref.phrases), key=len, reverse=True)
+    out = text or ""
+    for name in names:
+        if not name or len(name) < 4:
+            continue
+        rx = re.compile(r"(?i)(?<=[.!?…])\s+(" + r"\s+".join(re.escape(w) for w in name.split()) + r")\s+(?=\S)")
+
+        def rep(m):
+            rest = out[m.end():m.end() + 30]
+            return ("\n" + m.group(1) + " ") if not _BE_VERB.match(rest) else m.group(0)
+        out = rx.sub(rep, out)
+    return out
+
+
+def lead_subject_names_stop(lead: str, ref: "Referent") -> bool:
+    """The article's SUBJECT (its lead sentence before 'is/was/la/est ...', parenthesised aliases
+    included) names the stop: it is the stop's own article in some language. A neighbour whose lead only
+    mentions the stop later ('... surrounds the Cathedral') is not."""
+    first = (split_sentences(re.sub(r"^\s*\[[^\]]{1,60}\]\s*", "", lead or "")) or [""])[0]
+    m = re.search(r"\s(?:is|was|are|were|là|est|es|ist|è)\s", first)
+    subj = first[:m.start()] if m else first[:160]
+    return ref.mentions(subj) > 0
+
+
 def para_about(para: str, ref: Referent, geo_m: Optional[float] = None) -> Tuple[bool, str]:
     """Is a non-own paragraph ABOUT the stop? It must name the stop with the weight of a subject:
     >= 2 mentions, or a mention in its first sentence (single-sentence items need 1). A geo-tag
     within 150 m lets a paragraph that names the stop stand on 1 mention anywhere."""
+    para = strip_glued_title(para, ref)
     sents = split_sentences(para)
     if not sents:
         return False, "empty"
@@ -255,6 +309,7 @@ def build_items(evidence: str, title: str, aliases: Sequence[str] = (),
             is_own = True                    # the stop's LOCAL-language edition (its local name)
         src = a.get("title", "")
         g = (geo or {}).get(_fold(src))
+        subject_ok = (not is_own) and lead_subject_names_stop(a.get("lead", ""), ref)
         body_parts = [("lead", a.get("lead", "")), ("passages", a.get("passages", ""))]
         for part, txt in body_parts:
             if not (txt or "").strip():
@@ -263,11 +318,16 @@ def build_items(evidence: str, title: str, aliases: Sequence[str] = (),
                 add(txt, True, "own_article", src, "the stop's own article")
                 continue
             for para in _paragraphs(txt):
+                if subject_ok:
+                    add(para, True, "local_edition", src, "its lead's subject is the stop")
+                    continue
                 ok, why = para_about(para, ref, g)
                 add(para, ok, "passage" if ok else "context", src, why)
         if a.get("infobox"):
             if is_own:
                 add(a["infobox"], True, "own_article", src, "own-article infobox")
+            elif subject_ok:
+                add(a["infobox"], True, "local_edition", src, "its lead's subject is the stop (infobox)")
             else:
                 ok, why = para_about(a["infobox"], ref, g)
                 add(a["infobox"], ok, "passage" if ok else "context", src, "infobox: " + why)
@@ -281,7 +341,7 @@ def build_items(evidence: str, title: str, aliases: Sequence[str] = (),
             # text after the last article body is not separable here; articles() already took it
     except Exception:
         pass
-    for chunk in _non_article_chunks(rest):
+    for chunk in _non_article_chunks(split_glued(rest, ref)):
         g = None
         if geo:
             for k, v in geo.items():
@@ -403,12 +463,13 @@ JUDGE_ADDENDUM = (
 
 
 # ═════════════════════ the aboutness verdict ═════════════════════
+_PLACE_AFTER = r",?\s+(?:at|on|in|near|by|outside|inside)\s+(?:the\s+)?[A-ZÀ-ỸĐ]"
 _OTHER_PLACE = re.compile(
-    r"(?i)\b(?:a\s+few\s+(?:blocks?|streets?|minutes?|hundred\s+(?:metres|meters|yards))\s+(?:away|from)|"
-    r"(?:blocks?|streets?)\s+away|not\s+far\s+from\s+here|elsewhere\s+in\s+the\s+(?:city|town)|"
-    r"(?:nearby|close\s+by),?\s+(?:at|on|in)\s+(?:the\s+)?[A-Z]|"
-    r"(?:a\s+short\s+walk|minutes?)\s+(?:away|from\s+here)|"
-    r"(?:at|on)\s+the\s+(?:intersection|junction|corner)\s+of\s+[A-Z])")
+    r"(?:\b(?:[Aa]\s+few\s+(?:blocks?|streets?|minutes?|hundred\s+(?:metres|meters|yards))\s+(?:away|from\s+here)|"
+    r"(?:[Bb]locks?|[Ss]treets?)\s+away|[Nn]ot\s+far\s+from\s+here|[Ee]lsewhere\s+in\s+the\s+(?:city|town)|"
+    r"(?:[Nn]earby|[Cc]lose\s+by)|[Aa]\s+short\s+walk\s+(?:away|from\s+here)|[Jj]ust\s+steps\s+away)"
+    + _PLACE_AFTER + r")"
+    r"|\b(?:at|on)\s+the\s+(?:intersection|junction|corner)\s+of\s+[A-ZÀ-ỸĐ]")
 
 
 def _coverage(sent_toks: set, item_text: str) -> float:
@@ -656,6 +717,13 @@ def fix_leading_pronoun(first: str, title: str) -> str:
 
 
 # ═════════════════════ one stop ═════════════════════
+def _about_cov(sentence: str, about_items: List[Dict]) -> float:
+    st = _distinct_toks(sentence)
+    if len(st) < 2 or not about_items:
+        return 0.0
+    return max(_coverage(st, it["text"]) for it in about_items)
+
+
 def clean_stop(title: str, sentences: List[str], evidence: str, *, items: Optional[List[Dict]] = None,
                log: Optional[Callable] = None, where: str = "final", min_keep: int = 2
                ) -> Tuple[List[str], Dict]:
@@ -677,6 +745,11 @@ def clean_stop(title: str, sentences: List[str], evidence: str, *, items: Option
     except Exception:
         pass
     cur = list(sentences)
+    try:
+        about_items = [it for it in (items if items is not None else build_items(evidence, title))
+                       if it["about_stop"]]
+    except Exception:
+        about_items = []
 
     def drop(i, bucket, why):
         if len(cur) <= min_keep:
@@ -703,8 +776,11 @@ def clean_stop(title: str, sentences: List[str], evidence: str, *, items: Option
             fact = _sgg.is_factual_sentence(s) or _past_event(s)
         except Exception:
             fact = True
-        if fact and own_sents and not _is_navigation(s) and not kfc.is_sensory(s):
+        if fact and own_sents and not _is_navigation(s) and not kfc.is_sensory(s) \
+                and not re.search(r"(?i)\b(?:you|your|you're)\b", s):
             why = tangent_reason(s, ref, own_sents)
+            if why and _about_cov(s, about_items) >= 0.5:
+                why = None                 # the stop's own text carries it: not a tangent
             if why:
                 drop(i, "tangent", why)
     for d, k, why in sorted(near_repeats(cur, ref), key=lambda x: -x[0]):
@@ -800,6 +876,9 @@ def narrator_items(title: str, wiki_items: Sequence[str], aliases: Sequence[str]
                                              and a.get("lang") == own.get("lang"))
                                 or _same_entity(own, a)):
             keep.append(it)
+            continue
+        if lead_subject_names_stop(a.get("lead", ""), ref):
+            keep.append(it)                  # the stop's own article in another language
             continue
         good, bad = [], []
         for part in (a.get("lead", ""), a.get("passages", "")):
