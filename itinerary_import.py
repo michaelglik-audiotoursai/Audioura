@@ -45,6 +45,7 @@ import threading
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from urllib.parse import quote
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -186,6 +187,13 @@ def parse_itinerary(text: str, city_hint: str = "") -> List[Dict]:
         if new == s:
             break
         s = new
+
+    # [LOCAL-893] The app sends "Opera House/Đồng Khởi" as "Opera House_Đồng Khởi"
+    # (the same underscore it uses for "/" in a mangled URL). URLs are protected
+    # above, so an underscore BETWEEN two word characters here is that qualifier:
+    # treat it as the "/" combine so the title is "Opera House" and the street an
+    # alt name, not part of the venue lookup ("Dong Khoi Street", 850 m off).
+    s = re.sub(r"(?<=[^\W_])_(?=[^\W_])", "/", s)
 
     # 2. inline "1) A 2) B" numbering -> newlines (only with >= 2 markers).
     if len(_INLINE_NUM_RE.findall(s)) >= 2:
@@ -738,9 +746,28 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
 
     st = _State(max_serper_calls)
     t_all = time.time()
-    # [LOCAL-893] Phase 1: pin resolution, sequential (shared Serper cap and the
-    # 1 req/s Nominatim limiter make this the part that cannot fan out).
+    # [LOCAL-893] The LOCAL-882 canonical-venue lookups (a WDQS "around" query and
+    # sometimes a Places call per stop) ran one after another AFTER each pin and
+    # took /preview-stops from ~6 s to ~18-25 s for ten stops, past the
+    # orchestrator's read timeout. They are independent per stop, so:
+    #   * each stop's lookup is submitted to a bounded pool (default 5 workers) the
+    #     moment its pin resolves, overlapping with the remaining sequential pin
+    #     resolution (shared Serper cap + 1 req/s Nominatim limiter);
+    #   * every lookup shares one deadline measured from the start of the call
+    #     (PREVIEW_CANON_DEADLINE_S, default 6.5 s). A lookup still running at the
+    #     deadline is ABANDONED LOUDLY and that stop keeps the pin resolver's own
+    #     name (the documented no-canonical behaviour); it finishes in the
+    #     background and warms its caches.
+    workers = max(1, int(os.environ.get("PREVIEW_CANON_WORKERS", "5") or 5))
+    deadline_s = float(os.environ.get("PREVIEW_CANON_DEADLINE_S", "6.5") or 6.5)
+    pool = ThreadPoolExecutor(max_workers=workers)
+    futures: Dict[int, "object"] = {}
     resolved: List[Tuple[Dict, Optional[Dict], float]] = []
+
+    def _canon_job(s_, r_):
+        t0_ = time.time()
+        return _canonical_lookup(s_, r_, c, res, log), time.time() - t0_
+
     for i, s in enumerate(stops):
         t0 = time.time()
         try:
@@ -748,27 +775,25 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
         except Exception as e:  # one bad item must not sink the preview
             r = {"unresolved": True, "reason": f"lookup error: {type(e).__name__}"}
         resolved.append((s, r, time.time() - t0))
+        if not r.get("unresolved"):
+            futures[i] = pool.submit(_canon_job, s, r)
     t_pins = time.time() - t_all
 
-    # [LOCAL-893] Phase 2: the LOCAL-882 canonical-venue lookups were run one
-    # after another inside the loop and took /preview-stops from ~6 s to ~18 s
-    # for ten stops (past the orchestrator's 20 s read timeout). They are
-    # independent per stop, so run them on a bounded pool.
-    workers = max(1, int(os.environ.get("PREVIEW_CANON_WORKERS", "5") or 5))
     canon: Dict[int, Tuple[Optional[Dict], float]] = {}
-    pending = [i for i, (_s, r, _t) in enumerate(resolved) if not r.get("unresolved")]
-
-    def _canon_job(i: int):
-        t0 = time.time()
-        s, r, _t = resolved[i]
-        return i, _canonical_lookup(s, r, c, res, log), time.time() - t0
-
-    t_c0 = time.time()
-    if pending:
-        with ThreadPoolExecutor(max_workers=min(workers, len(pending))) as pool:
-            for i, cn, dt in pool.map(_canon_job, pending):
-                canon[i] = (cn, dt)
-    t_canon = time.time() - t_c0
+    timed_out: List[int] = []
+    for i, fut in futures.items():
+        remaining = max(0.05, deadline_s - (time.time() - t_all))
+        try:
+            canon[i] = fut.result(timeout=remaining)
+        except Exception as e:      # FutureTimeout (deadline) or a lookup error
+            canon[i] = (None, time.time() - t_all)
+            if isinstance(e, FutureTimeout):
+                timed_out.append(i)
+                log(f"[LOCAL-893] canonical lookup for {resolved[i][0]['name']!r} "
+                    f"abandoned at the {deadline_s:.1f}s preview deadline — keeping "
+                    f"the pin resolver's name (the lookup finishes in the background)")
+    pool.shutdown(wait=False)
+    t_canon = time.time() - t_all - t_pins if time.time() - t_all > t_pins else 0.0
 
     out = []
     for i, (s, r, t_pin) in enumerate(resolved):
@@ -808,7 +833,8 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
             f"{item['source'] or 'UNRESOLVED'} "
             f"(pin {t_pin:.2f}s, canonical {canon.get(i, (None, 0.0))[1]:.2f}s)")
     log(f"[LOCAL-893] preview timing: {len(stops)} stops, pins {t_pins:.2f}s "
-        f"(sequential), canonical {t_canon:.2f}s ({workers} workers), "
+        f"(sequential), canonical tail {t_canon:.2f}s after the last pin "
+        f"({workers} workers, deadline {deadline_s:.1f}s, {len(timed_out)} abandoned), "
         f"total {time.time() - t_all:.2f}s")
 
     rate = 0.002
@@ -960,9 +986,7 @@ def clean_raw_stop_titles(raw_stops, city_hint: str = ""):
             if not (isinstance(s, str) and s.strip()) or "http" in s \
                     or any(m in s for m in _LIST_MARKERS):
                 continue
-            # the "_" street qualifier the app sends for "/" (wave 40)
-            probe = re.sub(r"(?<=\S)_(?=\S)", "/", s.strip())
-            got = parse_itinerary(probe, city_hint)
+            got = parse_itinerary(s.strip(), city_hint)
             if len(got) == 1 and got[0].get("name"):
                 out[i] = got[0]["name"]
         except Exception:

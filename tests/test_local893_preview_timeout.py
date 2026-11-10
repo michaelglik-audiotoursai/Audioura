@@ -256,3 +256,30 @@ def test_harness_log_assertions():
     g = h.assess_gen_log("[LOCAL-852] user stop resolved 'Opera House_Đồng Khởi' "
                          "(no coord — geocode by name) via name_only\n")
     assert not g[0][1] and not g[1][1]
+
+
+# ── 6. underscore qualifier + preview deadline ───────────────────────────────
+def test_parser_treats_underscore_street_qualifier_like_slash():
+    got = ii.parse_itinerary("Opera House_Đồng Khởi", CITY)
+    assert got[0]["name"] == "Opera House" and got[0]["alt_names"] == ["Đồng Khởi"]
+
+
+def test_underscore_inside_a_protected_url_is_untouched():
+    got = ii.parse_itinerary(
+        "Thi Bar https://www.google.com/maps/place/Thi_Bar/@10.7,106.6,17z", CITY)
+    assert got[0]["name"] == "Thi Bar" and "Thi_Bar" in got[0]["url"]
+
+
+def test_slow_canonical_is_abandoned_at_the_deadline_loudly(monkeypatch):
+    monkeypatch.setenv("PREVIEW_CANON_DEADLINE_S", "0.6")
+    lines = []
+    t0 = time.time()
+    out = ii.preview_stops("\n".join(CLEAN), CITY, resolvers=_stub_resolvers(5.0),
+                           log=lines.append)
+    dt = time.time() - t0
+    assert dt < 3.0, f"preview waited for the slow canonical lookups ({dt:.1f}s)"
+    assert out["ok"] and out["count"] == 10
+    resolved = [s for s in out["stops"] if not s["unresolved"]]
+    assert resolved and all(s["canonical_aliases"] == [] for s in resolved)
+    assert any("abandoned at the 0.6s preview deadline" in x for x in lines)
+    assert any("[LOCAL-893] preview timing" in x and "abandoned" in x for x in lines)
