@@ -307,10 +307,10 @@ def independent_audit(warm_text, evidence_by_stop, model=_AUDIT_MODEL):
         return {"error": "no OPENAI_API_KEY", "unsupported": None,
                 "evidence_chars": ev_counts}, False
     ev_blob = "\n\n".join(
-        f"### {t}  [{len((e or '').strip())} evidence chars]\n{(e or '').strip()[:6000]}"
+        f"### {t}  [{len((e or '').strip())} evidence chars]\n{(e or '').strip()}"
         for t, e in (evidence_by_stop or {}).items() if e)
     user = (f"TOUR TEXT:\n{warm_text[:16000]}\n\n"
-            f"PER-STOP EVIDENCE (with char counts):\n{ev_blob[:40000]}\n\n"
+            f"PER-STOP EVIDENCE (with char counts):\n{ev_blob[:150000]}\n\n"
             f"List every unsupported factual claim as JSON now.")
     try:
         import requests

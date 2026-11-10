@@ -208,7 +208,8 @@ def _generate(forced, cap_usd, tag):
     try:
         from live_run_meter import LiveRunMeter
         os.environ["TEST_GEMINI_MAX_USD"] = f"{max(0.0, cap_usd - before):.4f}"
-        _lrm = LiveRunMeter("LOCAL-882", cap_usd=cap_usd - before)
+        _lrm = LiveRunMeter(os.environ.get("TASK_BUDGET_ID") or "LOCAL-882",
+                            cap_usd=cap_usd - before)
     except Exception:
         _lrm = None
     import generate_tour_text as g
@@ -485,6 +486,182 @@ def phase(tag, cap_usd):
     return text, log
 
 
+# ── LOCAL-886: load the CLOUD cache snapshot, run ONLY the warm phase ─────────
+SNAPSHOT_GLOB = "cloud_*_cache_*.csv.gz"
+_SNAP_PORT = os.environ.get("LOCAL886_DB_PORT", "55986")
+_SNAP_DB = os.environ.get(
+    "LOCAL886_DB_URL", f"postgresql://admin:password123@localhost:{_SNAP_PORT}/audiotours")
+_SNAP_BUDGET_ID = "LOCAL-886"
+
+
+def _ensure_snapshot_tables(conn, log=print):
+    """Create each cache table with the GENERATOR'S OWN schema (its own lazy
+    CREATE TABLE IF NOT EXISTS) when it is missing. domain_tier_cache has no SQL
+    schema in the generator (it is a JSON file cache), so it gets a plain table
+    matching the snapshot header."""
+    import importlib
+    makers = [
+        ("landmark_wikipedia_evidence", "_ensure"),
+        ("wikidata_landmark_lookup", "_ensure_cache_table"),
+        ("local_language", "_ensure_cache"),
+        ("thin_verify_cache", "_ensure_table"),
+        ("venue_preflight", "_ensure_cache_table"),
+        ("venue_resolver", "_ensure_venue_works_table"),
+        ("work_story_research", "_ensure_cache_table"),
+    ]
+    for mod, fn in makers:
+        try:
+            m = importlib.import_module(mod)
+            for flag in ("_TABLE_OK", "_CACHE_TABLE_ENSURED", "_CACHE_TABLE_OK",
+                         "_VENUE_WORKS_TABLE_ENSURED"):
+                if hasattr(m, flag):
+                    setattr(m, flag, False)      # force the CREATE on this fresh DB
+            getattr(m, fn)(conn)
+            conn.commit()
+        except Exception as e:
+            conn.rollback()
+            log(f"  [snapshot] {mod}.{fn} failed: {type(e).__name__}: {str(e)[:160]}")
+    with conn.cursor() as cur:
+        cur.execute("""CREATE TABLE IF NOT EXISTS domain_tier_cache (
+            domain TEXT PRIMARY KEY, tier TEXT, checked_at TIMESTAMP,
+            expires_at TIMESTAMP)""")
+    conn.commit()
+
+
+def _snap_table_name(path):
+    m = re.match(r"cloud_(.+)_cache_\d+\.csv\.gz$", os.path.basename(path))
+    return f"{m.group(1)}_cache" if m else None
+
+
+def load_snapshot(snap_dir, db_url, log=print):
+    """Load every cloud_*_cache_*.csv.gz in snap_dir into the matching table of the
+    DISPOSABLE proof DB at db_url. Prints the row count per table before and after.
+    No DELETE/TRUNCATE: rows go through a temp staging table and INSERT ... ON
+    CONFLICT DO NOTHING. Refuses any DB that is not a local own-port DB.
+    Returns {table: (before, after)}."""
+    import csv
+    import glob
+    import gzip
+    import io
+    import psycopg2
+    from urllib.parse import urlparse
+    u = urlparse(db_url)
+    if u.hostname not in ("localhost", "127.0.0.1") or u.port in (None, 5432, 5433):
+        raise RuntimeError(f"refusing to load a snapshot into {u.hostname}:{u.port} "
+                           f"(not a disposable own-port proof DB)")
+    csv.field_size_limit(10 ** 9)
+    files = sorted(glob.glob(os.path.join(os.path.expanduser(snap_dir), SNAPSHOT_GLOB)))
+    if not files:
+        raise RuntimeError(f"no {SNAPSHOT_GLOB} in {snap_dir}")
+    conn = psycopg2.connect(db_url)
+    result = {}
+    try:
+        _ensure_snapshot_tables(conn, log)
+        for path in files:
+            table = _snap_table_name(path)
+            if not table:
+                continue
+            with gzip.open(path, "rt", encoding="utf-8", newline="") as fh:
+                text = fh.read()
+            cols = next(csv.reader([text.split("\n", 1)[0]]))
+            if table == "work_story_research_cache" and "id" in cols:
+                # SERIAL id: let the DB assign it (a copied id would not advance the sequence)
+                keep = [c for c in cols if c != "id"]
+            else:
+                keep = cols
+            col_list = ", ".join(f'"{c}"' for c in keep)
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT COUNT(*) FROM {table}")
+                before = cur.fetchone()[0]
+                cur.execute(f"CREATE TEMP TABLE _snap ON COMMIT DROP AS "
+                            f"SELECT {col_list} FROM {table} WITH NO DATA")
+                if keep == cols:
+                    cur.copy_expert("COPY _snap (%s) FROM STDIN WITH (FORMAT csv, HEADER true)"
+                                    % col_list, io.StringIO(text))
+                else:   # re-emit the CSV without the dropped column
+                    rows = list(csv.reader(io.StringIO(text)))
+                    idx = [cols.index(c) for c in keep]
+                    out = io.StringIO()
+                    w = csv.writer(out)
+                    for r in rows:
+                        w.writerow([r[i] for i in idx])
+                    cur.copy_expert("COPY _snap (%s) FROM STDIN WITH (FORMAT csv, HEADER true)"
+                                    % col_list, io.StringIO(out.getvalue()))
+                cur.execute(f"INSERT INTO {table} ({col_list}) SELECT {col_list} FROM _snap "
+                            f"ON CONFLICT DO NOTHING")
+                cur.execute(f"SELECT COUNT(*) FROM {table}")
+                after = cur.fetchone()[0]
+            conn.commit()
+            result[table] = (before, after)
+            log(f"  [snapshot] {table:28} rows before={before:4d}  after={after:4d}  "
+                f"({os.path.basename(path)})")
+    finally:
+        conn.close()
+    return result
+
+
+def snapshot_main(snap_dir):
+    """--snapshot DIR: load the cloud's warm cache, run ONLY the WARM phase, PASS-check
+    it, run the independent gpt-4.1 audit on the same evidence bundle. Own DB
+    (:55986), own budget ledger (LOCAL-886, default dir), at most one paid run per
+    call; the spend is recorded into the ledger even if the run crashes."""
+    global _OWN_DB, _METER_DIR, _ART_DIR
+    _OWN_DB, _METER_DIR = _SNAP_DB, os.path.join(_HERE, "_local886_meterlogs")
+    _ART_DIR = os.path.join(_HERE, "submission_artifacts", "local886")
+    os.makedirs(_ART_DIR, exist_ok=True)
+    os.makedirs(_METER_DIR, exist_ok=True)
+    if os.environ.get("TASK_BUDGET_ID") != _SNAP_BUDGET_ID:
+        sys.exit(f"refusing live run: launch with TASK_BUDGET_ID={_SNAP_BUDGET_ID}")
+    if os.environ.get("AUDIOURA_TASK_BUDGET_DIR"):
+        sys.exit("refusing: AUDIOURA_TASK_BUDGET_DIR must be unset (default ledger dir only)")
+    import task_budget
+    hard_cap = float(os.environ.get("TASK_BUDGET_USD", "0.70") or "0.70")
+    spent = task_budget.spent_so_far(_SNAP_BUDGET_ID)
+    audit_reserve = float(os.environ.get("LOCAL886_AUDIT_RESERVE", "0.08"))
+    print(f"[LOCAL-886] ledger spent_so_far={spent} of cap ${hard_cap:.2f}", flush=True)
+    if spent + audit_reserve + 0.10 > hard_cap:
+        sys.exit("refusing: not enough ledger headroom for one more run (unproven, hand to LEAD)")
+    os.environ.setdefault("PAID_API_LOG", os.path.join(_METER_DIR, "paid_api_calls.jsonl"))
+
+    _apply_live_env()
+    os.environ["DB_PORT"] = _SNAP_PORT
+    os.environ["DATABASE_URL"] = os.environ["VENUE_CACHE_DB_URL"] = _SNAP_DB
+    os.environ.setdefault("GROUNDING_GATE_ENABLED", "1")
+    os.environ.setdefault("GROUNDING_GATE_MODEL", "gpt-4.1-mini")
+
+    print("\n=== LOAD CLOUD CACHE SNAPSHOT ===", flush=True)
+    load_snapshot(snap_dir, _SNAP_DB, log=lambda m: print(m, flush=True))
+
+    sys.modules.setdefault("run_cloud_parity_proof", sys.modules[__name__])
+    import run_cloud_parity_proof_884 as h884
+    meter_before = _meter_total()
+    rc, run_usd = 1, 0.0
+    try:
+        warm_cap = meter_before + (hard_cap - spent - audit_reserve)
+        warm_text, warm_log = phase("warm", warm_cap)
+        print("\n=== WARM PASS CHECK (cloud-parity + 884 criteria) ===", flush=True)
+        warm_ok = h884.evaluate_884(warm_text, warm_log)
+        print(f"=== WARM {'PASS' if warm_ok else 'FAIL'} ===", flush=True)
+        print("\n=== INDEPENDENT gpt-4.1 AUDIT (same evidence bundle; evidence_chars/stop) ===",
+              flush=True)
+        ev = h884._build_evidence_by_stop()
+        audit, audit_ok = h884.independent_audit(warm_text, ev)
+        audit["used_cloud_snapshot"] = True
+        with open(os.path.join(_ART_DIR, "saigon_warm_audit.json"), "w", encoding="utf-8") as f:
+            json.dump(audit, f, ensure_ascii=False, indent=2)
+        uns = audit.get("unsupported")
+        print(f"   audit unsupported={len(uns) if isinstance(uns, list) else 'ERROR'}", flush=True)
+        for u in (uns or []):
+            print(f"      UNSUPPORTED [{u.get('stop')}]: {u.get('claim', '')[:120]}", flush=True)
+        rc = 0 if (warm_ok and audit_ok) else 1
+    finally:
+        run_usd = max(0.0, _meter_total() - meter_before)
+        task_budget.record_run(_SNAP_BUDGET_ID, run_usd, note="snapshot warm run + audit")
+        print(f"\n[LOCAL-886] run metered ${run_usd:.4f}; ledger now "
+              f"${task_budget.spent_so_far(_SNAP_BUDGET_ID)} of ${hard_cap:.2f}", flush=True)
+    return rc
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--selfcheck", action="store_true",
@@ -493,7 +670,14 @@ def main():
     ap.add_argument("--cold", action="store_true")
     ap.add_argument("--warm", action="store_true")
     ap.add_argument("--run", action="store_true", help="seed + cold + warm, PASS on warm")
+    ap.add_argument("--snapshot", metavar="DIR", default=None,
+                    help="LOCAL-886: load the CLOUD cache snapshot (cloud_*_cache_*.csv.gz) "
+                         "from DIR into the disposable proof DB, then run ONLY the WARM "
+                         "phase + the independent gpt-4.1 audit (no seed, no cold)")
     args = ap.parse_args()
+
+    if args.snapshot:
+        return snapshot_main(args.snapshot)
 
     os.makedirs(_ART_DIR, exist_ok=True)
     os.makedirs(_METER_DIR, exist_ok=True)
