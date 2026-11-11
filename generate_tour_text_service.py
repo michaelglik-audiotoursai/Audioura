@@ -1013,10 +1013,10 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
                       f"{_l831_svc_err}", flush=True)
 
         # Create a safe filename for the output
-        safe_location = ''.join(c if c.isalnum() else '_' for c in location)
-        safe_tour_type = ''.join(c if c.isalnum() else '_' for c in tour_type)
+        # [LOCAL-894B] bounded + hashed when long: a described request arrives whole.
+        from safe_filename import generator_output_filename as _gof894b
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"{safe_location}_{safe_tour_type}_tour_{timestamp}.txt"
+        output_filename = _gof894b(location, tour_type, timestamp)
         output_path = os.path.join(TOURS_DIR, output_filename)
         
         # Copy the temporary file to the output path

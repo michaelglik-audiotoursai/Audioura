@@ -986,6 +986,17 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                             facts.append(_fs)
                 except Exception:
                     pass
+            # [LOCAL-894B] a stop with SNIPPET evidence (no own article: every user-list
+            # landmark) got [] from refill_facts above; take its plain, distinct, English
+            # fact sentences that name the stop.
+            if len(facts) < 6 and not _evidence_is_thin(ev or ""):
+                try:
+                    import aboutness as _ab894b
+                    for _fs in _ab894b.snippet_facts(ev or "", title, limit=14):
+                        if _fs not in facts:
+                            facts.append(_fs)
+                except Exception:
+                    pass
             if len(facts) < 6 and not _evidence_is_thin(ev or ""):
                 try:
                     from stop_coherence import evidence_fact_sentences

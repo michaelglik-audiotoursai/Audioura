@@ -172,7 +172,11 @@ POLLY_TTS_URL = os.getenv('POLLY_TTS_URL', 'http://polly-tts-1:5018')
 def create_modernized_tour_zip(tour_data, job_id):
     """Create tour ZIP with separate MP3 and TXT files"""
     tour_name = tour_data.get('tour_name', f'tour_{job_id[:8]}')
-    zip_filename = f"{tour_name}_{job_id[:8]}.zip"
+    # [LOCAL-894B] the header's tour name can carry a long place/description; bound it.
+    from safe_filename import safe_component as _sc894b, safe_name as _sn894b
+    _stem = tour_name if len(tour_name.encode('utf-8')) <= 80 else _sc894b(tour_name, style='alnum')
+    _stem = _stem.replace('/', '_').replace('\\', '_').replace('\x00', '')
+    zip_filename = _sn894b(_stem, ext=".zip", suffix=f"_{job_id[:8]}")
     zip_path = os.path.join(TOURS_DIR, zip_filename)
     
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:

@@ -9,6 +9,7 @@ COPY tour_orchestrator_service.py /app/
 COPY text_polish.py /app/
 # [LOCAL-894] description -> place/scope/title + named-place hygiene + stop place cores.
 COPY user_list_integrity.py /app/
+COPY safe_filename.py /app/
 # [LOCAL-821] durable orchestrator-jobs store for resume-on-boot + sweep.
 COPY orchestrator_jobs.py /app/
 COPY swipe_preference_service.py /app/

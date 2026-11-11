@@ -5832,7 +5832,20 @@ def _classify_fix_should_promote_to_museum(location, tour_type, matched_word):
 # and the genuinely-unclassifiable clean-fail can be unit-tested directly, without
 # driving the whole generation pipeline (which needs OpenAI + live services).
 
-def _infer_category_log_line(tour_type, tour_category):
+_MODE_CATEGORY_894B = {'bike': 'biking', 'vehicle': 'driving', 'animal': 'animal',
+                       'country_scale': 'road_trip'}
+
+
+def effective_category_894b(tour_category, transport_mode):
+    """[LOCAL-894B] The category the listener asked for. The logical template category of a
+    movement tour is still 'walking' (same verification path), but every label the listener or
+    the log sees (header, title, audit line) names the mode: driving, biking, road_trip, animal."""
+    if tour_category == 'walking':
+        return _MODE_CATEGORY_894B.get(transport_mode, tour_category)
+    return tour_category
+
+
+def _infer_category_log_line(tour_type, tour_category, transport_mode=None):
     """Return the audit line proving what the classifier decided for a request.
 
     When tour_type arrived empty, source='inferred'; when the caller supplied a
@@ -5841,7 +5854,9 @@ def _infer_category_log_line(tour_type, tour_category):
     rather than silent.
     """
     _type_source = "explicit" if (tour_type or '').strip() else "inferred"
-    return f"[LOCAL-474] tour_type='{tour_type or ''}' → category='{tour_category}' (source={_type_source})"
+    _eff = effective_category_894b(tour_category, transport_mode)
+    _tmpl = f" template={tour_category}" if _eff != tour_category else ""
+    return f"[LOCAL-474] tour_type='{tour_type or ''}' → category='{_eff}'{_tmpl} (source={_type_source})"
 
 
 def _build_unclassifiable_evidence(location, tour_type):
@@ -10696,6 +10711,12 @@ def _apply_delivery_hours_guard(result):
         try:
             import title_line_guard as _tlg
             final, _title_restored = _tlg.restore_title_line(final)
+            try:    # [LOCAL-894B] the delivered opening line names the REAL mode (not "walking")
+                import spoken_text_hygiene as _sth894b
+                final, _hm_n = _sth894b.enforce_header_mode(
+                    final, getattr(_J, '_EFFECTIVE_CATEGORY_894B', ''))
+            except Exception:
+                pass
             # [LEAD 2026-10-09] A year/date parenthetical is a catalogue label, not a spoken title:
             # "Danaë (1802)" (St Louis 548). Strip it from every occurrence of each stop title.
             for _ht in re.findall(r"(?m)^Stop\s+\d+:\s*(.+?)\s*$", final):
@@ -11583,7 +11604,19 @@ def _apply_description_location_894(location, tour_type):
             _J._ROUTE_LOCATION = None
             _J._REQUEST_TOPICS = []
             _J._REQUEST_DESCRIPTION = None
+            try:
+                import aboutness as _ab894b
+                _ab894b.set_route_region()
+            except Exception:
+                pass
         return location
+    try:   # [LOCAL-894B] the listener's own request defines the route region (aboutness)
+        import aboutness as _ab894b
+        _ab894b.set_route_region(location, info.get('location'), info.get('scope'),
+                                 info.get('origin'), info.get('destination'),
+                                 ' '.join(info.get('through') or []))
+    except Exception as _rg894b:
+        print(f"  [LOCAL-894B] route region not set (non-fatal): {_rg894b}")
     _J._ROUTE_INFO = info
     _J._ROUTE_SCOPE = info.get('scope') or info.get('location')
     _J._ROUTE_LOCATION = info['location']
@@ -13083,7 +13116,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     # the audit trail proving what the classifier decided — so a wrong inference is
     # visible in the tour log rather than silent. Printed alongside the request
     # parameters that were logged at function entry (GENERATE_TOUR_TEXT_FUNCTION_ENTRY).
-    print(_infer_category_log_line(tour_type, tour_category))
+    print(_infer_category_log_line(tour_type, tour_category, transport_mode))
+    _J._EFFECTIVE_CATEGORY_894B = effective_category_894b(tour_category, transport_mode)
 
     # [LOCAL-46 Bug B] Display the transport mode as the detected category when applicable.
     # The logical tour_category stays 'walking' (same verification/template path) but the
@@ -34733,10 +34767,10 @@ RULES:
     # Save to file if output_file is provided
     if not output_file:
         # Create default filename based on location and tour type
-        safe_location = ''.join(c if c.isalnum() else '_' for c in location)
-        safe_tour_type = ''.join(c if c.isalnum() else '_' for c in tour_type)
+        # [LOCAL-894B] bounded + hashed when long: a described request arrives whole.
+        from safe_filename import generator_output_filename as _gof894b
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f"{safe_location}_{safe_tour_type}_tour_{timestamp}.txt"
+        output_file = _gof894b(location, tour_type, timestamp)
     
     with open(output_file, "w", encoding="utf-8") as f:
         # [LOCAL-357] Stamp forced-stops banner — VERIFICATION HARNESS ONLY.
@@ -35402,6 +35436,14 @@ RULES:
             complete_tour, _n4 = _sth880.strip_orientation_filler(complete_tour)
             complete_tour, _n8 = _sth880.strip_promotional_sentences(complete_tour)
             complete_tour, _n5 = _sth880.fix_intro_grammar(complete_tour)
+            try:    # [LOCAL-894B] the opening line names the real mode (driving, not "walking")
+                complete_tour, _n5b = _sth880.enforce_header_mode(
+                    complete_tour, effective_category_894b(tour_category, transport_mode))
+                if _n5b:
+                    print("  [LOCAL-894B] opening line mode corrected to "
+                          f"{effective_category_894b(tour_category, transport_mode)!r}")
+            except Exception as _hm894b:
+                print(f"  [LOCAL-894B] header-mode check skipped: {_hm894b}")
             # closing: name real stop titles from the headers we have
             _st_titles = [m.group(1).strip() for m in _re880e.finditer(
                 r"(?mi)^Stop\s+\d+:\s*(.+)$", complete_tour)]

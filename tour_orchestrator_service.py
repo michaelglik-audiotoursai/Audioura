@@ -2665,8 +2665,11 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
         
         # Step 2: Download complete modernized tour ZIP
         log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 2/5: Downloading complete modernized tour...")
-        safe_location = location.replace(' ', '_').replace(',', '').replace(':', '').replace('/', '_').replace('\\', '_').lower()
-        
+        # [LOCAL-894B] bounded, hashed when long (255-byte file-name limit); the stored
+        # zip/extract names are read back from the job, never re-derived from the text.
+        from safe_filename import tour_zip_names as _tzn894b
+        zip_filename, extract_dir = _tzn894b(location, tour_type, job_id, preferred=_desc_title)
+
         print(f"Downloading complete tour from MODERNIZED service: {datetime.now().isoformat()}")
         download_response = _authenticated_request("GET", f"{MODERNIZED_URL}/download/{modernized_job_id}", timeout=60)
         print(f"Download response: {download_response.status_code}")
@@ -2682,7 +2685,6 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
         log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 3/5: Processing modernized tour ZIP...")
         print(f"MODERNIZED service returned complete tour with separate MP3/TXT files")
         
-        zip_filename = f"{safe_location}_{tour_type}_{job_id[:8]}.zip"
         zip_path = os.path.join(TOURS_DIR, zip_filename)
         print(f"Saving modernized tour to: {zip_path}")
         with open(zip_path, 'wb') as f:
@@ -2693,7 +2695,6 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
         
         # Step 4: Extract modernized tour ZIP
         log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 4/5: Extracting modernized tour package...")
-        extract_dir = f"{safe_location}_{tour_type}_{job_id[:8]}"
         extract_path = os.path.join(TOURS_DIR, extract_dir)
         print(f"Extracting ZIP file to: {extract_path}")
         os.makedirs(extract_path, exist_ok=True)
