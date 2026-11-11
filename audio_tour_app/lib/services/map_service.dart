@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/saved_tour_stops.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -38,7 +39,10 @@ class MapService {
       final newTour = {
         'title': tour['title'],
         'path': tour['path'] ?? '',
-        'stops': tour['stops'] ?? 10,
+        ...stopsEntry(resolveRealStopCount(
+          tourDirPath: tour['path'] as String?,
+          userListLength: int.tryParse('${tour['stops'] ?? ''}'),
+        )),
         'created': DateTime.now().toIso8601String(),
         'original_request': tour['request_string'] ?? tour['title'],
         'lat': tour['lat'],

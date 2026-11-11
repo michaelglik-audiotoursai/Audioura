@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../utils/saved_tour_stops.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -192,7 +193,10 @@ class BackgroundTourMonitor {
           }
           
           // Get stop count
-          final stopCount = prefs.getString('stop_count_$jobId') ?? '10';
+          final stopCount = resolveRealStopCount(
+            tourDirPath: extractPath,
+            serverCount: serverStopCount(status),
+            userListLength: int.tryParse(prefs.getString('stop_count_$jobId') ?? ''));
           
           // Add to saved tours
           final tours = prefs.getStringList('saved_tours') ?? [];
@@ -204,7 +208,7 @@ class BackgroundTourMonitor {
             'original_request': location,
             'path': extractPath,
             'created': DateTime.now().toIso8601String(),
-            'stops': stopCount,
+            ...stopsEntry(stopCount),
             'lat': lat,
             'lng': lng,
           }));
