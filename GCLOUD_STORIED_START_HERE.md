@@ -54,6 +54,8 @@ has lapsed twice and Michael has had to ask twice.
 - Michael's own regen is held until LEAD says go.
 - Flutter for Android = flutter-3.41.6.
 
+# ▶️ 2026-11-11 18:42Z — APPLE_BUNDLE_ID fix on Subscribed (Michael's explicit "yes"). Sophia's tour purchase got 402 `[LOCAL-677] apple verify failed: bundle_mismatch`: user-api-subscribed had APPLE_BUNDLE_ID=com.glikfamily.audioura, but App Store Connect app 6807925770 (checked by Michael as glikfamily@gmail.com) and the iOS project use **com.audioura.audiotours**. Changed the env only → **user-api-subscribed-00004-qzj** (100%). Rollback = `update-traffic user-api-subscribed --to-revisions user-api-subscribed-00003-hvw=100`. Env before/after JSON in scratchpad bundlefix_*. Probe via the gateway with a fake JWS → 402 `no_x5c` on 00004-qzj (service up; a fake cannot reach the bundle check, so that check is still unproven until a real iPhone sandbox purchase). The docs that say com.glikfamily.audioura (remind_ios_ai.md, APPLE_SETUP.md, android_q_onboarding.md) are wrong. Separate open item: 401 on /iap/apple/notifications, not investigated. Michael's 549/550 Phan Thiet tour is free (price NULL); Sophie has it.
+
 # ▶️ 2026-11-08 ~20:40 EST — credits restored ($19.98). Wave 36 re-proof FAILED (547: Opera House narrated as the Sydney Opera House; Post Office empty) → rolled back to gen 00036-qbq; 547 hidden; rows 439. Item 3 below is DONE (failed). Michael's regen is on hold until LEAD's combined 873/875/876 wave. 3h watch is still not armed.
 
 # ▶️▶️ RESUME HERE — written 2026-11-06 ~16:00 EST (Michael closed the laptop to travel; 3h watch cron 7503d257 deleted, nothing armed)
@@ -86,7 +88,7 @@ has lapsed twice and Michael has had to ask twice.
 - translation 00005-c9r
 - tour-editing 00003-tfp
 - map 00006-6kk
-- user-api 00003-hvw
+- user-api 00004-qzj (2026-11-11 bundle-ID fix; was 00003-hvw)
 - tile-proxy 00002
 
 audio_tours = 438 rows. 544 (share ouVCyG8V) is visible for Michael. The 543 and 546 proofs are hidden (backups in AudiouraBackups\wave35_proof_hide_20261106).
