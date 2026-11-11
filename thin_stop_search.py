@@ -211,7 +211,8 @@ def _strip_diacritics_keep_case(name: str) -> str:
 def name_variant_queries(name: str, city: str, *, local_name: str = "",
                          kind_words_en: Sequence[str] = (),
                          kind_words_local: Sequence[str] = (),
-                         local_lang: str = "", max_queries: int = MAX_QUERIES
+                         local_lang: str = "", max_queries: int = MAX_QUERIES,
+                         topics: Sequence[str] = ()
                          ) -> List[str]:
     """Build up to ``max_queries`` distinct Serper ORGANIC queries from name
     variants: English + local, with and without diacritics, kind-word synonyms,
@@ -234,6 +235,13 @@ def name_variant_queries(name: str, city: str, *, local_name: str = "",
     # 2. the diacritic-stripped name + city (English search engines index both)
     if ascii_name and ascii_name.lower() != name.lower():
         _add(f"{ascii_name} {city}")
+    # [LOCAL-894] The topics the REQUEST asked this stop to cover ("how dragon fruit is
+    # grown", "the pilgrimage tradition"): searched by name + topic so the evidence
+    # can support them. Generic; at most two, placed right after the plain name query.
+    for _tp in list(topics or [])[:2]:
+        _tp = re.sub(r"^(?:the|its)\s+", "", (_tp or "").split("\u2014")[-1].strip(), flags=re.I)
+        if _tp:
+            _add(f"{ascii_name or name} {_tp} {city}")
     # 3. the local-language alias + city
     if local_name and fold(local_name) != fold(name):
         _add(f"{local_name} {city}")
@@ -430,7 +438,7 @@ def escalate_thin_stop(
         serp_fn: Optional[Callable] = None, fetch_fn: Optional[Callable] = None,
         llm_fn: Optional[Callable] = None, escalate_fn: Optional[Callable] = None,
         wiki_fetch_fn: Optional[Callable] = None, log: Optional[Callable] = None,
-        use_cache: bool = True,
+        use_cache: bool = True, topics: Sequence[str] = (),
         ) -> Dict:
     """Escalate a THIN stop to a real web search + page fetch, returning a bundle:
 
@@ -518,7 +526,8 @@ def escalate_thin_stop(
     # 3. build the name-variant queries
     queries = name_variant_queries(
         name, city, local_name=local_alias, kind_words_en=kw_en,
-        kind_words_local=kw_local, local_lang=dominant, max_queries=max_queries)
+        kind_words_local=kw_local, local_lang=dominant, max_queries=max_queries,
+        topics=topics)
     report["queries"] = queries
     if not queries:
         return report

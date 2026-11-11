@@ -604,8 +604,12 @@ def handle_options(*args, **kwargs):
     response = make_response()
     return add_cors_headers(response)
 
-def sanitize_input(input_text):
-    """Sanitize user input for security and filesystem safety"""
+def sanitize_input(input_text, max_len=200):
+    """Sanitize user input for security and filesystem safety.
+
+    [LOCAL-894] ``max_len`` lets a free-text request DESCRIPTION through whole (the
+    app sends the description as ``location``). When a cut IS needed it lands on a
+    word boundary, never mid-word."""
     if not input_text or not isinstance(input_text, str):
         return ""
     
@@ -626,11 +630,19 @@ def sanitize_input(input_text):
     sanitized = re.sub(r'\s+', ' ', sanitized).strip()
     
     # Limit length to prevent issues
-    if len(sanitized) > 200:
-        sanitized = sanitized[:200].strip()
+    if len(sanitized) > max_len:
+        sanitized = sanitized[:max_len]
+        if ' ' in sanitized:
+            sanitized = sanitized.rsplit(' ', 1)[0]
+        sanitized = sanitized.strip()
     
     return sanitized
 
+
+try:
+    from user_list_integrity import DESCRIPTION_INPUT_MAX as _ULI_INPUT_MAX
+except Exception:  # pragma: no cover
+    _ULI_INPUT_MAX = 200
 
 # [LOCAL-525] Ceiling on user-chosen stops — mirrors the total_stops 1..50 range.
 _MAX_USER_STOPS = 50
@@ -2173,6 +2185,21 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
     print(f"  user_id: {user_id}")
     print(f"  request_string: {request_string}")
     print(f"  language: {language}")
+    # [LOCAL-894] A described request arrives as ``location``. The generator gets the
+    # WHOLE description (topics, route); everything the orchestrator itself does with
+    # a place (geocode, storage, naming) uses the derived short place + title.
+    _full_location = location
+    _desc_title = None
+    try:
+        from user_list_integrity import derive_request_place as _drp894b
+        _ri894b = _drp894b(location, tour_type)
+        if _ri894b.get('is_description'):
+            location = _ri894b['location']
+            _desc_title = _ri894b['title']
+            print(f"[LOCAL-894] location is a description ({len(_full_location)} chars) -> "
+                  f"place={location!r} scope={_ri894b['scope']!r} title={_desc_title!r}")
+    except Exception as _ri_err:
+        print(f"[LOCAL-894] description derivation skipped: {_ri_err}")
     print(f"  persona: {persona}")
     print(f"  resume_generator_job_id: {resume_generator_job_id}")
     _orch_store = _orch_jobs_store()
@@ -2276,7 +2303,7 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
             # Step 1: Generate tour text first, then process with modernized service
             log_job_update(job_id, ACTIVE_JOBS[job_id]["status"], "Step 1/5: Generating tour text...")
             generate_data = {
-                "location": location,
+                "location": _full_location,
                 "tour_type": tour_type,
                 "total_stops": total_stops
             }
@@ -2759,6 +2786,8 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
                 except Exception:
                     pass
         tour_name = _derive_tour_name860(location, tour_type, _first_line)
+        if _desc_title:
+            tour_name = _desc_title
         print(f"Tour name (from effective category): {tour_name}")
         
         # Extract coordinates
@@ -3938,11 +3967,11 @@ def generate_complete_tour():
     data = request.json
     print(f"Received request data: {data}")
     
-    location = sanitize_input(data.get('location'))
+    location = sanitize_input(data.get('location'), max_len=_ULI_INPUT_MAX)
     tour_type = sanitize_input(data.get('tour_type'))
     total_stops = data.get('total_stops', 10)
     user_id = sanitize_input(data.get('user_id'))
-    request_string = sanitize_input(data.get('request_string'))
+    request_string = sanitize_input(data.get('request_string'), max_len=_ULI_INPUT_MAX)
     language = data.get('language', 'en')  # Default to English
     # [LOCAL-830] Idempotency key from the app. Reserve a job_id for this
     # client_request_id ATOMICALLY: if the id was already seen within the window
@@ -4041,7 +4070,14 @@ def generate_complete_tour():
         from user_stops_flag import user_stops_enabled as _us_on_exp
         if _us_on_exp() and isinstance(_raw_stops, list):
             from itinerary_import import expand_pasted_lists as _exp_lists
-            _raw_stops, _exp_n = _exp_lists(_raw_stops, data.get('location') or '')
+            # [LOCAL-894] A described request's pin city is the REGION of the route
+            # (covers origin AND destination), never the whole description.
+            from user_list_integrity import derive_request_place as _drp894, \
+                lookup_core as _lc894
+            _ri894 = _drp894(location, tour_type)
+            _pin_city = ((_ri894.get('scope') or _ri894.get('location'))
+                         if _ri894.get('is_description') else (data.get('location') or ''))
+            _raw_stops, _exp_n = _exp_lists(_raw_stops, _pin_city)
             from itinerary_import import resolve_user_stop_pins as _rusp
 
             def _gen_preview(_text, _city):
@@ -4050,8 +4086,8 @@ def generate_complete_tour():
                 # orchestrator image has neither (No module named 'city_scope').
                 return _d762_gen_preview(_text, _city)
 
-            _raw_stops, _pin_n = _rusp(_raw_stops, data.get('location') or '',
-                                       preview_fn=_gen_preview)
+            _raw_stops, _pin_n = _rusp(_raw_stops, _pin_city,
+                                       preview_fn=_gen_preview, core_fn=_lc894)
             if _exp_n:
                 print(f"[D762] expanded {_exp_n} pasted list(s) into "
                       f"{len(_raw_stops)} stops, order kept")

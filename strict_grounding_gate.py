@@ -808,15 +808,32 @@ _SENSORY_TEMPLATES = (
 )
 
 
-def sensory_body(title: str, kept: List[str], target: int) -> List[str]:
+# [LOCAL-894] Driving register: a driving tour is never told to "look around you at
+# the street ... the pavement". Same rule as above: nothing here states a fact.
+_SENSORY_TEMPLATES_DRIVING = (
+    "As you pass {t}, look out at the road, the land around it and the pace of the day.",
+    "Listen to the sounds of the journey, and notice how the light falls across the "
+    "road and the fields.",
+    "Settle back and let the scenery tell you what the records do not.",
+    "Watch how people go about their day along this stretch of road, and notice what "
+    "they stop to look at.",
+)
+
+
+def sensory_body(title: str, kept: List[str], target: int,
+                 register: str = "walking") -> List[str]:
     """Pad ``kept`` with non-factual sensory sentences until it holds ``target``
     content sentences. The disclosure (if present) stays last. Pure, free."""
     out = list(kept)
     disc = [s for s in out if _fold(NO_HISTORY_DISCLOSURE)[:30] in _fold(s)]
     base = [s for s in out if s not in disc]
     i = 0
-    while len(base) + len(disc) < target and i < len(_SENSORY_TEMPLATES):
-        cand = _SENSORY_TEMPLATES[i].format(t=title)
+    while len(base) + len(disc) < target:
+        _tpls = (_SENSORY_TEMPLATES_DRIVING if register == "driving"
+                 else _SENSORY_TEMPLATES)
+        if i >= len(_tpls):
+            break
+        cand = _tpls[i].format(t=title)
         i += 1
         if not any(_fold(cand)[:30] == _fold(b)[:30] for b in base):
             base.append(cand)
@@ -886,6 +903,7 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                      max_cost_usd: Optional[float] = None,
                      coherence: bool = False,
                      narrate_fn: Optional[Callable] = None,
+                     register: str = "walking",
                      log: Optional[Callable] = None) -> Tuple[str, Dict]:
     """Run the strict grounding gate over every 'Stop N:' block.
 
@@ -1030,7 +1048,8 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                 kept_sents = kept_sents + [disclosure]
             # [LOCAL-888] a no-evidence stop is not left a 2-sentence fragment: pad
             # with NON-FACTUAL sensory sentences (no date, name or claim) up to 4.
-            kept_sents = sensory_body(title, kept_sents, MIN_NO_EVIDENCE_SENTENCES)
+            kept_sents = sensory_body(title, kept_sents, MIN_NO_EVIDENCE_SENTENCES,
+                                      register=register)
             new_text = _replace_block_body(new_text, stop_num, kept_sents)
             rep["no_history_stops"] += 1
             if log:

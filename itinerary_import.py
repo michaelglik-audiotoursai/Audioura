@@ -1002,16 +1002,16 @@ def clean_raw_stop_titles(raw_stops, city_hint: str = ""):
     return out
 
 
-def resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn=None):
+def resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn=None, core_fn=None):
     """Pins via the preview; on ANY failure the stops still leave with cleaned
     titles (LOCAL-893), never raw. See ``_resolve_user_stop_pins``."""
-    out, n = _resolve_user_stop_pins(raw_stops, city_hint, log, preview_fn)
+    out, n = _resolve_user_stop_pins(raw_stops, city_hint, log, preview_fn, core_fn)
     if n == 0 and isinstance(out, list) and not any(isinstance(x, dict) for x in out):
         out = clean_raw_stop_titles(out, city_hint)
     return out, n
 
 
-def _resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn=None):
+def _resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_fn=None, core_fn=None):
     """[LEAD wave-30 finding] Give every plain-name user stop a checked pin, with the
     same free resolvers as /preview-stops (no LLM; Serper /places only for leftovers).
     This covers the pasted list AND the app's already-split stops. Items that already
@@ -1027,11 +1027,30 @@ def _resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_f
                and not any(m in s for m in _LIST_MARKERS)]
         if not idx or not (city_hint or "").strip():
             return raw_stops, 0
-        names = [raw_stops[i].strip() for i in idx]
-        if preview_fn is not None:
-            pv = preview_fn("\n".join(names), city_hint) or {}
+        # [LOCAL-894] Look up the PLACE-NAME CORE of a narrative stop phrase; the
+        # display title below stays the listener's own words. A phrase with no
+        # proper noun at all ("The cable car ascent") has no place to look up: it is
+        # left out of the batch (kept as a stop, announced without a pin).
+        if core_fn is not None:
+            _keep_idx, _lookup_names = [], []
+            for _i in idx:
+                try:
+                    _c = core_fn(raw_stops[_i].strip())
+                except Exception:
+                    _c = raw_stops[_i].strip()
+                if _c:
+                    _keep_idx.append(_i)
+                    _lookup_names.append(_c)
+            idx = _keep_idx
+            if not idx:
+                return raw_stops, 0
         else:
-            pv = preview_stops("\n".join(names), city_hint, log=lambda *_a: None)
+            _lookup_names = [raw_stops[i].strip() for i in idx]
+        names = _lookup_names
+        if preview_fn is not None:
+            pv = preview_fn("\n".join(_lookup_names), city_hint) or {}
+        else:
+            pv = preview_stops("\n".join(_lookup_names), city_hint, log=lambda *_a: None)
         if not pv.get("ok"):
             log(f"[D762] user-stop pin resolve skipped: {pv.get('error')}")
             return raw_stops, 0
@@ -1049,6 +1068,19 @@ def _resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_f
             # "Opera House/Đồng Khởi" -> "Opera House", "(tour-bus + waterbus)" ->
             # a note, never part of the title (wave-32 cosmetic finding).
             _clean = (st.get("name") or "").strip() or raw_stops[i].strip()
+            if core_fn is not None:
+                # A narrative phrase was reduced to its place-name core for the lookup;
+                # the DISPLAY title stays the listener's words (qualifier-stripped only,
+                # never the core). A title that was not reduced keeps the parser's
+                # cleaned name exactly as before.
+                try:
+                    from user_list_integrity import strip_qualifier as _sq894
+                    _raw_t = _sq894(raw_stops[i])
+                    _core_t = core_fn(raw_stops[i].strip())
+                    if _raw_t and _core_t and _core_t != _raw_t:
+                        _clean = _raw_t
+                except Exception:
+                    pass
             st["name"] = st["stop_name"] = _clean
             s = stop_to_generation_string(st)
             if "/@" in s:
