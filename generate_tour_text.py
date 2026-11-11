@@ -6416,6 +6416,17 @@ _J = _jss.attach_to_module(__name__, {
     # LOCAL-357/525), so _compute_route_order must not re-sequence it. Set (and
     # reset) per job at the forced-stops block.
     "_KEEP_GIVEN_ORDER": lambda: False,
+    # [LOCAL-894] Route state for a request whose ``location`` was a DESCRIPTION:
+    # derived info, the region scope, the short place it maps to, the request's
+    # "Include ..." topics, the original description, the user display titles and
+    # the per-stop topic-support report. Per JOB (never leaks across tours).
+    "_ROUTE_INFO": lambda: None,
+    "_ROUTE_SCOPE": lambda: None,
+    "_ROUTE_LOCATION": lambda: None,
+    "_REQUEST_TOPICS": list,
+    "_REQUEST_DESCRIPTION": lambda: None,
+    "_USER_STOP_DISPLAY_TITLES": list,
+    "_TOPIC_REPORT": dict,
     # [LOCAL-644] The LAST generation's structured records (Stop/Opening/Closing),
     # serialized to JSON-safe dicts, so the STOP-POOL orchestrator can carry the
     # generator's OWN records through the pool delivery instead of re-parsing the
@@ -11570,6 +11581,8 @@ def _apply_description_location_894(location, tour_type):
             _J._ROUTE_INFO = None
             _J._ROUTE_SCOPE = None
             _J._ROUTE_LOCATION = None
+            _J._REQUEST_TOPICS = []
+            _J._REQUEST_DESCRIPTION = None
         return location
     _J._ROUTE_INFO = info
     _J._ROUTE_SCOPE = info.get('scope') or info.get('location')
@@ -11614,6 +11627,10 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # path below overwrites it. The service's fail-closed coordinate assertion
     # reads this to name the delivering path.
     _J._LAST_DELIVERY_PATH = 'fresh'
+    # [LOCAL-894] The impl receives the ORIGINAL request (it derives the place itself,
+    # inside its own job scope -- the cost scope below opens a new context, so state
+    # set here would not reach it). The wrapper's own steps use the short place.
+    _request_as_sent_894 = location
     location = _apply_description_location_894(location, tour_type)
 
     # [LOCAL-879 §5] Register any free-text TOPIC segment of the request as a
@@ -12140,14 +12157,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
     if _cost_accumulator is None:
         return _apply_delivery_hours_guard(_generate_tour_text_impl(
-            location, tour_type, output_file, total_stops,
+            _request_as_sent_894, tour_type, output_file, total_stops,
             persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
             exclude_titles=exclude_titles,
         ))
 
     with _cost_accumulator.tour_scope(job_id=job_id) as _acc:
         result = _generate_tour_text_impl(
-            location, tour_type, output_file, total_stops,
+            _request_as_sent_894, tour_type, output_file, total_stops,
             persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
             exclude_titles=exclude_titles,
         )
@@ -12735,8 +12752,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     _transport_keyword = _detect_transport_mode(location)
     if _transport_keyword == 'on_foot' and tour_type:
         _tt_keyword = _detect_transport_mode(str(tour_type))
+        # [LOCAL-894] A BARE transport word in tour_type ("driving") is the mode; the
+        # keyword regex needs "... tour" after it, so tour_type='driving' read on_foot.
+        if _tt_keyword == 'on_foot':
+            _tt_keyword = _detect_transport_mode(f"{tour_type} tour")
         if _tt_keyword != 'on_foot':
             _transport_keyword = _tt_keyword
+    if _transport_keyword == 'on_foot' and getattr(_J, '_REQUEST_DESCRIPTION', None):
+        # [LOCAL-894] the place was derived from a description: read its mode too
+        _d_keyword = _detect_transport_mode(_J._REQUEST_DESCRIPTION)
+        if _d_keyword != 'on_foot':
+            _transport_keyword = _d_keyword
     _transport_from_intent = (intent.get('transport_mode', 'on_foot') if intent else 'on_foot')
     # Keyword match takes priority; fall back to intent's answer
     transport_mode = _transport_keyword if _transport_keyword != 'on_foot' else _transport_from_intent
@@ -14229,15 +14255,41 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             except Exception:
                 _nl_center = None
             _nl_bbox = None
+            # [LOCAL-894] A described route is boxed by its REGION (covers origin,
+            # destination and through-places), not the first locality.
+            _nl_scope894 = location
+            try:
+                if getattr(_J, '_ROUTE_SCOPE', None) and location == getattr(_J, '_ROUTE_LOCATION', None):
+                    _nl_scope894 = _J._ROUTE_SCOPE
+            except Exception:
+                pass
             try:
                 from stop_existence_gate import _geocode_scope_bbox as _gsb859
-                _nl_bbox = _gsb859(location)
+                _nl_bbox = _gsb859(_nl_scope894)
             except Exception:
                 _nl_bbox = None
-            _nl_city = (location or "").split(",")[-1].strip() or location
+            _nl_city = (_nl_scope894 or "").split(",")[-1].strip() or _nl_scope894
+            if _nl_scope894 != location:
+                print(f"  [LOCAL-894] user-stop name lookup scope: {_nl_scope894!r} "
+                      f"(route region) bbox={_nl_bbox}")
             for _i_poi in _us_unresolved:
                 _poi = poi_list[_i_poi]
                 _nm = (_poi.get("name") or "").strip()
+                # [LOCAL-894] look up the PLACE-NAME CORE of a narrative stop phrase
+                # ("Arriving at Ta Cu - the mountain ..." -> "Ta Cu Mountain"); a phrase
+                # with no proper noun names no place to look up (kept, no pin).
+                try:
+                    import user_list_integrity as _uli894n
+                    _core894 = _uli894n.lookup_core(_nm)
+                    if not _core894:
+                        print(f"  [LOCAL-894] user stop {_nm!r} names no place — "
+                              f"no lookup, no pin (kept)")
+                        continue
+                    if _core894 != _nm:
+                        print(f"  [LOCAL-894] user stop lookup {_nm[:50]!r} -> {_core894!r}")
+                        _nm = _core894
+                except Exception:
+                    pass
                 if not _nm:
                     continue
                 _ps859b = (_us_parsed[_i_poi]

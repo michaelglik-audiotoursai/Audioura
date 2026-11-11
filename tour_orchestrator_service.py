@@ -639,10 +639,9 @@ def sanitize_input(input_text, max_len=200):
     return sanitized
 
 
-try:
-    from user_list_integrity import DESCRIPTION_INPUT_MAX as _ULI_INPUT_MAX
-except Exception:  # pragma: no cover
-    _ULI_INPUT_MAX = 200
+# [LOCAL-894] A request DESCRIPTION travels whole (2000 chars), never cut at 200. Kept
+# literal here (not imported) so a missing module can never re-introduce the cut.
+_ULI_INPUT_MAX = 2000
 
 # [LOCAL-525] Ceiling on user-chosen stops — mirrors the total_stops 1..50 range.
 _MAX_USER_STOPS = 50

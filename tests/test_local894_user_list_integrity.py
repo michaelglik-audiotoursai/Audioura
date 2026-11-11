@@ -230,11 +230,14 @@ def tour(tmp_path_factory):
             if "Analyze this tour request" in body:
                 # the intent model reads the (now short) request; hand back what a model
                 # would for a driving route, INCLUDING a junk named place the old code trusted
+                # what the LIVE run's intent model returned for the short place: on_foot
+                # (the mode must come from tour_type), plus junk named places the old
+                # code trusted
                 return _chat(json.dumps({
                     "poi_type": "landmarks", "location": "Vietnam", "theme_type": "STANDARD",
                     "venue_name": None, "geographic_scope": "Phan Thiet",
                     "named_places": ["the", "past dragon fruit plantations. Include the history"],
-                    "scope_precision": "CITY", "transport_mode": "vehicle"}))
+                    "scope_precision": "CITY", "transport_mode": "on_foot"}))
             return _chat("The road runs on ahead. Fishing boats line the shore at dawn. "
                          "The hills rise slowly. Take your time.")
         raise requests.ConnectionError("blocked " + url)
@@ -293,3 +296,38 @@ class TestEndToEnd:
     def test_user_list_blocks_description_named_places(self, tour):
         assert "named-place insertion from the request text is OFF" in tour["log"]
         assert "verified against discovered landmark" not in tour["log"]
+
+
+class TestEndToEndRouteState:
+    """Defects the ONE live run exposed (submission_artifacts/local894): the mode came
+    out on_foot, and the route scope set in the wrapper never reached the impl."""
+
+    def test_tour_type_driving_sets_vehicle_even_when_intent_says_on_foot(self, tour):
+        assert "[TRANSPORT] mode=vehicle" in tour["log"]
+        assert "force-ENFORCE NOT applied to a driving tour" in tour["log"]
+        assert "audio-guided walking tour" not in tour["text"]
+
+    def test_route_scope_reaches_the_impl(self, tour):
+        # the pin snap runs deep in the impl; its scope must be the REGION
+        m = re.search(r"\[LOCAL-791C\] pin snap: scope='([^']+)'", tour["log"])
+        assert m and "Binh Thuan" in m.group(1), m and m.group(1)
+        assert "[LOCAL-894] user-stop name lookup scope: 'Binh Thuan province'" in tour["log"]
+
+    def test_name_lookup_uses_the_place_core(self, tour):
+        assert "-> 'Ta Cu Mountain'" in tour["log"]
+        assert "'The cable car ascent' names no place" in tour["log"]
+
+    def test_impl_has_the_request_topics(self, tour):
+        # logged by the derivation inside the impl (the wrapper logs it once too)
+        assert tour["log"].count("[LOCAL-894] request topics:") >= 2
+
+
+class TestPackaging:
+    def test_orchestrator_image_ships_the_module(self):
+        df = open(os.path.join(ROOT, "Dockerfile.orchestrator"), encoding="utf-8").read()
+        assert re.search(r"(?m)^COPY user_list_integrity\.py /app/", df)
+        assert re.search(r"(?m)^COPY itinerary_import\.py /app/", df)
+
+    def test_orchestrator_never_cuts_a_description_at_200(self):
+        import tour_orchestrator_service as orch
+        assert orch._ULI_INPUT_MAX >= 1000
