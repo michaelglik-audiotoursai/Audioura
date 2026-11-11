@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../utils/saved_tour_stops.dart';
 import 'dart:convert';
 import 'dart:io';
 
@@ -340,7 +341,11 @@ class PendingTourResumeHandler {
           'original_request': req.title,
           'path': extractPath,
           'created': DateTime.now().toIso8601String(),
-          'stops': req.stopCount ?? '10',
+          ...stopsEntry(resolveRealStopCount(
+            tourDirPath: extractPath,
+            serverCount: serverStopCount(status),
+            userListLength: int.tryParse(req.stopCount ?? ''),
+          )),
           'editable': false,
           'is_translation': false,
           'lat': lat,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/saved_tour_stops.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -1312,7 +1313,6 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     for (final file in archive) {
       if (file.isFile && file.name.endsWith('.mp3')) stops++;
     }
-    if (stops == 0) stops = 10;
 
     // A translation is produced by the same track the tester is on (the
     // translation request went to that gateway), so tag it with the current
@@ -1325,7 +1325,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       'title': tourName,
       'path': tourDir.path,
       'created': DateTime.now().toIso8601String(),
-      'stops': stops.toString(),
+      ...stopsEntry(stops > 0 ? stops : null),
       'original_request': tourName,
       'tour_id': tourId.toString(),
       'editable': false,
@@ -1562,6 +1562,7 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
       // none. See wdvrdaxxmb and LOCAL-737.
       String tourTrack = 'beta';
       int? buildNumber;
+      int? serverStops;
       try {
         final statusResponse = await http.get(
           await Endpoints.url(Service.orchestrator, '/status/$jobId'),
@@ -1575,6 +1576,9 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
             lat = statusData['coordinates'][0]?.toDouble();
             lng = statusData['coordinates'][1]?.toDouble();
             await DebugLogHelper.addDebugLog('SAVE_TOUR: Found coordinates: $lat, $lng');
+          }
+          if (statusData is Map<String, dynamic>) {
+            serverStops = serverStopCount(statusData);
           }
           final rawTrack = statusData['track'];
           if (rawTrack is String && Config.validTracks.contains(rawTrack)) {
@@ -1602,7 +1606,13 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
         'original_request': location,
         'path': path,
         'created': DateTime.now().toIso8601String(),
-        'stops': _stopCountController.text,
+        // [LOCAL-895] The REAL count (mp3s on disk > server > user list),
+        // never the stop-count box. Omitted when unknown.
+        ...stopsEntry(resolveRealStopCount(
+          tourDirPath: path,
+          serverCount: serverStops,
+          userListLength: _stopMode == 'name' ? _userStops.length : null,
+        )),
         'editable': false,
         'is_translation': false,
         'lat': lat,
@@ -2708,14 +2718,18 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
     final pendingTours = prefs.getStringList('pending_background_tours') ?? [];
     
     // Store the stop count for this job
-    await prefs.setString('stop_count_$jobId', _stopCountController.text);
+    // [LOCAL-895] Only a user-named list is a real count; the box is a request.
+    if (_stopMode == 'name' && _userStops.isNotEmpty) {
+      await prefs.setString('stop_count_$jobId', _userStops.length.toString());
+    }
     
     // Create pending tour entry
     final pendingTour = jsonEncode({
       'jobId': jobId,
       'location': location,
       'startTime': DateTime.now().toIso8601String(),
-      'stopCount': _stopCountController.text,
+      if (_stopMode == 'name' && _userStops.isNotEmpty)
+        'stopCount': _userStops.length.toString(),
       'notificationsEnabled': requestPermission && status.isGranted,
     });
     
@@ -2846,7 +2860,10 @@ class _TourGeneratorScreenState extends State<TourGeneratorScreen> {
           'original_request': tour['title'],
           'path': extractPath,
           'created': tour['created'] ?? DateTime.now().toIso8601String(),
-          'stops': tour['stops'] ?? '10',
+          ...stopsEntry(resolveRealStopCount(
+            tourDirPath: extractPath,
+            userListLength: int.tryParse('${tour['stops'] ?? ''}'),
+          )),
           'lat': lat,
           'lng': lng,
         }));

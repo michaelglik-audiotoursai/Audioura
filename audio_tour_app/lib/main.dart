@@ -21,6 +21,8 @@ import 'services/deep_link_service.dart';
 import 'services/shared_text_service.dart';
 import 'services/failure_reporter.dart';
 import 'package:workmanager/workmanager.dart';
+import 'services/saved_tours_store.dart';
+import 'utils/saved_tour_stops.dart';
 
 class MainScreenWithTreatsTab extends StatelessWidget {
   const MainScreenWithTreatsTab({super.key});
@@ -183,6 +185,17 @@ void main() async {
 
   // [LOCAL-868] Android Share → Audioura: text/plain handed over by MainActivity.
   unawaited(SharedTextService.instance.init());
+
+  // [LOCAL-895] One-time repair: recount the MP3s of every saved tour and fix a
+  // wrong `stops` (the old stop-count-box '10'). Idempotent; never blocks startup.
+  unawaited(() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final r = repairSavedTourStops(
+          prefs.getStringList(SavedToursStore.key) ?? const <String>[]);
+      if (r.changed) await SavedToursStore.save(prefs, r.tours);
+    } catch (_) {}
+  }());
 
   // [iOS IAP] StoreKit 2 must be enabled before InAppPurchase is first used,
   // and the purchase listener must run from launch. Bounded inside.

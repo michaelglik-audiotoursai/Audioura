@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../utils/saved_tour_stops.dart';
 import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
@@ -225,19 +226,7 @@ List<String> applyTourEditToSavedTours(
 /// Returns the number of `audio_*.mp3` files directly in [tourDirPath], or
 /// `null` if the directory is missing or contains none (unknown — caller must
 /// not invent a count).
-int? countStopsOnDisk(String tourDirPath) {
-  final dir = Directory(tourDirPath);
-  if (!dir.existsSync()) return null;
-
-  final mp3Pattern = RegExp(r'audio_\d+\.mp3$');
-  int count = 0;
-  for (final entity in dir.listSync()) {
-    if (entity is File && mp3Pattern.hasMatch(entity.uri.pathSegments.last)) {
-      count++;
-    }
-  }
-  return count > 0 ? count : null;
-}
+int? countStopsOnDisk(String tourDirPath) => countAudioMp3s(tourDirPath);
 
 class EditScreenLogger {
   static Future<void> logFromService(String message) async {

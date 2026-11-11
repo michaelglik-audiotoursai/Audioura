@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../utils/saved_tour_stops.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -146,7 +147,10 @@ class BackgroundService {
           String uniqueTitle = _generateUniqueTitle(location, tours);
           
           // Get the stop count from preferences if available
-          final stopCount = prefs.getString('stop_count_$jobId') ?? '10';
+          final stopCount = resolveRealStopCount(
+            tourDirPath: extractPath,
+            serverCount: serverStopCount(statusData),
+            userListLength: int.tryParse(prefs.getString('stop_count_$jobId') ?? ''));
           
           // Extract coordinates if available in status data
           double? lat;
@@ -167,7 +171,7 @@ class BackgroundService {
             'original_request': location,
             'path': extractPath,
             'created': DateTime.now().toIso8601String(),
-            'stops': stopCount,
+            ...stopsEntry(stopCount),
             'lat': lat,
             'lng': lng,
           }));
