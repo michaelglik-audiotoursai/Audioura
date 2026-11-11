@@ -1031,6 +1031,7 @@ def _resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_f
         # display title below stays the listener's own words. A phrase with no
         # proper noun at all ("The cable car ascent") has no place to look up: it is
         # left out of the batch (kept as a stop, announced without a pin).
+        _n_asked = len(idx)
         if core_fn is not None:
             _keep_idx, _lookup_names = [], []
             for _i in idx:
@@ -1086,7 +1087,7 @@ def _resolve_user_stop_pins(raw_stops, city_hint: str = "", log=print, preview_f
             if "/@" in s:
                 out[i] = s
                 n += 1
-        log(f"[D762] user-stop pins resolved {n}/{len(names)} "
+        log(f"[D762] user-stop pins resolved {n}/{_n_asked} "
             f"(city {pv.get('city', {}).get('name') if isinstance(pv.get('city'), dict) else city_hint})")
         return out, n
     except Exception as e:

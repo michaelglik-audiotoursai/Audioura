@@ -134,8 +134,8 @@ class TestTitles:
                                            preview_fn=preview, core_fn=uli.lookup_core)
         assert "Ta Cu Mountain" in seen["q"] and "Arriving at Ta Cu" not in " ".join(seen["q"])
         assert seen["city"] == "Binh Thuan province"
-        assert len(seen["q"]) == 6 and n == 6            # 2 stops name no place
-        assert any("pins resolved 6/6" in l for l in logs)
+        assert len(seen["q"]) == 6 and n == 6            # 2 of the 8 name no place
+        assert any("pins resolved 6/8" in l for l in logs)
         # display titles keep the listener's words, in order, for all 8
         assert [re.split(r"\s+https?://", s)[0].strip() for s in out][3].startswith(
             "Arriving at Ta Cu")
