@@ -1784,7 +1784,8 @@ def apple_notifications():
     except sn.SubscriptionNotificationError as e:
         # 200 for a handled-but-ignored type (unknown notificationType) so Apple
         # does not retry forever; the real error codes carry their http_status.
-        logger.info(f"[LOCAL-807] apple notification not applied: {e.code}")
+        (logger.info if e.http_status == 200 else logger.warning)(
+            f"[LOCAL-807] apple notification not applied: {e.code} (http {e.http_status})")
         return jsonify({"status": "ignored", "reason": e.code}), e.http_status
 
     conn = _get_db()
@@ -1827,7 +1828,8 @@ def google_rtdn():
         event = sn.parse_google_rtdn(
             body, api_client=client, package_name=GOOGLE_PACKAGE_NAME)
     except sn.SubscriptionNotificationError as e:
-        logger.info(f"[LOCAL-807] google rtdn not applied: {e.code}")
+        (logger.info if e.http_status == 200 else logger.warning)(
+            f"[LOCAL-807] google rtdn not applied: {e.code} (http {e.http_status})")
         return jsonify({"status": "ignored", "reason": e.code}), e.http_status
 
     conn = _get_db()
