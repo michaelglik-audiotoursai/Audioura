@@ -210,7 +210,8 @@ def tour(tmp_path_factory):
     import requests
     mp = pytest.MonkeyPatch()
     for k, v in dict(OPENAI_API_KEY="sk-test", DISABLE_TOUR_CACHE="1", GEMINI_API_KEY="",
-                     SERPER_API_KEY="", SERP_API_KEY="",
+                     SERPER_API_KEY="", SERP_API_KEY="", STOP_EXISTENCE_GATE_MODE="log_only",
+                     ENABLE_STOP_EXISTENCE_GATE="",
                      DATABASE_URL="postgresql://x:y@127.0.0.1:1/z").items():
         mp.setenv(k, v)
     mp.setattr(time, "sleep", lambda *_a, **_k: None)
