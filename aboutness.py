@@ -847,6 +847,8 @@ def set_route_region(*texts: str) -> frozenset:
     for t in texts:
         toks |= {_stem(w) for w in re.findall(r"[^\W_]+", _fold(t or "")) if len(w) >= 3}
     _REGION_TOKS = frozenset(toks - set(_STOPW) - set(_GENERIC))
+    if not toks:
+        set_route_places()
     return _REGION_TOKS
 
 
@@ -858,6 +860,86 @@ _LOCATOR = re.compile(r"\b(?:in|near|at|outside|around|from)\s+(?:the\s+)?((?:[A
 def _outside_region(name: str) -> bool:
     ws = [_stem(w) for w in re.findall(r"[^\W_]+", _fold(name)) if len(w) >= 2]
     return bool(ws) and not any(w in _REGION_TOKS for w in ws)
+
+
+_PLACE_TOKS: frozenset = frozenset()
+_PLACE_NOISE = frozenset(("mountain mount hill peak lake river beach island valley bay coast resort hotel province "
+                          "district town village national park temple pagoda tour route road trip north south "
+                          "east west central old new").split())
+
+
+def set_route_places(*texts: str) -> frozenset:
+    """Place-name PHRASES of the listener's route ("ham tien", "mui ne", "ta cu", "binh thuan"), from the
+    comma parts of origin / destination / area / towns, minus kind words ("mountain", "resort",
+    "province"), which a place elsewhere shares. Phrases, not single tokens: "Toc Tien" is not "Ham
+    Tien". Empty clears."""
+    global _PLACE_TOKS
+    phr = set()
+    for t in texts:
+        for part in re.split(r"[,;/]|\band\b", _fold(t or "")):
+            ws = [w for w in re.findall(r"[^\W_]+", part)
+                  if w not in KIND and w not in _PLACE_NOISE and w not in _GENERIC and w not in _STOPW]
+            if ws and len(" ".join(ws)) >= 4:
+                phr.add(" ".join(ws))
+    _PLACE_TOKS = frozenset(phr)
+    return _PLACE_TOKS
+
+
+def _names_route_place(text: str) -> bool:
+    f = " ".join(re.findall(r"[^\W_]+", _fold(text or "")))
+    return any(re.search(r"\b" + re.escape(p) + r"\b", f) for p in _PLACE_TOKS)
+
+
+def strip_other_place_evidence(evidence: str) -> Tuple[str, int]:
+    """[LOCAL-894B] A search for a stop called "The cable car ascent" returned the cable car of ANOTHER
+    province: every sentence of that evidence is "supported" and none is off-topic by the sentence
+    rules. Evidence that places itself in a named place OUTSIDE the listener's route region ("... in the
+    north in Sa Pa") and never once names any of the route's own places is about somewhere else: the
+    stop gets no evidence (an honest non-factual body), not another place's facts. Returns
+    (evidence, 1 if dropped else 0)."""
+    if not _PLACE_TOKS or not _REGION_TOKS or not evidence:
+        return evidence or "", 0
+    locs = [m.group(1) for m in _LOCATOR.finditer(evidence)
+            if _outside_region(m.group(1)) and _fold(m.group(1)) not in _GENERIC_PLACE
+            and _fold(m.group(1).split()[0]) not in _STARTERS]
+    if not locs:
+        return evidence, 0
+    if _names_route_place(evidence):
+        return evidence, 0
+    return "", 1
+
+
+_MULTI_CAP = re.compile(r"\b([A-ZÀ-ỸĐ][^\W\d_'’-]+(?:\s+[A-ZÀ-ỸĐ][^\W\d_'’-]+)+)")
+
+
+def other_place_names(evidence: str) -> List[str]:
+    """Multi-word proper names in (dropped) other-place evidence that are not the route's places:
+    "Fansipan Mountain", "Sa Pa", "Toc Tien". A delivered sentence naming one came from that evidence."""
+    out = []
+    for m in _MULTI_CAP.finditer(evidence or ""):
+        name = m.group(1)
+        ws = [w for w in re.findall(r"[^\W_]+", _fold(name))]
+        while ws and (ws[0] in _STARTERS or ws[0] in _STOPW):
+            ws = ws[1:]
+        if len(ws) < 2 and not (ws and ws[0] not in _REGION_TOKS and len(ws[0]) >= 5):
+            continue
+        if _names_route_place(name) or all(_stem(w) in _REGION_TOKS or w in KIND for w in ws):
+            continue
+        ph = " ".join(ws)
+        if ph not in out:
+            out.append(ph)
+    return out
+
+
+def drop_sentences_naming(sentences: Sequence[str], names: Sequence[str]) -> Tuple[List[str], List[str]]:
+    kept, dropped = [], []
+    for x in sentences:
+        f = " ".join(re.findall(r"[^\W_]+", _fold(x)))
+        if any(re.search(r"\b" + re.escape(n) + r"\b", f) for n in names):
+            dropped.append(x)
+        else:
+            kept.append(x)
+    return kept, dropped
 
 
 def other_place_reason(sentence: str, ref: "Referent") -> Optional[str]:

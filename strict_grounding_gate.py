@@ -930,12 +930,24 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
     if not tour_text:
         return tour_text or "", rep
     facts_by_title = facts_by_title or {}
+    _other_names = {}                        # [LOCAL-894B] stop -> names from its dropped other-place evidence
     try:                                     # [LOCAL-892] LLM text out of the evidence; D769 location tokens
         import llm_evidence as _le892
         import aboutness as _ab892
         evidence_by_title = _le892.scrub_map(evidence_by_title)
         if location or evidence_by_title:
             _ab892.set_location(location, evidence_by_title)
+        # [LOCAL-894B] a block of snippets about ANOTHER place (outside the listener's route region)
+        _eb = {}
+        for _k, _v in (evidence_by_title or {}).items():
+            _nv, _nd = _ab892.strip_other_place_evidence(_v)
+            if _nd:
+                _other_names[_fold(str(_k))] = _ab892.other_place_names(_v)
+            if _nd and log:
+                log(f"  [LOCAL-894B] '{str(_k)[:40]}': dropped evidence about another "
+                    f"place (outside the route region)")
+            _eb[_k] = _nv
+        evidence_by_title = _eb
     except Exception:
         pass
     norm_ev = {_fold(k): v for k, v in (evidence_by_title or {}).items()}
@@ -957,6 +969,22 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
         body = _block_body_prose(block)
         if not body.strip():
             continue
+        _on = _other_names.get(_fold(title))
+        if _on:
+            try:
+                import aboutness as _ab894c
+                _ks, _ds = _ab894c.drop_sentences_naming(_content_sentences(body), _on)
+                if _ds:
+                    for _d in _ds:
+                        if log:
+                            log(f"  [LOCAL-894B] Stop {stop_num} '{title[:40]}': dropped (names another "
+                                f"place {_on[:3]}): \"{_d[:100]}\"")
+                    new_text = _replace_block_body(new_text, stop_num, _ks)
+                    block = _block_for(new_text, stop_num)
+                    body = _block_body_prose(block or "")
+                    rep["total_dropped"] += len(_ds)
+            except Exception:
+                pass
         grounded, grep = apply_grounding_gate(
             title, body, ev or "", classify_fn=classify_fn, model=model, log=log)
         rep["cost_usd"] += grep.get("cost_usd", 0.0)

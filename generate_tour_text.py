@@ -11615,6 +11615,8 @@ def _apply_description_location_894(location, tour_type):
         _ab894b.set_route_region(location, info.get('location'), info.get('scope'),
                                  info.get('origin'), info.get('destination'),
                                  ' '.join(info.get('through') or []))
+        _ab894b.set_route_places(info.get('location'), info.get('scope'), info.get('origin'),
+                                 info.get('destination'), ' '.join(info.get('through') or []))
     except Exception as _rg894b:
         print(f"  [LOCAL-894B] route region not set (non-fatal): {_rg894b}")
     _J._ROUTE_INFO = info

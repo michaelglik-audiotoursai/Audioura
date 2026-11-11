@@ -242,3 +242,56 @@ class TestServiceSavePathEndToEnd:
         out = job["output_file"]
         assert _b(out) <= 255 and (tmp_path / out).read_text(encoding="utf-8") == text
         assert out.endswith(".txt")
+
+
+EV_LIVE = json.load(open(os.path.join(ROOT, "submission_artifacts", "local894b",
+                                      "evidence_bundle.json"), encoding="utf-8"))
+TOUR_LIVE = open(os.path.join(ROOT, "submission_artifacts", "local894b", "tour.txt"),
+                 encoding="utf-8").read()
+
+
+def _set_route():
+    import aboutness as ab
+    import user_list_integrity as uli
+    i = uli.derive_request_place(REQUEST, "driving")
+    parts = (i["location"], i["scope"], i["origin"], i["destination"], " ".join(i["through"]))
+    ab.set_route_region(REQUEST, *parts)
+    ab.set_route_places(*parts)
+
+
+class TestOtherPlaceEvidence:
+    """The ONE live run (894B) still shipped Fansipan: the cable-car stop's whole evidence was another
+    province's cable car, so every sentence was 'supported'. Evidence-level rule, after the run."""
+
+    def setup_method(self):
+        _set_route()
+
+    def teardown_method(self):
+        import aboutness as ab
+        ab.set_route_region()
+
+    def test_route_places_are_phrases(self):
+        import aboutness as ab
+        assert {"ham tien", "mui ne", "ta cu", "binh thuan", "phan thiet"} <= set(ab._PLACE_TOKS)
+
+    @pytest.mark.parametrize("bundle", ["local894", "local894b"])
+    def test_only_the_other_place_evidence_is_dropped(self, bundle):
+        import aboutness as ab
+        ev = json.load(open(os.path.join(ROOT, "submission_artifacts", bundle,
+                                         "evidence_bundle.json"), encoding="utf-8"))
+        dropped = [k for k, v in ev.items() if ab.strip_other_place_evidence(v)[1]]
+        assert dropped == ["The cable car ascent"], dropped
+
+    def test_gate_removes_fansipan_from_the_delivered_tour(self):
+        import strict_grounding_gate as g
+        out, _ = g.ground_tour_text(TOUR_LIVE, EV_LIVE, location="Ham Tien, Mui Ne",
+                                    classify_fn=lambda *a, **k: (None, 0, 0), register="driving")
+        assert "fansipan" in TOUR_LIVE.lower()
+        low = out.lower()
+        assert "fansipan" not in low and "sa pa" not in low and "toc tien" not in low
+        assert len(re.findall(r"(?m)^Stop \d+:", out)) == 8
+
+    def test_no_region_no_change(self):
+        import aboutness as ab
+        ab.set_route_region()
+        assert ab.strip_other_place_evidence(EV_LIVE["The cable car ascent"])[1] == 0
