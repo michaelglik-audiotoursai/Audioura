@@ -365,7 +365,12 @@ def topic_support(topics: List[str], evidence_texts) -> Dict[str, bool]:
     ev = " ".join(str(x) for x in (evidence_texts or [])).lower()
     out: Dict[str, bool] = {}
     for t in topics or []:
-        words = [w for w in re.findall(r"[a-z\u00C0-\u024F]{4,}", t.lower()) if w not in _TOPIC_STOP]
+        # a "subject \u2014 aspect" topic is scored on the ASPECT's own words, so the
+        # subject's name alone never counts as covering "its construction".
+        _scored = t.split("\u2014", 1)[1] if "\u2014" in t else t
+        words = [w for w in re.findall(r"[a-z\u00C0-\u024F]{4,}", _scored.lower())
+                 if w not in _TOPIC_STOP - {"construction", "pilgrimage", "meaning",
+                                            "heritage", "history", "tradition", "grown"}]
         if not words:
             out[t] = False
             continue
@@ -397,3 +402,30 @@ def driving_register_block(title: str, topics: List[str]) -> str:
             ". Cover a topic ONLY where the reference material supports it; if it does not, "
             "leave it out. Never invent a fact, date or name to cover a topic.")
     return "\n".join(lines) + "\n"
+
+
+_DRIVE_SEG = re.compile(r"(?i)\b(leav\w*|drive|driving|road|along|journey|route|heading|return\w*|"
+                        r"country|plantations?|fields?)\b")
+
+
+def route_topics(topics: List[str], titles: List[str]) -> Dict[str, List[str]]:
+    """{title: [topics]} -- each topic to the stop(s) whose title shares its subject
+    words; a topic that matches NO stop (a region-wide theme) goes to the drive
+    segment(s), else the first stop, so every requested topic is searched once.
+    A "why X is famous for it" follow-on rides with the topic before it."""
+    out: Dict[str, List[str]] = {t: [] for t in titles}
+    if not titles:
+        return out
+    drives = [t for t in titles if _DRIVE_SEG.search(t)] or [titles[0]]
+    prev_home: List[str] = []
+    for tp in topics or []:
+        homes = [t for t in titles if tp in topics_for_stop([tp], t)]
+        if not homes and re.search(r"(?i)\b(it|its|them|they)\b", tp) and prev_home:
+            homes = prev_home
+        if not homes:
+            homes = drives[:1]
+        for h in homes:
+            if tp not in out[h]:
+                out[h].append(tp)
+        prev_home = homes
+    return out

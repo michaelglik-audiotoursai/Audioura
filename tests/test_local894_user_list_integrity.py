@@ -156,6 +156,15 @@ class TestTopics:
                    uli.topics_for_stop(t, "Phan Thiet and the Ca Ty River"))
         assert uli.topics_for_stop(t, "The cable car ascent") != []
 
+    def test_every_requested_topic_has_a_home_stop(self):
+        t = uli.request_topics(REQUEST)
+        r = uli.route_topics(t, EXPECTED_TITLES)
+        homed = {x for v in r.values() for x in v}
+        assert homed == set(t)
+        assert "the Cham heritage of the region" in r[EXPECTED_TITLES[0]]      # drive segment
+        assert "why Binh Thuan is famous for it" in r[EXPECTED_TITLES[2]]      # follows dragon fruit
+        assert any("pilgrimage" in x for x in r["The Reclining Buddha"])
+
     def test_support_is_reported_never_invented(self):
         sup = uli.topic_support(["the pilgrimage tradition", "its construction"],
                                 ["Pilgrims climb the mountain each lunar new year."])
@@ -165,6 +174,10 @@ class TestTopics:
         assert sup2["how dragon fruit is grown"] is True
         assert uli.topic_support(["the history of Phan Thiet"], ["unrelated text"]) == {
             "the history of Phan Thiet": False}
+        # the subject's name never covers an aspect on its own
+        asp = "the 49-meter Reclining Buddha \u2014 its construction"
+        assert uli.topic_support([asp], ["The Reclining Buddha is 49 meters long."])[asp] is False
+        assert uli.topic_support([asp], ["Its construction began in 1962."])[asp] is True
 
     def test_thin_stop_queries_carry_the_topics(self):
         import thin_stop_search as ts

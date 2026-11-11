@@ -23825,7 +23825,10 @@ NO CONDESCENSION:
             if transport_mode == 'vehicle':
                 try:
                     import user_list_integrity as _uli894d
-                    _tp894 = (_uli894d.topics_for_stop(_J._REQUEST_TOPICS, poi_name)
+                    _tp894 = ((_uli894d.route_topics(
+                                  _J._REQUEST_TOPICS,
+                                  list(_J._USER_STOP_DISPLAY_TITLES or [poi_name])).get(poi_name)
+                               or _uli894d.topics_for_stop(_J._REQUEST_TOPICS, poi_name))
                               if getattr(_J, '_REQUEST_TOPICS', None) else [])
                     description_prompt += _uli894d.driving_register_block(poi_name, _tp894)
                 except Exception as _dr894:
@@ -24426,7 +24429,10 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                 try:
                     import user_list_integrity as _uli894e
                     if _forced_stops_active and getattr(_J, '_REQUEST_TOPICS', None):
-                        _ts_topics894 = _uli894e.topics_for_stop(_J._REQUEST_TOPICS, poi_name)
+                        _ts_topics894 = _uli894e.route_topics(
+                            _J._REQUEST_TOPICS,
+                            list(_J._USER_STOP_DISPLAY_TITLES or [poi_name])).get(poi_name) \
+                            or _uli894e.topics_for_stop(_J._REQUEST_TOPICS, poi_name)
                     _ts_name894 = _uli894e.lookup_core(poi_name) or poi_name
                     if _ts_name894 != poi_name:
                         print(f"  [LOCAL-894] evidence search name {poi_name[:50]!r} -> "
