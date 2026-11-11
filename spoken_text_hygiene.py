@@ -36,7 +36,7 @@ __all__ = ['clean_spoken_text', 'MISSING_SPACE_RE', 'TEMPLATE_SEAM_RE',
            'strip_contradicted_former_use',
            'audit_seating_capacity', 'strip_orphan_capacity_clause',
            'strip_orientation_filler',
-           'fix_intro_grammar', 'fix_orphan_closing',
+           'fix_intro_grammar', 'enforce_header_mode', 'fix_orphan_closing',
            'strip_empty_current_affairs_note']
 
 # "At this work:", "in the stop:", "At this piece:" — the preposition keeps its
@@ -855,6 +855,39 @@ def strip_orientation_filler(text: str) -> tuple:
 _INTRO_BROKEN_RE = re.compile(
     r"(?im)^\s*Step-by-step audio[- ]?guided tour of (.+?)[,.]?\s*"
     r"(?:is a |,\s*)?(walking|biking|cycling|driving|road[- ]?trip)\s+tour\.?\s*$")
+
+
+_MODE_WORD = {"driving": "driving", "biking": "cycling", "cycling": "cycling",
+              "road_trip": "road trip", "animal": "animal"}
+_INTRO_MODE_RE = re.compile(
+    r"(?i)^(\s*(?:This is a )?step-by-step audio[- ]?guided )(walking|biking|cycling|driving|road[- ]?trip)"
+    r"( tour\b)")
+_TITLE_MODE_RE = re.compile(
+    r"(?im)^(Step-by-Step Audio Guided Tour:.*? - )(Walking|Biking|Cycling|Driving|Road[- ]?trip)( Tour)\s*$")
+
+
+def enforce_header_mode(text: str, category: str) -> tuple:
+    """[LOCAL-894B] The opening line must name the tour's real mode. A driving tour opened
+    "audio-guided walking tour" (the template category leaked into the spoken intro). Rewrites only the
+    mode word of the FIRST line (spoken intro or canonical title) to ``category``'s word. A walking /
+    unknown category is left alone. Returns (text, n_fixed)."""
+    word = _MODE_WORD.get((category or "").strip().lower())
+    if not text or not word:
+        return text or "", 0
+    lines = text.split("\n")
+    for i, ln in enumerate(lines):
+        if not ln.strip():
+            continue
+        m = _INTRO_MODE_RE.match(ln)
+        if m and m.group(2).lower().replace("-", " ") != word:
+            lines[i] = m.group(1) + word + ln[m.end(2):]
+            return "\n".join(lines), 1
+        m = _TITLE_MODE_RE.match(ln)
+        if m and m.group(2).lower().replace("-", " ") != word:
+            lines[i] = m.group(1) + word.title() + m.group(3)
+            return "\n".join(lines), 1
+        break
+    return text, 0
 
 
 def fix_intro_grammar(text: str) -> tuple:

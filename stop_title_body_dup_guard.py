@@ -188,7 +188,7 @@ def _block_body(block_text: str) -> str:
     return " ".join(lines)
 
 
-def repair_tour_text_title_body_dup(tour_text: str) -> Tuple[str, List[Dict]]:
+def repair_tour_text_title_body_dup(tour_text: str, keep_titles=None) -> Tuple[str, List[Dict]]:
     """Repair every stop whose ``Stop N:`` title is a prefix copy of its body.
 
     Returns ``(new_text, repaired)`` where ``repaired`` is a list of
@@ -203,8 +203,13 @@ def repair_tour_text_title_body_dup(tour_text: str) -> Tuple[str, List[Dict]]:
         return tour_text, []
     repaired: List[Dict] = []
     out_parts = [preamble]
+    keep = {(t or "").strip() for t in (keep_titles or [])}
     for b in blocks:
         body = _block_body(b["text"])
+        if b["title"].strip() in keep:
+            # [LOCAL-894] a USER-chosen title is the listener's own wording: never shortened.
+            out_parts.append(b["text"])
+            continue
         new_title, did = repair_title(b["title"], body)
         if did and new_title != b["title"]:
             new_text = _STOP_HEADER_RE.sub(

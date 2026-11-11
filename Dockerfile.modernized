@@ -11,6 +11,7 @@ COPY job_store.py /app/
 COPY build_manifest.py /app/
 COPY spoken_text_hygiene.py /app/
 COPY text_polish.py /app/
+COPY safe_filename.py /app/
 RUN mkdir -p /app/tours
 
 # Build-time manifest: record checksums of all Python sources + git SHA

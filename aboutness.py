@@ -829,6 +829,141 @@ def _about_cov(sentence: str, about_items: List[Dict]) -> float:
     return max(_coverage(st, it["text"]) for it in about_items)
 
 
+# ═════════════════ [LOCAL-894B] a sentence about ANOTHER named place is off-topic ═════════════════
+# The 894 cable-car stop said "Fansipan is the tallest peak in Vietnam, located in the north in Sa
+# Pa": another place's cable car. ``tangent_reason`` could not catch it -- it only tests a subject
+# against the stop's OWN ARTICLE, and a user-list stop in a described route often has none. The
+# route region is what the listener asked for (their whole request text), so a sentence whose
+# subject is a proper name that is neither the stop nor in that region, and that places itself
+# "in/near <Other Place>" with a name outside the region, is about somewhere else.
+_REGION_TOKS: frozenset = frozenset()
+
+
+def set_route_region(*texts: str) -> frozenset:
+    """Region = every word of the listener's own request (origin, destination, stops they named,
+    province, 'through' towns). Empty clears it (an ordinary place request keeps old behaviour)."""
+    global _REGION_TOKS
+    toks = set()
+    for t in texts:
+        toks |= {_stem(w) for w in re.findall(r"[^\W_]+", _fold(t or "")) if len(w) >= 3}
+    _REGION_TOKS = frozenset(toks - set(_STOPW) - set(_GENERIC))
+    if not toks:
+        set_route_places()
+    return _REGION_TOKS
+
+
+_CAP_RUN = re.compile(r"[A-ZÀ-ỸĐ][^\W\d_'’-]+(?:\s+[A-ZÀ-ỸĐ][^\W\d_'’-]+)*")
+_LOCATOR = re.compile(r"\b(?:in|near|at|outside|around|from)\s+(?:the\s+)?((?:[A-ZÀ-ỸĐ][^\W\d_'’-]+)"
+                      r"(?:\s+[A-ZÀ-ỸĐ][^\W\d_'’-]+)*)")
+
+
+def _outside_region(name: str) -> bool:
+    ws = [_stem(w) for w in re.findall(r"[^\W_]+", _fold(name)) if len(w) >= 2]
+    return bool(ws) and not any(w in _REGION_TOKS for w in ws)
+
+
+_PLACE_TOKS: frozenset = frozenset()
+_PLACE_NOISE = frozenset(("mountain mount hill peak lake river beach island valley bay coast resort hotel province "
+                          "district town village national park temple pagoda tour route road trip north south "
+                          "east west central old new").split())
+
+
+def set_route_places(*texts: str) -> frozenset:
+    """Place-name PHRASES of the listener's route ("ham tien", "mui ne", "ta cu", "binh thuan"), from the
+    comma parts of origin / destination / area / towns, minus kind words ("mountain", "resort",
+    "province"), which a place elsewhere shares. Phrases, not single tokens: "Toc Tien" is not "Ham
+    Tien". Empty clears."""
+    global _PLACE_TOKS
+    phr = set()
+    for t in texts:
+        for part in re.split(r"[,;/]|\band\b", _fold(t or "")):
+            ws = [w for w in re.findall(r"[^\W_]+", part)
+                  if w not in KIND and w not in _PLACE_NOISE and w not in _GENERIC and w not in _STOPW]
+            if ws and len(" ".join(ws)) >= 4:
+                phr.add(" ".join(ws))
+    _PLACE_TOKS = frozenset(phr)
+    return _PLACE_TOKS
+
+
+def _names_route_place(text: str) -> bool:
+    f = " ".join(re.findall(r"[^\W_]+", _fold(text or "")))
+    return any(re.search(r"\b" + re.escape(p) + r"\b", f) for p in _PLACE_TOKS)
+
+
+def strip_other_place_evidence(evidence: str) -> Tuple[str, int]:
+    """[LOCAL-894B] A search for a stop called "The cable car ascent" returned the cable car of ANOTHER
+    province: every sentence of that evidence is "supported" and none is off-topic by the sentence
+    rules. Evidence that places itself in a named place OUTSIDE the listener's route region ("... in the
+    north in Sa Pa") and never once names any of the route's own places is about somewhere else: the
+    stop gets no evidence (an honest non-factual body), not another place's facts. Returns
+    (evidence, 1 if dropped else 0)."""
+    if not _PLACE_TOKS or not _REGION_TOKS or not evidence:
+        return evidence or "", 0
+    locs = [m.group(1) for m in _LOCATOR.finditer(evidence)
+            if _outside_region(m.group(1)) and _fold(m.group(1)) not in _GENERIC_PLACE
+            and _fold(m.group(1).split()[0]) not in _STARTERS]
+    if not locs:
+        return evidence, 0
+    if _names_route_place(evidence):
+        return evidence, 0
+    return "", 1
+
+
+_MULTI_CAP = re.compile(r"\b([A-ZÀ-ỸĐ][^\W\d_'’-]+(?:\s+[A-ZÀ-ỸĐ][^\W\d_'’-]+)+)")
+
+
+def other_place_names(evidence: str) -> List[str]:
+    """Multi-word proper names in (dropped) other-place evidence that are not the route's places:
+    "Fansipan Mountain", "Sa Pa", "Toc Tien". A delivered sentence naming one came from that evidence."""
+    out = []
+    for m in _MULTI_CAP.finditer(evidence or ""):
+        name = m.group(1)
+        ws = [w for w in re.findall(r"[^\W_]+", _fold(name))]
+        while ws and (ws[0] in _STARTERS or ws[0] in _STOPW):
+            ws = ws[1:]
+        if len(ws) < 2 and not (ws and ws[0] not in _REGION_TOKS and len(ws[0]) >= 5):
+            continue
+        if _names_route_place(name) or all(_stem(w) in _REGION_TOKS or w in KIND for w in ws):
+            continue
+        ph = " ".join(ws)
+        if ph not in out:
+            out.append(ph)
+    return out
+
+
+def drop_sentences_naming(sentences: Sequence[str], names: Sequence[str]) -> Tuple[List[str], List[str]]:
+    kept, dropped = [], []
+    for x in sentences:
+        f = " ".join(re.findall(r"[^\W_]+", _fold(x)))
+        if any(re.search(r"\b" + re.escape(n) + r"\b", f) for n in names):
+            dropped.append(x)
+        else:
+            kept.append(x)
+    return kept, dropped
+
+
+def other_place_reason(sentence: str, ref: "Referent") -> Optional[str]:
+    """Reason string when ``sentence`` is about a different named place than the stop and the
+    listener's route region; else None. Needs a region (``set_route_region``)."""
+    if not _REGION_TOKS or not sentence:
+        return None
+    if ref.mentions(sentence) or re.search(r"(?i)\b(?:you|your|you're)\b", sentence):
+        return None
+    subj = subject_of(sentence)
+    m = _CAP_RUN.match(subj.strip()) if subj else None
+    if not m:
+        return None
+    name = m.group(0)
+    if _fold(name.split()[0]) in _STARTERS or not _outside_region(name):
+        return None
+    for loc in _LOCATOR.finditer(sentence):
+        if _fold(loc.group(1)) != _fold(name) and _outside_region(loc.group(1)) \
+                and not _fold(loc.group(1)) in _GENERIC_PLACE:
+            return (f"subject '{name}' is another place (not the stop, not in the route region) "
+                    f"placed in '{loc.group(1)}'")
+    return None
+
+
 def clean_stop(title: str, sentences: List[str], evidence: str, *, items: Optional[List[Dict]] = None,
                log: Optional[Callable] = None, where: str = "final", min_keep: int = 2
                ) -> Tuple[List[str], Dict]:
@@ -889,6 +1024,15 @@ def clean_stop(title: str, sentences: List[str], evidence: str, *, items: Option
                 why = None                 # the stop's own text carries it: not a tangent
             if why:
                 drop(i, "tangent", why)
+    for i in range(len(cur) - 1, -1, -1):          # [LOCAL-894B] another named place (no own article needed)
+        if i >= len(cur):
+            continue
+        try:
+            why = other_place_reason(cur[i], ref)
+            if why:      # no evidence exemption: a snippet about the other place is not about this stop
+                drop(i, "tangent", why)
+        except Exception:
+            pass
     for i in range(len(cur) - 1, -1, -1):          # [LOCAL-892] a person with no stated role is a tangent
         why = unanchored_person(cur[i], ref, about_items)
         if why:
@@ -954,6 +1098,52 @@ def refill_facts(evidence: str, title: str, limit: int = 24) -> List[str]:
             continue
         seen.add(key)
         out.append((-(_concreteness(s) + 2 * len(kfc._FAMOUS.findall(s))), k, s))
+    out.sort()
+    return [s for _c, _k, s in out[:limit]]
+
+
+_MARKETING = re.compile(r"(?i)(?:\bbook(?:ing)?\b.*\b(?:tickets?|now)\b|\btickets?\b.*\b(?:offers?|confirmation)\b|"
+                        r"skip-the-line|limited-time|\bpromos?\b|\bprices?,|opening hours|free cancell|"
+                        r"\breviews? &|sign up|subscribe|click here|linocut|photo by|\bimage:)")
+_LEAD_JUNK = re.compile(r"(?i)^\s*(?:promos?,\s*prices?,\s*reviews?\s*&\s*opening hours|book[^.]{0,80}?confirmation\.?)\s*")
+
+
+def _mostly_english(s: str) -> bool:
+    letters = [c for c in s if c.isalpha()]
+    if not letters:
+        return False
+    ascii_share = sum(1 for c in letters if c.isascii()) / len(letters)
+    return ascii_share >= 0.97
+
+
+def snippet_facts(evidence: str, title: str, limit: int = 14) -> List[str]:
+    """[LOCAL-894B] Fact sentences for a stop whose evidence is SNIPPETS, not an own article (a user-list
+    landmark: ``refill_facts`` returns [] there, so the 885/888 refill had nothing to narrate and the
+    stop stayed at two sensory sentences although the bundle held "founded by Master Tran Huu Duc").
+    Keeps plain English sentences that NAME the stop, drops ad copy / previews / foreign-language
+    lines, strips a leading ad fragment (still a substring of the evidence, so traceable), and
+    removes near-duplicates. Richest (dates, names, numbers) first."""
+    ev = _scrub_llm(evidence or "")
+    if not ev.strip():
+        return []
+    ref = Referent(title)
+    out, seen_sets = [], []
+    for k, raw in enumerate(split_sentences(ev)):
+        s = _LEAD_JUNK.sub("", raw.strip()).strip()
+        if (len(s) < 40 or len(s) > 320 or not s.endswith((".", "!", "?"))
+                or s.endswith("...") or "\u2026" in s or not _mostly_english(s)
+                or _MARKETING.search(s) or is_filler(s) or _is_navigation(s)):
+            continue
+        if not ref.mentions(s):
+            continue
+        if _REGION_TOKS and any(_outside_region(m.group(1)) and _fold(m.group(1)) not in _GENERIC_PLACE
+                                for m in _LOCATOR.finditer(s)):
+            continue                       # places itself somewhere outside the listener's route region
+        st = set(toks(s))
+        if any(len(st & o) / max(1, min(len(st), len(o))) >= 0.6 for o in seen_sets):
+            continue
+        seen_sets.append(st)
+        out.append((-_concreteness(s), k, s))
     out.sort()
     return [s for _c, _k, s in out[:limit]]
 

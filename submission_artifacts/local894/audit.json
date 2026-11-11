@@ -1,0 +1,303 @@
+{
+  "unsupported": [
+    {
+      "stop": "Leaving Mui Ne – the fishing coast and Ham Tien strip",
+      "claim": "Mui Ne is a coastal fishing ward located in the Lâm Đồng Province of Vietnam.",
+      "why": "Evidence states Mui Ne is in Bình Thuận Province, not Lâm Đồng."
+    }
+  ],
+  "_model": "gpt-4.1",
+  "_usage": {
+    "prompt_tokens": 5108,
+    "completion_tokens": 74,
+    "total_tokens": 5182,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "evidence_chars": {
+    "The cable car ascent": 247,
+    "Phan Thiet and the Ca Ty River": 6959,
+    "Dragon fruit country – the plantations along the road": 785,
+    "Arriving at Ta Cu – the mountain and its legends": 883,
+    "The Reclining Buddha": 751,
+    "Leaving Mui Ne – the fishing coast and Ham Tien strip": 1191,
+    "Linh Son Truong Tho Pagoda": 2029
+  },
+  "offtopic_mechanical": [],
+  "items_by_stop": {
+    "The cable car ascent": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (2x)"
+      }
+    ],
+    "Phan Thiet and the Ca Ty River": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (7x)"
+      }
+    ],
+    "Dragon fruit country – the plantations along the road": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (13x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (9x)"
+      }
+    ],
+    "Arriving at Ta Cu – the mountain and its legends": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (3x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (5x)"
+      }
+    ],
+    "The Reclining Buddha": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (6x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 6x"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 9x"
+      }
+    ],
+    "Leaving Mui Ne – the fishing coast and Ham Tien strip": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (10x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (5x)"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (3x)"
+      }
+    ],
+    "Linh Son Truong Tho Pagoda": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (15x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (20x)"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (19x)"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (15x)"
+      }
+    ]
+  }
+}

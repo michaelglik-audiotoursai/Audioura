@@ -538,8 +538,13 @@ def download_tour(tour_id):
             if version_param == current_version:
                 return '', 304  # Not Modified
         
-        safe_name = request_string.replace(' ', '_').lower()
-        filename = f"{safe_name}_tour.zip"
+        # [LOCAL-894B] bounded download name (a described request is hundreds of chars)
+        try:
+            from safe_filename import download_name as _dn894b
+            filename = _dn894b(request_string)
+        except ImportError:  # image without the helper: plain cut
+            safe_name = request_string.replace(' ', '_').lower()[:80]
+            filename = f"{safe_name}_tour.zip"
         
         print(f"Sending tour file: {filename}")
         sys.stdout.flush()

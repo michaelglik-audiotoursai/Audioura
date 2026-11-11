@@ -1,0 +1,71 @@
+{
+ "note": "POST-HOC, offline: requested topics (user_list_integrity.request_topics on the full request) scored against the live run's evidence bundle and delivered text with user_list_integrity.topic_support (a word-overlap check, not a judge). The live generator never saw the topics: the orchestrator truncated the description (packaging defect, fixed in 2b06e8c3).",
+ "rows": [
+  {
+   "topic": "the history of Phan Thiet",
+   "stop": "Phan Thiet and the Ca Ty River",
+   "evidence_supports": true,
+   "delivered_text_mentions": true
+  },
+  {
+   "topic": "the Cham heritage of the region",
+   "stop": null,
+   "evidence_supports": false,
+   "delivered_text_mentions": false
+  },
+  {
+   "topic": "how dragon fruit is grown",
+   "stop": "Dragon fruit country – the plantations along the road",
+   "evidence_supports": true,
+   "delivered_text_mentions": true
+  },
+  {
+   "topic": "why Binh Thuan is famous for it",
+   "stop": null,
+   "evidence_supports": false,
+   "delivered_text_mentions": false
+  },
+  {
+   "topic": "the story of Ta Cu Mountain",
+   "stop": "Arriving at Ta Cu – the mountain and its legends",
+   "evidence_supports": true,
+   "delivered_text_mentions": true
+  },
+  {
+   "topic": "the Linh Son Truong Tho Pagoda",
+   "stop": "Linh Son Truong Tho Pagoda",
+   "evidence_supports": true,
+   "delivered_text_mentions": false
+  },
+  {
+   "topic": "the cable car ascent",
+   "stop": "The cable car ascent",
+   "evidence_supports": true,
+   "delivered_text_mentions": true
+  },
+  {
+   "topic": "the 49-meter Reclining Buddha",
+   "stop": "The Reclining Buddha",
+   "evidence_supports": true,
+   "delivered_text_mentions": true
+  },
+  {
+   "topic": "the 49-meter Reclining Buddha — its construction",
+   "stop": "The Reclining Buddha",
+   "evidence_supports": false,
+   "delivered_text_mentions": false
+  },
+  {
+   "topic": "the 49-meter Reclining Buddha — meaning in Buddhism",
+   "stop": "The Reclining Buddha",
+   "evidence_supports": false,
+   "delivered_text_mentions": false
+  },
+  {
+   "topic": "the 49-meter Reclining Buddha — the pilgrimage tradition",
+   "stop": "The Reclining Buddha",
+   "evidence_supports": false,
+   "delivered_text_mentions": false
+  }
+ ]
+}

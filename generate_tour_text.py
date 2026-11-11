@@ -1738,6 +1738,14 @@ def _scope_from_request(location, intent=None):
     a place. A stray "near me" inside the surviving segment is removed. Never
     returns empty — falls back to the original string so the guard still runs.
     """
+    # [LOCAL-894] A described request carries its own scope: the REGION of the route
+    # (covers origin AND destination), not the first city the intent model read.
+    try:
+        if (getattr(_J, '_ROUTE_SCOPE', None) and location
+                and location == getattr(_J, '_ROUTE_LOCATION', None)):
+            return _J._ROUTE_SCOPE
+    except Exception:
+        pass
     if intent and (intent.get('geographic_scope') or '').strip():
         _gs = intent['geographic_scope'].strip()
         # [LOCAL-791 defect 8] A parenthetical anchor list in the LLM's
@@ -5824,7 +5832,20 @@ def _classify_fix_should_promote_to_museum(location, tour_type, matched_word):
 # and the genuinely-unclassifiable clean-fail can be unit-tested directly, without
 # driving the whole generation pipeline (which needs OpenAI + live services).
 
-def _infer_category_log_line(tour_type, tour_category):
+_MODE_CATEGORY_894B = {'bike': 'biking', 'vehicle': 'driving', 'animal': 'animal',
+                       'country_scale': 'road_trip'}
+
+
+def effective_category_894b(tour_category, transport_mode):
+    """[LOCAL-894B] The category the listener asked for. The logical template category of a
+    movement tour is still 'walking' (same verification path), but every label the listener or
+    the log sees (header, title, audit line) names the mode: driving, biking, road_trip, animal."""
+    if tour_category == 'walking':
+        return _MODE_CATEGORY_894B.get(transport_mode, tour_category)
+    return tour_category
+
+
+def _infer_category_log_line(tour_type, tour_category, transport_mode=None):
     """Return the audit line proving what the classifier decided for a request.
 
     When tour_type arrived empty, source='inferred'; when the caller supplied a
@@ -5833,7 +5854,9 @@ def _infer_category_log_line(tour_type, tour_category):
     rather than silent.
     """
     _type_source = "explicit" if (tour_type or '').strip() else "inferred"
-    return f"[LOCAL-474] tour_type='{tour_type or ''}' → category='{tour_category}' (source={_type_source})"
+    _eff = effective_category_894b(tour_category, transport_mode)
+    _tmpl = f" template={tour_category}" if _eff != tour_category else ""
+    return f"[LOCAL-474] tour_type='{tour_type or ''}' → category='{_eff}'{_tmpl} (source={_type_source})"
 
 
 def _build_unclassifiable_evidence(location, tour_type):
@@ -6408,6 +6431,17 @@ _J = _jss.attach_to_module(__name__, {
     # LOCAL-357/525), so _compute_route_order must not re-sequence it. Set (and
     # reset) per job at the forced-stops block.
     "_KEEP_GIVEN_ORDER": lambda: False,
+    # [LOCAL-894] Route state for a request whose ``location`` was a DESCRIPTION:
+    # derived info, the region scope, the short place it maps to, the request's
+    # "Include ..." topics, the original description, the user display titles and
+    # the per-stop topic-support report. Per JOB (never leaks across tours).
+    "_ROUTE_INFO": lambda: None,
+    "_ROUTE_SCOPE": lambda: None,
+    "_ROUTE_LOCATION": lambda: None,
+    "_REQUEST_TOPICS": list,
+    "_REQUEST_DESCRIPTION": lambda: None,
+    "_USER_STOP_DISPLAY_TITLES": list,
+    "_TOPIC_REPORT": dict,
     # [LOCAL-644] The LAST generation's structured records (Stop/Opening/Closing),
     # serialized to JSON-safe dicts, so the STOP-POOL orchestrator can carry the
     # generator's OWN records through the pool delivery instead of re-parsing the
@@ -10677,6 +10711,12 @@ def _apply_delivery_hours_guard(result):
         try:
             import title_line_guard as _tlg
             final, _title_restored = _tlg.restore_title_line(final)
+            try:    # [LOCAL-894B] the delivered opening line names the REAL mode (not "walking")
+                import spoken_text_hygiene as _sth894b
+                final, _hm_n = _sth894b.enforce_header_mode(
+                    final, getattr(_J, '_EFFECTIVE_CATEGORY_894B', ''))
+            except Exception:
+                pass
             # [LEAD 2026-10-09] A year/date parenthetical is a catalogue label, not a spoken title:
             # "Danaë (1802)" (St Louis 548). Strip it from every occurrence of each stop title.
             for _ht in re.findall(r"(?m)^Stop\s+\d+:\s*(.+?)\s*$", final):
@@ -11192,7 +11232,8 @@ def _apply_delivery_hours_guard(result):
         #     opening is shortened to a clean banner. Deterministic, idempotent.
         try:
             import stop_title_body_dup_guard as _stbd
-            final, _tbd = _stbd.repair_tour_text_title_body_dup(final)
+            final, _tbd = _stbd.repair_tour_text_title_body_dup(
+                final, keep_titles=list(getattr(_J, '_USER_STOP_DISPLAY_TITLES', None) or []))
             for _r in _tbd:
                 print(f"  [LOCAL-823] title/body dedup: Stop {_r['num']} title was "
                       f"a prefix copy of its body — shortened "
@@ -11528,6 +11569,70 @@ def _apply_delivery_hours_guard(result):
         return result
 
 
+def _route_title_894(location, display_category):
+    """[LOCAL-894] Short generated title (<= 60 chars) for a described request, or None
+    for an ordinary place request. Never a fragment of the description."""
+    try:
+        info = getattr(_J, '_ROUTE_INFO', None)
+        if not info or location != getattr(_J, '_ROUTE_LOCATION', None):
+            return None
+        import user_list_integrity as _uli
+        suffix = f" - {display_category} Tour"
+        base = (f"{info['origin']} to {info['destination']}"
+                if info.get('origin') and info.get('destination')
+                else (info.get('origin') or info.get('location') or ''))
+        return f"{_uli._cap_title(base, _uli.TITLE_MAX_CHARS - len(suffix))}{suffix}"
+    except Exception:
+        return None
+
+
+def _apply_description_location_894(location, tour_type):
+    """[LOCAL-894] A ``location`` that is a request DESCRIPTION is not a place.
+    Derive the place from the request's own "from X to Y" wording, remember the route
+    scope / title / topics for this generation, and return the short place. A plain
+    place string is returned unchanged (and clears any earlier route state)."""
+    try:
+        import user_list_integrity as _uli
+        info = _uli.derive_request_place(location, tour_type)
+    except Exception as _e894:
+        print(f"  [LOCAL-894] description derivation skipped (non-fatal): {_e894}")
+        return location
+    if not info.get('is_description'):
+        if getattr(_J, '_ROUTE_LOCATION', None) != location:
+            _J._ROUTE_INFO = None
+            _J._ROUTE_SCOPE = None
+            _J._ROUTE_LOCATION = None
+            _J._REQUEST_TOPICS = []
+            _J._REQUEST_DESCRIPTION = None
+            try:
+                import aboutness as _ab894b
+                _ab894b.set_route_region()
+            except Exception:
+                pass
+        return location
+    try:   # [LOCAL-894B] the listener's own request defines the route region (aboutness)
+        import aboutness as _ab894b
+        _ab894b.set_route_region(location, info.get('location'), info.get('scope'),
+                                 info.get('origin'), info.get('destination'),
+                                 ' '.join(info.get('through') or []))
+        _ab894b.set_route_places(info.get('location'), info.get('scope'), info.get('origin'),
+                                 info.get('destination'), ' '.join(info.get('through') or []))
+    except Exception as _rg894b:
+        print(f"  [LOCAL-894B] route region not set (non-fatal): {_rg894b}")
+    _J._ROUTE_INFO = info
+    _J._ROUTE_SCOPE = info.get('scope') or info.get('location')
+    _J._ROUTE_LOCATION = info['location']
+    _J._REQUEST_TOPICS = list(info.get('topics') or [])
+    _J._REQUEST_DESCRIPTION = location
+    print(f"  [LOCAL-894] location is a description ({len(location)} chars), not a place -> "
+          f"location={info['location']!r} scope={info['scope']!r} "
+          f"origin={info['origin']!r} destination={info['destination']!r} "
+          f"through={info['through']} title={info['title']!r}")
+    if info.get('topics'):
+        print(f"  [LOCAL-894] request topics: {info['topics']}")
+    return info['location']
+
+
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False, exclude_titles=None, mode=None):
     """[LOCAL-562] Public entry: run one tour inside its own cost scope.
 
@@ -11557,6 +11662,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # path below overwrites it. The service's fail-closed coordinate assertion
     # reads this to name the delivering path.
     _J._LAST_DELIVERY_PATH = 'fresh'
+    # [LOCAL-894] The impl receives the ORIGINAL request (it derives the place itself,
+    # inside its own job scope -- the cost scope below opens a new context, so state
+    # set here would not reach it). The wrapper's own steps use the short place.
+    _request_as_sent_894 = location
+    location = _apply_description_location_894(location, tour_type)
 
     # [LOCAL-879 §5] Register any free-text TOPIC segment of the request as a
     # banned R5 Wikipedia title, so the city-context / story page fetch never
@@ -12082,14 +12192,14 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
 
     if _cost_accumulator is None:
         return _apply_delivery_hours_guard(_generate_tour_text_impl(
-            location, tour_type, output_file, total_stops,
+            _request_as_sent_894, tour_type, output_file, total_stops,
             persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
             exclude_titles=exclude_titles,
         ))
 
     with _cost_accumulator.tour_scope(job_id=job_id) as _acc:
         result = _generate_tour_text_impl(
-            location, tour_type, output_file, total_stops,
+            _request_as_sent_894, tour_type, output_file, total_stops,
             persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
             exclude_titles=exclude_titles,
         )
@@ -12304,6 +12414,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     # empty signal — which is exactly what "classify it" means.
     if tour_type is None:
         tour_type = ''
+    location = _apply_description_location_894(location, tour_type)
 
     # [LOCAL-590] Stop-pool exclusion. When the pool orchestrator asks for only
     # the NEW stops of a larger request, it passes the titles already in the pool
@@ -12676,8 +12787,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     _transport_keyword = _detect_transport_mode(location)
     if _transport_keyword == 'on_foot' and tour_type:
         _tt_keyword = _detect_transport_mode(str(tour_type))
+        # [LOCAL-894] A BARE transport word in tour_type ("driving") is the mode; the
+        # keyword regex needs "... tour" after it, so tour_type='driving' read on_foot.
+        if _tt_keyword == 'on_foot':
+            _tt_keyword = _detect_transport_mode(f"{tour_type} tour")
         if _tt_keyword != 'on_foot':
             _transport_keyword = _tt_keyword
+    if _transport_keyword == 'on_foot' and getattr(_J, '_REQUEST_DESCRIPTION', None):
+        # [LOCAL-894] the place was derived from a description: read its mode too
+        _d_keyword = _detect_transport_mode(_J._REQUEST_DESCRIPTION)
+        if _d_keyword != 'on_foot':
+            _transport_keyword = _d_keyword
     _transport_from_intent = (intent.get('transport_mode', 'on_foot') if intent else 'on_foot')
     # Keyword match takes priority; fall back to intent's answer
     transport_mode = _transport_keyword if _transport_keyword != 'on_foot' else _transport_from_intent
@@ -12998,7 +13118,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     # the audit trail proving what the classifier decided — so a wrong inference is
     # visible in the tour log rather than silent. Printed alongside the request
     # parameters that were logged at function entry (GENERATE_TOUR_TEXT_FUNCTION_ENTRY).
-    print(_infer_category_log_line(tour_type, tour_category))
+    print(_infer_category_log_line(tour_type, tour_category, transport_mode))
+    _J._EFFECTIVE_CATEGORY_894B = effective_category_894b(tour_category, transport_mode)
 
     # [LOCAL-46 Bug B] Display the transport mode as the detected category when applicable.
     # The logical tour_category stays 'walking' (same verification/template path) but the
@@ -14048,6 +14169,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     _forced_stops_active = False
     try:
         _J._KEEP_GIVEN_ORDER = False
+        _J._USER_STOP_DISPLAY_TITLES = []
     except Exception:
         pass
     if forced_stops is not None and len(forced_stops) > 0:
@@ -14098,6 +14220,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
 
         # [LOCAL-554] Present the listener's own words properly. Matching and
         # protection still key on what they typed; only the DISPLAY title changes.
+        # [LOCAL-894] Strip ONLY parenthetical qualifiers from a user title; a named
+        # place in it ("Phan Thiet and the Ca Ty River") is kept whole.
+        try:
+            import user_list_integrity as _uli894c
+            _clean_names = [(_uli894c.strip_qualifier(n) or n) if ("http" not in n) else n
+                            for n in _clean_names]
+        except Exception as _q894:
+            print(f"  [LOCAL-894] qualifier strip skipped (non-fatal): {_q894}")
         _forced_titles = [_presentable_stop_title(n) for n in _clean_names]
         for _orig, _pretty in zip(forced_stops, _forced_titles):
             if _orig != _pretty:
@@ -14117,6 +14247,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 if (_p or {}).get("resolved_name")}
         except Exception:
             pass
+        _J._USER_STOP_DISPLAY_TITLES = list(_forced_titles)   # [LOCAL-894]
         poi_list = [_new_poi(name) for name in _forced_titles]
         # [LOCAL-852] Stamp every user stop user_explicit/_anchor (so it is exempt
         # from the provider/category guards, existence/closure drops, and from
@@ -14160,15 +14291,41 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             except Exception:
                 _nl_center = None
             _nl_bbox = None
+            # [LOCAL-894] A described route is boxed by its REGION (covers origin,
+            # destination and through-places), not the first locality.
+            _nl_scope894 = location
+            try:
+                if getattr(_J, '_ROUTE_SCOPE', None) and location == getattr(_J, '_ROUTE_LOCATION', None):
+                    _nl_scope894 = _J._ROUTE_SCOPE
+            except Exception:
+                pass
             try:
                 from stop_existence_gate import _geocode_scope_bbox as _gsb859
-                _nl_bbox = _gsb859(location)
+                _nl_bbox = _gsb859(_nl_scope894)
             except Exception:
                 _nl_bbox = None
-            _nl_city = (location or "").split(",")[-1].strip() or location
+            _nl_city = (_nl_scope894 or "").split(",")[-1].strip() or _nl_scope894
+            if _nl_scope894 != location:
+                print(f"  [LOCAL-894] user-stop name lookup scope: {_nl_scope894!r} "
+                      f"(route region) bbox={_nl_bbox}")
             for _i_poi in _us_unresolved:
                 _poi = poi_list[_i_poi]
                 _nm = (_poi.get("name") or "").strip()
+                # [LOCAL-894] look up the PLACE-NAME CORE of a narrative stop phrase
+                # ("Arriving at Ta Cu - the mountain ..." -> "Ta Cu Mountain"); a phrase
+                # with no proper noun names no place to look up (kept, no pin).
+                try:
+                    import user_list_integrity as _uli894n
+                    _core894 = _uli894n.lookup_core(_nm)
+                    if not _core894:
+                        print(f"  [LOCAL-894] user stop {_nm!r} names no place — "
+                              f"no lookup, no pin (kept)")
+                        continue
+                    if _core894 != _nm:
+                        print(f"  [LOCAL-894] user stop lookup {_nm[:50]!r} -> {_core894!r}")
+                        _nm = _core894
+                except Exception:
+                    pass
                 if not _nm:
                     continue
                 _ps859b = (_us_parsed[_i_poi]
@@ -17019,13 +17176,29 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _n = (_name or "").strip() if isinstance(_name, str) else ""
                     if len(_n) < 3:
                         return
+                    # [LOCAL-894] A stopword / lowercase word / sentence fragment is
+                    # never a named place (and is never announced as one).
+                    try:
+                        import user_list_integrity as _uli894
+                        if _uli894.reject_named_place_candidate(_n):
+                            print(f"  [LOCAL-894] rejected named-place candidate "
+                                  f"(fragment/stopword): {_n[:60]!r}")
+                            return
+                    except Exception:
+                        pass
                     _k = _n.lower()
                     if _k in _seen_np:
                         return
                     _seen_np.add(_k)
                     _walk_named_places.append(_n)
 
-                if intent:
+                # [LOCAL-894] With a USER stop list the list IS the tour: no named place
+                # parsed from the description/request text is inserted as a stop (the
+                # description supplies topics and context only).
+                if _forced_stops_active:
+                    print(f"  [LOCAL-894] user stop list active — named-place insertion "
+                          f"from the request text is OFF (the list is the tour)")
+                if intent and not _forced_stops_active:
                     _raw_np = intent.get('named_places') or []
                     if isinstance(_raw_np, str):
                         _raw_np = [_raw_np]
@@ -17033,9 +17206,11 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         _add_np(_n)
                 # Deterministic fallback/union from the request string itself.
                 try:
-                    for _n in extract_named_places_from_clause(location):
+                    for _n in ([] if _forced_stops_active
+                               else extract_named_places_from_clause(location)):
                         _add_np(_n)
-                    for _n in extract_named_places_from_clause(_location_normalized):
+                    for _n in ([] if _forced_stops_active
+                               else extract_named_places_from_clause(_location_normalized)):
                         _add_np(_n)
                 except Exception as _np_ex:
                     print(f"  [LOCAL-751] named-place clause parse skipped: {_np_ex}")
@@ -17453,6 +17628,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 # already reformatted the inserted anchor ("Jade Emperor Pagoda" →
                 # "Ngoc Hoang Pagoda (Jade Emperor Pagoda)") before this block. Match
                 # the poi to the user's anchor wording and set the title back to it.
+                # [LOCAL-894] A USER stop title is already the listener's wording: never
+                # "restore" it to a shorter named-place anchor ("Phan Thiet and the Ca Ty
+                # River" -> "Phan Thiet" lost the river the listener named).
+                if _is_anchor_791c and _forced_stops_active and (
+                        _p791b.get("user_explicit") or _is_user_stop_title(_orig_name_791c)):
+                    _kept_791c.append(_p791b)
+                    continue
                 if _is_anchor_791c:
                     try:
                         from place_title_naming import anchor_for_title as _aft791c
@@ -18094,7 +18276,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         # fabricate on stops with no material, select stops that HAVE material.
         _coverage_selection_disabled = os.environ.get('DISABLE_COVERAGE_SELECTION', '').strip() == '1'
 
-        if not _coverage_selection_disabled and len(poi_list) > total_stops:
+        if _forced_stops_active and not _coverage_selection_disabled:
+            # [LOCAL-894] A user's stop list is exempt from coverage ranking and the
+            # N cap: it is neither re-ranked (which lost the order) nor sliced
+            # (which dropped "The summit views and the drive home").
+            print(f"  [LOCAL-894] coverage selection skipped: user stop list "
+                  f"({len(poi_list)} stops) keeps its order and every stop")
+        elif not _coverage_selection_disabled and len(poi_list) > total_stops:
             try:
                 from stop_corpus_reader import get_stop_corpus_for_tour
                 from corpus_coverage import assess_stop_coverage
@@ -18428,6 +18616,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     tour_category, poi_type=_seg_gate_poi_type,
                     request_text=(user_request if 'user_request' in dir() else location))
             except Exception:
+                _seg_mode = get_gate_mode()
+            # [LOCAL-894] A DRIVING tour is not a street walk: the walking
+            # force-ENFORCE (LOCAL-662) is not applied to it; the global mode stands.
+            if (transport_mode == 'vehicle' and tour_category == 'walking'
+                    and _seg_mode == 'enforce' and get_gate_mode() != 'enforce'):
+                print(f"  [LOCAL-894] EXISTENCE-GATE: walking force-ENFORCE NOT applied to a "
+                      f"driving tour (global mode {get_gate_mode().upper()})")
                 _seg_mode = get_gate_mode()
             if _seg_mode == 'enforce' and get_gate_mode() != 'enforce':
                 print(f"  [LOCAL-662] EXISTENCE-GATE: forcing ENFORCE for "
@@ -21910,6 +22105,11 @@ Exempt: navigation directions ("Turn left", "Continue past").
     # from-X-to-Y ends at Y, via-points keep the listener's order. Position-only —
     # never adds or drops.
     _lr576_order_info = named_anchors(user_request)
+    if _forced_stops_active and _lr576_order_info.get('anchors'):
+        # [LOCAL-894] The user's stop list order is the route; request-text anchors
+        # never re-order it.
+        print(f"  [LOCAL-894] LOCAL-576 anchor ordering skipped: user stop list keeps its order")
+        _lr576_order_info = {'anchors': [], 'start': None, 'end': None, 'is_loop': False}
     if _lr576_order_info.get('anchors'):
         _lr576_pre = [p.get('name', '') for p in poi_list]
         poi_list = _order_by_anchors(poi_list, _lr576_order_info)
@@ -23655,6 +23855,20 @@ NO CONDESCENSION:
 - NEVER write "To truly appreciate/understand [X], one must..." — just state the context.
 - NEVER write "It is worth noting that..." or "It is important to understand that..."
 """
+            # [LOCAL-894] Driving register: no "street / pavement / look around you"
+            # voice on a driving tour; drive segments get the longer stories, stops on
+            # the mountain stay short; requested topics are covered only if sourced.
+            if transport_mode == 'vehicle':
+                try:
+                    import user_list_integrity as _uli894d
+                    _tp894 = ((_uli894d.route_topics(
+                                  _J._REQUEST_TOPICS,
+                                  list(_J._USER_STOP_DISPLAY_TITLES or [poi_name])).get(poi_name)
+                               or _uli894d.topics_for_stop(_J._REQUEST_TOPICS, poi_name))
+                              if getattr(_J, '_REQUEST_TOPICS', None) else [])
+                    description_prompt += _uli894d.driving_register_block(poi_name, _tp894)
+                except Exception as _dr894:
+                    print(f"  [LOCAL-894] driving register block skipped: {_dr894}")
             # [LOCAL-855 defects 1/3/4] A user-CHOSEN venue is narrated as the
             # venue its Type/Specialty names, never the literal meaning of the
             # name (fruit/street/legend), never padded with regional/national
@@ -24245,7 +24459,23 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         _ts_existing.append(_lf.get('fact', '') if isinstance(_lf, dict) else str(_lf))
                 except Exception:
                     pass
-                if _ts873.is_thin(_ts_existing):
+                # [LOCAL-894] Topics the REQUEST asked this stop to cover go to the evidence
+                # search; a stop with requested topics is searched even if not thin.
+                _ts_topics894, _ts_name894 = [], poi_name
+                try:
+                    import user_list_integrity as _uli894e
+                    if _forced_stops_active and getattr(_J, '_REQUEST_TOPICS', None):
+                        _ts_topics894 = _uli894e.route_topics(
+                            _J._REQUEST_TOPICS,
+                            list(_J._USER_STOP_DISPLAY_TITLES or [poi_name])).get(poi_name) \
+                            or _uli894e.topics_for_stop(_J._REQUEST_TOPICS, poi_name)
+                    _ts_name894 = _uli894e.lookup_core(poi_name) or poi_name
+                    if _ts_name894 != poi_name:
+                        print(f"  [LOCAL-894] evidence search name {poi_name[:50]!r} -> "
+                              f"{_ts_name894!r}")
+                except Exception:
+                    _ts_topics894, _ts_name894 = [], poi_name
+                if _ts873.is_thin(_ts_existing) or _ts_topics894:
                     try:
                         from pin_snap import _parse_coord as _pc873
                         _ts_pin = _pc873(poi.get('coordinates') or '')
@@ -24257,10 +24487,27 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         _ts_al = None
                     _ts_al = [_ts_al] if isinstance(_ts_al, str) else list(_ts_al or [])
                     _ts_rep = _ts873.escalate_thin_stop(
-                        poi_name, location or '', existing_facts=_ts_existing,
+                        _ts_name894, location or '', existing_facts=_ts_existing,
                         poi=poi, pin=_ts_pin, aliases=_ts_al,
                         places_type=poi.get('type_specialty') or '',
-                        wikidata_instance_of=poi.get('_wikidata_instance_of') or '')
+                        wikidata_instance_of=poi.get('_wikidata_instance_of') or '',
+                        topics=_ts_topics894)
+                    # [LOCAL-894] Report whether the evidence found supports the topics.
+                    if _ts_topics894:
+                        try:
+                            _sup894 = _uli894e.topic_support(
+                                _ts_topics894,
+                                list(_ts_existing) + [f.get('text', '') for f in
+                                                      (_ts_rep.get('facts') or [])])
+                            _rep894 = getattr(_J, '_TOPIC_REPORT', None)
+                            if not isinstance(_rep894, dict):
+                                _rep894 = {}
+                                _J._TOPIC_REPORT = _rep894
+                            _rep894[poi_name] = _sup894
+                            print(f"  [LOCAL-894] Stop {stop_num} '{poi_name[:40]}' topic support: "
+                                  f"{ {k[:40]: v for k, v in _sup894.items()} }")
+                        except Exception as _tr894:
+                            print(f"  [LOCAL-894] topic report skipped: {_tr894}")
                     # [LOCAL-887] No English article was accepted for this stop but its
                     # geo/name-gated LOCAL-language article was: it is the narrator's
                     # AND the gate's evidence (it used to reach neither).
@@ -30447,6 +30694,11 @@ REWRITE RULES (all mandatory):
     else:
         # Otherwise, create a title that incorporates the category naturally
         tour_title = f"Step-by-Step Audio Guided Tour: {_title_loc} - {_display_category} Tour"
+
+    _rt894 = _route_title_894(location, _display_category)
+    if _rt894:
+        tour_title = _rt894
+        print(f"  [LOCAL-894] title from the route (<= 60 chars): {tour_title!r}")
     
     # [LOCAL-286] Tour-Category header: write the effective category.
     # For non-on_foot tours that classify as 'walking' (biking, driving, animal),
@@ -31872,6 +32124,7 @@ RULES:
             tour_title = f"Step-by-Step Audio Guided Tour: {_title_loc2}"
         else:
             tour_title = f"Step-by-Step Audio Guided Tour: {_title_loc2} - {_display_category} Tour"
+        tour_title = _route_title_894(location, _display_category) or tour_title
         complete_tour = tour_title + "\n" + f"Tour-Category: {_header_category}" + "\n\n"
 
     if len(poi_list) == 0:
@@ -34516,10 +34769,10 @@ RULES:
     # Save to file if output_file is provided
     if not output_file:
         # Create default filename based on location and tour type
-        safe_location = ''.join(c if c.isalnum() else '_' for c in location)
-        safe_tour_type = ''.join(c if c.isalnum() else '_' for c in tour_type)
+        # [LOCAL-894B] bounded + hashed when long: a described request arrives whole.
+        from safe_filename import generator_output_filename as _gof894b
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f"{safe_location}_{safe_tour_type}_tour_{timestamp}.txt"
+        output_file = _gof894b(location, tour_type, timestamp)
     
     with open(output_file, "w", encoding="utf-8") as f:
         # [LOCAL-357] Stamp forced-stops banner — VERIFICATION HARNESS ONLY.
@@ -35185,6 +35438,14 @@ RULES:
             complete_tour, _n4 = _sth880.strip_orientation_filler(complete_tour)
             complete_tour, _n8 = _sth880.strip_promotional_sentences(complete_tour)
             complete_tour, _n5 = _sth880.fix_intro_grammar(complete_tour)
+            try:    # [LOCAL-894B] the opening line names the real mode (driving, not "walking")
+                complete_tour, _n5b = _sth880.enforce_header_mode(
+                    complete_tour, effective_category_894b(tour_category, transport_mode))
+                if _n5b:
+                    print("  [LOCAL-894B] opening line mode corrected to "
+                          f"{effective_category_894b(tour_category, transport_mode)!r}")
+            except Exception as _hm894b:
+                print(f"  [LOCAL-894B] header-mode check skipped: {_hm894b}")
             # closing: name real stop titles from the headers we have
             _st_titles = [m.group(1).strip() for m in _re880e.finditer(
                 r"(?mi)^Stop\s+\d+:\s*(.+)$", complete_tour)]
@@ -35338,7 +35599,8 @@ RULES:
             complete_tour, _g883_rep = _sgg883.ground_tour_text(
                 complete_tour, _ev883, location=location or "",
                 rebuild_fn=_rebuild_from_facts_883, facts_by_title=_facts883,
-                max_cost_usd=_ground_cap883, coherence=True, log=print)
+                max_cost_usd=_ground_cap883, coherence=True,
+                register=('driving' if transport_mode == 'vehicle' else 'walking'), log=print)
             print(f"  [LOCAL-883] grounding gate: "
                   f"{_g883_rep.get('stops', 0)} stop(s), "
                   f"{_g883_rep.get('grounded', 0)} edited, "
@@ -35472,7 +35734,8 @@ RULES:
             # the honest no-history disclosure.
             complete_tour, _gf_rep = _sgg884f.ground_tour_text(
                 complete_tour, _evf, location=location or "",
-                model=_final_model, max_cost_usd=_capf, log=print)
+                model=_final_model, max_cost_usd=_capf,
+                register=('driving' if transport_mode == 'vehicle' else 'walking'), log=print)
             print(f"  [LOCAL-884] FINAL grounding re-pass: "
                   f"{_gf_rep.get('stops', 0)} stop(s), "
                   f"{_gf_rep.get('grounded', 0)} edited, "

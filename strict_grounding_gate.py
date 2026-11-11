@@ -808,15 +808,32 @@ _SENSORY_TEMPLATES = (
 )
 
 
-def sensory_body(title: str, kept: List[str], target: int) -> List[str]:
+# [LOCAL-894] Driving register: a driving tour is never told to "look around you at
+# the street ... the pavement". Same rule as above: nothing here states a fact.
+_SENSORY_TEMPLATES_DRIVING = (
+    "As you pass {t}, look out at the road, the land around it and the pace of the day.",
+    "Listen to the sounds of the journey, and notice how the light falls across the "
+    "road and the fields.",
+    "Settle back and let the scenery tell you what the records do not.",
+    "Watch how people go about their day along this stretch of road, and notice what "
+    "they stop to look at.",
+)
+
+
+def sensory_body(title: str, kept: List[str], target: int,
+                 register: str = "walking") -> List[str]:
     """Pad ``kept`` with non-factual sensory sentences until it holds ``target``
     content sentences. The disclosure (if present) stays last. Pure, free."""
     out = list(kept)
     disc = [s for s in out if _fold(NO_HISTORY_DISCLOSURE)[:30] in _fold(s)]
     base = [s for s in out if s not in disc]
     i = 0
-    while len(base) + len(disc) < target and i < len(_SENSORY_TEMPLATES):
-        cand = _SENSORY_TEMPLATES[i].format(t=title)
+    while len(base) + len(disc) < target:
+        _tpls = (_SENSORY_TEMPLATES_DRIVING if register == "driving"
+                 else _SENSORY_TEMPLATES)
+        if i >= len(_tpls):
+            break
+        cand = _tpls[i].format(t=title)
         i += 1
         if not any(_fold(cand)[:30] == _fold(b)[:30] for b in base):
             base.append(cand)
@@ -886,6 +903,7 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                      max_cost_usd: Optional[float] = None,
                      coherence: bool = False,
                      narrate_fn: Optional[Callable] = None,
+                     register: str = "walking",
                      log: Optional[Callable] = None) -> Tuple[str, Dict]:
     """Run the strict grounding gate over every 'Stop N:' block.
 
@@ -912,12 +930,24 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
     if not tour_text:
         return tour_text or "", rep
     facts_by_title = facts_by_title or {}
+    _other_names = {}                        # [LOCAL-894B] stop -> names from its dropped other-place evidence
     try:                                     # [LOCAL-892] LLM text out of the evidence; D769 location tokens
         import llm_evidence as _le892
         import aboutness as _ab892
         evidence_by_title = _le892.scrub_map(evidence_by_title)
         if location or evidence_by_title:
             _ab892.set_location(location, evidence_by_title)
+        # [LOCAL-894B] a block of snippets about ANOTHER place (outside the listener's route region)
+        _eb = {}
+        for _k, _v in (evidence_by_title or {}).items():
+            _nv, _nd = _ab892.strip_other_place_evidence(_v)
+            if _nd:
+                _other_names[_fold(str(_k))] = _ab892.other_place_names(_v)
+            if _nd and log:
+                log(f"  [LOCAL-894B] '{str(_k)[:40]}': dropped evidence about another "
+                    f"place (outside the route region)")
+            _eb[_k] = _nv
+        evidence_by_title = _eb
     except Exception:
         pass
     norm_ev = {_fold(k): v for k, v in (evidence_by_title or {}).items()}
@@ -939,6 +969,22 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
         body = _block_body_prose(block)
         if not body.strip():
             continue
+        _on = _other_names.get(_fold(title))
+        if _on:
+            try:
+                import aboutness as _ab894c
+                _ks, _ds = _ab894c.drop_sentences_naming(_content_sentences(body), _on)
+                if _ds:
+                    for _d in _ds:
+                        if log:
+                            log(f"  [LOCAL-894B] Stop {stop_num} '{title[:40]}': dropped (names another "
+                                f"place {_on[:3]}): \"{_d[:100]}\"")
+                    new_text = _replace_block_body(new_text, stop_num, _ks)
+                    block = _block_for(new_text, stop_num)
+                    body = _block_body_prose(block or "")
+                    rep["total_dropped"] += len(_ds)
+            except Exception:
+                pass
         grounded, grep = apply_grounding_gate(
             title, body, ev or "", classify_fn=classify_fn, model=model, log=log)
         rep["cost_usd"] += grep.get("cost_usd", 0.0)
@@ -964,6 +1010,17 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                 try:
                     import aboutness as _ab891
                     for _fs in _ab891.refill_facts(ev or "", title, limit=18):
+                        if _fs not in facts:
+                            facts.append(_fs)
+                except Exception:
+                    pass
+            # [LOCAL-894B] a stop with SNIPPET evidence (no own article: every user-list
+            # landmark) got [] from refill_facts above; take its plain, distinct, English
+            # fact sentences that name the stop.
+            if len(facts) < 6 and not _evidence_is_thin(ev or ""):
+                try:
+                    import aboutness as _ab894b
+                    for _fs in _ab894b.snippet_facts(ev or "", title, limit=14):
                         if _fs not in facts:
                             facts.append(_fs)
                 except Exception:
@@ -1030,7 +1087,8 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                 kept_sents = kept_sents + [disclosure]
             # [LOCAL-888] a no-evidence stop is not left a 2-sentence fragment: pad
             # with NON-FACTUAL sensory sentences (no date, name or claim) up to 4.
-            kept_sents = sensory_body(title, kept_sents, MIN_NO_EVIDENCE_SENTENCES)
+            kept_sents = sensory_body(title, kept_sents, MIN_NO_EVIDENCE_SENTENCES,
+                                      register=register)
             new_text = _replace_block_body(new_text, stop_num, kept_sents)
             rep["no_history_stops"] += 1
             if log:

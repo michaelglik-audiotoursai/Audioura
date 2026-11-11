@@ -2408,6 +2408,13 @@ def build_named_place_intro_sentence(uncovered_names) -> str:
                                           included."
     """
     names = [n.strip() for n in (uncovered_names or []) if n and n.strip()]
+    # [LOCAL-894] Never announce a stopword / lowercase word / sentence fragment as a
+    # "place you asked for" (the 'the' that opened the Phan Thiet tour).
+    try:
+        from user_list_integrity import reject_named_place_candidate as _rej894
+        names = [n for n in names if not _rej894(n)]
+    except Exception:
+        pass
     if not names:
         return ""
 
