@@ -11570,6 +11570,12 @@ def _apply_delivery_hours_guard(result):
                     print("  [LOCAL-896] route content pass changed the delivered text", flush=True)
         except Exception as _rc896e:  # pragma: no cover
             _import_logger.error(f"[LOCAL-896] route content pass skipped: {_rc896e}")
+        # [LOCAL-900B] on every path: fragments, the carry-with-you filler, and (single-place) Directions
+        try:
+            import route_content_896 as _rc900b
+            final = _rc900b.apply_single_place_guards(final, log=lambda m: print(m, flush=True))
+        except Exception as _rc900be:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-900B] final guards skipped: {_rc900be}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
@@ -20385,15 +20391,22 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 # each to the scope geocode the pipeline already holds (no new geocode call).
                 try:
                     import place_names_900 as _pn900
+                    # [LOCAL-900B] the reference must be a PLACE, not a province centroid. Record where the
+                    # centre came from and how specific it is; check_pins_against_scope refuses a coarse one.
                     _c900 = locals().get('_center_858')
+                    _src900, _prec900 = 'city_center_for_request', 'city'
                     if not _c900:
                         _ar900 = locals().get('_area')
                         if _ar900 is not None and (getattr(_ar900, 'center_lat', 0) or getattr(_ar900, 'center_lng', 0)):
                             _c900 = (_ar900.center_lat, _ar900.center_lng)
-                    if _c900:
+                            _src900 = f"area_resolver({getattr(_ar900, 'city_name', '')!r})"
+                            _prec900 = 'district' if getattr(_ar900, 'neighborhood_qid', '') else (
+                                'region' if getattr(_ar900, 'bounding_radius_km', 0) and _ar900.bounding_radius_km >= 15 else 'city')
+                    if _c900 or any(isinstance(_p, dict) and _p.get('wikidata_lat') is not None for _p in poi_list):
                         _pn900.check_pins_against_scope(
-                            poi_list, tuple(_c900), (intent.get('scope_precision') or '') if intent else '',
-                            parse=_parse_coords, log=print)
+                            poi_list, tuple(_c900) if _c900 else None,
+                            (intent.get('scope_precision') or '') if intent else '',
+                            parse=_parse_coords, log=print, ref_precision=_prec900, ref_source=_src900)
                     else:
                         print("  [LOCAL-900] pin check skipped: no scope geocode available")
                 except Exception as _e900:
@@ -30661,6 +30674,7 @@ REWRITE RULES (all mandatory):
             venue_fallback_coordinate=_pin_venue_fallback_813,
             city_centroid=_pin_center_791c, route_box=_route_box_896,
             route_refs=_route_refs_897,
+            scope_precision=((intent.get('scope_precision') or '') if isinstance(intent, dict) else ''),
             is_user_stop_fn=lambda _p: bool(
                 _p.get('user_explicit') or _p.get('_anchor')
                 or _is_user_stop_title(_p.get('name'))),
