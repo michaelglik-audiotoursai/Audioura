@@ -30736,6 +30736,24 @@ REWRITE RULES (all mandatory):
                 _p.get('user_explicit') or _p.get('_anchor')
                 or _is_user_stop_title(_p.get('name'))),
             log=print)
+        try:   # [LOCAL-903] a snapped, verified place supersedes the place reference; a single place is one place
+            import single_place_903 as _sp903
+            _ar903 = locals().get('_area')
+            _pn903, _pr903 = '', None
+            if _ar903 is not None and getattr(_ar903, 'place_ref_precision', '') == 'place':
+                _pn903 = getattr(_ar903, 'place_ref_name', '') or ''
+                _pr903 = (_ar903.place_ref_lat, _ar903.place_ref_lng)
+            if len(poi_list) <= 2:
+                _sp903.reconcile_after_snap(
+                    poi_list, _snap_rows_791c, _pn903, _pr903,
+                    ((intent.get('scope_precision') or '') if isinstance(intent, dict) else ''), log=print)
+            # [LOCAL-903] the stored tour pin is the first stop's FINAL pin (the earlier extraction ran before the snap)
+            _fp903 = _sp903.tour_pin(poi_list, first_poi_coordinates)
+            if _fp903 != first_poi_coordinates:
+                print(f"  [LOCAL-903] tour pin {first_poi_coordinates} -> {_fp903} (first stop after the snap)")
+                first_poi_coordinates = _fp903
+        except Exception as _sp903e:
+            print(f"  [LOCAL-903] single-place reconcile skipped (non-fatal): {_sp903e}")
         try:   # [LOCAL-902] a model-written Address is kept only if it agrees with the reference's district
             from pin_snap import verify_addresses as _va902
             _va902(poi_list, _snap_rows_791c, scope=_pin_scope_791c, log=print)

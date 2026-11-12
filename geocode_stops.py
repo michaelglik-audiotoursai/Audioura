@@ -273,6 +273,40 @@ def _geocode_once_detailed(query):
         return None
 
 
+def geocode_candidates(query, limit=5):
+    """[LOCAL-903] Up to ``limit`` Nominatim hits for ``query`` as a list of dicts ({lat, lng, type, class,
+    addresstype, display_name}), best first. [] on any failure. Same host, rate limit and User-Agent as
+    ``geocode``; one request."""
+    global _last_request_at
+    if not query or not query.strip():
+        return []
+    elapsed = time.time() - _last_request_at
+    if elapsed < _MIN_INTERVAL_S:
+        time.sleep(_MIN_INTERVAL_S - elapsed)
+    url = NOMINATIM_URL + "?" + urllib.parse.urlencode({
+        "q": query, "format": "jsonv2", "limit": int(limit), "addressdetails": 0,
+    })
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+            payload = json.load(resp)
+        _last_request_at = time.time()
+        out = []
+        for row in payload or []:
+            out.append({
+                "lat": float(row["lat"]), "lng": float(row["lon"]),
+                "type": str(row.get("type") or ""),
+                "class": str(row.get("category") or row.get("class") or ""),
+                "addresstype": str(row.get("addresstype") or ""),
+                "display_name": str(row.get("display_name") or ""),
+            })
+        return out
+    except Exception as e:
+        _last_request_at = time.time()
+        logging.warning("[GEOCODE] candidates lookup failed for %r: %s", query, e)
+        return []
+
+
 def is_city_like(detail):
     """[LOCAL-858B] True when a ``geocode_detailed`` result is a plausible tour
     CENTRE — a city/town/suburb/neighbourhood/landmark — and NOT a country, a
