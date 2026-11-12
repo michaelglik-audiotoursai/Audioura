@@ -328,3 +328,23 @@ def test_missing_evidence_entry_is_logged_not_silent(route):
     logs = []
     rc.finalize_898(t, {"Some Other Title": "x"}, logs.append)
     assert any("no evidence entry under this title" in x for x in logs)
+
+
+def test_lead_own_reference_abroad_is_ignored():
+    """[LOCAL-900B/LEAD] a stop's Wikidata point 870 km from the (even coarse) scope centre never becomes the pin."""
+    import place_names_900 as pn
+    stops = [{"coordinates": "10.8665, 107.2872", "wikidata_lat": 13.748056, "wikidata_lng": 100.491111}]
+    logs = []
+    n = pn.check_pins_against_scope(stops, (11.083333, 108.083333), "DISTRICT", log=logs.append,
+                                    ref_precision="region", ref_source="area_resolver")
+    assert n == 0
+    assert stops[0]["coordinates"] == "10.8665, 107.2872"
+    assert any("ignored" in l for l in logs)
+
+
+def test_lead_own_reference_near_scope_still_used():
+    import place_names_900 as pn
+    stops = [{"coordinates": "10.8784, 107.3067", "wikidata_lat": 10.8133, "wikidata_lng": 107.8941}]
+    n = pn.check_pins_against_scope(stops, (11.083333, 108.083333), "DISTRICT", log=None,
+                                    ref_precision="region", ref_source="area_resolver")
+    assert n == 1 and stops[0]["coordinates"].startswith("10.813")

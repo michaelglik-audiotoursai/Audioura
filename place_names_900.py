@@ -122,6 +122,9 @@ def _rank(precision: str) -> int:
     return PRECISION_RANK.get((precision or "").strip().lower(), -1)
 
 
+OWN_REF_MAX_KM = 100.0
+
+
 def stop_verified_reference(p: dict) -> Optional[Tuple[float, float]]:
     """A coordinate already fetched and verified for THIS stop (its Wikidata P625), or None."""
     try:
@@ -158,6 +161,14 @@ def check_pins_against_scope(stops: List[dict], scope_center: Optional[Tuple[flo
         if not c:
             continue
         own = stop_verified_reference(p)
+        # [LOCAL-900B/LEAD] a Wikidata NAME lookup can return a same-named place abroad (wave 47: the 552
+        # statue's P625 is in another country). Even a coarse centre bounds it: farther than
+        # OWN_REF_MAX_KM from any known scope centre, the stop's own point is not trusted.
+        if own and scope_center and _hav(own, scope_center) > OWN_REF_MAX_KM:
+            if log:
+                log(f"  [LOCAL-900B] stop={i} own reference {own} is {_hav(own, scope_center):.0f} km from the "
+                    f"scope centre -> ignored")
+            own = None
         ref, why = (own, "stop_verified") if own else ((scope_center, ref_source or "scope") if centre_ok else (None, ""))
         if ref is None:
             if scope_center:
