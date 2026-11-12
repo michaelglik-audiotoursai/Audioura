@@ -56,7 +56,8 @@ has lapsed twice and Michael has had to ask twice.
 
 # ▶️ WAVE 45 — 2026-11-12 ~08:00 EST (wdvrdazhmu) — LIVE @ 9dc4ced7 (build 1062d0af, bsub53). Phan Thiet route-tour fixes (LOCAL-894/894B/896/897).
 - Live: gen 00047-k89, orch 00027-4rw. Rollback: 00046-lf9 / 00026-v47. Cloud SQL backup 'pre-wave45-9dc4ced7'.
-- Modernized @9dc4ced7 BUILT, not deployed (still 00009-cn4); deploy only if LEAD asks.
+- Modernized @9dc4ced7 deployed at LEAD's request → 00010-9cn (rollback 00009-cn4). Proof 552 (2 stops, $0.082) OK, hidden; rows 444. Wave 45 total $0.416.
+- is_test=false on cloud proofs is by design: the LOCAL-103 gate needs TOUR_TEST_MODE or TOUR_TEST_MODE_ALLOW_REQUEST on the orchestrator; neither is set. Options sent to LEAD.
 - Proof 551 = Michael's 549 input (777-char description + 8 stops, driving), $0.334: correct title, 8 stops in his order, no ghost/dropped stop, pins 8/8 but stops 4-8 share the Ta Cu pin. Leftovers sent to LEAD: Stop 3 type copied, Stops 5/8 filler, is_test stored false.
 - 551 hidden (backup AudiouraBackups\wave45_proof_hide_20261112); rows 443. runproof_s.py finds the row by request_string, which now stores the derived place; look the row up by id.
 - Play probe (LEAD on the Mac, 11/12): still 403/401 until Michael grants 'Draft apps'. The key exists only on the Mac.
