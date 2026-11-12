@@ -581,6 +581,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          venue_fallback_coordinate: Optional[Tuple[float, float]] = None,
                          city_centroid: Optional[Tuple[float, float]] = None,
                          is_user_stop_fn: Optional[Callable[[Dict], bool]] = None,
+                         route_box: Optional[Sequence[float]] = None,
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -871,6 +872,21 @@ def snap_poi_coordinates(poi_list: List[Dict],
         _user_model_pin = bool(
             (is_user_stop_fn or _default_is_user_stop)(poi)
             and not _is_user_pin(poi) and _is_model_sourced_coord(poi))
+        # [LOCAL-896] A ROUTE's stops are spread over a region (a base station, a pagoda and a
+        # statue on one mountain sit a few hundred metres apart). A model pin that lies INSIDE the
+        # route region is not collapsed for having no reference or for sitting near a differently
+        # named stop; the identical-point and marked-fallback tests below still apply.
+        _in_route = False
+        if route_box and len(route_box) >= 4:
+            try:
+                _in_route = (route_box[0] <= pt[0] <= route_box[1]
+                             and route_box[2] <= pt[1] <= route_box[3])
+            except Exception:
+                _in_route = False
+        if _in_route and (_user_model_pin or _cluster_hit):
+            emit(f"[LOCAL-896] {title!r}: model pin lies inside the route region -- kept "
+                 f"(no reference/cluster collapse)")
+            _user_model_pin = _cluster_hit = False
         if _user_model_pin:
             emit(f"[LOCAL-870] user stop {title!r} has only a model coordinate "
                  f"and no reference — announced with no pin")

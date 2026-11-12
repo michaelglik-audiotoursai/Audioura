@@ -627,7 +627,8 @@ _REFLECTIVE = re.compile(
     r"\breflects?\s+the\s+(?:sharp\s+|complex\s+|layered\s+)?(?:intersection|interplay|story|spirit|"
     r"journey|legacy|essence|tension)\b|\bstands?\s+in\s+(?:stark\s+)?contrast\s+to\b|"
     r"\b(?:tells|holds|carries)\s+a\s+(?:vivid\s+)?story\s+of\b|\bstory\s+of\s+reinvention\b|"
-    r"\bcaptures?\s+a\s+moment\b|\bthe\s+pulse\s+of\b)")
+    r"\bcaptures?\s+a\s+moment\b|\bthe\s+pulse\s+of\b|"
+    r"\ba\s+threshold\s+where\b|\b(?:past|history)[\u2019']?s?\b[^.]{0,40}\bfuture\b|\bconverge\b)")
 _TAIL = re.compile(
     r"(?i),\s*(?:serving\s+as\s+|standing\s+as\s+|acting\s+as\s+|a\s+|an\s+|bridging\b|linking\b|"
     r"connecting\b|uniting\b|blending\b|anchoring\b|symboli[sz]ing\b)[^.!?]*"
@@ -1143,7 +1144,7 @@ _RAW_FIELD = re.compile(r"(?i)\b(?:infobox|passages)\s*:|(?:;\s*[a-z][a-z ]{1,24
 def finalize_stop(title: str, sentences: List[str], evidence: str, *,
                   classify_fn=None, model: Optional[str] = None,
                   log: Optional[Callable] = None, where: str = "final",
-                  min_sentences: int = 4) -> Tuple[List[str], Dict]:
+                  min_sentences: int = 4, user_list: bool = False) -> Tuple[List[str], Dict]:
     """Deny-set -> filler cap -> key-fact coverage (one gated plain sentence per
     missing fact). Returns (sentences, report)."""
     rep = {"title": title, "denied": 0, "filler": {}, "K": 0, "k_before": 0, "k": 0,
@@ -1207,7 +1208,27 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
         rep["aboutness"] = {"error": str(_e891)}
     import strict_grounding_gate as _sgg
     if _sgg._evidence_is_thin(evidence):
-        rep["filler"] = {"skipped": "no evidence (honest non-factual body)"}
+        # [LOCAL-896] The filler cap also applies on the user-list path: a stop with no evidence kept
+        # "the past's tides meet the future's unfolding course" because the cap was skipped here.
+        # Only reflective sentences that state no fact go; a body is never emptied.
+        if user_list:
+            # the delivered closing rides on the last stop's block: cap the stop's own sentences only
+            _ti = next((i for i, x in enumerate(cur) if re.match(r"(?i)^That['\u2019]s\s+\d+\s+stops?\b", x)), None)
+            _cut = max(0, _ti - 1) if _ti is not None else len(cur)
+            _own, _tail = cur[:_cut], cur[_cut:]
+            _own, rep["filler"] = cap_filler(_own, min_keep=0)
+            if rep["filler"].get("reflective_dropped") or rep["filler"].get("sensory_dropped"):
+                # an emptied stop gets the honest non-factual body (plain look-around sentences + the
+                # D760 disclosure), never silence
+                _own = _sgg.sensory_body(title, _own + [_sgg.NO_HISTORY_DISCLOSURE]
+                                         if not any(_sgg._fold(_sgg.NO_HISTORY_DISCLOSURE)[:30] in _sgg._fold(x)
+                                                    for x in _own) else _own,
+                                         _sgg.MIN_NO_EVIDENCE_SENTENCES - 1, register="driving")
+                if log:
+                    log(f"  [LOCAL-896] filler cap on a no-evidence user-list stop '{title[:40]}': {rep['filler']}")
+            cur = _own + _tail
+        else:
+            rep["filler"] = {"skipped": "no evidence (honest non-factual body)"}
         if log:
             log(f"  [LOCAL-889] coverage {title[:40]}: no evidence -> no key facts, filler cap skipped")
         rep["k"] = rep["K"] = 0
@@ -1372,7 +1393,8 @@ def finalize_stop(title: str, sentences: List[str], evidence: str, *,
 
 def finalize_tour(tour_text: str, evidence_by_title: Dict[str, str], *,
                   classify_fn=None, model: Optional[str] = None,
-                  log: Optional[Callable] = None, where: str = "final") -> Tuple[str, Dict]:
+                  log: Optional[Callable] = None, where: str = "final",
+                  user_list: bool = False) -> Tuple[str, Dict]:
     """finalize_stop over every 'Stop N:' block of a tour."""
     import strict_grounding_gate as sgg
     rep = {"stops": [], "header_splices": 0, "header_dropped": []}
@@ -1390,7 +1412,7 @@ def finalize_tour(tour_text: str, evidence_by_title: Dict[str, str], *,
         ev = sgg._lookup(norm, title) or ""
         try:
             new, r = finalize_stop(title, sents, ev, classify_fn=classify_fn, model=model,
-                                   log=log, where=where)
+                                   log=log, where=where, user_list=user_list)
         except Exception as e:                      # never break the tour
             if log:
                 log(f"  [LOCAL-889] finalize skipped for '{title[:40]}' (non-fatal): {e}")

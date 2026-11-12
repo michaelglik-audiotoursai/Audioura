@@ -1102,6 +1102,12 @@ def _delivered_text_corpus(stops: List[Dict], venue_name: str = "") -> set:
     toks = set()
     blob = " ".join(((s.get("title") or "") + " " + (s.get("narration") or "")) for s in stops or [])
     blob += " " + (venue_name or "")
+    try:    # [LOCAL-896] a route's own origin and destination are the listener's words, not invented names
+        import route_content_896 as _rc896d
+        if _rc896d.active():
+            blob += " " + " ".join(_rc896d.endpoints())
+    except Exception:
+        pass
     for w in re.findall(r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\-']*", blob):
         toks.add(_concl_fold(w.lower()).strip("'"))
         for part in w.split("-"):
@@ -1174,6 +1180,13 @@ def build_conclusion(
     # theme, (b) reject a foreign LLM body, and (c) strip a foreign example from
     # the final body. Empty grounding (non-art tour) disables the check.
     _delivered_grounding = _delivered_conclusion_grounding(stops)
+    try:    # [LOCAL-896] a route's own origin and destination are the listener's words
+        import route_content_896 as _rc896e
+        if _rc896e.active() and _delivered_grounding:
+            _delivered_grounding = set(_delivered_grounding) | set().union(
+                *[_concl_grounding_tokens(x) for x in _rc896e.endpoints()])
+    except Exception:
+        pass
     _corpus_864b = _delivered_text_corpus(stops, venue_name)
     # The venue name is a legitimate thread subject ("the collection of {venue}"),
     # so its tokens are part of the allowed grounding — never flagged as foreign.
@@ -1219,6 +1232,12 @@ def build_conclusion(
             v = (_cfs878(venue_name) or "").strip()
         except Exception:
             v = (venue_name or "").strip()
+        try:    # [LOCAL-896] a route runs between places, not across a city
+            import route_content_896 as _rc896b
+            if _rc896b.active():
+                v = ""
+        except Exception:
+            pass
         thread_phrase = (f"the places you chose across {v}" if v
                          else "the places you chose on this route")
         common = dict(common)
@@ -1226,6 +1245,13 @@ def build_conclusion(
         common["meaning"] = (
             "Each was picked by you, and together they trace your own route "
             "through the city.")
+        try:    # [LOCAL-896]
+            import route_content_896 as _rc896c
+            _rcs = _rc896c.closing_sentence()
+            if _rcs:
+                common["meaning"] = _rcs
+        except Exception:
+            pass
         # Suppress any derived subject/period so the template names no example
         # and asserts no period thread.
         common["subject_phrase"] = ""
@@ -1592,7 +1618,15 @@ def _template_thematic_body(
     # they trace your own route through the city." — an orphan that says nothing.
     # Replace it with a close that names real stop titles (first, last, and a
     # middle one on a long route), or a clean one-line close when no titles.
-    if user_stops:
+    _route_close_896 = None
+    try:    # [LOCAL-896] a ROUTE closes on its own origin and destination, never "through the city"
+        import route_content_896 as _rc896
+        _route_close_896 = _rc896.closing_sentence()
+    except Exception:
+        _route_close_896 = None
+    if user_stops and _route_close_896:
+        meaning = _route_close_896
+    elif user_stops:
         _real = [t.strip() for t in (titles or []) if t and t.strip()]
         _picked = []
         if len(_real) >= 2:
