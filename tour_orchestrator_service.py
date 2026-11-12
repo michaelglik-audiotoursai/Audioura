@@ -1922,8 +1922,10 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                          str(_job_id)[:128])
                     )
 
-                    # Replace the row's content/zip/stops_count; set lat/lng only if
-                    # they were NULL (D622: "sets lat/lng if they are NULL"). Keep
+                    # Replace the row's content/zip/stops_count. [LEAD-905] The NEW tour pin
+                    # wins (the content changed, so its pin must follow); the old pin stays only
+                    # when the new generation has none. Before, the first run's pin was kept
+                    # forever, even after a pin fix. Keep
                     # id, tour_name, share code, original_tour_id unchanged, and bump
                     # number_requested like any served delivery.
                     cur.execute(
@@ -1933,8 +1935,8 @@ def store_audio_tour(tour_name, request_string, zip_path, lat, lng, tour_content
                             audio_tour = %s,
                             zip_filename = %s,
                             stops_count = %s,
-                            lat = COALESCE(lat, %s),
-                            lng = COALESCE(lng, %s),
+                            lat = COALESCE(%s, lat),
+                            lng = COALESCE(%s, lng),
                             number_requested = number_requested + 1
                         WHERE id = %s
                         """,

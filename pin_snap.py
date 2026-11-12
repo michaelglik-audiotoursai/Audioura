@@ -752,7 +752,6 @@ def snap_poi_coordinates(poi_list: List[Dict],
         if row.get("snapped") and row.get("new_coordinate") and _model_pin_902 and _verified_only_902:
             _nc902 = tuple(row["new_coordinate"])
             _in902 = _ref_in_scope_902(_nc902)
-            _mv902 = _haversine_m(coord, _nc902) / 1000.0
             _auth902 = str(row.get("source") or "").lower().startswith(("wikidata", "landmark"))
             if _in902 is False and _auth902:
                 pass                       # an authority reference keeps its own (900B) scope rules
@@ -760,9 +759,12 @@ def snap_poi_coordinates(poi_list: List[Dict],
                 row.update({"snapped": False, "new_coordinate": None,
                             "reason": f"reference {_nc902[0]:.4f},{_nc902[1]:.4f} outside the scope — refused "
                                       f"(wrong same-name place)"})
-            elif _in902 and _mv902 <= _MODEL_PIN_SCOPE_KM and _short_tour_902:
+            elif _in902 and _short_tour_902:
                 # [LOCAL-902/LEAD] only on short tours (<= 2 pinned stops): on a larger tour the 900B
                 # scope radius (CITY 25 km, DISTRICT 15 km) still bounds a model pin's move.
+                # [LEAD-905] no cap on the MOVE itself: the reference is already judged in scope, and an
+                # unverified model pin can be anywhere (the 905 proof put both pins in the sea, 86 km from the
+                # province centre; the right in-scope reference was refused for moving 109 km).
                 _accepted_902 = True
                 row["accepted_902"] = True
         # [LOCAL-900B] SCOPE GUARD on every snap (authority or not). A same-named place elsewhere in the world must

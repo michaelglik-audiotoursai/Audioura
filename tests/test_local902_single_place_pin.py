@@ -294,3 +294,26 @@ def test_lead_large_tour_model_pin_keeps_900b_radius():
     for p in out:
         lat, lng = [float(x) for x in p["coordinates"].split(",")]
         assert pin_snap._haversine_m((lat, lng), REF) > 15000      # 900B DISTRICT cap still held them
+
+
+def test_lead905_far_model_pin_snaps_to_in_scope_reference():
+    """[LEAD-905] both model pins ~86 km from the coarse centre (offshore) and ~108 km from the in-scope
+    reference: the reference is in scope, so the move is accepted however far the unverified pin was."""
+    far = [{"name": "Alpha Mountain", "coordinates": "10.9794, 108.8656"},
+           {"name": "Beta Statue", "coordinates": "10.9795, 108.8657"}]
+    out, rows, logs = _live_guards_snap(REF, pois=far, bbox=None)
+    assert any("[LOCAL-902] snap accepted" in l for l in logs)
+    for p in out:
+        lat, lng = [float(x) for x in p["coordinates"].split(",")]
+        assert pin_snap._haversine_m((lat, lng), REF) < 3000
+
+
+def test_lead905_out_of_scope_reference_still_refused_for_far_model_pin():
+    far = [{"name": "Alpha Mountain", "coordinates": "10.9794, 108.8656"},
+           {"name": "Beta Statue", "coordinates": "10.9795, 108.8657"}]
+    abroad = (13.748056, 100.491111)
+    out, rows, logs = _live_guards_snap(abroad, pois=far, bbox=None)
+    assert not any("[LOCAL-902] snap accepted" in l for l in logs)
+    for p in out:
+        lat, lng = [float(x) for x in p["coordinates"].split(",")]
+        assert pin_snap._haversine_m((lat, lng), abroad) > 500000
