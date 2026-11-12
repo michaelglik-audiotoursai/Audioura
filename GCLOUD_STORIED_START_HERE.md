@@ -54,6 +54,8 @@ has lapsed twice and Michael has had to ask twice.
 - Michael's own regen is held until LEAD says go.
 - Flutter for Android = flutter-3.41.6.
 
+# ▶️ WAVE 47 — 2026-11-12 ~10:45 EST (wdvrdazht8) — DEPLOYED then ROLLED BACK. gen 00049-kt8 (be8fc75b, build 0e081753, bsub55) is idle; traffic is on 00048-j9s (wave 46). Only the generator was deployed (orch/modernized images copy none of the changed files). Failures: on 552 the LOCAL-900 pin check replaced pins with the province centroid 11.0833,108.0833, then the LOCAL-791C wikidata snap moved Stop 2 876 km to Wat Pho, Bangkok; on 551 the superlative drop left fragments ('Ta Cu Mountain is home to.'). Spend $0.447. 551/552 hidden (backup wave47_proof_hide_20261112); rows 444.
+
 # ▶️ WAVE 46 — 2026-11-12 ~09:35 EST (wdvrdazhrd) — LIVE @ e6143bf9 (build 4db8d2d3, bsub54). LOCAL-898 route text + LOCAL-899 proof is_test.
 - Live: gen 00048-j9s, orch 00028-qfs, user-api 00005-g62 (efa88f68 WARNING logs). Rollback: 00047-k89 / 00027-4rw / 00004-qzj. Backup 'pre-wave46-e6143bf9'.
 - **TOUR_TEST_PROOF_USER_IDS is NOT set.** It waits for Michael's OK (env change); value would be USER-1073427300.
