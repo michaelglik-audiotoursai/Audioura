@@ -225,6 +225,6 @@ def test_replay_cloud_tour():
     b = _blocks(out)
     assert "Type/Specialty: City and river" not in b[3]
     five = b[5]
-    assert five.index("As you pass") < five.index("Directions:")      # body before Directions
+    assert five.index("We could not confirm") < five.index("Directions:")      # body before Directions [LOCAL-900: kind-aware sentence]
     assert not re.search(r"(?i)retrace|descent|back down", out)
     assert all(_dirs(b[n]).startswith("Walk on to") for n in (4, 5, 6, 7))   # one shared pin

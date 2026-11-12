@@ -823,21 +823,31 @@ _SENSORY_TEMPLATES_DRIVING = (
 
 
 def sensory_body(title: str, kept: List[str], target: int,
-                 register: str = "walking") -> List[str]:
+                 register: str = "walking", kind_text: str = "",
+                 supported_sentence: Optional[str] = None) -> List[str]:
     """Pad ``kept`` with non-factual sensory sentences until it holds ``target``
     content sentences. The disclosure (if present) stays last. Pure, free."""
     out = list(kept)
     disc = [s for s in out if _fold(NO_HISTORY_DISCLOSURE)[:30] in _fold(s)]
     base = [s for s in out if s not in disc]
+    # [LOCAL-900] the short spoken name, the stop's kind picks the sentence (no road/fields on a summit or a
+    # temple), and a same-site neighbour's supported sentence about this subject replaces the template.
+    import place_names_900 as _pn900
+    _short900 = _pn900.short_place_name(title)
+    _kind900 = _pn900.stop_kind(title, kind_text)
+    if supported_sentence and len(base) + len(disc) < target and supported_sentence not in base:
+        base.append(supported_sentence)
     i = 0
     while len(base) + len(disc) < target:
-        _tpls = (_SENSORY_TEMPLATES_DRIVING if register == "driving"
-                 else _SENSORY_TEMPLATES)
+        if _kind900 != "neutral" or register == "driving":
+            _tpls = _pn900.SENSORY_BY_KIND[_kind900]
+        else:
+            _tpls = _SENSORY_TEMPLATES
         if i >= len(_tpls):
             break
         # [LOCAL-897] "As you pass The cable car ascent," read as two sentences to the broken-join
         # repair ("As you pass. The cable car ...") -- a leading article is lower-cased mid-sentence
-        _t = re.sub(r"^(The|A|An)\s", lambda m: m.group(1).lower() + " ", (title or "").strip())
+        _t = _short900
         cand = _tpls[i].format(t=_t)
         i += 1
         if not any(_fold(cand)[:30] == _fold(b)[:30] for b in base):
