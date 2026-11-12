@@ -321,7 +321,10 @@ def strip_origin_locality(tour_text: str, log: Optional[Callable] = None) -> str
 
 # ── 3. directions on a route ─────────────────────────────────────────────────
 _COORD = re.compile(r"(?mi)^Coordinates:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
-_MINUTES = re.compile(r"(?i)\b(?:\d+\s*(?:-\s*\d+\s*)?|an?\s+|half\s+an\s+)(?:minutes?|mins?|hours?)\b")   # [897] "about a minute"
+_NUMW = (r"(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|"
+         r"fifty|sixty|ninety|a\s+few|a\s+couple\s+of|couple\s+of|several|many|few|an?|half\s+an?)")
+# [LOCAL-898] digits, number words, and the hyphenated adjective forms ("a 40-minute trip", "two-hour drive")
+_MINUTES = re.compile(r"(?i)\b(?:\d+(?:\.\d+)?\s*(?:-\s*\d+\s*)?|" + _NUMW + r")[\s-]*(?:minutes?|mins?|hours?|hrs?)\b")
 
 
 def _km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
@@ -529,6 +532,8 @@ _TRAVEL = re.compile(
     r"(?i)\b\d+(?:\.\d+)?\s*(?:-\s*\d+(?:\.\d+)?\s*)?(?:minutes?|mins?|km|kilomet(?:er|re)s?|miles?)\s+"
     r"(?:away|drive|ride|from\b|north|south|east|west)"
     r"|\b(?:takes?|about|roughly|approximately|within)\s+(?:an?\s+)?\d+\s*(?:-\s*\d+\s*)?(?:minutes?|mins?)\b"
+    r"|\b\d+(?:\.\d+)?\s*-?\s*(?:minute|min|hour|hr)s?\b"                     # [LOCAL-898] 40-minute, 2 hours
+    r"|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty|thirty|a\s+few|several|a\s+couple\s+of)[\s-]+(?:minute|hour)s?\b"
     r"|\b(?:to|toward|towards|on|from|in)\s+the\s+(?:north|south|east|west)(?:ern)?(?:east|west)?\b"
     r"(?!\s+(?:asia|china|coast|side))"
     r"|\b(?:north|south|east|west)(?:ward)?\s+(?:of|from)\b"
@@ -536,7 +541,7 @@ _TRAVEL = re.compile(
 
 
 def _has_travel(sentence: str) -> bool:
-    return bool(_TRAVEL.search(sentence))
+    return bool(_TRAVEL.search(sentence) or _MINUTES.search(sentence))   # [LOCAL-898] every time form
 
 
 def repair_travel_sentence(sentence: str) -> Optional[str]:
@@ -732,3 +737,251 @@ def fill_empty_bodies(tour_text: str, log: Optional[Callable] = None) -> str:
         pieces.append(block)
     pieces.append(tour_text[pos:])
     return "".join(pieces)
+
+
+# ══ [LOCAL-898] leftovers: Directions are only "Continue to / Walk on to", creators agree, headers differ ══
+_ROAD_WORD = (r"(?:street|st\.|road|rd\.?|highway|hwy|avenue|ave\.?|boulevard|blvd|lane|expressway|"
+              r"freeway|bypass|alley|bridge|junction|roundabout|intersection)")
+_NOT_SCENERY = re.compile(
+    r"(?i)\b(?:turn|turns|take|exit|merge|follow|head|heads|drive|driving|walk|continue|retrace|return|back|"
+    r"descen\w*|ascen\w*|leav\w*|depart\w*|climb\w*|cable\s*car|enjoy|arriv\w*|reach\w*|left|right|onto|"
+    r"north\w*|south\w*|east\w*|west\w*|kilomet\w*|km|meters?|metres?|miles?|minutes?|hours?|"
+    r"mins?|away|down|winds?|twists?)\b|\b" + _ROAD_WORD + r"\b|\d|\b(?:NH|QL|AH)\s*\d|\bnational\s+route\b|\broute\s+\w*\d")
+_SCENERY_CUE = re.compile(
+    r"(?i)\b(?:notice|see|spot|pass|passes|admire|views?|vistas?|fields?|plantations?|greenery|forest|coast|"
+    r"sea|river|hills?|lining|scenery|landscape|farms?|rice|trees|lush|colou?rful|orchards?|villages?|"
+    r"fishing|boats?|dunes?|paddies|gardens?)\b")
+_DIR_LINE = re.compile(r"(?mi)^Directions:[ \t]*(.*)$")
+
+
+def _scenery_clause(directions_text: str) -> Optional[str]:
+    """ONE short scenery sentence from a model Directions line: no turn, road name, number, compass
+    point, distance, time, or going back / up / down. None when no sentence qualifies."""
+    for sent in split_sentences(directions_text):
+        if len(sent.split()) > 22 or _NOT_SCENERY.search(sent) or not _SCENERY_CUE.search(sent):
+            continue
+        return sent
+    return None
+
+
+def normalize_directions(tour_text: str, log: Optional[Callable] = None, walk_km: float = 1.0) -> str:
+    """[LOCAL-898] On a route a Directions line holds only: ``Continue to <next>.`` (``Walk on to
+    <next>.`` when the next stop is under ``walk_km`` away or shares the pin), ``It is roughly D km
+    away.`` when both ends are pinned and the stops are >= walk_km apart, and at most ONE scenery
+    clause. No turns, road names, compass points, model minutes, or "retrace / descend". The last
+    stop is left alone."""
+    if not active() or not tour_text:
+        return tour_text
+    blocks = _stop_blocks(tour_text)
+    out, pos = [], 0
+    for k, (s, e, num, title) in enumerate(blocks):
+        out.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        dm = _DIR_LINE.search(block) if k + 1 < len(blocks) else None
+        if dm:
+            nxt = blocks[k + 1]
+            a, b = _pin(block), _pin(tour_text[nxt[0]:nxt[1]])
+            d = _km(a, b) if a and b else None
+            if d is not None and d < walk_km:
+                line = f"Walk on to {nxt[3]}."
+            else:
+                line = f"Continue to {nxt[3]}."
+                if d is not None:
+                    line += f" It is roughly {d:.1f} km away."
+            sc = _scenery_clause(re.sub(r"(?i)\bContinue to\b.*$", "", dm.group(1)))
+            if sc:
+                line += " " + sc
+            new = f"Directions: {line}"
+            if new != dm.group(0):
+                if log:
+                    log(f"  [LOCAL-898] Stop {num}: Directions reduced to the continue/walk-on form")
+                block = block[:dm.start()] + new + block[dm.end():]
+        out.append(block)
+    out.append(tour_text[pos:])
+    return "".join(out)
+
+
+def order_directions_last(tour_text: str, log: Optional[Callable] = None) -> str:
+    """[LOCAL-898] The body always comes before Directions: a Directions line that sits above body
+    prose in its block is moved below the last body line (the route closing, if any, stays last)."""
+    if not tour_text:
+        return tour_text
+    pieces, pos = [], 0
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        lines = block.split("\n")
+        di = next((i for i, ln in enumerate(lines) if re.match(r"(?i)^directions\s*:", ln)), None)
+        if di is not None:
+            ci = next((i for i, ln in enumerate(lines) if i > 0 and _CLOSING_LINE.match(ln.strip())), len(lines))
+            body = [i for i, ln in enumerate(lines) if 0 < i < ci and i != di and ln.strip() and not _KEYED.match(ln)]
+            if body and body[-1] > di:
+                dline = lines.pop(di)
+                last = body[-1] - 1
+                spaced = len(lines) > 1 and not lines[1].strip()
+                lines[last + 1:last + 1] = ([""] if spaced else []) + [dline]
+                block = re.sub(r"\n{3,}", "\n\n", "\n".join(lines))
+                if not block.endswith("\n") and tour_text[s:e].endswith("\n"):
+                    block += "\n"
+                if log:
+                    log(f"  [LOCAL-898] Stop {num}: Directions moved below the body")
+        pieces.append(block)
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+# ── distinct Type/Specialty per stop ─────────────────────────────────────────
+_KIND_LABELS = (
+    (re.compile(r"(?i)\b(?:cable\s*car|ropeway|gondola|funicular|chairlift)\b"), "Cable car ride"),
+    (re.compile(r"(?i)\b(?:plantations?|farms?|fields?|orchards?|fruit|paddies|vineyards?|agricultur\w*)\b"), "Agricultural area"),
+    (re.compile(r"(?i)\b(?:pagoda|temple|shrine|monastery|church|cathedral|mosque)\b"), "Place of worship"),
+    (re.compile(r"(?i)\b(?:statue|monument|memorial|buddha|sculpture)\b"), "Monument or statue"),
+    (re.compile(r"(?i)\b(?:museum|gallery)\b"), "Museum"),
+    (re.compile(r"(?i)\bmarkets?\b"), "Market"),
+    (re.compile(r"(?i)\b(?:summit|viewpoint|lookout|views?|vistas?|overlook)\b"), "Scenic viewpoint"),
+    (re.compile(r"(?i)\b(?:beach|coast|bay|harbou?r|fishing)\b"), "Coastal area"),
+    (re.compile(r"(?i)\b(?:river|lake|waterfall)\b"), "Water feature"),
+    (re.compile(r"(?i)\b(?:mountain|mount|peak|hill)\b"), "Mountain area"),
+    (re.compile(r"(?i)\b(?:city|town|village)\b"), "Town or village"),
+)
+_TYPE_LINE = re.compile(r"(?mi)^Type/Specialty:[ \t]*(.*)$")
+
+
+def _kind_label(title: str) -> Optional[str]:
+    for rx, label in _KIND_LABELS:
+        if rx.search(title or ""):
+            return label
+    return None
+
+
+def distinct_type_specialty(tour_text: str, log: Optional[Callable] = None) -> str:
+    """[LOCAL-898] A stop whose Type/Specialty repeats the PREVIOUS stop's (a different place) gets a
+    label derived from its own title; when the title says nothing about its kind the copied line is
+    removed -- no label is better than the neighbour's."""
+    if not active() or not tour_text:
+        return tour_text
+    pieces, pos, prev = [], 0, ""            # prev = the previous stop's line AS DELIVERED
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        m = _TYPE_LINE.search(block)
+        cur = fold(m.group(1)).strip() if m else ""
+        if m and cur and cur == prev:
+            label = _kind_label(title)
+            if label and fold(label) != cur:
+                block = block[:m.start()] + f"Type/Specialty: {label}" + block[m.end():]
+            else:
+                block = (block[:m.start()] + block[m.end():].lstrip("\n")) if label is None else block
+            if log:
+                log(f"  [LOCAL-898] Stop {num} '{title[:40]}': Type/Specialty copied from the previous stop -> "
+                    f"{label or 'removed'}")
+        prev = cur
+        pieces.append(block)
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+# ── two people for one object ────────────────────────────────────────────────
+_MAKER = r"(?:built|constructed|erected|carved|sculpted|created|made|cast)"
+_DESIGNER = r"(?:designed|planned)"
+_FOUNDER = r"(?:founded|established)"
+_ROLE_RX = re.compile(
+    r"(?i:\b(?P<verb>" + "|".join((_MAKER, _DESIGNER, _FOUNDER)) + r"))\b(?:\s+in\s+\d{3,4})?\s+by\s+(?:the\s+)?"
+    r"(?:(?i:sculptor|architect|designer|master|artist|craftsman|builder|monk|abbot|emperor|king|prince)\s+)?"
+    r"(?P<name>[A-ZÀ-Ỹ][^\W\d_]+(?:\s+[A-ZÀ-Ỹ][^\W\d_]+){0,3})")
+
+
+def _role_of(verb: str) -> str:
+    v = verb.lower()
+    if re.fullmatch(_DESIGNER, v):
+        return "designer"
+    if re.fullmatch(_FOUNDER, v):
+        return "founder"
+    return "maker"
+
+
+def _creator_claims(sentence: str) -> List[Tuple[str, str]]:
+    return [(_role_of(m.group("verb")), m.group("name").strip()) for m in _ROLE_RX.finditer(sentence)]
+
+
+def _same_person(a: str, b: str) -> bool:
+    ta, tb = set(_words(a)), set(_words(b))
+    return bool(ta and tb) and (ta <= tb or tb <= ta)
+
+
+def consistent_creators(tour_text: str, evidence_by_title: Optional[Dict[str, str]],
+                        log: Optional[Callable] = None) -> str:
+    """[LOCAL-898] Two stops naming DIFFERENT people for the same role (built/carved/designed/founded by)
+    of the same object: keep the sentence whose name the evidence of the two stops states, drop the
+    other; neither stated -> drop both; both stated -> leave. Same object = two or more content words
+    shared by the sentences (plus their stops' titles), the names aside. ``evidence_by_title`` falsy
+    (no evidence map available) -> unchanged."""
+    if not active() or not tour_text or not evidence_by_title:
+        return tour_text
+    ev_map = {fold(str(k)): v for k, v in evidence_by_title.items()}
+    blocks = _stop_blocks(tour_text)
+    claims = []          # (stop idx, sentence, role, name, object tokens)
+    for bi, (s, e, num, title) in enumerate(blocks):
+        for ln in tour_text[s:e].split("\n")[1:]:
+            if not ln.strip() or _KEYED.match(ln) or _CLOSING_LINE.match(ln.strip()):
+                continue
+            for sent in split_sentences(ln):
+                for role, name in _creator_claims(sent):
+                    claims.append((bi, sent, role, name, _content_tokens(sent) | _content_tokens(title)))
+    drop: Dict[int, set] = {}
+    for i in range(len(claims)):
+        for j in range(i + 1, len(claims)):
+            (bi, si, ri, ni, ti), (bj, sj, rj, nj, tj) = claims[i], claims[j]
+            if bi == bj or ri != rj or _same_person(ni, nj):
+                continue
+            gone = set(_words(ni)) | set(_words(nj))
+            skip = set()
+            for p in (_STATE["origin"], _STATE["destination"], *_STATE["through"]):
+                skip |= _content_tokens(p)
+            if len((ti - gone - skip) & (tj - gone - skip)) < 2:
+                continue
+            ev = fold(" ".join(str(ev_map.get(fold(blocks[x][3]), "")) for x in (bi, bj)))
+            ev_words = " ".join(_words(ev))
+            ok_i = " ".join(_words(ni)) in ev_words
+            ok_j = " ".join(_words(nj)) in ev_words
+            if ok_i and ok_j:
+                continue
+            if not ok_i:
+                drop.setdefault(bi, set()).add(si)
+            if not ok_j:
+                drop.setdefault(bj, set()).add(sj)
+    if not drop:
+        return tour_text
+    pieces, pos = [], 0
+    for bi, (s, e, num, title) in enumerate(blocks):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        if bi in drop:
+            def fix(sents: List[str], _d=drop[bi], _n=num, _t=title) -> List[str]:
+                for x in sents:
+                    if x in _d and log:
+                        log(f"  [LOCAL-898] Stop {_n} '{_t[:40]}': conflicting creator not supported by the evidence "
+                            f"-> sentence dropped: \"{x[:90]}\"")
+                return [x for x in sents if x not in _d]
+            block = _rewrite_prose(block, fix)
+        pieces.append(block)
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+def finalize_898(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
+                 log: Optional[Callable] = None) -> str:
+    """[LOCAL-898] The route text leftovers, in order: creators agree, no emptied body, body above
+    Directions, Directions reduced, distinct Type/Specialty."""
+    if not active() or not tour_text:
+        return tour_text
+    t = consistent_creators(tour_text, evidence_by_title, log)
+    t = fill_empty_bodies(t, log)
+    t = order_directions_last(t, log)
+    t = normalize_directions(t, log)
+    t = distinct_type_specialty(t, log)
+    return t

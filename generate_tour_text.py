@@ -11565,6 +11565,7 @@ def _apply_delivery_hours_guard(result):
                 # [LOCAL-897] after the locality strip: body minutes / compass, and no emptied stop body
                 final = _rc896f.strip_body_travel(final, log=lambda m: print(m, flush=True))
                 final = _rc896f.fill_empty_bodies(final, log=lambda m: print(m, flush=True))
+                final = _rc896f.finalize_898(final, None, log=lambda m: print(m, flush=True))   # [LOCAL-898]
                 if final != _before896:
                     print("  [LOCAL-896] route content pass changed the delivered text", flush=True)
         except Exception as _rc896e:  # pragma: no cover
@@ -35840,6 +35841,7 @@ RULES:
                 if _rc897b.active():
                     complete_tour = _rc897b.cap_unsupported(complete_tour, _ev889, log=print)
                     complete_tour = _rc897b.strip_body_travel(complete_tour, log=print)
+                    complete_tour = _rc897b.finalize_898(complete_tour, _ev889, log=print)   # [LOCAL-898]
             except Exception as _e897b:
                 print(f"  [LOCAL-897] route body pass skipped (non-fatal): {_e897b}")
             _tot = sum(r.get("K", 0) for r in _kf_rep["stops"])

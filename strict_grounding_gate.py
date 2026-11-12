@@ -769,6 +769,8 @@ def _replace_block_body(tour_text: str, stop_num: int, new_sentences: List[str]
     k += 1
     while k < end_idx:
         s = lines[k].strip()
+        if _DIRECTIONS_RE.match(s):      # [LOCAL-898] Directions is never head: an empty body must go BEFORE it
+            break
         if _FIELD_RE.match(s) or not s:
             head_keep.append(lines[k])
             k += 1
