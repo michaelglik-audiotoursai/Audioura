@@ -285,7 +285,7 @@ def test_neighbour_sentence_survives_every_pass(route):
     assert gate
     logs = []
     o1 = rc.finalize_898(t, ev, logs.append)
-    assert "cable car designed to transport visitors" in _stop_body(o1, 5)
+    assert "You can take a modern cable car to explore the mountain" in _stop_body(o1, 5)   # [LOCAL-902] delivered body
     o2 = rc.finalize_898(o1, None, logs.append)                    # the delivery pass runs without the evidence
     o3 = rc.finalize_898(o2, ev, logs.append)
     assert o1 == o2 == o3
@@ -295,10 +295,11 @@ def test_neighbour_sentence_survives_every_pass(route):
 
 def test_honest_body_built_without_evidence_gets_the_neighbour_sentence_later(route):
     t = _fx("local900b_tour551_input.txt")
+    # [LOCAL-902] the neighbour sentence comes from the neighbour's DELIVERED BODY, so it no longer needs the evidence
     o1 = rc.finalize_898(t, None)
-    assert "cable car designed to transport" not in _stop_body(o1, 5)
+    assert "You can take a modern cable car to explore the mountain" in _stop_body(o1, 5)
     o2 = rc.finalize_898(o1, _evidence(t))
-    assert "cable car designed to transport visitors" in _stop_body(o2, 5)
+    assert "You can take a modern cable car to explore the mountain" in _stop_body(o2, 5)
 
 
 # ── B. unsupported facts on user-list stops ─────────────────────────────────

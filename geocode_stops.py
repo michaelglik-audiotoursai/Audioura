@@ -1435,3 +1435,23 @@ def repair_inherited_coordinates(poi_list, tour_location,
         rec["reason"] = ("clustered stops found but each geocodes within "
                          f"{geocode_away_m:.0f} m (or did not geocode) — left as-is")
     return rec
+
+
+def reverse_address(lat, lng):
+    """[LOCAL-902] Free reverse geocode (the same Nominatim host as ``geocode``): the display name of the
+    place at (lat, lng), e.g. "<commune>, <district>, <province>, <country>"; '' on any failure."""
+    global _last_request_at
+    try:
+        elapsed = time.time() - _last_request_at
+        if elapsed < _MIN_INTERVAL_S:
+            time.sleep(_MIN_INTERVAL_S - elapsed)
+        url = NOMINATIM_URL.replace("/search", "/reverse") + "?" + urllib.parse.urlencode({
+            "lat": f"{float(lat):.6f}", "lon": f"{float(lng):.6f}", "format": "jsonv2", "zoom": 14})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+            payload = json.load(resp)
+        _last_request_at = time.time()
+        return str((payload or {}).get("display_name") or "")
+    except Exception as e:
+        logging.warning("[GEOCODE] reverse lookup failed for %r,%r: %s", lat, lng, e)
+        return ""

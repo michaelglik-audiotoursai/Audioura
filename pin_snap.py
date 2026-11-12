@@ -568,6 +568,7 @@ def snap_pin(title: str,
 
 
 _ROUTE_PLACE_KEEP_M = 3000.0
+_MODEL_PIN_SCOPE_KM = 100.0     # [LOCAL-902] a model pin may be replaced by a reference this close to the coarse centre
 _SNAP_RADIUS_KM = {"BUILDING": 15.0, "CORRIDOR": 15.0, "DISTRICT": 15.0, "CITY": 25.0}
 _ROUTE_MARGIN_KM = 10.0
 
@@ -607,6 +608,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          route_box: Optional[Sequence[float]] = None,
                          route_refs: Optional[Dict[int, Dict]] = None,
                          scope_precision: str = "",
+                         coarse_center: Optional[Tuple[float, float]] = None,
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -648,8 +650,40 @@ def snap_poi_coordinates(poi_list: List[Dict],
     # its own pin, and one wrong pin does not pull its own bound).
     coords_all: List[Optional[Tuple[float, float]]] = [_poi_coord(p) for p in poi_list]
 
+    # [LOCAL-902] The centroid test may only use VERIFIED stop pins (Wikidata / geocoded / user-given).
+    # The model's own pins are unverified: comparing a reference to them is circular (tour 552: the
+    # correct reference was refused for being 32 km from two model pins that were themselves 33 km off).
+    def _is_verified_pin(idx: int) -> bool:
+        p = poi_list[idx]
+        if coords_all[idx] is None or not isinstance(p, dict):
+            return False
+        return _is_user_pin(p) or not _is_model_sourced_coord(p)
+
+    _verified_idx = {j for j in range(len(poi_list)) if _is_verified_pin(j)}
+    _scope_known_902 = bool(scope_bbox or coarse_center or scope_center)
+    # Model-only tour with >= 3 pinned stops: their mutual agreement is real evidence (and the GEO-CHECK
+    # runs there), so the legacy all-pins centroid stays. With <= 2 pins (or any verified pin) only
+    # verified pins are used.
+    _verified_only_902 = _scope_known_902 and (bool(_verified_idx)
+                                               or sum(1 for c in coords_all if c) <= 2)
+
+    def _ref_in_scope_902(ref) -> Optional[bool]:
+        """True/False when the scope can judge a reference, None when no scope is known. Inside the
+        scope bbox, else within 100 km of the coarse centre."""
+        if ref is None:
+            return None
+        if scope_bbox and len(scope_bbox) >= 4:
+            return bool(scope_bbox[0] <= ref[0] <= scope_bbox[1] and scope_bbox[2] <= ref[1] <= scope_bbox[3])
+        _c = coarse_center or scope_center
+        if _c:
+            return _haversine_m(ref, _c) / 1000.0 <= _MODEL_PIN_SCOPE_KM
+        return None
+
     def _centroid_excluding(idx: int) -> Optional[Tuple[float, float]]:
-        pts = [c for j, c in enumerate(coords_all) if j != idx and c]
+        if _verified_only_902:
+            pts = [coords_all[j] for j in _verified_idx if j != idx]
+        else:
+            pts = [c for j, c in enumerate(coords_all) if j != idx and c]
         if not pts:
             return None
         return (sum(p[0] for p in pts) / len(pts),
@@ -666,7 +700,8 @@ def snap_poi_coordinates(poi_list: List[Dict],
     def _adaptive_bound(idx: int, centroid: Optional[Tuple[float, float]]) -> float:
         if not centroid:
             return _max_centroid or 0.0
-        other = [c for j, c in enumerate(coords_all) if j != idx and c]
+        other = ([coords_all[j] for j in _verified_idx if j != idx] if _verified_only_902
+                 else [c for j, c in enumerate(coords_all) if j != idx and c])
         spread = max((_haversine_m(c, centroid) / 1000.0 for c in other),
                      default=0.0)
         return max(_max_centroid or 0.0, spread + (_max_centroid or 0.0))
@@ -710,12 +745,30 @@ def snap_poi_coordinates(poi_list: List[Dict],
                 row.update({"snapped": True, "new_coordinate": _ref, "reference": _ref, "source": "route_place",
                             "distance_m": _haversine_m(coord, _ref) if coord is not None else None,
                             "reason": f"route place {_rr['place']!r} is the reference ({_rr['why']})"})
+        # [LOCAL-902] When no verified stop pin exists to judge the reference against, judge it by the scope.
+        _model_pin_902 = (coord is not None and not _is_verified_pin(i))
+        _accepted_902 = False
+        if row.get("snapped") and row.get("new_coordinate") and _model_pin_902 and _verified_only_902:
+            _nc902 = tuple(row["new_coordinate"])
+            _in902 = _ref_in_scope_902(_nc902)
+            _mv902 = _haversine_m(coord, _nc902) / 1000.0
+            _auth902 = str(row.get("source") or "").lower().startswith(("wikidata", "landmark"))
+            if _in902 is False and _auth902:
+                pass                       # an authority reference keeps its own (900B) scope rules
+            elif _in902 is False:
+                row.update({"snapped": False, "new_coordinate": None,
+                            "reason": f"reference {_nc902[0]:.4f},{_nc902[1]:.4f} outside the scope — refused "
+                                      f"(wrong same-name place)"})
+            elif _in902 and _mv902 <= _MODEL_PIN_SCOPE_KM:
+                _accepted_902 = True
+                row["accepted_902"] = True
         # [LOCAL-900B] SCOPE GUARD on every snap (authority or not). A same-named place elsewhere in the world must
         # never win: wave 47 snapped "Reclining Buddha Statue" to the statue in another country (876 km, a Wikidata
         # P625). A snap that moves the pin farther than the scope radius (DISTRICT/BUILDING/CORRIDOR 15 km, CITY
         # 25 km), or on a route lands outside the route box + 10 km, is rejected; the shipped pin stays.
         if row.get("snapped") and row.get("new_coordinate"):
-            _rej = _snap_outside_scope(coord, tuple(row["new_coordinate"]), scope_precision, route_box)
+            _rej = ("" if _accepted_902 else
+                    _snap_outside_scope(coord, tuple(row["new_coordinate"]), scope_precision, route_box))
             if _rej:
                 _dm = row.get("distance_m")
                 if _dm is None and coord is not None:
@@ -736,6 +789,9 @@ def snap_poi_coordinates(poi_list: List[Dict],
                 poi["longitude"] = lng
             poi["_pin_snapped"] = True
             poi["_pin_snap_source"] = row["source"]
+            if row.get("accepted_902"):
+                emit(f"[LOCAL-902] snap accepted {title} {_haversine_m(coord, (lat, lng)) / 1000.0:.0f} km: "
+                     f"model pins unverified, reference in scope")
             d = row["distance_m"]
             emit(f"[LOCAL-791C] pin snap {title} "
                  f"{('%.0f' % d) if d is not None else '?'}m "
@@ -983,3 +1039,60 @@ def snap_poi_coordinates(poi_list: List[Dict],
                  f"final pin {_fin if not _p.get('_no_coordinate') else None} "
                  f"({_row_for(_i).get('source') or 'no reference'})")
     return poi_list, rows
+
+
+# ── [LOCAL-902] a model-written Address is unverified ─────────────────────────────────────────────────────
+def _fold_addr(text: str) -> str:
+    import unicodedata
+    t = (text or "").replace("\u0111", "d").replace("\u0110", "D")
+    t = "".join(c for c in unicodedata.normalize("NFKD", t) if not unicodedata.combining(c)).lower()
+    return re.sub(r"[^a-z0-9]+", " ", t).strip()
+
+
+def address_agrees(address: str, reverse_text: str, scope: str = "") -> bool:
+    """True when the district / commune parts of ``address`` agree with the reference's reverse geocode or the
+    scope string. Parts already in the scope (province, country) say nothing about the district and are ignored;
+    a part with a digit (house / hamlet number) is ignored; of the rest, MORE THAN HALF must be found."""
+    parts = [_fold_addr(x) for x in (address or "").split(",")]
+    scope_f, rev_f = f" {_fold_addr(scope)} ", f" {_fold_addr(reverse_text)} "
+    local = [x for x in parts if x and not re.search(r"\d", x) and f" {x} " not in scope_f]
+    # drop the trailing admin levels the scope string already names (province, country)
+    if not local:
+        return True                      # nothing district-level to contradict
+    hit = sum(1 for x in local if f" {x} " in rev_f or f" {x} " in scope_f)
+    return hit * 2 > len(local)
+
+
+def verify_addresses(poi_list: List[Dict], rows: List[Dict], scope: str = "",
+                     reverse_fn: Optional[Callable] = None, log: Optional[Callable[[str], None]] = None,
+                     max_stops: int = 2) -> int:
+    """[LOCAL-902] On a single-place tour (at most ``max_stops`` stops), a stop whose reference exists (the
+    snap row carries one) keeps its model-written ``address`` only if its district / commune tokens agree with
+    the reference's reverse geocode (``reverse_fn(lat, lng) -> str``, a free path) or the scope string; otherwise
+    the address is dropped and ``[LOCAL-902] address dropped`` logged. Returns the number dropped. Never raises."""
+    emit = log or (lambda _m: None)
+    if len(poi_list or []) > max_stops:
+        return 0
+    if reverse_fn is None:
+        try:
+            from geocode_stops import reverse_address as reverse_fn
+        except Exception:
+            return 0
+    dropped = 0
+    for poi, row in zip(poi_list, rows):
+        try:
+            addr = str(poi.get("address") or "").strip()
+            ref = row.get("new_coordinate") if row.get("snapped") else row.get("reference")
+            if not addr or not ref or row.get("rejected_900b") or "refused" in (row.get("reason") or ""):
+                continue
+            rev = reverse_fn(ref[0], ref[1]) or ""
+            if not rev:
+                continue
+            if not address_agrees(addr, rev, scope):
+                poi["address"] = ""
+                dropped += 1
+                emit(f"[LOCAL-902] address dropped for {poi.get('name')!r}: {addr!r} disagrees with the "
+                     f"reference's reverse geocode ({rev[:80]!r})")
+        except Exception as e:
+            emit(f"[LOCAL-902] address check skipped for {poi.get('name')!r} (non-fatal): {e}")
+    return dropped

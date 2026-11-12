@@ -79,10 +79,60 @@ _BAD_NEIGH = re.compile(r"(?i)\b(?:minutes?|hours?|km|kilomet\w*|miles?|http|www
                         r"per person|children|adults?)\b|\d{4,}")
 
 
+_NON_SUBJECT_OPEN = frozenset({
+    "will", "to", "and", "but", "or", "with", "which", "that", "of", "in", "on", "at", "for", "by", "from", "as",
+    "also", "is", "are", "was", "were", "has", "have", "had", "being", "be", "been", "then", "so", "while",
+    "when", "where", "who", "whose", "if", "because", "although", "nearby", "can", "may", "could", "would"})
+
+
+def _repeated_ngram(sentence: str, n_max: int = 3) -> bool:
+    """True when a word, or a 2..n_max-word run, occurs twice IN A ROW or a 2+-word run occurs twice
+    anywhere ("<Mountain> <Mountain> is ...", "the lake the lake")."""
+    w = _toks(sentence)
+    for i in range(len(w) - 1):
+        if w[i] == w[i + 1]:
+            return True
+    for n in range(2, n_max + 1):
+        seen = set()
+        for i in range(len(w) - n + 1):
+            g = tuple(w[i:i + n])
+            if g in seen:
+                return True
+            seen.add(g)
+    return False
+
+
+def is_clean_neighbour_sentence(s: str) -> bool:
+    """[LOCAL-902] ONE complete sentence: starts with a capital and a subject (not a verb / conjunction /
+    preposition), at most 30 words, no repeated n-gram, not a fragment, a single terminal stop."""
+    x = (s or "").strip()
+    if not x or not x[0].isalpha() or not x[0].isupper():
+        return False
+    words = x.split()
+    if len(words) < 5 or len(words) > 30:
+        return False
+    first = _toks(words[0])
+    if not first or first[0] in _NON_SUBJECT_OPEN:
+        return False
+    if len(re.findall(r"[.!?](?:\s|$)", x)) > 1:
+        return False
+    if _repeated_ngram(x):
+        return False
+    try:
+        from route_content_896 import is_fragment
+        if is_fragment(x):
+            return False
+    except Exception:
+        pass
+    return True
+
+
 def neighbour_sentence(short_name: str, neighbour_evidence: Sequence[str],
                        split: Callable[[str], List[str]]) -> Optional[str]:
-    """[LOCAL-900] A sentence from a same-site neighbour's evidence that speaks about THIS stop's subject
-    (>= half of its subject words, at least one). Plain, short, no travel/price noise."""
+    """[LOCAL-900/902] A sentence from a same-site neighbour that speaks about THIS stop's subject
+    (>= half of its subject words, at least one). ``neighbour_evidence`` is the neighbour's DELIVERED BODY (whole
+    sentences), never raw evidence text. The sentence must be one clean sentence (``is_clean_neighbour_sentence``);
+    otherwise None -- no neighbour sentence is used."""
     subj = subject_tokens(short_name)
     if not subj:
         return None
@@ -90,13 +140,16 @@ def neighbour_sentence(short_name: str, neighbour_evidence: Sequence[str],
     for ev in neighbour_evidence:
         for s in split(ev or ""):
             n = len(s.split())
-            if n < 6 or n > 32 or _BAD_NEIGH.search(s) or sum(ord(c) > 127 for c in s) > 3:
+            if n < 6 or n > 30 or _BAD_NEIGH.search(s) or sum(ord(c) > 127 for c in s) > 3:
                 continue
             words = set(_toks(s))
             if sum(1 for w in subj if w in words or (w.endswith("s") and w[:-1] in words)) >= need:
                 s = s.strip()
-                s = s[0].upper() + s[1:]
-                return s if s[-1:] in ".!?" else s + "."
+                if not s[-1:] in ".!?":
+                    continue                  # a body sentence is punctuated; one that is not is raw text
+                if not is_clean_neighbour_sentence(s):
+                    continue
+                return s
     return None
 
 
