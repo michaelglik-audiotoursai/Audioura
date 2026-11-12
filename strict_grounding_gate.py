@@ -833,7 +833,10 @@ def sensory_body(title: str, kept: List[str], target: int,
                  else _SENSORY_TEMPLATES)
         if i >= len(_tpls):
             break
-        cand = _tpls[i].format(t=title)
+        # [LOCAL-897] "As you pass The cable car ascent," read as two sentences to the broken-join
+        # repair ("As you pass. The cable car ...") -- a leading article is lower-cased mid-sentence
+        _t = re.sub(r"^(The|A|An)\s", lambda m: m.group(1).lower() + " ", (title or "").strip())
+        cand = _tpls[i].format(t=_t)
         i += 1
         if not any(_fold(cand)[:30] == _fold(b)[:30] for b in base):
             base.append(cand)

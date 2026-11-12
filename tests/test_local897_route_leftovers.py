@@ -100,10 +100,12 @@ def test_compass_in_body_dropped_but_regional_names_and_lengths_kept():
 
 def test_both_ends_pinned_keeps_the_travel_claim():
     rc.route_box(["Alpha Lodge", "Beta Town", "Gamma Peak"], "Delta province", _geo)
+    t = _tour("Gamma Peak is 40 km away from here.", pin="10.1, 108.1")
+    assert "40 km" in rc.strip_body_travel(t)                       # distance between two pins: kept
     t = _tour("Gamma Peak is 40 minutes away from here.", pin="10.1, 108.1")
-    assert "40 minutes" in rc.strip_body_travel(t)
-    out = rc.strip_body_travel(_tour("Gamma Peak is 40 minutes away from here."))
-    assert "40 minutes" not in out and "Stop 1: Beta Town" in out
+    assert "40 minutes" not in rc.strip_body_travel(t)              # a time claim always goes
+    out = rc.strip_body_travel(_tour("Gamma Peak is 40 km away from here."))
+    assert "40 km" not in out and "Stop 1: Beta Town" in out
 
 
 # ── unsupported sentence / thin stop ─────────────────────────────────────────
@@ -193,3 +195,62 @@ class TestReplay896:
         low = out.lower()
         for bad in ("fansipan", "sa pa", "toc tien", "1955", "65 passengers", "6:00"):
             assert bad not in low
+
+
+# ── post-live fixes (offline) ────────────────────────────────────────────────
+def test_destination_geocode_on_top_of_a_through_town_is_not_used():
+    geo = {"alpha lodge": (10.0, 108.0), "beta town": (10.30, 107.90), "gamma peak": (10.301, 107.901)}
+    rc.route_box(["Alpha Lodge", "Beta Town", "Gamma Peak"], "Delta province",
+                 lambda q: geo.get(q.split(",")[0].strip().lower()))
+    titles = ["Leaving Alpha", "Arriving at Gamma Peak", "Ropeway", "Old Hall"]
+    assert all(r["place"] != "Gamma Peak" for r in rc.stop_references(titles).values())
+    refs = rc.stop_references(titles, user_pins={3: (10.1, 107.7)})
+    assert refs[1]["coord"] == (10.1, 107.7) and refs[2]["coord"] == (10.1, 107.7)
+
+
+def test_body_travel_to_the_origin_locality_is_dropped_even_when_pinned():
+    rc.route_box(["Alpha Lodge", "Beta Town", "Gamma Peak"], "Delta province", _geo)
+    t = ("X\n\nStop 1: Arriving at Gamma Peak\n\nCoordinates: 10.3, 107.9\n\nType/Specialty: y\n\n"
+         "Gamma Peak is a volcano in Eta District, about 40 minutes from Epsilon Quarter and Beta Town. It is tall.\n")
+    out = rc.strip_body_travel(t)
+    assert "40 minutes" not in out and "Gamma Peak is a volcano in Eta District." in out
+
+
+def test_closing_on_the_same_line_survives_the_thin_stop_rewrite():
+    import strict_grounding_gate as g
+    t = ("X\n\nStop 1: Sunset views\n\nType/Specialty: y\n\nThe quiet hill meets the restless sea. "
+         "From Alpha Lodge to Gamma Peak, this route is the one you chose — your own path. That's 1 stops in all.\n")
+    out = rc.cap_unsupported(t, {})
+    assert g.NO_HISTORY_DISCLOSURE in out and "this route is the one you chose" in out and "restless" not in out
+    assert out.index(g.NO_HISTORY_DISCLOSURE) < out.index("this route is the one you chose")
+
+
+def test_empty_last_stop_body_is_filled_before_the_closing():
+    import strict_grounding_gate as g
+    t = ("X\n\nStop 1: Sunset views\n\nCoordinates: 1, 2\n\nType/Specialty: y\n\n"
+         "From Alpha Lodge to Gamma Peak, this route is the one you chose — your own path. That's 1 stops in all.\n")
+    out = rc.fill_empty_bodies(t)
+    assert out.index(g.NO_HISTORY_DISCLOSURE) < out.index("this route is the one you chose")
+    assert rc.fill_empty_bodies(out) == out
+
+
+def test_sensory_template_lowercases_a_leading_article():
+    import strict_grounding_gate as g
+    b = g.sensory_body("The cable car ascent", [], 1, register="driving")[0]
+    assert b.startswith("As you pass the cable car ascent,")
+
+
+def test_pinned_directions_a_minute_is_replaced():
+    t = ("X\n\nStop 1: Beta Town\n\nCoordinates: 10.1, 108.1\n\nType/Specialty: y\n\nBody here.\n\n"
+         "Directions: Drive north for about a minute, and you'll reach it.\n\n"
+         "Stop 2: Gamma Peak\n\nCoordinates: 10.1, 108.1\n\nType/Specialty: y\n\nBody.\n")
+    out = rc.simplify_directions(t)
+    assert "Directions: Continue to Gamma Peak." in out and "minute" not in out
+
+
+def test_mangled_minutes_clause_from_the_live_run_is_dropped():
+    rc.route_box(["Alpha Lodge", "Beta Town", "Gamma Peak"], "Delta province", _geo)
+    t = ("X\n\nStop 1: Arriving at Gamma Peak\n\nCoordinates: 10.3, 107.9\n\nType/Specialty: y\n\n"
+         "You are at Gamma Peak, an extinct volcano in Eta District, about 40 minutes and Beta Town City. It is tall.\n")
+    out = rc.strip_body_travel(t)
+    assert "minutes" not in out and "You are at Gamma Peak, an extinct volcano in Eta District." in out

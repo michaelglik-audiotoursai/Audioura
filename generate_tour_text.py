@@ -11562,6 +11562,9 @@ def _apply_delivery_hours_guard(result):
                 _before896 = final
                 final = _rc896f.strip_origin_locality(final, log=lambda m: print(m, flush=True))
                 final = _rc896f.simplify_directions(final, log=lambda m: print(m, flush=True))
+                # [LOCAL-897] after the locality strip: body minutes / compass, and no emptied stop body
+                final = _rc896f.strip_body_travel(final, log=lambda m: print(m, flush=True))
+                final = _rc896f.fill_empty_bodies(final, log=lambda m: print(m, flush=True))
                 if final != _before896:
                     print("  [LOCAL-896] route content pass changed the delivered text", flush=True)
         except Exception as _rc896e:  # pragma: no cover
@@ -30614,7 +30617,17 @@ REWRITE RULES (all mandatory):
         try:   # [LOCAL-897] stops that name (or follow the arrival at) a route place
             import route_content_896 as _rc897
             if _rc897.active():
-                _route_refs_897 = _rc897.stop_references([str((_p or {}).get('name', '')) for _p in poi_list])
+                _up897 = {}
+                for _k897, _p897 in enumerate(poi_list):
+                    from pin_snap import _is_user_pin as _iup897
+                    if _iup897(_p897):
+                        try:
+                            _la, _lo = [float(x) for x in str(_p897.get('coordinates')).split(',')[:2]]
+                            _up897[_k897] = (_la, _lo)
+                        except Exception:
+                            pass
+                _route_refs_897 = _rc897.stop_references(
+                    [str((_p or {}).get('name', '')) for _p in poi_list], user_pins=_up897)
                 print(f"  [LOCAL-897] route-place references: "
                       f"{ {k + 1: v['place'] for k, v in _route_refs_897.items()} }")
         except Exception as _e897:

@@ -321,7 +321,7 @@ def strip_origin_locality(tour_text: str, log: Optional[Callable] = None) -> str
 
 # ── 3. directions on a route ─────────────────────────────────────────────────
 _COORD = re.compile(r"(?mi)^Coordinates:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
-_MINUTES = re.compile(r"(?i)\b\d+\s*(?:-\s*\d+\s*)?(?:minutes?|mins?)\b")
+_MINUTES = re.compile(r"(?i)\b(?:\d+\s*(?:-\s*\d+\s*)?|an?\s+|half\s+an\s+)(?:minutes?|mins?|hours?)\b")   # [897] "about a minute"
 
 
 def _km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
@@ -474,7 +474,20 @@ def _names(title: str, place: str) -> bool:
     return bool(need) and need <= _title_tokens(title)
 
 
-def stop_references(titles: Sequence[str]) -> Dict[int, Dict]:
+def _collapsed(name: str, km: float = 5.0) -> bool:
+    """[LOCAL-897 live] A route place whose geocode sits on top of ANOTHER route place's geocode is a
+    geocoder fallback (the destination resolved to the through-town's centre), not the place."""
+    pt = place_point(name)
+    if not pt:
+        return False
+    for other, opt in _POINTS.items():
+        if other != fold(name).strip() and _km(pt, opt) <= km:
+            return True
+    return False
+
+
+def stop_references(titles: Sequence[str], user_pins: Optional[Dict[int, Tuple[float, float]]] = None
+                    ) -> Dict[int, Dict]:
     """{stop index: {"coord": (lat, lng), "place": name, "why": ...}} -- a stop whose title names
     the route's destination (or another route place) uses that place's own geocode as its
     reference; the stops from the first one that names the DESTINATION onward are on the
@@ -485,10 +498,21 @@ def stop_references(titles: Sequence[str]) -> Dict[int, Dict]:
     o, d = endpoints()
     out: Dict[int, Dict] = {}
     arrived = None
+    user_pins = user_pins or {}
+    for i, t in enumerate(titles):                     # where the listener arrives at the destination
+        if _names(t, d):
+            arrived = i
+            break
     dpt = place_point(d)
+    if dpt and _collapsed(d):
+        # the destination's geocode is another route place's: use the listener's own pin of a stop
+        # at / after the arrival instead (a pin the user gave is authoritative), else no reference
+        later = [user_pins[k] for k in sorted(user_pins) if arrived is not None and k >= arrived]
+        dpt = tuple(later[0]) if later else None
+    arrived = None
     for i, t in enumerate(titles):
         for pl in [*_STATE["through"], d]:
-            pt = place_point(pl)
+            pt = dpt if pl == d else (None if _collapsed(pl) else place_point(pl))
             if pt and _names(t, pl):
                 out[i] = {"coord": pt, "place": pl, "why": "title names the route place"}
                 if pl == d:
@@ -532,6 +556,16 @@ def repair_travel_sentence(sentence: str) -> Optional[str]:
     return out if len(_words(out)) >= 5 and not _has_travel(out) else None
 
 
+def _names_unpinned(sentence: str) -> bool:
+    """The sentence names the origin's locality or the origin (not a pinned route place)."""
+    f = fold(sentence)
+    for l in _STATE["localities"]:
+        if re.search(r"\b" + re.escape(l) + r"\b", f):
+            return True
+    o = _KIND_TAIL.sub("", _STATE["origin"] or "").strip()
+    return bool(o) and not place_point(_STATE["origin"]) and fold(o) in f
+
+
 def strip_body_travel(tour_text: str, log: Optional[Callable] = None) -> str:
     """No \"N minutes/km away\" or compass direction in a stop BODY unless both ends are pinned (the
     stop, and the route place the sentence names). Directions lines are handled by
@@ -549,7 +583,10 @@ def strip_body_travel(tour_text: str, log: Optional[Callable] = None) -> str:
         def fix(sents: List[str], _n=num, _t=title, _pinned=pinned) -> List[str]:
             out = []
             for x in sents:
-                if _has_travel(x) and not (_pinned and any(_names(x, p) for p in places)):
+                _other = [p for p in places if _names(x, p) and not _names(_t, p)]
+                # a TIME claim ("N minutes") is never measured by two pins (896 rule for Directions): it always goes
+                _time = bool(_MINUTES.search(x))
+                if _has_travel(x) and (_time or not (_pinned and _other and not _names_unpinned(x))):
                     y = repair_travel_sentence(x)
                     if log:
                         log(f"  [LOCAL-897] Stop {_n} '{_t[:40]}': body distance/time/compass without both ends "
@@ -618,22 +655,80 @@ def cap_unsupported(tour_text: str, evidence_by_title: Dict[str, str], log: Opti
             return out
 
         lines = block.split("\n")
-        body_idx = [i for i, ln in enumerate(lines) if i > 0 and ln.strip() and not _KEYED.match(ln)
-                    and not _CLOSING_LINE.match(ln.strip())]
+        # the route closing (and anything after it) rides on the last stop: split it off, never touched
+        tail: List[str] = []
+        for i, ln in enumerate(lines):
+            if i == 0 or not ln.strip() or _KEYED.match(ln):
+                continue
+            sents = split_sentences(ln)
+            ci = next((k for k, x in enumerate(sents) if _CLOSING_LINE.match(x)), None)
+            if ci is not None:
+                lines[i] = " ".join(sents[:ci])
+                tail = [" ".join(sents[ci:])] + [x for x in lines[i + 1:] if x.strip()]
+                lines = lines[:i + 1]
+                break
+        body_idx = [i for i, ln in enumerate(lines) if i > 0 and ln.strip() and not _KEYED.match(ln)]
         for i in body_idx:
             lines[i] = " ".join(fix(split_sentences(lines[i])))
         body_idx = [i for i in body_idx if lines[i].strip()]
-        if thin and body_idx and not any("legend" in lines[i].lower() for i in body_idx):
-            # no evidence for this stop: the D760 honest body, not mood-only text
+        if thin and not any("legend" in lines[i].lower() for i in body_idx):
+            # no evidence for this stop (or an emptied body): the D760 honest body, not mood-only text
             honest = sgg.sensory_body(title, [sgg.NO_HISTORY_DISCLOSURE], sgg.MIN_NO_EVIDENCE_SENTENCES - 1,
                                       register="driving")
             if fold(" ".join(lines[i] for i in body_idx)) != fold(" ".join(honest)) and log:
                 log(f"  [LOCAL-897] Stop {num} '{title[:40]}': no evidence for this destination -> honest "
                     f"non-factual body + disclosure (D760), not mood-only text")
-            lines[body_idx[0]] = " ".join(honest)
-            for i in body_idx[1:]:
-                lines[i] = None
+            if body_idx:
+                lines[body_idx[0]] = " ".join(honest)
+                for i in body_idx[1:]:
+                    lines[i] = None
+            else:
+                # before the Directions line when there is one, else at the end of the block
+                di = next((i for i, ln in enumerate(lines) if ln and re.match(r"(?i)^directions\s*:", ln)), None)
+                if di is None:
+                    while lines and lines[-1] is not None and not lines[-1].strip():
+                        lines.pop()
+                    lines += ["", " ".join(honest), ""]
+                else:
+                    lines[di:di] = [" ".join(honest), ""]
+        if tail:
+            while lines and lines[-1] is not None and not lines[-1].strip():
+                lines.pop()
+            lines += [""] + [x for t_ in tail for x in (t_, "")]
         new_block = "\n".join(ln for ln in lines if ln is not None)
         pieces.append(re.sub(r"\n{3,}", "\n\n", new_block))
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+def fill_empty_bodies(tour_text: str, log: Optional[Callable] = None) -> str:
+    """[LOCAL-897 live] D760 on the delivered text: a route stop whose body ended up empty (the last stop
+    lost its honest body when the closing was rebuilt) gets the honest non-factual body + disclosure."""
+    if not active() or not tour_text:
+        return tour_text
+    import strict_grounding_gate as sgg
+    pieces, pos = [], 0
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        lines = block.split("\n")
+        prose = [ln for i, ln in enumerate(lines) if i > 0 and ln.strip() and not _KEYED.match(ln)
+                 and not _CLOSING_LINE.match(ln.strip())]
+        if not prose:
+            honest = " ".join(sgg.sensory_body(title, [sgg.NO_HISTORY_DISCLOSURE],
+                                               sgg.MIN_NO_EVIDENCE_SENTENCES - 1, register="driving"))
+            at = next((i for i, ln in enumerate(lines) if i > 0 and (re.match(r"(?i)^directions\s*:", ln)
+                                                                  or _CLOSING_LINE.match(ln.strip()))), None)
+            if at is None:
+                while len(lines) > 1 and not lines[-1].strip():
+                    lines.pop()
+                lines += ["", honest, "", ""]
+            else:
+                lines[at:at] = [honest, ""]
+            if log:
+                log(f"  [LOCAL-897] Stop {num} '{title[:40]}': empty body on delivery -> honest body + D760 disclosure")
+            block = "\n".join(lines)
+        pieces.append(block)
     pieces.append(tour_text[pos:])
     return "".join(pieces)
