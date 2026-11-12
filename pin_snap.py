@@ -1052,12 +1052,22 @@ def _fold_addr(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", t).strip()
 
 
+_ADMIN_PREFIX = re.compile(r"^(?:huyen|district|quan|thi xa|xa|thi tran|phuong)\s+(.+)$")
+
+
 def address_agrees(address: str, reverse_text: str, scope: str = "") -> bool:
     """True when the district / commune parts of ``address`` agree with the reference's reverse geocode or the
     scope string. Parts already in the scope (province, country) say nothing about the district and are ignored;
     a part with a digit (house / hamlet number) is ignored; of the rest, MORE THAN HALF must be found."""
     parts = [_fold_addr(x) for x in (address or "").split(",")]
     scope_f, rev_f = f" {_fold_addr(scope)} ", f" {_fold_addr(reverse_text)} "
+    # [LOCAL-903] ANY district-level token (the part after Huyen / District / Quan / Thi xa / Xa / Thi tran, the
+    # admin-type prefix stripped) found in the reverse geocode keeps the address: a province-level mismatch is
+    # not decisive (provinces get renamed or merged).
+    for x in parts:
+        m = _ADMIN_PREFIX.match(x)
+        if m and m.group(1).strip() and not re.search(r"\d", m.group(1)) and f" {m.group(1).strip()} " in rev_f:
+            return True
     local = [x for x in parts if x and not re.search(r"\d", x) and f" {x} " not in scope_f]
     # drop the trailing admin levels the scope string already names (province, country)
     if not local:

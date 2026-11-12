@@ -266,9 +266,88 @@ def _default_free_geocode(query: str):
         return None
 
 
+# ── [LOCAL-903] a geocoder hit must fit the kind of place the name says it is ─────────────────────────────
+_SETTLEMENT_TYPES = {"city", "town", "village", "suburb", "hamlet", "municipality", "borough", "quarter",
+                     "neighbourhood", "neighborhood", "city_district", "district", "county", "state",
+                     "province", "region", "administrative", "residential"}
+_NATURAL_OK = {"peak", "hill", "volcano", "ridge", "rock", "mountain", "cliff", "saddle", "valley",
+               "cave_entrance", "waterfall", "water", "bay", "beach", "spring", "wood", "tree", "wetland"}
+_WORSHIP_OK = {"place_of_worship", "temple", "pagoda", "church", "mosque", "shrine", "monastery",
+               "wayside_shrine", "religious", "cathedral", "chapel"}
+# folded generic word -> (allowed classes, allowed types within natural-ish classes or None for any type)
+_FEATURE_TABLE = {
+    **{w: ({"natural", "tourism", "historic", "place"}, _NATURAL_OK | {"viewpoint", "attraction", "peak", "locality", "isolated_dwelling"})
+       for w in ("mountain", "mount", "mt", "hill", "peak", "nui", "doi", "dinh", "monte", "montana", "mont", "berg", "gora")},
+    **{w: ({"amenity", "building", "historic", "tourism", "man_made", "religion"},
+           _WORSHIP_OK | {"yes", "attraction", "monument", "memorial", "tower", "statue", "archaeological_site", "ruins"})
+       for w in ("pagoda", "temple", "chua", "church", "mosque", "shrine", "monastery")},
+    **{w: ({"natural", "waterway", "tourism", "water"}, None)
+       for w in ("lake", "ho", "river", "song", "waterfall", "falls", "thac", "bay", "bai", "beach", "island", "dao", "cave", "valley")},
+    **{w: ({"leisure", "tourism", "natural", "boundary", "landuse", "historic"}, None) for w in ("park",)},
+}
+
+
+def _name_feature_words(name: str) -> List[str]:
+    return [w for w in (_fold_diacritics(x).lower().strip(".,") for x in (name or "").split())
+            if w in _FEATURE_TABLE]
+
+
+def name_core_tokens(name: str) -> List[str]:
+    """The name without its generic geographic words, diacritics folded, lower-case (tokens of >= 3 letters)."""
+    toks = [_fold_diacritics(x).lower().strip(".,") for x in (name or "").split()]
+    core = [t for t in toks if t and t not in _GENERIC_GEO_WORDS and len(t) >= 3]
+    return core or [t for t in toks if len(t) >= 3]
+
+
+def geocoder_hit_verdict(name: str, hit: Dict) -> Tuple[bool, str]:
+    """[LOCAL-903] (ok, 'class/type') for a Nominatim hit against the name's generic word. A name with a feature
+    word (mountain, pagoda, lake ...) needs a feature of that kind; a settlement / administrative / boundary
+    result is rejected. Without a feature word only administrative / boundary results are rejected."""
+    cls = str((hit or {}).get("class") or "").lower()
+    typ = str((hit or {}).get("type") or "").lower()
+    label = f"{cls}/{typ}"
+    admin = cls == "boundary" or typ == "administrative" or (cls == "place" and typ in _SETTLEMENT_TYPES)
+    words = _name_feature_words(name)
+    if not words:
+        return (not admin), label
+    if admin:
+        return False, label
+    for w in words:
+        classes, types = _FEATURE_TABLE[w]
+        if cls in classes and (types is None or typ in types or cls in ("tourism", "historic")):
+            return True, label
+    return False, label
+
+
+def pick_geocoder_hit(name: str, variant: str, candidates: List[Dict], log=print) -> Optional[Dict]:
+    """[LOCAL-903] The best acceptable candidate: among the hits whose class/type fits the name, the top one
+    whose display name contains the name's core token (diacritics folded), else the top acceptable one."""
+    core = name_core_tokens(variant or name)
+    ok = []
+    for c in candidates or []:
+        good, label = geocoder_hit_verdict(name, c)
+        if good:
+            ok.append(c)
+        elif log:
+            log(f"  [LOCAL-903] geocoder hit {str(c.get('display_name') or '')[:90]!r} rejected: {label}")
+    for c in ok:
+        disp = " " + re.sub(r"[^a-z0-9]+", " ", _fold_diacritics(str(c.get("display_name") or "")).lower()) + " "
+        if any(f" {t} " in disp for t in core):
+            return c
+    return ok[0] if ok else None
+
+
+def _default_free_candidates(query: str):
+    try:
+        import geocode_stops as _gs
+        return _gs.geocode_candidates(query, 5)
+    except Exception:
+        return []
+
+
 def first_named_place_reference(location: str, city: str,
                                coarse_center: Tuple[float, float],
-                               geocode_fn=None) -> Optional[Dict]:
+                               geocode_fn=None, candidates_fn=None) -> Optional[Dict]:
     """[LOCAL-901/902] The full location string was not on Wikidata, so the area fell
     back to the city centre. Try the FIRST NAMED PLACE of the location through the
     existing ``_wikidata_name_lookup`` and, on a miss, the free geocoder ("<name>, <city>"),
@@ -283,7 +362,10 @@ def first_named_place_reference(location: str, city: str,
                 and not _PLACE_SPLIT.search((location or "").strip()):
             # A single-name location was already tried whole; nothing new to try.
             return None
-        gfn = geocode_fn or _default_free_geocode
+        # [LOCAL-903] the live path takes several Nominatim hits and validates their class/type; an INJECTED
+        # point-returning geocode_fn is vouched for by its caller (legacy contract).
+        gfn = geocode_fn
+        cfn = candidates_fn or (None if geocode_fn else _default_free_candidates)
         bb_cache: List = []
 
         def _inside(lat, lng) -> bool:
@@ -302,8 +384,13 @@ def first_named_place_reference(location: str, city: str,
                         hit = _wikidata_name_lookup(variant, city)
                         pt = (float(hit.get("lat") or 0.0), float(hit.get("lng") or 0.0)) if hit else None
                     else:
-                        g = gfn(f"{variant}, {city}" if city else variant)
-                        pt = (float(g[0]), float(g[1])) if g else None
+                        q = f"{variant}, {city}" if city else variant
+                        if cfn is not None:
+                            best = pick_geocoder_hit(name, variant, cfn(q) or [], log=print)
+                            pt = (float(best["lat"]), float(best["lng"])) if best else None
+                        else:
+                            g = gfn(q)
+                            pt = (float(g[0]), float(g[1])) if g else None
                 except Exception:
                     pt = None
                 if not pt or not (pt[0] or pt[1]):
