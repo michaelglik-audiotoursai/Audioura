@@ -88,9 +88,9 @@ def test_replay_without_evidence_uses_neighbour_then_honest():
     for m in MOOD2:
         assert m not in out
     assert "dragon fruit" not in out
-    # exactly one neighbour sentence (about the statue), taken from Stop 1's body
+    # [LOCAL-906] item 5: no sentence of Stop 1's body is borrowed into Stop 2 (it would be delivered twice)
     s1 = set(rc.fold(x) for x in _stop_body(out, 1))
-    assert sum(rc.fold(x) in s1 for x in body) == 1
+    assert sum(rc.fold(x) in s1 for x in body) == 0
     assert rc.apply_single_place_guards(out) == out, "idempotent"
 
 
@@ -103,7 +103,8 @@ def test_neighbour_stage_when_it_is_enough():
     logs = []
     out = rc.refill_thin_stops(before, t, None, logs.append)
     assert len(_stop_body(out, 2)) == 3, out
-    assert any("Stop 2 thin (2 sentences) -> refilled from neighbour" in x for x in logs), logs
+    # [LOCAL-906] item 5: a same-site neighbour sentence is a repeat, so the refill goes on to the honest stage
+    assert any("Stop 2 thin (2 sentences) -> refilled from honest" in x for x in logs), logs
 
 
 def test_a_dropped_sentence_is_never_readded():

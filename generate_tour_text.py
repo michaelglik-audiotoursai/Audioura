@@ -11689,6 +11689,14 @@ def _apply_description_location_894(location, tour_type):
     return info['location']
 
 
+try:   # [LOCAL-906] job-scoped module state for route_content_896 (two jobs in one process never share it)
+    from route_content_896 import job_scoped as _rc906_job_scoped
+except Exception:  # pragma: no cover
+    def _rc906_job_scoped(fn):
+        return fn
+
+
+@_rc906_job_scoped   # [LOCAL-906] the route / evidence module state is per job, cleared at the job's end
 def generate_tour_text(location, tour_type, output_file=None, total_stops=None, persona=None, user_id=None, job_id=None, forced_stops=None, harness=False, exclude_titles=None, mode=None):
     """[LOCAL-562] Public entry: run one tour inside its own cost scope.
 
@@ -30789,6 +30797,15 @@ REWRITE RULES (all mandatory):
                 first_poi_coordinates = _fp903
         except Exception as _sp903e:
             print(f"  [LOCAL-903] single-place reconcile skipped (non-fatal): {_sp903e}")
+        try:   # [LOCAL-906] an AREA stop of a route lies between its neighbours (else: on the segment, approximate)
+            import route_content_896 as _rc906r
+            import route_leftovers_906 as _l906
+            import single_place_903 as _sp903b
+            if _rc906r.active():
+                _ver906 = {_i for _i, _r in enumerate(_snap_rows_791c or []) if _sp903b._verified_snap(_r)}
+                _l906.repin_area_stops(poi_list, _ver906, log=print)
+        except Exception as _l906e:
+            print(f"  [LOCAL-906] area-stop re-pin skipped (non-fatal): {_l906e}")
         try:   # [LOCAL-902] a model-written Address is kept only if it agrees with the reference's district
             from pin_snap import verify_addresses as _va902
             _va902(poi_list, _snap_rows_791c, scope=_pin_scope_791c, log=print)
@@ -35935,6 +35952,11 @@ RULES:
             try:   # [LOCAL-904] the delivery guards' thin-stop refill reads the same per-stop evidence
                 import route_content_896 as _rc904
                 _rc904.set_evidence_904(_evf)
+                try:   # [LOCAL-906] the first-stop tone guard reads the stops' signature stories
+                    import route_leftovers_906 as _l906s
+                    _l906s.set_signature_stories(dict(_SIGNATURE_STORY_SINK.get(_J._THIN_SINK_KEY, {}) or {}))
+                except Exception:
+                    pass
             except Exception:
                 pass
             try:

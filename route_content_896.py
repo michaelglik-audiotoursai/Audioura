@@ -16,13 +16,165 @@ generation by ``set_route`` (the same pattern as ``aboutness.set_route_region``)
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import re
+import threading
 import unicodedata
+from collections.abc import MutableMapping, MutableSet
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
-_STATE: Dict = {"origin": "", "destination": "", "through": [], "localities": [], "box": None}
+# ── [LOCAL-906] per-job module state ─────────────────────────────────────────────────────────────────────
+# The route state (_STATE), the geocoded route places (_POINTS), the honest-body memo (_HONEST_DONE) and the
+# per-stop evidence (_EVIDENCE_904, read by delivery_bodies_905) used to be plain module globals: two jobs
+# generating in one process read and overwrote each other's. They are now job-scoped containers that keep
+# the dict / set interface. The current job is a ContextVar (``bind_job`` / ``job_scope``); a context with no
+# job bound uses the sole bound job when there is exactly one (a worker thread of a single job), else the
+# default "" slot (unit tests, CLI). ``end_job`` drops the job's slot.
+_JOB: contextvars.ContextVar = contextvars.ContextVar("route_content_job", default=None)
+_JOB_LOCK = threading.RLock()
+_BOUND_JOBS: Dict[str, int] = {}          # job id -> nesting depth of bind_job
+
+
+def _current_job() -> str:
+    j = _JOB.get()
+    if j is not None:
+        return j
+    with _JOB_LOCK:
+        if len(_BOUND_JOBS) == 1:
+            return next(iter(_BOUND_JOBS))
+    return ""
+
+
+class _ScopedBase:
+    _registry: List["_ScopedBase"] = []
+
+    def __init__(self, factory):
+        self._factory = factory
+        self._slots: Dict[str, object] = {}
+        _ScopedBase._registry.append(self)
+
+    def _slot(self):
+        j = _current_job()
+        with _JOB_LOCK:
+            if j not in self._slots:
+                self._slots[j] = self._factory()
+            return self._slots[j]
+
+    def _drop(self, job: str) -> None:
+        with _JOB_LOCK:
+            self._slots.pop(job, None)
+
+
+class _ScopedDict(_ScopedBase, MutableMapping):
+    def __getitem__(self, k):
+        return self._slot()[k]
+
+    def __setitem__(self, k, v):
+        self._slot()[k] = v
+
+    def __delitem__(self, k):
+        del self._slot()[k]
+
+    def __iter__(self):
+        return iter(list(self._slot()))
+
+    def __len__(self):
+        return len(self._slot())
+
+    def __repr__(self):
+        return repr(self._slot())
+
+
+class _ScopedSet(_ScopedBase, MutableSet):
+    def __contains__(self, x):
+        return x in self._slot()
+
+    def __iter__(self):
+        return iter(list(self._slot()))
+
+    def __len__(self):
+        return len(self._slot())
+
+    def add(self, x):
+        self._slot().add(x)
+
+    def discard(self, x):
+        self._slot().discard(x)
+
+    def __repr__(self):
+        return repr(self._slot())
+
+
+def bind_job(job_id) -> "contextvars.Token":
+    """Make ``job_id`` the current job of this context (and of the threads / pools that copy it)."""
+    j = str(job_id) if job_id else ""
+    with _JOB_LOCK:
+        _BOUND_JOBS[j] = _BOUND_JOBS.get(j, 0) + 1
+    return _JOB.set(j)
+
+
+def unbind_job(token, job_id=None) -> None:
+    j = str(job_id) if job_id else None
+    try:
+        if j is None:
+            j = _JOB.get()
+        _JOB.reset(token)
+    except Exception:
+        _JOB.set(None)
+    with _JOB_LOCK:
+        if j in _BOUND_JOBS:
+            _BOUND_JOBS[j] -= 1
+            if _BOUND_JOBS[j] <= 0:
+                del _BOUND_JOBS[j]
+
+
+def end_job(job_id=None) -> None:
+    """Clear every piece of per-job state of ``job_id`` (the current job when None)."""
+    j = str(job_id) if job_id else _current_job()
+    for c in list(_ScopedBase._registry):
+        c._drop(j)
+
+
+@contextlib.contextmanager
+def job_scope(job_id):
+    """``with job_scope(id):`` binds the job for the block and clears its state at the end (when no outer scope
+    of the same job is still running: the stop pool re-enters the generator for the same job)."""
+    tok = bind_job(job_id)
+    try:
+        yield
+    finally:
+        unbind_job(tok, job_id)
+        with _JOB_LOCK:
+            still = str(job_id or "") in _BOUND_JOBS
+        if not still:
+            end_job(job_id)
+
+
+def job_scoped(fn):
+    """Decorator for the generator's public entry: the call runs in the scope of its ``job_id`` (the job already
+    bound in this context when the call has none -- a nested call of the same job -- else a per-call token)."""
+    import functools
+    import inspect
+    import uuid
+    sig = inspect.signature(fn)
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        jid = None
+        try:
+            jid = sig.bind_partial(*args, **kwargs).arguments.get("job_id")
+        except Exception:
+            pass
+        jid = str(jid) if jid else (_JOB.get() or f"call-{uuid.uuid4().hex[:10]}")
+        with job_scope(jid):
+            return fn(*args, **kwargs)
+    return wrapper
+
+
+_STATE: Dict = _ScopedDict(lambda: {"origin": "", "destination": "", "through": [], "localities": [], "box": None})
 # [LOCAL-897] geocode of each route place that route_box placed, keyed by the folded place name
-_POINTS: Dict[str, Tuple[float, float]] = {}
+_POINTS: Dict[str, Tuple[float, float]] = _ScopedDict(dict)
 
 
 # ── text helpers ─────────────────────────────────────────────────────────────
@@ -786,6 +938,32 @@ def _scenery_clause(directions_text: str) -> Optional[str]:
     return None
 
 
+# [LOCAL-906] A Directions line keeps at most ONE extra sentence, and only a wayfinding one: it names a turn,
+# a road type or a landmark the listener can look for. Scenery and mood ("The bright pink and green hues ...
+# are striking against the landscape", "The expansive landscape stretches out before you") are dropped.
+_TURN = re.compile(r"(?i)\b(?:turn|turns|bear|keep\s+(?:left|right)|left|right|straight\s+ahead|onto|u-turn)\b")
+_LANDMARK = re.compile(
+    r"(?i)\b(?:landmark|signpost|sign|gate|gates|arch|archway|tower|fountain|junction|roundabout|intersection|"
+    r"bridge|crossing|bus\s+stop|station|market|church|temple|pagoda|stairs|steps|staircase|ticket\s+(?:office|booth)|"
+    r"entrance|trailhead)\b")
+_COMPASS = re.compile(r"(?i)\b(?:north|south|east|west)\w*\b")
+_DIST_WORD = re.compile(r"(?i)\b\d+(?:\.\d+)?\s*(?:km|kilomet\w+|m|meters?|metres?|miles?)\b")
+_MOODY = re.compile(
+    r"(?i)\b(?:views?|vistas?|landscape|scenery|hues?|colou?rs?|striking|stretch\w*|expansive|breathtaking|"
+    r"panoram\w+|sparkl\w+|vibrant|bright|lush|beauty|serene|peaceful|atmosphere|surround\w*|contrast)\b")
+
+
+def _wayfinding_clause(directions_text: str) -> Optional[str]:
+    """[LOCAL-906] ONE short wayfinding sentence from a model Directions line, else None."""
+    for sent in split_sentences(directions_text):
+        if (len(sent.split()) > 22 or "!" in sent or _EVALUATIVE.search(sent) or _MINUTES.search(sent)
+                or _COMPASS.search(sent) or _DIST_WORD.search(sent) or _MOODY.search(sent)):
+            continue
+        if (_TURN.search(sent) or re.search(r"(?i)\b" + _ROAD_WORD + r"\b", sent) or _LANDMARK.search(sent)):
+            return sent
+    return None
+
+
 def normalize_directions(tour_text: str, log: Optional[Callable] = None, walk_km: float = 1.0,
                          force: bool = False, max_km: Optional[float] = None) -> str:
     """[LOCAL-898] On a route a Directions line holds only: ``Continue to <next>.`` (``Walk on to
@@ -826,7 +1004,7 @@ def normalize_directions(tour_text: str, log: Optional[Callable] = None, walk_km
             # [LOCAL-900] rebuilt from the template only: the model's own travel sentences are set aside
             _rest = " ".join(x for x in split_sentences(dm.group(1))
                              if not re.match(r"(?i)^(?:continue|walk on|head|go|proceed)\b.*\bto\b|^it is roughly\b", x))
-            sc = _scenery_clause(_rest)
+            sc = _wayfinding_clause(_rest)             # [LOCAL-906] wayfinding only, never scenery / mood
             if sc:
                 line += " " + sc
             new = f"Directions: {line}"
@@ -1041,7 +1219,7 @@ _HONEST_SKELETON = re.compile(
     r"feel the height")
 
 
-_HONEST_DONE: set = set()      # [LOCAL-900B] folded bodies this module has already produced
+_HONEST_DONE: set = _ScopedSet(set)      # [LOCAL-900B] folded bodies this module has already produced
 
 
 def rebuild_honest_bodies(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
@@ -1071,6 +1249,15 @@ def rebuild_honest_bodies(tour_text: str, evidence_by_title: Optional[Dict[str, 
             tm = _TYPE_RX.search(block)
             neigh = pn.neighbour_sentence(pn.short_place_name(title),
                                           _neighbour_evidence(blocks, k, ev_map, tour_text), split_sentences)
+            try:   # [LOCAL-906] item 5: the neighbour sentence is a sentence the tour already delivers -> not borrowed
+                import route_leftovers_906 as _l906h
+                if neigh and _l906h.is_repeat(neigh, [_l906h._tok(y) for j2, b2 in enumerate(blocks) if j2 != k
+                                                       for y in _content_sentences_of(
+                                                           tour_text[b2[0]:b2[1]].split("\n"),
+                                                           j2 == len(blocks) - 1)]):
+                    neigh = None
+            except Exception:
+                pass
             honest = " ".join(sgg.sensory_body(title, [sgg.NO_HISTORY_DISCLOSURE], sgg.MIN_NO_EVIDENCE_SENTENCES - 1,
                                                register="driving", kind_text=tm.group(1) if tm else "",
                                                supported_sentence=neigh))
@@ -1553,7 +1740,7 @@ def strip_invented_route(tour_text: str, log: Optional[Callable] = None) -> str:
 
 # ── [LOCAL-904] a floor under the single-place caps ──────────────────────────────────────────────────────
 THIN_FLOOR_904 = 3
-_EVIDENCE_904: Dict[str, str] = {}      # {stop title: evidence blob}, stashed by the generator for the delivery guards
+_EVIDENCE_904: Dict[str, str] = _ScopedDict(dict)      # {stop title: evidence blob}, stashed by the generator for the delivery guards
 
 
 def set_evidence_904(ev: Optional[Dict[str, str]]) -> None:
@@ -1652,9 +1839,20 @@ def refill_thin_stops(before: str, after: str, evidence_by_title: Optional[Dict[
             support = _content_tokens(title)
             tour_sents = [x for ln in text.split("\n") for x in split_sentences(ln)]
 
+            # [LOCAL-906] a refill never repeats a sentence another stop already delivers (the same-site neighbour
+            # sentence is by definition such a repeat: wave 51 heard it in Stops 4 and 5)
+            try:
+                import route_leftovers_906 as _l906r
+                _others = [_l906r._tok(y) for j2, b2 in enumerate(blocks) if j2 != k
+                           for y in _content_sentences_of(text[b2[0]:b2[1]].split("\n"), j2 == len(blocks) - 1)]
+            except Exception:
+                _l906r, _others = None, []
+
             def ok(x: str, _have=None) -> bool:
                 x = x.strip()
                 if len(x.split()) < 6 or len(x) > 320 or x[-1:] not in ".!?" or is_fragment(x):
+                    return False
+                if _l906r is not None and _l906r.is_repeat(x, _others):
                     return False
                 if is_mood_filler(x, set()) or _has_travel(x) or is_offsite_suggestion(x, set()):
                     return False
@@ -1723,6 +1921,16 @@ def apply_single_place_guards(tour_text: str, log: Optional[Callable] = None, ma
         t = refill_thin_stops(_pre904, t, evidence_by_title, log)   # [LOCAL-904] floor under the caps
     if not active() and len(_stop_blocks(t)) <= max_stops:
         t = normalize_directions(t, log, force=True, max_km=max_km)
+    try:   # [LOCAL-906] the single-place comparatives (902 item 5 never ran here) and the 906 content pass
+        import route_leftovers_906 as _l906
+        if not active() and len(_stop_blocks(t)) <= max_stops:
+            _ev906 = dict(_EVIDENCE_904)
+            _ev906.update({str(k): v for k, v in (evidence_by_title or {}).items()})
+            t = drop_unsupported_comparatives(t, _ev906, log, force=True)
+        t = _l906.content_pass(t, evidence_by_title, log)
+    except Exception as _e906:  # pragma: no cover
+        if log:
+            log(f"  [LOCAL-906] single-place leftovers skipped (non-fatal): {_e906}")
     return t
 
 
@@ -1742,13 +1950,16 @@ _CAP_WORD = re.compile(r"\b[A-ZÀ-Ỹ][^\W\d_]{2,}")
 
 
 def drop_unsupported_comparatives(tour_text: str, evidence_by_title: Optional[Dict[str, str]],
-                                  log: Optional[Callable] = None) -> str:
+                                  log: Optional[Callable] = None, force: bool = False) -> str:
     """[LOCAL-900B/902] "larger than the statues at <A> and <B> in <C>": a comparison with other NAMED places
     that the stop's own evidence does not state, and that are not part of the tour (a stop title). The whole
     sentence goes. A stop with no evidence entry states nothing, so its comparison names must be tour places."""
-    if not active() or not tour_text or not evidence_by_title:
+    # [LOCAL-906] ``force`` = the single-place path: 902 item 5 only ever ran on a described route (``active()``) and
+    # only when evidence was handed in; the single-place delivery pass has neither, so "larger than those at <A> and
+    # <B>" survived. With ``force`` a missing evidence map is an empty one: the names must then be tour places.
+    if (not active() and not force) or not tour_text or (not evidence_by_title and not force):
         return tour_text                       # no evidence handed in (the delivery pass): nothing to judge by
-    ev_map = {fold(str(k)): v for k, v in evidence_by_title.items()}
+    ev_map = {fold(str(k)): v for k, v in (evidence_by_title or {}).items()}
     blocks = _stop_blocks(tour_text)
     tour_words = set()
     for _s, _e, _n, _t in blocks:
@@ -1873,6 +2084,12 @@ def finalize_898(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = N
     if not active() or not tour_text:
         return tour_text
     _orig902 = tour_text
+    try:   # [LOCAL-906] an area stop's pin first: the Directions distances below are measured from the final pins
+        import route_leftovers_906 as _l906a
+        tour_text = _l906a.repin_area_stops_in_text(tour_text, log=log)
+    except Exception as _e906a:  # pragma: no cover
+        if log:
+            log(f"  [LOCAL-906] area-stop re-pin skipped (non-fatal): {_e906a}")
     t = consistent_creators(tour_text, evidence_by_title, log)
     t = consistent_superlatives(t, evidence_by_title, log)          # [LOCAL-900]
     t = cap_unsupported_numbers(t, evidence_by_title, log)          # [LOCAL-900]
@@ -1885,5 +2102,11 @@ def finalize_898(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = N
     t = normalize_directions(t, log)
     t = distinct_type_specialty(t, log)
     t = drop_fragments(t, log)                                      # [LOCAL-900B] after the rebuilds, too
+    try:   # [LOCAL-906] claims / orientation / repeats / tone / closing filler, and the area-stop pin in the text
+        import route_leftovers_906 as _l906
+        t = _l906.content_pass(t, evidence_by_title, log)
+    except Exception as _e906:  # pragma: no cover
+        if log:
+            log(f"  [LOCAL-906] route leftovers skipped (non-fatal): {_e906}")
     report_thin_bodies(_orig902, t, log)                            # [LOCAL-902]
     return t

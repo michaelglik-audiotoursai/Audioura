@@ -66,10 +66,13 @@ def test_filler_tail_dropped(tail):
     assert "Directions: Walk on to Delta Hall.\n" in out and "!" not in out and "lovely" not in out
 
 
-def test_concrete_scenery_clause_survives():
+def test_scenery_clause_is_dropped_wayfinding_survives():
+    # [LOCAL-906] item 3: a scenery sentence is no longer kept; a wayfinding one (a landmark to look for) is
     t = _stops(("A", "1.0, 1.0", "x", "Body one is long enough.", "Continue to Beta Hall. Notice the rice paddies along the way."),
                ("Beta Hall", "1.0, 1.0", "Hall", "Body two is long enough.", None))
-    assert "Notice the rice paddies along the way." in rc.normalize_directions(t)
+    assert "rice paddies" not in rc.normalize_directions(t)
+    t2 = t.replace("Notice the rice paddies along the way.", "Look for the red gate.")
+    assert "Look for the red gate." in rc.normalize_directions(t2)
 
 
 # ── 3 honest body ───────────────────────────────────────────────────────────
@@ -90,7 +93,9 @@ def test_sensory_body_no_road_on_summit_and_short_name():
     assert "road and the fields" in road
 
 
-def test_honest_body_uses_same_site_neighbour_sentence():
+def test_honest_body_does_not_borrow_a_sentence_the_tour_already_delivers():
+    # [LOCAL-906] item 5: the same-site neighbour sentence IS a repeat of the neighbour's delivered body (wave 51 heard
+    # it in Stops 4 and 5), so the honest body no longer borrows it.
     import strict_grounding_gate as sgg
     honest = " ".join(sgg.sensory_body("x", [sgg.NO_HISTORY_DISCLOSURE], 3, register="driving"))
     t = _stops(("Gamma Peak", "5.0, 5.0", "Mountain", "A modern cable car carries visitors up to the top of the peak. Hiking is possible too.", "Continue to The cable car ascent."),
@@ -101,7 +106,8 @@ def test_honest_body_uses_same_site_neighbour_sentence():
           "The cable car ascent": "", "Far Place": ""}
     out = rc.rebuild_honest_bodies(t, ev)
     blk = out.split("Stop 3")[0].split("Stop 2")[1]
-    assert "A modern cable car carries visitors up to the top of the peak." in blk and "road" not in blk
+    assert "A modern cable car carries visitors up to the top of the peak." not in blk and "road" not in blk
+    assert "We could not confirm" in blk
     # a stop at another site does not borrow
     t2 = t.replace("5.0, 5.0\nType/Specialty: Cable", "9.0, 9.0\nType/Specialty: Cable")
     assert "modern cable car carries" not in rc.rebuild_honest_bodies(t2, ev).split("Stop 2")[1]

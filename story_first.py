@@ -607,7 +607,45 @@ def _fetch_single_page(url: str, timeout: int = None) -> Dict:
         return {'url': url, 'text': '', 'success': False, 'elapsed_ms': elapsed_ms}
 
 
-def fetch_full_pages(urls: List[str], budget_seconds: float = None) -> List[Dict]:
+# [LOCAL-906] D556 / LOCAL-427 fetch selection: social / video hosts carry no usable prose, and a page whose title
+# or first paragraph shares no word with the stop or the tour's scope is not about it.
+_SOCIAL_HOSTS_906 = ('facebook.com', 'fb.com', 'fb.watch', 'youtube.com', 'youtu.be', 'tiktok.com', 'instagram.com',
+                     'x.com', 'twitter.com', 't.co', 'pinterest.com')
+_SCOPE_STOP_906 = frozenset(('the', 'and', 'of', 'in', 'at', 'to', 'for', 'with', 'from', 'tour', 'tours', 'audio',
+                             'walking', 'driving', 'guide', 'city', 'town', 'province', 'visit', 'stop'))
+
+
+def _host_906(url: str) -> str:
+    from urllib.parse import urlparse
+    h = (urlparse(url or '').netloc or '').lower().split('@')[-1].split(':')[0]
+    return h[4:] if h.startswith('www.') else h
+
+
+def is_social_host_906(url: str) -> bool:
+    """Host equals / is a subdomain of a social or video site (so ``box.com`` is not ``x.com``)."""
+    h = _host_906(url)
+    return any(h == d or h.endswith('.' + d) for d in _SOCIAL_HOSTS_906)
+
+
+def _scope_tokens_906(*texts) -> set:
+    toks = set()
+    for t in texts:
+        for w in re.findall(r"[^\W_]+", (t or '').lower()):
+            if len(w) >= 3 and w not in _SCOPE_STOP_906:
+                toks.add(w)
+    return toks
+
+
+def page_in_scope_906(text: str, scope_tokens) -> bool:
+    """The page's title / first paragraph (its first ~400 chars) shares a token with the scope; True when no
+    scope tokens were given (nothing to judge by)."""
+    if not scope_tokens:
+        return True
+    head = _scope_tokens_906((text or '')[:400])
+    return bool(head & set(scope_tokens))
+
+
+def fetch_full_pages(urls: List[str], budget_seconds: float = None, scope_tokens=None) -> List[Dict]:
     """[LOCAL-443-A] Fetch full page content for top tier1/tier2 URLs.
 
     Concurrent fetch (LOCAL-441 pattern) with wall-budget. Returns extracted
@@ -616,6 +654,8 @@ def fetch_full_pages(urls: List[str], budget_seconds: float = None) -> List[Dict
     Args:
         urls: list of URLs to fetch (already filtered to tier1/tier2, capped)
         budget_seconds: wall budget for all fetches (default: remaining pipeline budget)
+        scope_tokens: [LOCAL-906] words of the stop and the tour's scope; a fetched page whose title / first
+            paragraph shares none of them is skipped (its text is not used)
 
     Returns:
         list of {url, text, success, elapsed_ms}
@@ -629,21 +669,20 @@ def fetch_full_pages(urls: List[str], budget_seconds: float = None) -> List[Dict
     if budget_seconds is None:
         budget_seconds = FULLPAGE_FETCH_TIMEOUT * 2  # Sensible default
 
-    # Cap at FULLPAGE_FETCH_MAX_PAGES
-    urls = urls[:FULLPAGE_FETCH_MAX_PAGES]
-
-    # [LOCAL-901] Log only (selection is unchanged): how many of the pages we are
-    # about to fetch are social/video hosts, which carry no usable prose.
-    try:
-        _social = ('facebook.', 'fb.com', 'youtube.', 'youtu.be', 'instagram.',
-                   'tiktok.', 'twitter.', 'x.com', 'pinterest.')
-        from urllib.parse import urlparse as _up901
-        _n_social = sum(1 for _u in urls
-                        if any(h in (_up901(_u or '').netloc or '').lower() for h in _social))
-        print(f"  [LOCAL-901] page fetch: {len(urls)} url(s), {_n_social} social/video "
-              f"host(s) (facebook/youtube/...) - selection unchanged", flush=True)
-    except Exception:
-        pass
+    # [LOCAL-906] social / video hosts are not fetched (901 only logged the count); they go BEFORE the page cap so
+    # they do not take a slot from a usable page
+    _n_social = sum(1 for _u in urls if is_social_host_906(_u))
+    print(f"  [LOCAL-901] page fetch: {len(urls)} url(s), {_n_social} social/video host(s) "
+          f"(facebook/youtube/...) - skipped", flush=True)
+    _kept = []
+    for _u in urls:
+        if is_social_host_906(_u):
+            print(f"  [LOCAL-906] fetch skipped {_host_906(_u)}: social/video host", flush=True)
+        else:
+            _kept.append(_u)
+    urls = _kept[:FULLPAGE_FETCH_MAX_PAGES]      # cap at FULLPAGE_FETCH_MAX_PAGES
+    if not urls:
+        return []
 
     start = time.time()
     results = []
@@ -679,6 +718,16 @@ def fetch_full_pages(urls: List[str], budget_seconds: float = None) -> List[Dict
             future.cancel()
     finally:
         executor.shutdown(wait=False, cancel_futures=True)
+
+    if scope_tokens:      # [LOCAL-906] a page that shares no token with the stop or the tour scope is not used
+        _scoped = []
+        for r in results:
+            if r.get('success') and not page_in_scope_906(r.get('text', ''), scope_tokens):
+                print(f"  [LOCAL-906] fetch skipped {_host_906(r.get('url', ''))}: title/first paragraph shares no "
+                      f"token with the stop or tour scope", flush=True)
+                r = dict(r, text='', success=False, skipped='no_scope_token')
+            _scoped.append(r)
+        results = _scoped
 
     elapsed = time.time() - start
     succeeded = sum(1 for r in results if r['success'])
@@ -1329,7 +1378,11 @@ def story_first_pipeline(stop_data: Dict, fact_sheet: str = '',
         if deduped_urls:
             fetch_budget = min(_remaining() * 0.4, 10.0)
             fetch_start = time.time()
-            page_results = fetch_full_pages(deduped_urls, budget_seconds=fetch_budget)
+            _scope906 = _scope_tokens_906(
+                str(stop_data.get('canonical_title') or stop_data.get('name') or stop_data.get('title') or ''),
+                str(stop_data.get('venue_name') or ''),
+                str(stop_data.get('place') or stop_data.get('city') or stop_data.get('location') or ''))
+            page_results = fetch_full_pages(deduped_urls, budget_seconds=fetch_budget, scope_tokens=_scope906)
 
             for pr in page_results:
                 if pr.get('success') and pr.get('text'):

@@ -1,0 +1,22 @@
+<Mountain> and the <Statue> - Walking Tour
+Tour-Category: walking
+
+Stop 1: <Mountain>
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Mountain and cultural site
+
+<Mountain> is located about 28 kilometers west of <City> city in <Province>. At the top of the mountain, you can find two famous pagodas: <Pagoda A> and <Pagoda B>. Visitors often reach the summit by cable car or by hiking through the forest.
+
+Directions: Walk on to <Statue>.
+
+Stop 2: <Statue>
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Reclining Buddha statue
+
+You see the reclining Buddha statue here on <Mountain>, which is 49 meters long and 7 meters high. This statue is white in color and surrounded by lush green forest. Construction of this statue began in 1958 by <Person>, who also built three smaller Buddha statues nearby. While there are bigger reclining Buddha statues in <Country B>, this one is larger than those at <Place X> and <Place Y>.
+
+Across these stops, one thread runs through: the places that shape <Mountain> and the <Statue>. Taken together, the stops add up to more than any one of them seen alone. That's 2 stops in all.

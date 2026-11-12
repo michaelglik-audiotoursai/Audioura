@@ -173,7 +173,8 @@ def test_552_replay_single_place_path():
     assert any("BUG SIGNAL" in x and "100 km" in x for x in logs)
     assert "carry with you" not in out
     assert "covers of" not in out
-    assert "That's 2 stops in all." in out and "Across these stops, one thread runs through" in out
+    # [LOCAL-906] item 7: the template closing filler goes; the count line stays
+    assert "That's 2 stops in all." in out and "Across these stops, one thread runs through" not in out
     # the orientation line keeps its first sentence part? it is ONE fragment sentence -> the line is removed
     assert "Orientation:" not in out
 
@@ -285,21 +286,26 @@ def test_neighbour_sentence_survives_every_pass(route):
     assert gate
     logs = []
     o1 = rc.finalize_898(t, ev, logs.append)
-    assert "You can take a modern cable car to explore the mountain" in _stop_body(o1, 5)   # [LOCAL-902] delivered body
+    # [LOCAL-906] item 5: the neighbour sentence is delivered ONCE (in its own stop); Stop 5 keeps its honest body
+    assert "You can take a modern cable car to explore the mountain" in _stop_body(o1, 4)
+    assert "You can take a modern cable car to explore the mountain" not in _stop_body(o1, 5)
     o2 = rc.finalize_898(o1, None, logs.append)                    # the delivery pass runs without the evidence
     o3 = rc.finalize_898(o2, ev, logs.append)
     assert o1 == o2 == o3
-    assert sum("Stop 5" in x and "honest body rebuilt" in x for x in logs) == 1
-    assert "neighbour sentence=yes" in next(x for x in logs if "Stop 5" in x and "honest body rebuilt" in x)
+    # [LOCAL-906] item 5: the neighbour sentence is not borrowed (it is Stop 4's), so no pass rebuilds Stop 5 again
+    assert sum("Stop 5" in x and "honest body rebuilt" in x for x in logs) <= 1
+    assert not any("Stop 5" in x and "neighbour sentence=yes" in x for x in logs)
 
 
 def test_honest_body_built_without_evidence_gets_the_neighbour_sentence_later(route):
     t = _fx("local900b_tour551_input.txt")
     # [LOCAL-902] the neighbour sentence comes from the neighbour's DELIVERED BODY, so it no longer needs the evidence
     o1 = rc.finalize_898(t, None)
-    assert "You can take a modern cable car to explore the mountain" in _stop_body(o1, 5)
+    # [LOCAL-906] item 5: delivered once, in the neighbour's own stop; the later stop keeps its honest body
+    assert "You can take a modern cable car to explore the mountain" not in _stop_body(o1, 5)
     o2 = rc.finalize_898(o1, _evidence(t))
-    assert "You can take a modern cable car to explore the mountain" in _stop_body(o2, 5)
+    assert "You can take a modern cable car to explore the mountain" not in _stop_body(o2, 5)
+    assert _stop_body(o2, 5) and "We could not confirm" in _stop_body(o2, 5)
 
 
 # ── B. unsupported facts on user-list stops ─────────────────────────────────
