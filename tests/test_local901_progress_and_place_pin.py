@@ -355,7 +355,8 @@ def test_osm_venue_facts_no_longer_references_an_undefined_venue_name():
     assert "_venue_query_name = _museum_venue_name or location" in s
 
 
-def test_fetch_loop_logs_social_host_count_without_changing_selection(monkeypatch):
+def test_fetch_loop_logs_social_host_count_and_skips_them(monkeypatch):
+    # [LOCAL-906] 901 only logged the count; social / video hosts are now skipped (see test_local906_*)
     import story_first
     seen = []
 
@@ -368,7 +369,7 @@ def test_fetch_loop_logs_social_host_count_without_changing_selection(monkeypatc
     with contextlib.redirect_stdout(buf):
         out = story_first.fetch_full_pages(urls, budget_seconds=10)
     assert "[LOCAL-901] page fetch: 3 url(s), 2 social/video host(s)" in buf.getvalue()
-    assert sorted(seen) == sorted(urls) and len(out) == 3, "selection unchanged"
+    assert seen == ["https://example.org/a"] and len(out) == 1
 
 
 # ── B. single-place tour: place-level pin reference ──────────────────────────

@@ -78,10 +78,14 @@ def test_directions_hold_only_continue_distance_scenery(line):
     assert len(rc.split_sentences(d)) <= 3
 
 
-def test_scenery_clause_is_kept_once_and_clean():
-    d = _dirs(rc.normalize_directions(_two("Head west on Route 9. You'll notice the lush rice fields lining the route. "
+def test_scenery_clause_is_dropped_and_one_wayfinding_sentence_kept():
+    # [LOCAL-906] item 3: scenery / mood never rides on a Directions line; ONE wayfinding sentence (a turn, a road
+    # type or a landmark) may
+    d = _dirs(rc.normalize_directions(_two("Head west on Route 9. Turn left at the junction. Take the bridge. "
+                                           "You'll notice the lush rice fields lining the route. "
                                            "You'll see the sea glitter far off.")))
-    assert d.count("You'll") == 1 and "rice fields" in d
+    assert d.count("You'll") == 0 and "rice fields" not in d and "glitter" not in d
+    assert "Turn left at the junction." in d and "bridge" not in d
 
 
 def test_going_back_or_descending_is_not_narrated():

@@ -1,0 +1,86 @@
+<Resort> to <Mountain> - Driving Tour
+Tour-Category: driving
+
+Stop 1: <Ward> and the <Beach> strip
+
+Coordinates: 10.981999, 108.251183
+
+Type/Specialty: Coastal area
+
+You are standing near <Ward>, known for its <Ward> Market, a local hub for travelers. The beach here has faced pollution challenges, with trash sometimes washing ashore. This area is part of the city of <City>, which was officially established in 1999.
+
+Directions: Continue to <Town> and the <River>. It is roughly 17.5 km away.
+
+Stop 2: <Town> and the <River>
+
+Coordinates: 10.9281, 108.1002
+
+Type/Specialty: City and river
+
+You are standing by the <River>, which is about 7.2 kilometers long and flows through the town. Its boats are often called the lifeblood of <Town>. The town was divided into two areas during colonial times: the estuary wards around the <River> and the coastal regions.
+
+Directions: Continue to <Province>, the <fruit> plantations along the road. It is roughly 3.5 km away. The bright pink and green hues of the farms are striking against the landscape.
+
+Stop 3: <Province>, the <fruit> plantations along the road
+
+Coordinates: 10.9150, 108.1290
+
+Type/Specialty: Agricultural area
+
+You are standing in <Province>, <Country>'s largest <fruit>-growing region, often called the country's <Fruit> Kingdom. <Country> is the only country in <Region> that grows <fruit> on a commercial scale. Here in <Province>, thousands of local farmers cultivate <fruit> thanks to the sunny, dry climate.
+
+Directions: Continue to <Mountain>. It is roughly 28 km away.
+
+Stop 4: Arriving at <Mountain>, the mountain and its legends
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Mountain and cultural site
+
+<Mountain> is an extinct volcano near the coastal city of <Town>, reached from the national road. You can reach the top of <Mountain> by two ways, including a modern cable car ride. At the top of <Mountain> you will find two famous pagodas: <Pagoda A> and <Pagoda B>.
+
+Directions: Walk on to the cable car ascent.
+
+Stop 5: The cable car ascent
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Cable car experience
+
+You can reach the top of <Mountain> by two ways, including a modern cable car ride. The cable car climbs through the forest in about 20 gondolas. At the upper station a path leads to the first pagoda.
+
+Directions: Walk on to <Pagoda A>.
+
+Stop 6: <Pagoda A>
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Buddhist temple
+
+<Pagoda A> is a Buddhist temple near the summit of <Mountain>. Monks live and study in the compound beside the main hall.
+
+Directions: Walk on to the summit views. The expansive landscape stretches out before you, with the sea shimmering far below.
+
+Stop 7: The reclining <Statue>
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Reclining Buddha statue
+
+Orientation: As you arrive at the foot of <Mountain>, the massive form of the <Statue> stretches out before you.
+
+The <Statue> is 49 meters long and 7 meters high. It lies on a terrace near the top of the mountain.
+
+Directions: Walk on to <Viewpoint>.
+
+Stop 8: <Viewpoint>
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Viewpoint
+
+<Viewpoint> is the last stop on the terrace, with a railing and a few benches facing the coast. It is a short walk from the statue.
+
+From <Resort> to <Mountain>, this route is the one you chose, your own path in your own order.
+
+That's 8 stops in all.
