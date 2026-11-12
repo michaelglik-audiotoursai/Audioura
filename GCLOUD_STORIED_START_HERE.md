@@ -54,6 +54,12 @@ has lapsed twice and Michael has had to ask twice.
 - Michael's own regen is held until LEAD says go.
 - Flutter for Android = flutter-3.41.6.
 
+# ▶️ WAVE 46 — 2026-11-12 ~09:35 EST (wdvrdazhrd) — LIVE @ e6143bf9 (build 4db8d2d3, bsub54). LOCAL-898 route text + LOCAL-899 proof is_test.
+- Live: gen 00048-j9s, orch 00028-qfs, user-api 00005-g62 (efa88f68 WARNING logs). Rollback: 00047-k89 / 00027-4rw / 00004-qzj. Backup 'pre-wave46-e6143bf9'.
+- **TOUR_TEST_PROOF_USER_IDS is NOT set.** It waits for Michael's OK (env change); value would be USER-1073427300.
+- Proof with the 551 input, $0.333: it reused row 551 (D622, same string + same user) and un-hid it; re-hidden (backup AudiouraBackups\wave46_proof_hide_20261112). Rows 444. Directions clean, Stop 3 type fixed, Stop 5 order fixed; filler on stops 5/8 and the shared Ta Cu pin remain.
+- 552 pin: LLM-written coordinates; GEO-CHECK skips tours with fewer than 3 stops. Sent to LEAD.
+
 # ▶️ WAVE 45 — 2026-11-12 ~08:00 EST (wdvrdazhmu) — LIVE @ 9dc4ced7 (build 1062d0af, bsub53). Phan Thiet route-tour fixes (LOCAL-894/894B/896/897).
 - Live: gen 00047-k89, orch 00027-4rw. Rollback: 00046-lf9 / 00026-v47. Cloud SQL backup 'pre-wave45-9dc4ced7'.
 - Modernized @9dc4ced7 deployed at LEAD's request → 00010-9cn (rollback 00009-cn4). Proof 552 (2 stops, $0.082) OK, hidden; rows 444. Wave 45 total $0.416.
