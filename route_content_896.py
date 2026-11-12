@@ -615,8 +615,19 @@ _CLOSING_LINE = re.compile(r"(?i)^(?:from .{3,160}? this route is the one you ch
                            r"if you would like to eat)")
 
 
+# [LOCAL-900] a place-type noun that every stop of that kind shares is not "a concrete noun from the evidence"
+_GENERIC_NOUN = set("""city town village river lake sea coast beach mountain hill land place area spot site stop
+    heart soul pulse rhythm life story history past present time moment world people visitor visitor
+    scenery view landscape journey road street meets meet steady where this that""".split())
+
+
 def _supported(sentence: str, support: set) -> bool:
-    return bool(_content_tokens(sentence) & support)
+    shared = _content_tokens(sentence) & support
+    if not shared:
+        return False
+    # [LOCAL-900] only generic place-type words in common, no number -> mood filler ("the pulse of the city
+    # meets the steady rhythm of the river")
+    return bool({t for t in shared if t.isdigit() or t not in _GENERIC_NOUN})
 
 
 def cap_unsupported(tour_text: str, evidence_by_title: Dict[str, str], log: Optional[Callable] = None) -> str:
@@ -642,7 +653,10 @@ def cap_unsupported(tour_text: str, evidence_by_title: Dict[str, str], log: Opti
             pass
         thin = sgg._evidence_is_thin(ev)
         support = _content_tokens(ev) | _content_tokens(title)
-        tpl = [fold(t.format(t=title))[:30] for t in sgg._SENSORY_TEMPLATES_DRIVING + sgg._SENSORY_TEMPLATES]
+        import place_names_900 as _pn900
+        _alltpl = (sgg._SENSORY_TEMPLATES_DRIVING + sgg._SENSORY_TEMPLATES
+                   + tuple(x for v in _pn900.SENSORY_BY_KIND.values() for x in v))
+        tpl = [fold(t.format(t=nm))[:30] for t in _alltpl for nm in (title, _pn900.short_place_name(title))]
         disc = fold(sgg.NO_HISTORY_DISCLOSURE)[:30]
 
         def fix(sents: List[str], _n=num, _t=title, _thin=thin, _sup=support) -> List[str]:
@@ -754,11 +768,19 @@ _SCENERY_CUE = re.compile(
 _DIR_LINE = re.compile(r"(?mi)^Directions:[ \t]*(.*)$")
 
 
+# [LOCAL-900] evaluative filler and exclamations are never part of a Directions line
+_EVALUATIVE = re.compile(
+    r"(?i)\b(?:lovely|beautiful|wonderful|amazing|great|fantastic|stunning|gorgeous|charming|delightful|incredible|"
+    r"awesome|perfect|worth|explor\w*|enjoy\w*|nice|pleasant|must[- ]see|don'?t miss|spot to|place to)\b")
+
+
 def _scenery_clause(directions_text: str) -> Optional[str]:
     """ONE short scenery sentence from a model Directions line: no turn, road name, number, compass
-    point, distance, time, or going back / up / down. None when no sentence qualifies."""
+    point, distance, time, or going back / up / down; [LOCAL-900] no exclamation and no evaluative filler
+    ("lovely", "worth exploring", "great spot"). None when no sentence qualifies."""
     for sent in split_sentences(directions_text):
-        if len(sent.split()) > 22 or _NOT_SCENERY.search(sent) or not _SCENERY_CUE.search(sent):
+        if (len(sent.split()) > 22 or "!" in sent or _EVALUATIVE.search(sent)
+                or _NOT_SCENERY.search(sent) or not _SCENERY_CUE.search(sent)):
             continue
         return sent
     return None
@@ -783,13 +805,18 @@ def normalize_directions(tour_text: str, log: Optional[Callable] = None, walk_km
             nxt = blocks[k + 1]
             a, b = _pin(block), _pin(tour_text[nxt[0]:nxt[1]])
             d = _km(a, b) if a and b else None
+            import place_names_900 as _pn900
+            _nm = _pn900.short_place_name(nxt[3])          # [LOCAL-900] a short place name, not the raw title
             if d is not None and d < walk_km:
-                line = f"Walk on to {nxt[3]}."
+                line = f"Walk on to {_nm}."
             else:
-                line = f"Continue to {nxt[3]}."
+                line = f"Continue to {_nm}."
                 if d is not None:
                     line += f" It is roughly {d:.1f} km away."
-            sc = _scenery_clause(re.sub(r"(?i)\bContinue to\b.*$", "", dm.group(1)))
+            # [LOCAL-900] rebuilt from the template only: the model's own travel sentences are set aside
+            _rest = " ".join(x for x in split_sentences(dm.group(1))
+                             if not re.match(r"(?i)^(?:continue|walk on|head|go|proceed)\b.*\bto\b|^it is roughly\b", x))
+            sc = _scenery_clause(_rest)
             if sc:
                 line += " " + sc
             new = f"Directions: {line}"
@@ -973,6 +1000,238 @@ def consistent_creators(tour_text: str, evidence_by_title: Optional[Dict[str, st
     return "".join(pieces)
 
 
+# ══ [LOCAL-900] wave 46 leftovers ═══════════════════════════════════════════
+_TYPE_RX = re.compile(r"(?mi)^Type/Specialty:[ \t]*(.*)$")
+
+
+def _neighbour_evidence(blocks, k: int, ev_map: Dict[str, str], tour_text: str, km: float = 1.0) -> List[str]:
+    """Evidence of the OTHER stops at the same site (same pin, or < km) as stop ``k``."""
+    mine = _pin(tour_text[blocks[k][0]:blocks[k][1]])
+    out = []
+    for j, (s, e, num, title) in enumerate(blocks):
+        if j == k:
+            continue
+        other = _pin(tour_text[s:e])
+        if mine and other and _km(mine, other) < km:
+            out.append(str(ev_map.get(fold(title), "") or ""))
+    return out
+
+
+_HONEST_SKELETON = re.compile(
+    r"(?i)look out at the road|look around you at the street|take a moment at|look out at the view|"
+    r"courtyard and the quiet|listen to the sounds of the journey|listen for the sounds that belong|"
+    r"feel the height")
+
+
+def rebuild_honest_bodies(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
+                          log: Optional[Callable] = None) -> str:
+    """[LOCAL-900] The D760 honest body of a route stop is rebuilt with (a) the SHORT place name, (b) the
+    sensory sentences chosen by the stop's Type/Specialty or title kind (road/field -> the road; summit,
+    cable car -> view and height; temple -> courtyard and quiet; otherwise neutral), and (c) one
+    supported sentence from a neighbouring stop at the same site when it speaks about this stop's subject."""
+    if not active() or not tour_text:
+        return tour_text
+    import strict_grounding_gate as sgg
+    import place_names_900 as pn
+    ev_map = {fold(str(k)): v for k, v in (evidence_by_title or {}).items()}
+    blocks = _stop_blocks(tour_text)
+    pieces, pos = [], 0
+    disc = fold(sgg.NO_HISTORY_DISCLOSURE)[:30]
+    for k, (s, e, num, title) in enumerate(blocks):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        lines = block.split("\n")
+        body = [i for i, ln in enumerate(lines) if i > 0 and ln.strip() and not _KEYED.match(ln)
+                and not _CLOSING_LINE.match(ln.strip())]
+        text = " ".join(lines[i] for i in body)
+        if body and disc in fold(text) and _HONEST_SKELETON.search(text) and not any(
+                _CLOSING_LINE.match(x) for i in body for x in split_sentences(lines[i])):
+            tm = _TYPE_RX.search(block)
+            neigh = pn.neighbour_sentence(pn.short_place_name(title),
+                                          _neighbour_evidence(blocks, k, ev_map, tour_text), split_sentences)
+            honest = " ".join(sgg.sensory_body(title, [sgg.NO_HISTORY_DISCLOSURE], sgg.MIN_NO_EVIDENCE_SENTENCES - 1,
+                                               register="driving", kind_text=tm.group(1) if tm else "",
+                                               supported_sentence=neigh))
+            if fold(honest) != fold(text):
+                lines[body[0]] = honest
+                for i in body[1:]:
+                    lines[i] = None
+                if log:
+                    log(f"  [LOCAL-900] Stop {num} '{title[:40]}': honest body rebuilt (short name, "
+                        f"kind={pn.stop_kind(title, tm.group(1) if tm else '')}, "
+                        f"neighbour sentence={'yes' if neigh else 'no'})")
+                block = "\n".join(ln for ln in lines if ln is not None)
+        pieces.append(block)
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+# ── superlatives about the same object ───────────────────────────────────────
+_SUP_GROUP = {"longest": "long", "largest": "big", "biggest": "big", "tallest": "tall", "highest": "tall",
+              "oldest": "old", "deepest": "deep", "widest": "wide", "smallest": "small"}
+_SUP_RX = re.compile(r"(?i)\b(?P<sup>" + "|".join(_SUP_GROUP) + r")\s+(?P<obj>(?:[A-Za-z\-]+\s+){0,3}?[A-Za-z\-]+)"
+                     r"\s+in\s+(?P<reg>(?:the\s+)?[A-ZÀ-Ỹ][^\W\d_]+(?:\s+[A-ZÀ-Ỹ][^\W\d_]+){0,2})")
+
+
+def _superlatives(sentence: str) -> List[Dict]:
+    out = []
+    for m in _SUP_RX.finditer(sentence):
+        obj = [w for w in _words(m.group("obj")) if w not in {"the", "a", "an", "one", "of", "all"}]
+        if obj:
+            out.append({"sup": m.group("sup").lower(), "grp": _SUP_GROUP[m.group("sup").lower()], "obj": set(obj),
+                        "reg": set(_words(m.group("reg"))) - {"the"}, "span": m.span(), "text": sentence})
+    return out
+
+
+def _sup_in_evidence(c: Dict, evidence: str) -> bool:
+    """The evidence states this superlative of this object in this region (word match, any wording of the
+    same degree: largest = biggest)."""
+    ev = " ".join(_words(evidence))
+    for m in re.finditer(r"\b(" + "|".join(k for k, g in _SUP_GROUP.items() if g == c["grp"]) + r")\b", ev):
+        win = set(ev[m.end():m.end() + 90].split())
+        if (c["obj"] & win) and (c["reg"] & win):
+            return True
+    return False
+
+
+def _cut_clause(sentence: str, c: Dict) -> Optional[str]:
+    """The sentence without the superlative clause; None when nothing worth keeping is left."""
+    a, b = c["span"]
+    head = sentence[:a]
+    head = re.sub(r"(?i)[,;]?\s*(?:and\s+)?(?:it\s+(?:is|was)\s+)?(?:(?:one of\s+)?the|a|an)\s*$", "", head).rstrip(" ,;")
+    tail = sentence[b:].lstrip()
+    rest = (head + (" " + tail if tail and tail[0] not in ".,;!?" else tail)).strip()
+    rest = re.sub(r"(?i)[,;]\s*(?:and|which is|that is)\s*([.!?]?)$", r"\1", rest)
+    rest = rest.rstrip(" ,;")
+    if rest and rest[-1] not in ".!?":
+        rest += "."
+    return rest if len(rest.split()) >= 5 and not re.match(r"(?i)^(?:it|this|that)\s+(?:is|was)\s*\.?$", rest) else None
+
+
+def consistent_superlatives(tour_text: str, evidence_by_title: Optional[Dict[str, str]],
+                            log: Optional[Callable] = None) -> str:
+    """[LOCAL-900] Two stops claiming a superlative of the SAME object (longest/largest/biggest/tallest/
+    oldest ... in <region>) with a different degree or region: keep one, drop the other. The claim whose
+    own stop's evidence states it wins; if both are stated the stop whose title names the object wins
+    (else the earlier stop); if neither is stated both go. ``evidence_by_title`` falsy -> unchanged."""
+    if not active() or not tour_text or not evidence_by_title:
+        return tour_text
+    ev_map = {fold(str(k)): v for k, v in evidence_by_title.items()}
+    blocks = _stop_blocks(tour_text)
+    claims = []
+    for bi, (s, e, num, title) in enumerate(blocks):
+        ev = str(ev_map.get(fold(title), "") or "")
+        for ln in tour_text[s:e].split("\n")[1:]:
+            if not ln.strip() or _KEYED.match(ln) or _CLOSING_LINE.match(ln.strip()):
+                continue
+            for sent in split_sentences(ln):
+                for c in _superlatives(sent):
+                    c.update(bi=bi, ok=_sup_in_evidence(c, ev), titled=bool(c["obj"] & set(_words(title))))
+                    claims.append(c)
+    drop = []                                  # claims to remove
+    for i in range(len(claims)):
+        for j in range(i + 1, len(claims)):
+            a, b = claims[i], claims[j]
+            if a["bi"] == b["bi"] or len(a["obj"] & b["obj"]) < 2 and not (a["obj"] <= b["obj"] or b["obj"] <= a["obj"]):
+                continue
+            if a["grp"] == b["grp"] and a["reg"] == b["reg"]:
+                continue                        # the same claim twice is not a conflict
+            if a["ok"] and not b["ok"]:
+                gone = [b]
+            elif b["ok"] and not a["ok"]:
+                gone = [a]
+            elif not a["ok"] and not b["ok"]:
+                gone = [a, b]
+            else:
+                keep = b if (b["titled"] and not a["titled"]) else a
+                gone = [b if keep is a else a]
+            for g in gone:
+                if g not in drop:
+                    drop.append(g)
+    if not drop:
+        return tour_text
+    pieces, pos = [], 0
+    for bi, (s, e, num, title) in enumerate(blocks):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        mine = [g for g in drop if g["bi"] == bi]
+        if mine:
+            def fix(sents: List[str], _m=mine, _n=num, _t=title) -> List[str]:
+                out = []
+                for x in sents:
+                    hit = [g for g in _m if g["text"] == x]
+                    if hit:
+                        y = _cut_clause(x, hit[0])
+                        if log:
+                            log(f"  [LOCAL-900] Stop {_n} '{_t[:40]}': conflicting superlative -> "
+                                f"{'clause' if y else 'sentence'} dropped: \"{x[:90]}\"")
+                        if y is None:
+                            continue
+                        x = y
+                    out.append(x)
+                return out
+            block = _rewrite_prose(block, fix)
+        pieces.append(block)
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+# ── a measurement the evidence does not hold ─────────────────────────────────
+_MEASURE = re.compile(r"(?i)\b(?P<n>\d[\d,\.]*)\s*(?P<u>meters?|metres?|m|feet|ft|kilomet\w+|km|miles?|tons?|tonnes?|steps)\b")
+
+
+def _ev_numbers(text: str) -> set:
+    return {x.replace(",", "") for x in re.findall(r"\d[\d,]*(?:\.\d+)?", text or "")}
+
+
+def cap_unsupported_numbers(tour_text: str, evidence_by_title: Optional[Dict[str, str]],
+                            log: Optional[Callable] = None) -> str:
+    """[LOCAL-900] A measurement (N meters / feet / km / ...) in a stop body whose number is in neither the
+    stop's evidence nor its title is the unsupported-claim case: the clause (or sentence) carrying it is
+    dropped. Stops with no evidence entry are left to the other caps. Travel distances are not touched
+    (strip_body_travel owns those)."""
+    if not active() or not tour_text or not evidence_by_title:
+        return tour_text
+    ev_map = {fold(str(k)): v for k, v in evidence_by_title.items()}
+    pieces, pos = [], 0
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        ev = ev_map.get(fold(title))
+        if ev is None:
+            pieces.append(block)
+            continue
+        have = _ev_numbers(str(ev)) | _ev_numbers(title)
+
+        def fix(sents: List[str], _n=num, _t=title, _have=have) -> List[str]:
+            out = []
+            for x in sents:
+                bad = [m for m in _MEASURE.finditer(x) if m.group("n").replace(",", "").rstrip(".") not in _have
+                       and not _has_travel(x[max(0, m.start() - 0):m.end() + 12] + " away")]
+                if not bad:
+                    out.append(x)
+                    continue
+                parts = re.split(r"(?i),\s*(?:and|but|which)\s+|;\s*", x)
+                keep = [p for p in parts if not any(m.group(0) in p for m in bad)]
+                y = " ".join(keep).strip() if keep and len(parts) > 1 else ""
+                if y:
+                    y = y[0].upper() + y[1:]
+                    y = y if y[-1] in ".!?" else y + "."
+                if log:
+                    log(f"  [LOCAL-900] Stop {_n} '{_t[:40]}': measurement '{bad[0].group(0)}' not in the evidence -> "
+                        f"{'clause' if y else 'sentence'} dropped: \"{x[:90]}\"")
+                if y and len(y.split()) >= 5:
+                    out.append(y)
+            return out
+        pieces.append(_rewrite_prose(block, fix))
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+
 def finalize_898(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                  log: Optional[Callable] = None) -> str:
     """[LOCAL-898] The route text leftovers, in order: creators agree, no emptied body, body above
@@ -980,7 +1239,10 @@ def finalize_898(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = N
     if not active() or not tour_text:
         return tour_text
     t = consistent_creators(tour_text, evidence_by_title, log)
+    t = consistent_superlatives(t, evidence_by_title, log)          # [LOCAL-900]
+    t = cap_unsupported_numbers(t, evidence_by_title, log)          # [LOCAL-900]
     t = fill_empty_bodies(t, log)
+    t = rebuild_honest_bodies(t, evidence_by_title, log)            # [LOCAL-900]
     t = order_directions_last(t, log)
     t = normalize_directions(t, log)
     t = distinct_type_specialty(t, log)

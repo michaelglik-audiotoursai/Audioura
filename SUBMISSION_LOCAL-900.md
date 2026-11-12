@@ -1,0 +1,20 @@
+# LOCAL-900 — wave 46 cloud proof leftovers (offline, $0)
+
+Base e6143bf9 (subscribed). Branch `LOCAL-900-w46-leftovers`. No live run, no paid call.
+
+## Changes
+1. **Directions short names** — `place_names_900.short_place_name`: strips leading travel verbs, text after ` – ` / ` - ` / `:`, a trailing "and the drive home / and back", lower-cases a leading "The". `normalize_directions` uses it ("Continue to Gamma.", "Walk on to the summit views.").
+2. **Filler tail** — `normalize_directions` sets the model's own Continue/Walk-on/"It is roughly" sentences aside and keeps at most one scenery clause with no `!` and no evaluative word. Cause of the survivor: "spot" is in the scenery cue list, so "It's a lovely spot to explore!" qualified.
+3. **Honest body** (`strict_grounding_gate.sensory_body`, `route_content_896.rebuild_honest_bodies`): (a) short name; (b) sentence chosen by Type/Specialty or title kind (road/field → road; mountain/summit/viewpoint/cable car → view, height, air; temple/pagoda → courtyard, quiet; default neutral, no road); (c) a same-site neighbour's evidence sentence (same pin or < 1 km) that matches ≥ half of this stop's subject words replaces a template. Runs inside `finalize_898`, so it also fixes bodies produced earlier.
+4. **Superlatives** — `consistent_superlatives`: longest/largest/biggest/tallest/oldest… + object + "in <region>" across stops. Supported by the stop's own evidence (degree, object and region words) wins; both supported → the stop whose title names the object, else the earlier; neither → both go. Only the clause is cut when enough sentence remains. **Evidence (897 bundle):** stop 4 source says "longest reclining Buddha statue in Southeast Asia"; stop 7 says "biggest reclining Buddha in Vietnam"; so both were supported by their own evidence and the title rule keeps stop 7. **Pagoda height:** the bundle holds **400 m** ("độ cao 400 mét"); no source holds 475. New `cap_unsupported_numbers` drops the clause/sentence carrying a measurement (meters/feet/km/…) whose number is in neither the stop's evidence nor its title.
+5. **"Pulse of the city" filler** — it survived `cap_unsupported` because the sentence shared "river"/"city" with the title/evidence, and any shared token counted as support. `_supported` now ignores generic place-type/mood nouns unless a number or a non-generic word is shared.
+6. **Pins on short tours** — `place_names_900.check_pins_against_scope`, called where GEO-CHECK prints "skipped (fewer than 3 stops…)": pin farther than the radius (DISTRICT/BUILDING/CORRIDOR 15 km, CITY 25 km) from the scope geocode already held (`_center_858`, else the resolved area centre) is replaced by that geocode and flagged `coordinates_approximate`. Log: `[LOCAL-900] pin check stop=N dist_km=… action=kept|replaced`. No new geocode call. If no scope centre exists the check is skipped with a log line. Not verified live: that `_center_858` is populated on the cloud path for tour 552 (it is computed in the 858B early-landmark block; I read the code, did not run the pipeline).
+
+## Tests
+- `tests/test_local900_leftovers.py` (25 tests, generic fixtures) incl. replay of `tests/fixtures/local900_tour.txt` (place names replaced with generic ones) through `cap_unsupported` + `finalize_898`: no Directions with "Arriving at", " – ", "!"; no "road and the fields" on non-road stops; ≤ 1 superlative per object; no "pulse of the city"; no 475.
+- Requested suite (minus `test_local88_tour_pollution.py`): 887 passed, 4 skipped. Baseline before changes: 862 passed.
+- Two existing tests were updated because they asserted the old road template on a cable-car stop, which item 3 forbids: `test_local897…::test_sensory_template_lowercases_a_leading_article` (now passes a road kind) and `test_local898…::test_replay_cloud_tour` (checks body-before-Directions via the disclosure sentence).
+
+## Notes
+- The replay evidence map is synthetic (the real bundle names were not committed); it mirrors the wording found in the 897 bundle.
+- Neutral and body-kind sentences avoid "look around you / street / pavement" (an existing 894 test).

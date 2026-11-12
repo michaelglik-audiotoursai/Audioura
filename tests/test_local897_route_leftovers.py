@@ -236,7 +236,7 @@ def test_empty_last_stop_body_is_filled_before_the_closing():
 
 def test_sensory_template_lowercases_a_leading_article():
     import strict_grounding_gate as g
-    b = g.sensory_body("The cable car ascent", [], 1, register="driving")[0]
+    b = g.sensory_body("The cable car ascent", [], 1, register="driving", kind_text="plantation road")[0]  # [LOCAL-900] kind picks the sentence
     assert b.startswith("As you pass the cable car ascent,")
 
 

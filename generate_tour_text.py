@@ -20381,6 +20381,23 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     print(f"   GEO-CHECK: all {len(poi_list)} stops within {_geo_mode_word} distance (max leg {max(legs):.2f} km, total {total_route_km:.2f} km, limit {_total_limit:.0f} km)")
             else:
                 print(f"   GEO-CHECK: skipped (fewer than 3 stops have coordinates)")
+                # [LOCAL-900] GEO-CHECK is skipped on a short tour: the model's own pins go unchecked. Compare
+                # each to the scope geocode the pipeline already holds (no new geocode call).
+                try:
+                    import place_names_900 as _pn900
+                    _c900 = locals().get('_center_858')
+                    if not _c900:
+                        _ar900 = locals().get('_area')
+                        if _ar900 is not None and (getattr(_ar900, 'center_lat', 0) or getattr(_ar900, 'center_lng', 0)):
+                            _c900 = (_ar900.center_lat, _ar900.center_lng)
+                    if _c900:
+                        _pn900.check_pins_against_scope(
+                            poi_list, tuple(_c900), (intent.get('scope_precision') or '') if intent else '',
+                            parse=_parse_coords, log=print)
+                    else:
+                        print("  [LOCAL-900] pin check skipped: no scope geocode available")
+                except Exception as _e900:
+                    print(f"  [LOCAL-900] pin check skipped (non-fatal): {_e900}")
 
         # Country-scale containment check (KIRO_REVIEW_08)
         # For country_scale tours, validate each stop is within the target country (or its enclaves)
