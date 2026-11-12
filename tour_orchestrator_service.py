@@ -282,7 +282,7 @@ def _get_auth_headers(target_url):
     return {}
 
 
-def _d762_gen_preview(_text, _city):
+def _d762_gen_preview(_text, _city, _route=None):
     """[LOCAL-893] POST the generator's /preview-stops for the D762 pin resolve.
     Module-level so the timeout/retry/ERROR behaviour is unit-testable."""
     # [LOCAL-893] The read timeout was 20 s; with LOCAL-882's canonical
@@ -296,7 +296,8 @@ def _d762_gen_preview(_text, _city):
         try:
             _r = _authenticated_request(
                 "POST", f"{TOUR_GENERATOR_URL}/preview-stops",
-                json={"text": _text, "city": _city}, timeout=_pv_timeout)
+                json=({"text": _text, "city": _city, **_route} if _route
+                      else {"text": _text, "city": _city}), timeout=_pv_timeout)
         except Exception as _pv_exc:
             _r = None
             _pv_err = f"{type(_pv_exc).__name__}: {_pv_exc}"
@@ -4080,11 +4081,26 @@ def generate_complete_tour():
             _raw_stops, _exp_n = _exp_lists(_raw_stops, _pin_city)
             from itinerary_import import resolve_user_stop_pins as _rusp
 
+            # [LOCAL-896] A route (origin != destination) is pinned inside the ROUTE region.
+            _route896 = None
+            try:
+                if _ri894.get('is_description') and _ri894.get('origin') \
+                        and _ri894.get('destination') \
+                        and _ri894['origin'].strip().lower() != _ri894['destination'].strip().lower():
+                    _route896 = {
+                        "route_places": [p for p in [_ri894.get('origin'), *(_ri894.get('through') or []),
+                                                     _ri894.get('destination')] if p],
+                        "route_region": _ri894.get('region') or '',
+                        "route_fallbacks": [_ri894.get('origin_locality') or ''],
+                    }
+            except Exception as _r896e:
+                print(f"[LOCAL-896] route region for the pin preview skipped: {_r896e}")
+
             def _gen_preview(_text, _city):
                 # [LEAD wave-31 finding] Resolve on the GENERATOR's /preview-stops:
                 # it already has the resolver modules and the Serper key; the
                 # orchestrator image has neither (No module named 'city_scope').
-                return _d762_gen_preview(_text, _city)
+                return _d762_gen_preview(_text, _city, _route896)
 
             _raw_stops, _pin_n = _rusp(_raw_stops, _pin_city,
                                        preview_fn=_gen_preview, core_fn=_lc894)

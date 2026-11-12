@@ -696,6 +696,12 @@ def scrub_user_stop_body(text: str, poi: Dict, location: str = "",
         off_marker = bool(_OFF_TOPIC_MARKER_RE.search(sent))
         dated = bool(_DATED_CLAIM_RE.search(sent))
         legend = bool(_LEGEND_MARKER_RE.search(sent))
+        try:    # [LOCAL-896] a legend disclosed AS a legend ("Local legend ties ...") is the D760 form
+            import route_content_896 as _rc896
+            if legend and _rc896.is_legend_disclosure(sent):
+                legend = False
+        except Exception:
+            pass
         _disclosed862b = False
         # [LOCAL-862B / D760] A sentence that carries a disclosure marker ("A
         # Vietnamese folk tale tells …", "We couldn't confirm this, but …") is layer

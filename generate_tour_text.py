@@ -11554,6 +11554,18 @@ def _apply_delivery_hours_guard(result):
                       flush=True)
         except Exception as _wdgf:  # pragma: no cover
             _import_logger.error(f"[LOCAL-882] final directions guarantee skipped: {_wdgf}")
+        # [LOCAL-896] A described ROUTE (origin != destination), after every other pass: a stop's
+        # locality is never the origin's, and Directions carry no minutes / compass without a pin.
+        try:
+            import route_content_896 as _rc896f
+            if _rc896f.active():
+                _before896 = final
+                final = _rc896f.strip_origin_locality(final, log=lambda m: print(m, flush=True))
+                final = _rc896f.simplify_directions(final, log=lambda m: print(m, flush=True))
+                if final != _before896:
+                    print("  [LOCAL-896] route content pass changed the delivered text", flush=True)
+        except Exception as _rc896e:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-896] route content pass skipped: {_rc896e}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
@@ -11609,6 +11621,11 @@ def _apply_description_location_894(location, tour_type):
                 _ab894b.set_route_region()
             except Exception:
                 pass
+            try:
+                import route_content_896 as _rc896
+                _rc896.clear_route()
+            except Exception:
+                pass
         return location
     try:   # [LOCAL-894B] the listener's own request defines the route region (aboutness)
         import aboutness as _ab894b
@@ -11619,6 +11636,15 @@ def _apply_description_location_894(location, tour_type):
                                  info.get('destination'), ' '.join(info.get('through') or []))
     except Exception as _rg894b:
         print(f"  [LOCAL-894B] route region not set (non-fatal): {_rg894b}")
+    try:   # [LOCAL-896] the route (origin != destination) drives locality / directions / closing / pins
+        import route_content_896 as _rc896
+        _rc896.set_route(info)
+        if _rc896.active():
+            _rb, _rc_ctr = _rc896.box_for_info(info)
+            _rc896.set_box(_rb)
+            print(f"  [LOCAL-896] route region box={_rb} (origin + through + destination)")
+    except Exception as _rc896e:
+        print(f"  [LOCAL-896] route state not set (non-fatal): {_rc896e}")
     _J._ROUTE_INFO = info
     _J._ROUTE_SCOPE = info.get('scope') or info.get('location')
     _J._ROUTE_LOCATION = info['location']
@@ -19558,6 +19584,15 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _bbox_858 = _gsb858(_scope_858) if _scope_858 else None
                 except Exception:
                     _bbox_858 = None
+                try:   # [LOCAL-896] a route's scope box is the ROUTE region, not the origin's city
+                    import route_content_896 as _rc896a
+                    if _rc896a.active() and _rc896a.box():
+                        _bbox_858 = list(_rc896a.box())
+                        _center_858 = ((_bbox_858[0] + _bbox_858[1]) / 2.0,
+                                       (_bbox_858[2] + _bbox_858[3]) / 2.0)
+                        print(f"  [LOCAL-896] 858B scope = route region box {_bbox_858}")
+                except Exception:
+                    pass
                 _establish_landmark_coordinates(
                     poi_list, scope=_scope_858, scope_center=_center_858,
                     scope_bbox=_bbox_858, tour_language="en",
@@ -30537,6 +30572,17 @@ REWRITE RULES (all mandatory):
             _pin_bbox_803 = _gsb803(_pin_scope_791c) if _pin_scope_791c else None
         except Exception:
             _pin_bbox_803 = None
+        _route_box_896 = None
+        try:   # [LOCAL-896] pin-snap scope = the route region (origin + through + destination)
+            import route_content_896 as _rc896b
+            if _rc896b.active() and _rc896b.box():
+                _route_box_896 = list(_rc896b.box())
+                _pin_bbox_803 = _route_box_896
+                _pin_center_791c = ((_route_box_896[0] + _route_box_896[1]) / 2.0,
+                                    (_route_box_896[2] + _route_box_896[3]) / 2.0)
+                print(f"  [LOCAL-896] pin snap scope = route region box {_route_box_896}")
+        except Exception:
+            _route_box_896 = None
         # [LOCAL-813 Cause C] MUSEUM BUILDING PIN. A museum/gallery tour's stops are
         # artwork titles with no place identity of their own; they share the ONE
         # building-level pin of the museum. Resolve the museum building's
@@ -30572,7 +30618,7 @@ REWRITE RULES (all mandatory):
             poi_list, scope=_pin_scope_791c, scope_center=_pin_center_791c,
             scope_bbox=_pin_bbox_803, tour_language="en",
             venue_fallback_coordinate=_pin_venue_fallback_813,
-            city_centroid=_pin_center_791c,
+            city_centroid=_pin_center_791c, route_box=_route_box_896,
             is_user_stop_fn=lambda _p: bool(
                 _p.get('user_explicit') or _p.get('_anchor')
                 or _is_user_stop_title(_p.get('name'))),
@@ -35763,7 +35809,8 @@ RULES:
             _ev889 = locals().get('_evf') or {}
             complete_tour, _kf_rep = _kfc889.finalize_tour(
                 complete_tour, _ev889, model=os.environ.get(
-                    "GROUNDING_GATE_MODEL", "gpt-4.1-mini"), log=print)
+                    "GROUNDING_GATE_MODEL", "gpt-4.1-mini"), log=print,
+                user_list=bool(_get_user_stop_titles()))
             _tot = sum(r.get("K", 0) for r in _kf_rep["stops"])
             _got = sum(r.get("k", 0) for r in _kf_rep["stops"])
             print(f"  [LOCAL-889] coverage total: {_got}/{_tot} key facts over "

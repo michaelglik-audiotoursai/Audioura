@@ -525,6 +525,9 @@ def _in_city(pt, city) -> bool:
         return False
     if abs(lat) > 90 or abs(lng) > 180 or (lat == 0 and lng == 0):
         return False
+    rb = city.get("_route_box")           # [LOCAL-896] a route: the whole route region, not 25 km of a centre
+    if rb and len(rb) >= 4:
+        return rb[0] <= lat <= rb[1] and rb[2] <= lng <= rb[3]
     return _km((lat, lng), (city["lat"], city["lng"])) <= 25.0
 
 
@@ -721,7 +724,10 @@ def _canonical_lookup(s: Dict, r: Dict, c: Dict, res: "Resolvers", log) -> Optio
 
 def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] = None,
                   max_serper_calls: int = 10, max_stops: int = 50,
-                  log: Callable[[str], None] = print) -> Dict:
+                  log: Callable[[str], None] = print,
+                  route_places: Optional[List[str]] = None, route_region: str = "",
+                  route_fallbacks: Optional[List[str]] = None,
+                  route_geocode: Optional[Callable] = None) -> Dict:
     """Parse + resolve a pasted itinerary. Returns::
 
         {"ok": True, "city": {...}, "count": N, "unresolved_count": K,
@@ -743,6 +749,26 @@ def preview_stops(text: str, city: str = "", *, resolvers: Optional[Resolvers] =
         return {"ok": False,
                 "error": "could not determine the city — pass 'city' (e.g. "
                          "\"Ho Chi Minh City\") or name it in the text"}
+
+    # [LOCAL-896] A described ROUTE (origin, through, destination) is looked up in the ROUTE
+    # region. The city the request resolved to ("Phan Thiet") is only the origin's side: a stop 30 km
+    # along the route fell outside its 25 km radius and stayed unpinned (pins 1/8).
+    if route_places:
+        try:
+            import route_content_896 as _rc896
+            _bb, _ctr, _np = _rc896.route_box(route_places, route_region, route_geocode,
+                                              fallbacks=route_fallbacks or ())
+            if _bb:
+                c = dict(c)
+                c["_route_box"] = _bb
+                c["bbox"] = _bb
+                c["lat"], c["lng"] = _ctr
+                log(f"[LOCAL-896] preview scope = route region box {_bb} ({_np} route places placed)")
+            else:
+                log(f"[LOCAL-896] route region box not built ({_np} of {len(route_places)} places placed)"
+                    f" -- keeping the city scope")
+        except Exception as _e896:
+            log(f"[LOCAL-896] route region skipped (non-fatal): {_e896}")
 
     st = _State(max_serper_calls)
     t_all = time.time()

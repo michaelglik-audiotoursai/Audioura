@@ -931,6 +931,7 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
         return tour_text or "", rep
     facts_by_title = facts_by_title or {}
     _other_names = {}                        # [LOCAL-894B] stop -> names from its dropped other-place evidence
+    _dropped_ev = {}                         # [LOCAL-896] stop -> the other-place evidence itself
     try:                                     # [LOCAL-892] LLM text out of the evidence; D769 location tokens
         import llm_evidence as _le892
         import aboutness as _ab892
@@ -943,6 +944,7 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
             _nv, _nd = _ab892.strip_other_place_evidence(_v)
             if _nd:
                 _other_names[_fold(str(_k))] = _ab892.other_place_names(_v)
+                _dropped_ev[_fold(str(_k))] = _v
             if _nd and log:
                 log(f"  [LOCAL-894B] '{str(_k)[:40]}': dropped evidence about another "
                     f"place (outside the route region)")
@@ -985,8 +987,36 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                     rep["total_dropped"] += len(_ds)
             except Exception:
                 pass
-        grounded, grep = apply_grounding_gate(
-            title, body, ev or "", classify_fn=classify_fn, model=model, log=log)
+        _emptied896 = False
+        _de = _dropped_ev.get(_fold(title))
+        if _de:                              # [LOCAL-896] audit-level: a sentence only the dropped evidence backs
+            try:
+                import route_content_896 as _rc896
+                _cs = _content_sentences(body)
+                _gone = _rc896.sentences_backed_by(_cs, _de, ev or "", title)
+                if _gone:
+                    for _d in _gone:
+                        if log:
+                            log(f"  [LOCAL-896] Stop {stop_num} '{title[:40]}': dropped (only the other-place "
+                                f"evidence backs it): \"{_d[:100]}\"")
+                    _left = [x for x in _cs if x not in _gone]
+                    rep["total_dropped"] += len(_gone)
+                    if _left:
+                        new_text = _replace_block_body(new_text, stop_num, _left)
+                        block = _block_for(new_text, stop_num)
+                        body = _block_body_prose(block or "")
+                    else:        # nothing else was left: the honest non-factual body is written in place
+                        _emptied896 = True
+            except Exception:
+                pass
+        if _emptied896:
+            # nothing but the other place's facts was left: the honest non-factual body below
+            grounded, grep = body, {"kept": 0, "contradicted": 0, "unsupported": 0, "disclosed": 0,
+                                  "dropped": [], "labelled": 0, "no_evidence": True,
+                                  "sentences_after": 0, "cost_usd": 0.0}
+        else:
+            grounded, grep = apply_grounding_gate(
+                title, body, ev or "", classify_fn=classify_fn, model=model, log=log)
         rep["cost_usd"] += grep.get("cost_usd", 0.0)
         rep["total_dropped"] += len(grep.get("dropped", []))
         rep["total_labelled"] += grep.get("labelled", 0)
@@ -1081,7 +1111,7 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
         if grep.get("no_evidence") and not rebuilt_ok:
             cur_block = _block_for(new_text, stop_num)
             cur_prose = _block_body_prose(cur_block) if cur_block is not None else ""
-            kept_sents = _content_sentences(cur_prose)
+            kept_sents = [] if _emptied896 else _content_sentences(cur_prose)
             disclosure = NO_HISTORY_DISCLOSURE
             if not any(_fold(disclosure)[:30] in _fold(s) for s in kept_sents):
                 kept_sents = kept_sents + [disclosure]
@@ -1106,6 +1136,28 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
             "kept": grep["kept"], "contradicted": grep["contradicted"],
             "unsupported": grep["unsupported"], "disclosed": grep["disclosed"],
             "no_evidence": grep.get("no_evidence", False)})
+    # [LOCAL-896] D760: a disclosed legend beats an empty stop. Where the stop's own evidence calls
+    # its story a legend, ONE sentence framed as legend (never as fact).
+    try:
+        import route_content_896 as _rc896l
+        if _rc896l.active():
+            for _n, _t, _b in _split_blocks(new_text):
+                _ld = _rc896l.legend_disclosure(_t, _lookup(norm_ev, _t) or "")
+                if not _ld:
+                    continue
+                _cur = _content_sentences(_block_body_prose(_block_for(new_text, _n) or ""))
+                if any(_rc896l.is_legend_disclosure(x) for x in _cur):
+                    continue
+                _dis = [i for i, x in enumerate(_cur) if _fold(NO_HISTORY_DISCLOSURE)[:30] in _fold(x)]
+                _at = _dis[0] if _dis else len(_cur)
+                new_text = _replace_block_body(new_text, _n, _cur[:_at] + [_ld] + _cur[_at:])
+                rep["legends_disclosed"] = rep.get("legends_disclosed", 0) + 1
+                if log:
+                    log(f"  [LOCAL-896] Stop {_n} '{_t[:40]}': evidence calls it a legend -> disclosed as "
+                        f"legend: \"{_ld[:110]}\"")
+    except Exception as _e896:
+        if log:
+            log(f"  [LOCAL-896] legend disclosure skipped (non-fatal): {_e896}")
     if log:
         log(f"  [LOCAL-883] grounding gate: {rep['stops']} stop(s), "
             f"{rep['grounded']} edited, {rep['rebuilt']} rebuilt, "

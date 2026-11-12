@@ -1297,9 +1297,18 @@ def preview_stops_endpoint():
     if not isinstance(city, str):
         return jsonify({"error": "'city' must be a string"}), 400
     import itinerary_import
+    # [LOCAL-896] optional route region: pin the stops of a described route (origin, through,
+    # destination) inside the route's own box, not inside the origin's city.
+    _rp = data.get('route_places')
+    _rkw = {}
+    if isinstance(_rp, list) and 2 <= len(_rp) <= 8 and all(isinstance(x, str) and x.strip() for x in _rp):
+        _rkw = {"route_places": [x.strip()[:80] for x in _rp],
+                "route_region": str(data.get('route_region') or '')[:80],
+                "route_fallbacks": [str(x)[:80] for x in (data.get('route_fallbacks') or [])
+                                    if isinstance(x, str)][:3]}
     out = itinerary_import.preview_stops(
         text, city.strip(), max_stops=_MAX_USER_STOPS,
-        max_serper_calls=int(os.environ.get('PREVIEW_STOPS_MAX_SERPER', '10')))
+        max_serper_calls=int(os.environ.get('PREVIEW_STOPS_MAX_SERPER', '10')), **_rkw)
     if not out.get('ok'):
         return jsonify({"error": out.get('error')}), 400
     print(f"[LOCAL-867] preview-stops: {out['count']} stops, "

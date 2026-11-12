@@ -1,0 +1,527 @@
+{
+  "unsupported": [
+    {
+      "stop": "Linh Son Truong Tho Pagoda",
+      "claim": "Local legend ties Linh Son Truong Tho Pagoda to healing associated with Empress Dowager Tu Du, a story told by locals rather than documented history.",
+      "why": "The evidence states that Linh Son Truong Tho Pagoda was conferred royal recognition by Emperor Tu Duc after Master Tran Huu Duc successfully treated Empress Dowager Tu Du, and that the pagoda is steeped in a legend of healing associated with her. However, the tour text frames this as a local legend not documented in history, while the evidence presents it as a historical event. The claim that it is only a local legend and not documented history is not supported."
+    }
+  ],
+  "_model": "gpt-4.1",
+  "_usage": {
+    "prompt_tokens": 7400,
+    "completion_tokens": 168,
+    "total_tokens": 7568,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "evidence_chars": {
+    "The cable car ascent": 247,
+    "Phan Thiet and the Ca Ty River": 6959,
+    "Dragon fruit country – the plantations along the road": 908,
+    "Arriving at Ta Cu – the mountain and its legends": 912,
+    "Leaving Mui Ne – the fishing coast and Ham Tien strip": 7266,
+    "The Reclining Buddha": 1013,
+    "Linh Son Truong Tho Pagoda": 2124
+  },
+  "offtopic_mechanical": [],
+  "items_by_stop": {
+    "The cable car ascent": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (2x)"
+      }
+    ],
+    "Phan Thiet and the Ca Ty River": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (7x)"
+      }
+    ],
+    "Dragon fruit country – the plantations along the road": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (13x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (14x)"
+      }
+    ],
+    "Arriving at Ta Cu – the mountain and its legends": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (6x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (4x)"
+      }
+    ],
+    "Leaving Mui Ne – the fishing coast and Ham Tien strip": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E22",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E23",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E24",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E25",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E26",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E27",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E28",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E29",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E30",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop (infobox)"
+      },
+      {
+        "id": "E31",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (10x)"
+      },
+      {
+        "id": "E32",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (6x)"
+      },
+      {
+        "id": "E33",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (3x)"
+      }
+    ],
+    "The Reclining Buddha": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (9x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 3x"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 3x"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 3x"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (3x)"
+      }
+    ],
+    "Linh Son Truong Tho Pagoda": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (15x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (16x)"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 19x"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (20x)"
+      }
+    ]
+  }
+}
