@@ -35897,6 +35897,11 @@ RULES:
                         _evf[str(_k)] = (_evf.get(str(_k), "") + " " + _blob).strip()
             except Exception:
                 _evf = {}
+            try:   # [LOCAL-904] the delivery guards' thin-stop refill reads the same per-stop evidence
+                import route_content_896 as _rc904
+                _rc904.set_evidence_904(_evf)
+            except Exception:
+                pass
             try:
                 _nsf = len(re.findall(r"(?mi)^Stop\s+\d+:", complete_tour)) or 10
             except Exception:

@@ -1053,6 +1053,50 @@ def _fold_addr(text: str) -> str:
 
 
 _ADMIN_PREFIX = re.compile(r"^(?:huyen|district|quan|thi xa|xa|thi tran|phuong)\s+(.+)$")
+# [LOCAL-904] every admin prefix a reverse geocode (or a model address) can carry, folded; longest first
+_ADMIN_PREFIX_ALL = re.compile(
+    r"^(?:thanh pho|thi tran|thi xa|huyen|district|quan|phuong|ward|commune|county|municipality|"
+    r"province|tinh|city|town|xa)\s+(.+)$")
+_PROVINCE_PREFIX = re.compile(r"^(?:province|tinh|thanh pho|city|state)\s+")
+
+
+def _strip_admin(part: str) -> str:
+    m = _ADMIN_PREFIX_ALL.match(part or "")
+    return m.group(1).strip() if m else (part or "").strip()
+
+
+def address_part_matches(address: str, reverse_text: str, scope: str = "") -> bool:
+    """[LOCAL-904] True when ANY non-numeric part of ``address`` equals (or is a whole-word part of) a part of the
+    reverse geocode, both folded and with their admin prefixes (Xa / Huyen / Phuong / Quan / Thi tran / Tinh /
+    District / Ward / Province ...) stripped. The province and the country (the reverse geocode's last part, a part
+    that carries a province prefix, a part named by the scope string) never count: a stop in the wrong district
+    of the right province must not keep its address."""
+    rparts = [x.strip() for x in (reverse_text or "").split(",") if x.strip()]
+    if not rparts:
+        return False
+    scope_f = f" {_fold_addr(scope)} "
+    rev_local = []
+    for i, rp in enumerate(rparts):
+        f = _fold_addr(rp)
+        if not f or i == len(rparts) - 1 and len(rparts) > 1:      # the country
+            continue
+        if _PROVINCE_PREFIX.match(f):                                # the province / city-province
+            continue
+        core = _strip_admin(f)
+        if core and f" {core} " not in scope_f and not re.search(r"\d", core):
+            rev_local.append(f" {core} ")
+    aparts = [_fold_addr(x) for x in (address or "").split(",")]
+    for i, ap in enumerate(aparts):
+        if not ap or re.search(r"\d", ap) or f" {ap} " in scope_f:
+            continue
+        if i == len(aparts) - 1 and len(aparts) > 1:                 # the country
+            continue
+        core = _strip_admin(ap)
+        if not core or _PROVINCE_PREFIX.match(ap):
+            continue
+        if len(core) >= 3 and any(f" {core} " in r for r in rev_local):
+            return True
+    return False
 
 
 def address_agrees(address: str, reverse_text: str, scope: str = "") -> bool:
@@ -1068,6 +1112,10 @@ def address_agrees(address: str, reverse_text: str, scope: str = "") -> bool:
         m = _ADMIN_PREFIX.match(x)
         if m and m.group(1).strip() and not re.search(r"\d", m.group(1)) and f" {m.group(1).strip()} " in rev_f:
             return True
+    # [LOCAL-904] a part with NO admin prefix ("Ham Thuan Nam") is compared too, against the reverse geocode's
+    # parts with their prefixes stripped; the same rule for every stop of the tour
+    if address_part_matches(address, reverse_text, scope):
+        return True
     local = [x for x in parts if x and not re.search(r"\d", x) and f" {x} " not in scope_f]
     # drop the trailing admin levels the scope string already names (province, country)
     if not local:

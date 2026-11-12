@@ -1399,6 +1399,28 @@ def is_mood_filler(sentence: str, support: set, closing: bool = False) -> bool:
     return closing or len(hits) >= _MOOD_DENSE or not _supported(sentence, support)
 
 
+# ── [LOCAL-904] an off-site activity suggested with no evidence ──────────────────────────────────────────
+_OFFSITE = re.compile(
+    r"(?i)\b(?:you\s+(?:might|may|could|can)\s+(?:also\s+|even\s+)?(?:\w+\s+){0,2}?(?:visit|stop\s+by|drop\s+by|check\s+out|"
+    r"try|head\s+(?:to|over)|pop\s+into|sample|pick\s+up)|consider\s+(?:visiting|stopping|trying)|"
+    r"why\s+not\s+(?:visit|stop|try)|feel\s+free\s+to\s+(?:visit|stop|try)|don'?t\s+forget\s+to\s+(?:visit|stop|try))\b"
+    r"|\bon\s+your\s+way\s+(?:back|home|out|down|up)\b")
+_SUGGEST_WORDS = set("""explore might also visit local back your home nearby check stop drop consider sure forget feel
+    free head enjoy sample along trip journey return even pick could would should try take
+    way down""".split())
+
+
+def is_offsite_suggestion(sentence: str, support: set) -> bool:
+    """[LOCAL-904] \"you might also visit a local dragon fruit farm on your way back\": a suggestion of an activity
+    away from the site whose object (the content words left once the suggestion words are set aside) is neither in
+    the stop's support (title, Type / Specific Examples lines, evidence) nor backed by a number. On the
+    single-place path that is filler."""
+    if not sentence or re.search(r"\d", sentence) or not _OFFSITE.search(sentence):
+        return False
+    obj = _content_tokens(sentence) - _SUGGEST_WORDS
+    return not bool((obj & support) - _GENERIC_NOUN)
+
+
 def cap_single_place_filler(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                             log: Optional[Callable] = None) -> str:
     """[LOCAL-901] The 897 unsupported / mood-filler cap for the single-place path (where the 897 route
@@ -1446,6 +1468,11 @@ def cap_single_place_filler(tour_text: str, evidence_by_title: Optional[Dict[str
                     keep.append(x)
                 elif is_mood_filler(x, para_sup, closing=_is_closing):
                     dropped.append(x)
+                elif is_offsite_suggestion(x, para_sup):          # [LOCAL-904]
+                    dropped.append(x)
+                    if log:
+                        log(f"  [LOCAL-904] Stop {num} '{title[:40]}': off-site suggestion with no support dropped: "
+                            f"\"{x[:100]}\"")
                 else:
                     keep.append(x)
                     kept_any = True
@@ -1459,6 +1486,8 @@ def cap_single_place_filler(tour_text: str, evidence_by_title: Optional[Dict[str
             continue
         if log:
             for x in dropped:
+                if is_offsite_suggestion(x, sup) and not is_mood_filler(x, sup):
+                    continue                                              # already logged as [LOCAL-904]
                 log(f"  [LOCAL-901] Stop {num} '{title[:40]}': mood filler dropped (no support, no concrete fact): \"{x[:100]}\"")
         pieces.append(re.sub(r"\n{3,}", "\n\n", "\n".join(x for x in new_lines if x is not None)))
     pieces.append(tour_text[pos:])
@@ -1522,6 +1551,158 @@ def strip_invented_route(tour_text: str, log: Optional[Callable] = None) -> str:
     return "".join(pieces)
 
 
+# ── [LOCAL-904] a floor under the single-place caps ──────────────────────────────────────────────────────
+THIN_FLOOR_904 = 3
+_EVIDENCE_904: Dict[str, str] = {}      # {stop title: evidence blob}, stashed by the generator for the delivery guards
+
+
+def set_evidence_904(ev: Optional[Dict[str, str]]) -> None:
+    """The generator hands the per-stop evidence bundle over here; the delivery guards (which have no other way to
+    see it) use it for the thin-stop refill. Replaced wholesale, never raises."""
+    _EVIDENCE_904.clear()
+    try:
+        _EVIDENCE_904.update({str(k): str(v) for k, v in (ev or {}).items()})
+    except Exception:
+        pass
+
+
+def _prose_lines(lines: List[str], last: bool) -> List[int]:
+    """Indices of a block's body lines. On the LAST stop only the first prose line is the stop's own body (what
+    follows is the tour's closing paragraph)."""
+    idx = [i for i, ln in enumerate(lines) if i > 0 and ln.strip() and not _KEYED.match(ln)]
+    return idx[:1] if last and idx else idx
+
+
+def _content_sentences_of(lines: List[str], last: bool) -> List[str]:
+    out = []
+    for i in _prose_lines(lines, last):
+        out += [x for x in split_sentences(lines[i]) if not _CLOSING_LINE.match(x)]
+    return out
+
+
+def _near(a: str, b: str, thr: float = 0.6) -> bool:
+    """Folded identical, or sharing >= ``thr`` of the smaller content-token set (a paraphrase)."""
+    fa, fb = fold(a), fold(b)
+    if fa and fa == fb:
+        return True
+    ta, tb = _content_tokens(a), _content_tokens(b)
+    if not ta or not tb:
+        return False
+    return len(ta & tb) / min(len(ta), len(tb)) >= thr
+
+
+def _evidence_candidates(ev: str, title: str) -> List[str]:
+    """Plain fact sentences of the stop's OWN evidence, richest first: the 885/888 refill path
+    (``aboutness.refill_facts``), then the 894B snippet path, then the 873C evidence sentences."""
+    out: List[str] = []
+
+    def add(xs):
+        for x in xs or []:
+            if x and x not in out:
+                out.append(x)
+    try:
+        import aboutness as _ab
+        add(_ab.refill_facts(ev, title, limit=18))
+        if len(out) < 4:
+            add(_ab.snippet_facts(ev, title, limit=14))
+    except Exception:
+        pass
+    if len(out) < 4:
+        try:
+            from stop_coherence import evidence_fact_sentences
+            add(evidence_fact_sentences(ev, limit=14))
+        except Exception:
+            pass
+    return out
+
+
+def refill_thin_stops(before: str, after: str, evidence_by_title: Optional[Dict[str, str]] = None,
+                      log: Optional[Callable] = None, floor: int = THIN_FLOOR_904) -> str:
+    """[LOCAL-904] Single-place tour 552: the 901 mood cap dropped two of Stop 2's three sentences and left ONE,
+    though the stop's evidence held the statue's size, the pagoda's date and how to reach it. A stop that LOST
+    sentences between ``before`` and ``after`` and is left with fewer than ``floor`` content sentences is refilled,
+    in this order, from (1) its OWN evidence (885/888 refill facts), (2) ONE sentence of a same-site neighbour's
+    delivered body (902 ``neighbour_sentence``), (3) the D760 honest disclosure + non-factual sentences. A sentence
+    that either pass dropped is never re-added (nor a paraphrase of it), and nothing that is already in this stop
+    or was already borrowed into another is added twice. Pure, free, never raises."""
+    if not after or not before:
+        return after
+    try:
+        import place_names_900 as pn
+        import strict_grounding_gate as sgg
+        ev_src = dict(_EVIDENCE_904)
+        ev_src.update({str(k): v for k, v in (evidence_by_title or {}).items()})
+        ev_map = {fold(k): v for k, v in ev_src.items()}
+        b_blocks, a_blocks = _stop_blocks(before), _stop_blocks(after)
+        if len(b_blocks) != len(a_blocks):
+            return after
+        text, used = after, set()
+        for k in range(len(a_blocks)):
+            blocks = _stop_blocks(text)
+            s, e, num, title = blocks[k]
+            lines = text[s:e].split("\n")
+            last = k == len(blocks) - 1
+            b_lines = before[b_blocks[k][0]:b_blocks[k][1]].split("\n")
+            have = _content_sentences_of(lines, last)
+            was = _content_sentences_of(b_lines, last)
+            if len(have) >= floor or len(was) <= len(have) or not _prose_lines(lines, last):
+                continue
+            lost = [x for x in was if not any(fold(x) == fold(h) for h in have)]
+            n0 = len(have)
+            support = _content_tokens(title)
+            tour_sents = [x for ln in text.split("\n") for x in split_sentences(ln)]
+
+            def ok(x: str, _have=None) -> bool:
+                x = x.strip()
+                if len(x.split()) < 6 or len(x) > 320 or x[-1:] not in ".!?" or is_fragment(x):
+                    return False
+                if is_mood_filler(x, set()) or _has_travel(x) or is_offsite_suggestion(x, set()):
+                    return False
+                if any(_near(x, d) for d in lost) or any(_near(x, h) for h in (_have or have)):
+                    return False
+                return fold(x) not in used
+
+            stage, added = "", []
+            ev = _ev_for(ev_map, title) or ""
+            if ev:                                                     # (1) its OWN evidence
+                for x in _evidence_candidates(ev, title):
+                    if len(have) + len(added) >= floor:
+                        break
+                    if ok(x, have + added) and not any(fold(x) == fold(t) for t in tour_sents):
+                        added.append(x.strip())
+                        stage = "evidence"
+            if len(have) + len(added) < floor:                         # (2) ONE same-site neighbour sentence
+                bodies = []
+                for body in _neighbour_evidence(blocks, k, ev_map, text):
+                    bodies.append(" ".join(x for x in split_sentences(body)
+                                           if ok(x, have + added) and not _CLOSING_LINE.match(x)))
+                neigh = pn.neighbour_sentence(pn.short_place_name(title), bodies, split_sentences)
+                if neigh:
+                    added.append(neigh.strip())
+                    stage = "neighbour"
+            if len(have) + len(added) < floor:                         # (3) D760 honest disclosure
+                tm = _TYPE_RX.search("\n".join(lines))
+                content = have + added
+                honest = sgg.sensory_body(title, content + [sgg.NO_HISTORY_DISCLOSURE], floor,
+                                          register="walking", kind_text=tm.group(1) if tm else "")
+                added = [x for x in honest if x not in have]
+                stage = "honest"
+            if not added:
+                continue
+            for x in added:
+                used.add(fold(x))
+            i0 = _prose_lines(lines, last)[0]
+            lines[i0] = (lines[i0].rstrip() + " " + " ".join(added)).strip()
+            text = text[:s] + "\n".join(lines) + text[e:]
+            if log:
+                log(f"  [LOCAL-904] Stop {num} thin ({n0} sentence{'s' if n0 != 1 else ''}) -> refilled from {stage}")
+        return text
+    except Exception as ex:
+        if log:
+            log(f"  [LOCAL-904] thin-stop refill skipped (non-fatal): {ex}")
+        return after
+
+
 def apply_single_place_guards(tour_text: str, log: Optional[Callable] = None, max_stops: int = 2,
                               max_km: float = 100.0,
                               evidence_by_title: Optional[Dict[str, str]] = None) -> str:
@@ -1532,10 +1713,14 @@ def apply_single_place_guards(tour_text: str, log: Optional[Callable] = None, ma
     if not tour_text:
         return tour_text
     t = drop_carry_filler(tour_text, log)
-    if not active() and len(_stop_blocks(t)) <= max_stops:
+    _single904 = not active() and len(_stop_blocks(t)) <= max_stops
+    _pre904 = t
+    if _single904:
         t = strip_invented_route(t, log)                            # [LOCAL-902]
         t = cap_single_place_filler(t, evidence_by_title, log)      # [LOCAL-901] mood filler + closing paragraph
     t = drop_fragments(t, log, force=True)
+    if _single904:
+        t = refill_thin_stops(_pre904, t, evidence_by_title, log)   # [LOCAL-904] floor under the caps
     if not active() and len(_stop_blocks(t)) <= max_stops:
         t = normalize_directions(t, log, force=True, max_km=max_km)
     return t
