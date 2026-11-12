@@ -640,6 +640,16 @@ def same_building(a: Dict, b: Dict) -> bool:
     if name_b and name_b in aliases_a:
         return True
 
+    # [LOCAL-901] A distinct named structure is never the same place as the mountain / park / area that
+    # contains it (nor as a structure with a different proper-noun core): "located in" and "close
+    # coordinates" are not identity. Same QID and shared aliases (above) still merge.
+    try:
+        from distinct_sites_901 import distinct_sites as _ds901
+        if _ds901(a, b):
+            return False
+    except Exception:
+        pass
+
     # 2. located-in / part-of QID equals the other's entity QID.
     def _located_qids(s: Dict) -> Set[str]:
         out = set()

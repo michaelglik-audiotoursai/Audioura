@@ -292,6 +292,16 @@ def validate_stops(raw):
 
 def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=None, forced_stops=None, mode=None):
     """Generate tour text asynchronously."""
+    # [LOCAL-901] Durable heartbeat: a background ticker stamps heartbeat_at (and,
+    # via the store upsert, updated_at) on the job row every <= 30 s, so /status
+    # served by ANY instance proves liveness (wave 48: the poll hit the instance
+    # without this thread and the watchdog gave up on a healthy 8-stop tour).
+    _hb_ticker = None
+    try:
+        from job_heartbeat import HeartbeatTicker as _HBT
+        _hb_ticker = _HBT(ACTIVE_JOBS, job_id).start()
+    except Exception as _hb_err:
+        _svc_logger.warning(f"[LOCAL-901] heartbeat ticker not started (non-fatal): {_hb_err}")
     try:
         api_call_logger.log("GENERATOR_SERVICE_ASYNC_START", {
             "job_id": job_id,
@@ -1209,6 +1219,12 @@ def generate_tour_async(job_id, location, tour_type, total_stops=10, user_id=Non
         except ImportError:
             pass
     finally:
+        # [LOCAL-901] Stop the durable heartbeat ticker with the job.
+        try:
+            if _hb_ticker is not None:
+                _hb_ticker.stop()
+        except Exception:
+            pass
         # [LOCAL-848] Return this request's transient allocations (SPARQL JSON,
         # Serper snippets, per-work Wikipedia extracts, LLM response buffers) to
         # the OS now that the tour text is built. The generator is a WARM,
@@ -1489,6 +1505,12 @@ def get_job_status(job_id):
     _t = JOB_THREADS.get(job_id)
     if _t is not None and _t.is_alive():
         response["heartbeat_at"] = datetime.now().isoformat()
+    elif job.get("heartbeat_at") and job.get("status") in ("queued", "processing"):
+        # [LOCAL-901] This instance does not own the worker thread (multi-instance):
+        # return the DURABLE heartbeat the owning instance's ticker wrote to the
+        # generator_jobs row, so the orchestrator watchdog sees liveness whichever
+        # instance answers.
+        response["heartbeat_at"] = job["heartbeat_at"]
     if job.get("cancel_requested"):
         response["cancel_requested"] = True
     

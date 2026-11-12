@@ -632,6 +632,19 @@ def fetch_full_pages(urls: List[str], budget_seconds: float = None) -> List[Dict
     # Cap at FULLPAGE_FETCH_MAX_PAGES
     urls = urls[:FULLPAGE_FETCH_MAX_PAGES]
 
+    # [LOCAL-901] Log only (selection is unchanged): how many of the pages we are
+    # about to fetch are social/video hosts, which carry no usable prose.
+    try:
+        _social = ('facebook.', 'fb.com', 'youtube.', 'youtu.be', 'instagram.',
+                   'tiktok.', 'twitter.', 'x.com', 'pinterest.')
+        from urllib.parse import urlparse as _up901
+        _n_social = sum(1 for _u in urls
+                        if any(h in (_up901(_u or '').netloc or '').lower() for h in _social))
+        print(f"  [LOCAL-901] page fetch: {len(urls)} url(s), {_n_social} social/video "
+              f"host(s) (facebook/youtube/...) - selection unchanged", flush=True)
+    except Exception:
+        pass
+
     start = time.time()
     results = []
 
