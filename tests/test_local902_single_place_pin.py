@@ -281,3 +281,16 @@ def test_more_than_two_stops_is_not_the_single_place_path():
     pois = [{"name": str(i), "address": "x, y, z"} for i in range(3)]
     rows = [{"snapped": True, "new_coordinate": REF, "reference": REF}] * 3
     assert pin_snap.verify_addresses(pois, rows, reverse_fn=lambda a, b: "q") == 0
+
+
+def test_lead_large_tour_model_pin_keeps_900b_radius():
+    """[LOCAL-902/LEAD] on a >2-stop tour a model pin may not jump ~33 km just because the reference is in scope."""
+    pois = _pois() + [{"name": "Gamma Hall", "coordinates": "10.8300, 107.5950"},
+                      {"name": "Delta Gate", "coordinates": "10.8290, 107.5960",
+                       "wikidata_lat": 10.8290, "wikidata_lng": 107.5960}]   # one VERIFIED pin
+    pois = [dict(p, coord_source=p.get("coord_source", "model")) if "wikidata_lat" not in p else p for p in pois]
+    out, rows, logs = _live_guards_snap(REF, pois=pois)
+    assert not any("[LOCAL-902] snap accepted" in l for l in logs)
+    for p in out:
+        lat, lng = [float(x) for x in p["coordinates"].split(",")]
+        assert pin_snap._haversine_m((lat, lng), REF) > 15000      # 900B DISTRICT cap still held them

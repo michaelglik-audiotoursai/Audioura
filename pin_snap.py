@@ -664,6 +664,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
     # Model-only tour with >= 3 pinned stops: their mutual agreement is real evidence (and the GEO-CHECK
     # runs there), so the legacy all-pins centroid stays. With <= 2 pins (or any verified pin) only
     # verified pins are used.
+    _short_tour_902 = sum(1 for c in coords_all if c) <= 2
     _verified_only_902 = _scope_known_902 and (bool(_verified_idx)
                                                or sum(1 for c in coords_all if c) <= 2)
 
@@ -759,7 +760,9 @@ def snap_poi_coordinates(poi_list: List[Dict],
                 row.update({"snapped": False, "new_coordinate": None,
                             "reason": f"reference {_nc902[0]:.4f},{_nc902[1]:.4f} outside the scope — refused "
                                       f"(wrong same-name place)"})
-            elif _in902 and _mv902 <= _MODEL_PIN_SCOPE_KM:
+            elif _in902 and _mv902 <= _MODEL_PIN_SCOPE_KM and _short_tour_902:
+                # [LOCAL-902/LEAD] only on short tours (<= 2 pinned stops): on a larger tour the 900B
+                # scope radius (CITY 25 km, DISTRICT 15 km) still bounds a model pin's move.
                 _accepted_902 = True
                 row["accepted_902"] = True
         # [LOCAL-900B] SCOPE GUARD on every snap (authority or not). A same-named place elsewhere in the world must
