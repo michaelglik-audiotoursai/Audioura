@@ -217,41 +217,112 @@ def first_named_place(location: str) -> str:
     return ""
 
 
+_GENERIC_GEO_WORDS = (
+    "mountain", "mount", "mt", "hill", "peak", "lake", "river", "island", "beach", "cave", "waterfall",
+    "falls", "temple", "pagoda", "park", "valley", "bay",
+    "nui", "doi", "dinh", "ho", "song", "chua", "dao", "bai", "thac",          # Vietnamese (folded)
+    "monte", "montana", "lago", "rio", "isla", "mont", "lac", "berg", "see", "gora", "jezioro",
+)
+
+
+def _fold_diacritics(text: str) -> str:
+    import unicodedata
+    t = (text or "").replace("\u0111", "d").replace("\u0110", "D")
+    return "".join(c for c in unicodedata.normalize("NFD", t) if unicodedata.category(c) != "Mn")
+
+
+def place_name_variants(name: str) -> List[str]:
+    """[LOCAL-902] The name, then the label without a generic geographic word ("<Name> Mountain" ->
+    "<Name>"), "Mount <Name>", "Nui <Name>", each also with diacritics folded. Generic words only."""
+    base = re.sub(r"\s+", " ", (name or "").strip())
+    if not base:
+        return []
+    words = base.split(" ")
+    n_orig = len(words)
+    while len(words) > 1 and _fold_diacritics(words[0]).lower().strip(".") in _GENERIC_GEO_WORDS:
+        words = words[1:]
+    while len(words) > 1 and _fold_diacritics(words[-1]).lower().strip(".") in _GENERIC_GEO_WORDS:
+        words = words[:-1]
+    core = " ".join(words)
+    cands = [base]
+    if core != base:
+        cands.append(core)
+    if core != base or n_orig == 1:
+        cands += [f"Mount {core}", f"N\u00fai {core}"]
+    out: List[str] = []
+    for c in cands:
+        for v in (c, _fold_diacritics(c)):
+            if v and v not in out:
+                out.append(v)
+    return out
+
+
+def _default_free_geocode(query: str):
+    """Existing free geocoder path (geocode_stops.geocode, Nominatim). (lat, lng) or None."""
+    try:
+        import geocode_stops as _gs
+        return _gs.geocode(query)
+    except Exception:
+        return None
+
+
 def first_named_place_reference(location: str, city: str,
-                               coarse_center: Tuple[float, float]) -> Optional[Dict]:
-    """[LOCAL-901] The full location string was not on Wikidata, so the area fell
+                               coarse_center: Tuple[float, float],
+                               geocode_fn=None) -> Optional[Dict]:
+    """[LOCAL-901/902] The full location string was not on Wikidata, so the area fell
     back to the city centre. Try the FIRST NAMED PLACE of the location through the
-    existing ``_wikidata_name_lookup`` and, if its point lies inside the province /
-    city (within PLACE_REF_MAX_KM of the coarse centre, or inside the geocoder bbox
-    of the city), return ``{"name","lat","lng","precision":"place",
-    "source":"first_named_place"}``. A result elsewhere (same-named place abroad)
-    is refused. Best-effort; never raises."""
+    existing ``_wikidata_name_lookup`` and, on a miss, the free geocoder ("<name>, <city>"),
+    over the name variants (generic word dropped, diacritics folded). A point inside the
+    province / city (within PLACE_REF_MAX_KM of the coarse centre, or inside its bbox) is
+    returned as ``{"name","lat","lng","precision":"place","source":...}``; a result elsewhere
+    is refused. The outcome is always logged. Best-effort; never raises."""
+    name = ""
     try:
         name = first_named_place(location)
         if not name or name.lower() == (location or "").strip().lower() \
                 and not _PLACE_SPLIT.search((location or "").strip()):
             # A single-name location was already tried whole; nothing new to try.
             return None
-        hit = _wikidata_name_lookup(name, city)
-        if not hit:
-            return None
-        lat, lng = float(hit.get("lat") or 0.0), float(hit.get("lng") or 0.0)
-        if not (lat or lng):
-            return None
-        inside = _haversine_m(coarse_center, (lat, lng)) / 1000.0 <= PLACE_REF_MAX_KM
-        if not inside:
-            bb = _nominatim_bbox(city)
-            inside = bool(bb) and bb[0] <= lat <= bb[1] and bb[2] <= lng <= bb[3]
-        if not inside:
-            print(f"  [LOCAL-901] place reference '{name}' \u2192 {lat:.4f},{lng:.4f} "
-                  f"REFUSED: outside {city!r} (>{PLACE_REF_MAX_KM:.0f} km from its centre, "
-                  f"not in its bbox)")
-            return None
-        print(f"  [LOCAL-901] place reference '{name}' \u2192 {lat:.4f},{lng:.4f} (first_named_place)")
-        return {"name": name, "lat": lat, "lng": lng,
-                "precision": "place", "source": "first_named_place"}
+        gfn = geocode_fn or _default_free_geocode
+        bb_cache: List = []
+
+        def _inside(lat, lng) -> bool:
+            if _haversine_m(coarse_center, (lat, lng)) / 1000.0 <= PLACE_REF_MAX_KM:
+                return True
+            if not bb_cache:
+                bb_cache.append(_nominatim_bbox(city))
+            bb = bb_cache[0]
+            return bool(bb) and bb[0] <= lat <= bb[1] and bb[2] <= lng <= bb[3]
+
+        tried = []
+        for variant in place_name_variants(name):
+            for src in ("wikidata", "geocoder"):
+                try:
+                    if src == "wikidata":
+                        hit = _wikidata_name_lookup(variant, city)
+                        pt = (float(hit.get("lat") or 0.0), float(hit.get("lng") or 0.0)) if hit else None
+                    else:
+                        g = gfn(f"{variant}, {city}" if city else variant)
+                        pt = (float(g[0]), float(g[1])) if g else None
+                except Exception:
+                    pt = None
+                if not pt or not (pt[0] or pt[1]):
+                    continue
+                if not _inside(pt[0], pt[1]):
+                    tried.append(f"{variant!r}->outside")
+                    print(f"  [LOCAL-901] place reference '{variant}' \u2192 {pt[0]:.4f},{pt[1]:.4f} "
+                          f"REFUSED: outside {city!r} (>{PLACE_REF_MAX_KM:.0f} km from its centre, "
+                          f"not in its bbox)")
+                    continue
+                source = "first_named_place" if src == "wikidata" else "first_named_place_geocoder"
+                print(f"  [LOCAL-901] place reference '{name}' \u2192 {pt[0]:.4f},{pt[1]:.4f} ({source})")
+                return {"name": name, "lat": pt[0], "lng": pt[1],
+                        "precision": "place", "source": source}
+        print(f"  [LOCAL-901] place reference '{name}' \u2192 none (wikidata miss"
+              f", geocoder miss{'; ' + ', '.join(tried) if tried else ''})")
+        return None
     except Exception as e:
-        print(f"  [LOCAL-901] place reference skipped (non-fatal): {e}")
+        print(f"  [LOCAL-901] place reference '{name}' \u2192 none (non-fatal error: {e})")
         return None
 
 

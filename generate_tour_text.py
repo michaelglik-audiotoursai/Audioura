@@ -19378,6 +19378,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
         for i, p in enumerate(poi_list):
             p["stop_number"] = i + 1
 
+        # [LOCAL-902] "A and the B, <Province>": each named place is a required stop with its own title.
+        try:
+            import required_places_902 as _rp902
+            _req902 = _rp902.required_places(location) if not forced_stops else []
+            if _req902:
+                poi_list = _rp902.ensure_required_stops(
+                    poi_list, _req902, _new_poi, max_stops=max(total_stops or 0, len(_req902)), log=print)
+        except Exception as _rp902e:
+            print(f"  [LOCAL-902] required places skipped (non-fatal): {_rp902e}")
+
         # [LOCAL-326] Phase-boundary cost checkpoint: before Phase 3B.
         # Saves Phase 3B + Phase 5 on breach.
         _check_phase_boundary_cost(total_cost, "pre-Phase3B")
@@ -30701,6 +30711,15 @@ REWRITE RULES (all mandatory):
         except Exception as _e897:
             print(f"  [LOCAL-897] route-place references skipped (non-fatal): {_e897}")
             _route_refs_897 = None
+        _coarse_center_902 = None    # [LOCAL-902] the area resolver's centre: scope judge for a model-only tour
+        try:
+            _ar902 = locals().get('_area')
+            if _ar902 is not None and (getattr(_ar902, 'center_lat', 0) or getattr(_ar902, 'center_lng', 0)):
+                _coarse_center_902 = (_ar902.center_lat, _ar902.center_lng)
+                if getattr(_ar902, 'place_ref_precision', '') == 'place':
+                    _coarse_center_902 = (_ar902.place_ref_lat, _ar902.place_ref_lng)
+        except Exception:
+            _coarse_center_902 = None
         print(f"  [LOCAL-791C] pin snap: scope={_pin_scope_791c!r} "
               f"center={_pin_center_791c} bbox={_pin_bbox_803} "
               f"venue_fallback={_pin_venue_fallback_813} "
@@ -30712,10 +30731,16 @@ REWRITE RULES (all mandatory):
             city_centroid=_pin_center_791c, route_box=_route_box_896,
             route_refs=_route_refs_897,
             scope_precision=((intent.get('scope_precision') or '') if isinstance(intent, dict) else ''),
+            coarse_center=_coarse_center_902,
             is_user_stop_fn=lambda _p: bool(
                 _p.get('user_explicit') or _p.get('_anchor')
                 or _is_user_stop_title(_p.get('name'))),
             log=print)
+        try:   # [LOCAL-902] a model-written Address is kept only if it agrees with the reference's district
+            from pin_snap import verify_addresses as _va902
+            _va902(poi_list, _snap_rows_791c, scope=_pin_scope_791c, log=print)
+        except Exception as _va902e:
+            print(f"  [LOCAL-902] address check skipped (non-fatal): {_va902e}")
         _n_snapped_791c = sum(1 for r in _snap_rows_791c if r.get("snapped"))
         _n_noref_791c = sum(1 for r in _snap_rows_791c if r.get("reference") is None)
         # [LOCAL-858] Stops whose centroid pin was cleared (never shipped as a real

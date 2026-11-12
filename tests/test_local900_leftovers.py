@@ -93,7 +93,7 @@ def test_sensory_body_no_road_on_summit_and_short_name():
 def test_honest_body_uses_same_site_neighbour_sentence():
     import strict_grounding_gate as sgg
     honest = " ".join(sgg.sensory_body("x", [sgg.NO_HISTORY_DISCLOSURE], 3, register="driving"))
-    t = _stops(("Gamma Peak", "5.0, 5.0", "Mountain", "Body about the peak is here for you.", "Continue to The cable car ascent."),
+    t = _stops(("Gamma Peak", "5.0, 5.0", "Mountain", "A modern cable car carries visitors up to the top of the peak. Hiking is possible too.", "Continue to The cable car ascent."),
                ("The cable car ascent", "5.0, 5.0", "Cable car ride",
                 "As you pass the cable car ascent, look out at the road. " + sgg.NO_HISTORY_DISCLOSURE, "Walk on to Far Place."),
                ("Far Place", "6.0, 6.0", "Hall", "Body of the far place is here.", None))
@@ -104,7 +104,7 @@ def test_honest_body_uses_same_site_neighbour_sentence():
     assert "A modern cable car carries visitors up to the top of the peak." in blk and "road" not in blk
     # a stop at another site does not borrow
     t2 = t.replace("5.0, 5.0\nType/Specialty: Cable", "9.0, 9.0\nType/Specialty: Cable")
-    assert "modern cable car carries" not in rc.rebuild_honest_bodies(t2, ev)
+    assert "modern cable car carries" not in rc.rebuild_honest_bodies(t2, ev).split("Stop 2")[1]
     assert honest
 
 
