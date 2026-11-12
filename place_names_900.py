@@ -110,30 +110,75 @@ def _hav(a, b) -> float:
     return 2 * 6371.0 * math.asin(math.sqrt(h))
 
 
+# [LOCAL-900B] how specific a reference point is. A pin is a PLACE; only a reference at least that specific may
+# replace it. A province / region / country centroid (wave 47: Binh Thuan 11.0833,108.0833, 35 km from the site)
+# is never the truth about a place pin.
+PRECISION_RANK = {"country": 0, "region": 1, "province": 1, "state": 1, "city": 2, "town": 2, "district": 3,
+                  "neighbourhood": 3, "neighborhood": 3, "place": 4, "poi": 4, "building": 4, "destination": 4}
+_STOP_PRECISION = "place"
+
+
+def _rank(precision: str) -> int:
+    return PRECISION_RANK.get((precision or "").strip().lower(), -1)
+
+
+def stop_verified_reference(p: dict) -> Optional[Tuple[float, float]]:
+    """A coordinate already fetched and verified for THIS stop (its Wikidata P625), or None."""
+    try:
+        la, lo = p.get("wikidata_lat"), p.get("wikidata_lng")
+        if la is not None and lo is not None:
+            return (float(la), float(lo))
+    except (TypeError, ValueError):
+        pass
+    return None
+
+
 def check_pins_against_scope(stops: List[dict], scope_center: Optional[Tuple[float, float]],
                              scope_precision: str = "", parse: Optional[Callable] = None,
-                             log: Optional[Callable] = None) -> int:
-    """Used when GEO-CHECK is skipped (< 3 pinned stops). A stop pin farther than the scope radius from the
-    scope geocode (already computed/cached by the pipeline) is replaced by the scope geocode, flagged
-    approximate. Mutates ``stops``; returns the number replaced. No network call."""
-    if not scope_center or not stops:
+                             log: Optional[Callable] = None, ref_precision: str = "place",
+                             ref_source: str = "") -> int:
+    """Used when GEO-CHECK is skipped (< 3 pinned stops). A stop pin farther than the scope radius from a
+    reference is replaced by that reference, flagged approximate. Mutates ``stops``; returns the number
+    replaced. No network call.
+
+    [LOCAL-900B] The reference must be a place-level point: the stop's own verified coordinate (Wikidata P625
+    already on the stop), or ``scope_center`` when ``ref_precision`` says it is the geocode of the requested place
+    itself. A coarser reference (district / city / province / country centroid -- ``ref_precision`` below place)
+    never replaces a pin: ``action=skipped_coarse_ref``. The default ``ref_precision='place'`` keeps the original
+    contract for a caller that vouches for its centre; the pipeline always passes the real precision."""
+    if not stops:
         return 0
     radius = SCOPE_RADIUS_KM.get((scope_precision or "").upper(), 25.0)
     parse = parse or (lambda s: (lambda m: (float(m.group(1)), float(m.group(2))) if m else None)(
         re.match(r"\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)", s or "")))
+    centre_ok = bool(scope_center) and _rank(ref_precision) >= _rank(_STOP_PRECISION)
     n = 0
     for i, p in enumerate(stops, 1):
         c = parse(p.get("coordinates", "")) if isinstance(p.get("coordinates"), str) else p.get("coordinates")
         if not c:
             continue
-        d = _hav(c, scope_center)
+        own = stop_verified_reference(p)
+        ref, why = (own, "stop_verified") if own else ((scope_center, ref_source or "scope") if centre_ok else (None, ""))
+        if ref is None:
+            if scope_center:
+                d = _hav(c, scope_center)
+                if d > radius and log:
+                    log(f"  [LOCAL-900] pin check stop={i} dist_km={d:.1f} action=skipped_coarse_ref "
+                        f"ref_precision={ref_precision or 'unknown'} ref_source={ref_source or 'unknown'}")
+                elif log:
+                    log(f"  [LOCAL-900] pin check stop={i} dist_km={d:.1f} action=kept")
+            continue
+        d = _hav(c, ref)
         if d > radius:
-            p["coordinates"] = f"{scope_center[0]:.6f}, {scope_center[1]:.6f}"
+            p["coordinates"] = f"{ref[0]:.6f}, {ref[1]:.6f}"
             p["coordinates_approximate"] = True
             n += 1
             act = "replaced"
         else:
             act = "kept"
         if log:
-            log(f"  [LOCAL-900] pin check stop={i} dist_km={d:.1f} action={act}")
+            log(f"  [LOCAL-900] pin check stop={i} dist_km={d:.1f} action={act} ref={why}")
+    if log:
+        log(f"  [LOCAL-900B] pin check reference: center={scope_center} precision={ref_precision or 'unknown'} "
+            f"source={ref_source or 'unknown'} usable={'yes' if centre_ok else 'no (coarser than a place)'}")
     return n

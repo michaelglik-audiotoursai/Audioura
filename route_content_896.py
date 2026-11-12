@@ -786,13 +786,18 @@ def _scenery_clause(directions_text: str) -> Optional[str]:
     return None
 
 
-def normalize_directions(tour_text: str, log: Optional[Callable] = None, walk_km: float = 1.0) -> str:
+def normalize_directions(tour_text: str, log: Optional[Callable] = None, walk_km: float = 1.0,
+                         force: bool = False, max_km: Optional[float] = None) -> str:
     """[LOCAL-898] On a route a Directions line holds only: ``Continue to <next>.`` (``Walk on to
     <next>.`` when the next stop is under ``walk_km`` away or shares the pin), ``It is roughly D km
     away.`` when both ends are pinned and the stops are >= walk_km apart, and at most ONE scenery
     clause. No turns, road names, compass points, model minutes, or "retrace / descend". The last
-    stop is left alone."""
-    if not active() or not tour_text:
+    stop is left alone.
+
+    [LOCAL-900B] ``force`` runs the same reduction on a tour that is not a described route (the single-place
+    path); ``max_km`` is a distance no real leg of that tour exceeds: a longer one is a pin bug, logged loudly
+    and left out of the line ("Continue to X.")."""
+    if (not active() and not force) or not tour_text:
         return tour_text
     blocks = _stop_blocks(tour_text)
     out, pos = [], 0
@@ -807,6 +812,11 @@ def normalize_directions(tour_text: str, log: Optional[Callable] = None, walk_km
             d = _km(a, b) if a and b else None
             import place_names_900 as _pn900
             _nm = _pn900.short_place_name(nxt[3])          # [LOCAL-900] a short place name, not the raw title
+            if d is not None and max_km is not None and d > max_km:
+                if log:
+                    log(f"  [LOCAL-900B] BUG SIGNAL: Stop {num} -> next stop is {d:.1f} km apart "
+                        f"(> {max_km:.0f} km on a single-place tour); the pins are wrong. Distance left out.")
+                d = None
             if d is not None and d < walk_km:
                 line = f"Walk on to {_nm}."
             else:
@@ -1023,6 +1033,9 @@ _HONEST_SKELETON = re.compile(
     r"feel the height")
 
 
+_HONEST_DONE: set = set()      # [LOCAL-900B] folded bodies this module has already produced
+
+
 def rebuild_honest_bodies(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                           log: Optional[Callable] = None) -> str:
     """[LOCAL-900] The D760 honest body of a route stop is rebuilt with (a) the SHORT place name, (b) the
@@ -1053,6 +1066,12 @@ def rebuild_honest_bodies(tour_text: str, evidence_by_title: Optional[Dict[str, 
             honest = " ".join(sgg.sensory_body(title, [sgg.NO_HISTORY_DISCLOSURE], sgg.MIN_NO_EVIDENCE_SENTENCES - 1,
                                                register="driving", kind_text=tm.group(1) if tm else "",
                                                supported_sentence=neigh))
+            if fold(text) in _HONEST_DONE and (not neigh or fold(neigh) in fold(text)):
+                # [LOCAL-900B] this body is already the output of an earlier rebuild (finalize_898 runs more than
+                # once): a second pass, possibly without the evidence, must not overwrite the neighbour sentence
+                pieces.append(block)
+                continue
+            _HONEST_DONE.add(fold(honest))
             if fold(honest) != fold(text):
                 lines[body[0]] = honest
                 for i in body[1:]:
@@ -1163,13 +1182,12 @@ def consistent_superlatives(tour_text: str, evidence_by_title: Optional[Dict[str
                 for x in sents:
                     hit = [g for g in _m if g["text"] == x]
                     if hit:
-                        y = _cut_clause(x, hit[0])
+                        # [LOCAL-900B] the WHOLE sentence goes. Cutting only the clause left "Ta Cu Mountain is
+                        # home to." and "This pagoda is home to, measuring 49 meters in length."
                         if log:
                             log(f"  [LOCAL-900] Stop {_n} '{_t[:40]}': conflicting superlative -> "
-                                f"{'clause' if y else 'sentence'} dropped: \"{x[:90]}\"")
-                        if y is None:
-                            continue
-                        x = y
+                                f"sentence dropped: \"{x[:90]}\"")
+                        continue
                     out.append(x)
                 return out
             block = _rewrite_prose(block, fix)
@@ -1200,8 +1218,11 @@ def cap_unsupported_numbers(tour_text: str, evidence_by_title: Optional[Dict[str
         pieces.append(tour_text[pos:s])
         block = tour_text[s:e]
         pos = e
-        ev = ev_map.get(fold(title))
+        ev = _ev_for(ev_map, title)
         if ev is None:
+            if log:
+                log(f"  [LOCAL-900B] Stop {num} '{title[:40]}': no evidence entry under this title; measurements "
+                    f"are NOT checked for it")
             pieces.append(block)
             continue
         have = _ev_numbers(str(ev)) | _ev_numbers(title)
@@ -1232,6 +1253,222 @@ def cap_unsupported_numbers(tour_text: str, evidence_by_title: Optional[Dict[str
 
 
 
+# ══ [LOCAL-900B] wave 47 ════════════════════════════════════════════════════
+_DANGLE_END = {"to", "of", "in", "at", "by", "for", "with", "from", "into", "than", "as", "the", "a", "an", "and",
+               "or", "but", "is", "are", "was", "were", "has", "have", "had", "that", "which", "measuring",
+               "covering", "spanning", "stretching", "standing", "reaching"}
+_PARTICIPLE_OPEN = re.compile(r"(?i)^(?:measuring|covering|spanning|stretching|standing|reaching)\b")
+_EMPTY_CLAUSE = re.compile(r"(?i),\s*,|\b(?:to|of|at|by|with|than)\s*,\s*(?:measuring|covering|spanning|standing|"
+                           r"stretching|reaching|which|and)\b|\b(?:covers?|spans?)\s+of\s+the\b")
+
+
+def is_fragment(sentence: str) -> bool:
+    """A sentence that is not whole: it ends on a preposition / article / dangling verb, opens with a comma or a
+    bare participle, or holds an empty clause between commas."""
+    x = (sentence or "").strip()
+    if not x:
+        return False
+    core = x.rstrip(" .!?;:\"'\u201d)")
+    if not core:
+        return True
+    if x[0] in ",;" or _PARTICIPLE_OPEN.match(x):
+        return True
+    last = _words(core.split()[-1]) if core.split() else []
+    if last and last[-1] in _DANGLE_END:
+        return True
+    return bool(_EMPTY_CLAUSE.search(x))
+
+
+def drop_fragments(tour_text: str, log: Optional[Callable] = None, force: bool = False) -> str:
+    """[LOCAL-900B] Final guard over every stop body (and Orientation): a sentence that is a fragment goes, whole.
+    A body (or Orientation) emptied by it is left as it was only when ALL its sentences are fragments and the
+    stop would otherwise be silent; an emptied Orientation line is removed."""
+    if (not active() and not force) or not tour_text:
+        return tour_text
+    pieces, pos = [], 0
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        lines = block.split("\n")
+        for i, ln in enumerate(lines):
+            if i == 0 or not ln.strip():
+                continue
+            mo = re.match(r"(?i)^(\s*orientation\s*:\s*)(.*)$", ln)
+            if _KEYED.match(ln) and not mo:
+                continue
+            head, txt = (mo.group(1), mo.group(2)) if mo else ("", ln)
+            sents = split_sentences(txt)
+            closing = next((k for k, x in enumerate(sents) if _CLOSING_LINE.match(x)), len(sents))
+            own, tail = sents[:closing], sents[closing:]
+            keep = [x for x in own if not is_fragment(x)]
+            if len(keep) == len(own):
+                continue
+            for x in own:
+                if is_fragment(x) and log:
+                    log(f"  [LOCAL-900B] Stop {num} '{title[:40]}': fragment sentence dropped: \"{x[:90]}\"")
+            new = " ".join(keep + tail)
+            lines[i] = (head + new) if new.strip() else (None if mo else "")
+        new_block = "\n".join(x for x in lines if x is not None)
+        if not any(ln.strip() and not _KEYED.match(ln) for ln in new_block.split("\n")[1:]):
+            if log:
+                log(f"  [LOCAL-900B] Stop {num} '{title[:40]}': every sentence is a fragment; body left as it was")
+            new_block = block                  # never an emptied stop (fill_empty_bodies owns that on a route)
+        pieces.append(new_block)
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+_CARRY_FILLER = re.compile(r"(?i)^.{2,120}?\bis one you might carry with you[.!]?$")
+
+
+def drop_carry_filler(tour_text: str, log: Optional[Callable] = None) -> str:
+    """[LOCAL-900B] The closing filler "<X> is one you might carry with you." names a stop and says nothing."""
+    if not tour_text or "carry with you" not in tour_text.lower():
+        return tour_text
+    out = []
+    for ln in tour_text.split("\n"):
+        if "carry with you" in ln.lower():
+            sents = split_sentences(ln)
+            keep = [x for x in sents if not _CARRY_FILLER.match(x)]
+            if len(keep) != len(sents):
+                if log:
+                    log("  [LOCAL-900B] closing filler '... is one you might carry with you.' dropped")
+                ln = " ".join(keep)
+                if not ln.strip():
+                    continue
+        out.append(ln)
+    return "\n".join(out)
+
+
+def apply_single_place_guards(tour_text: str, log: Optional[Callable] = None, max_stops: int = 2,
+                              max_km: float = 100.0) -> str:
+    """[LOCAL-900B] Guards that are not specific to a described route, for the delivery path of any tour: the
+    carry-with-you filler goes, fragment sentences go, and a tour of at most ``max_stops`` stops (the single-place
+    path, where the 898 normalizer never ran) gets its Directions reduced to the template, with a leg over
+    ``max_km`` treated as a pin bug (logged, no distance spoken)."""
+    if not tour_text:
+        return tour_text
+    t = drop_carry_filler(tour_text, log)
+    t = drop_fragments(t, log, force=True)
+    if not active() and len(_stop_blocks(t)) <= max_stops:
+        t = normalize_directions(t, log, force=True, max_km=max_km)
+    return t
+
+
+def _ev_for(ev_map: Dict[str, str], title: str) -> Optional[str]:
+    """The evidence for a stop title: exact folded key, else a key that contains / is contained in it."""
+    f = fold(title)
+    if f in ev_map:
+        return ev_map[f]
+    for k, v in ev_map.items():
+        if k and f and (k in f or f in k):
+            return v
+    return None
+
+
+_COMPARATIVE = re.compile(r"(?i)\b(?:larger|bigger|taller|longer|older|higher|smaller|greater|wider|deeper)\s+than\b")
+_CAP_WORD = re.compile(r"\b[A-ZÀ-Ỹ][^\W\d_]{2,}")
+
+
+def drop_unsupported_comparatives(tour_text: str, evidence_by_title: Optional[Dict[str, str]],
+                                  log: Optional[Callable] = None) -> str:
+    """[LOCAL-900B] "larger than the statues at <A> and <B> in <C>": a comparison with other NAMED places that the
+    stop's own evidence does not state. The whole sentence goes. Stops with no evidence entry are untouched."""
+    if not active() or not tour_text or not evidence_by_title:
+        return tour_text
+    ev_map = {fold(str(k)): v for k, v in evidence_by_title.items()}
+    pieces, pos = [], 0
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        ev = _ev_for(ev_map, title)
+        if ev is None:
+            pieces.append(block)
+            continue
+        have = set(_words(str(ev))) | set(_words(title))
+
+        def fix(sents: List[str], _n=num, _t=title, _have=have) -> List[str]:
+            out = []
+            for x in sents:
+                m = _COMPARATIVE.search(x)
+                if m:
+                    names = [w for w in _CAP_WORD.findall(x[m.end():])]
+                    if names and any(fold(w) not in _have for w in names):
+                        if log:
+                            log(f"  [LOCAL-900B] Stop {_n} '{_t[:40]}': comparison with other places not in the "
+                                f"evidence -> sentence dropped: \"{x[:90]}\"")
+                        continue
+                out.append(x)
+            return out
+        pieces.append(_rewrite_prose(block, fix))
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+_YEAR = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
+_BY_CREATOR = re.compile(r"(?i)\bby\s+(?:the\s+)?(?:sculptor|architect|artist|monk|master|designer|builder|painter)\s+"
+                         r"((?:[A-ZÀ-Ỹ][^\W\d_]+\s*){1,4})")
+
+
+def cap_unsupported_facts(tour_text: str, evidence_by_title: Optional[Dict[str, str]],
+                          log: Optional[Callable] = None) -> str:
+    """[LOCAL-900B] A year, or a "by sculptor <Name>" creator, that neither the stop's evidence nor its title holds:
+    the clause (or sentence) carrying it goes. Stops with no evidence entry are untouched (logged)."""
+    if not active() or not tour_text or not evidence_by_title:
+        return tour_text
+    ev_map = {fold(str(k)): v for k, v in evidence_by_title.items()}
+    pieces, pos = [], 0
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        ev = _ev_for(ev_map, title)
+        if ev is None:
+            if log:
+                log(f"  [LOCAL-900B] Stop {num} '{title[:40]}': no evidence entry under this title; years / "
+                    f"creators / measurements are NOT checked for it")
+            pieces.append(block)
+            continue
+        evw, evtxt = set(_words(str(ev))), str(ev)
+
+        def bad_in(x: str) -> List[str]:
+            out = [m.group(0) for m in _YEAR.finditer(x) if m.group(0) not in evtxt and m.group(0) not in title]
+            for m in _BY_CREATOR.finditer(x):
+                toks = [fold(w) for w in m.group(1).split()]
+                if toks and not all(t in evw for t in toks):
+                    out.append(m.group(0).strip())
+            return out
+
+        def fix(sents: List[str], _n=num, _t=title) -> List[str]:
+            out = []
+            for x in sents:
+                bad = bad_in(x)
+                if not bad:
+                    out.append(x)
+                    continue
+                parts = re.split(r"(?i),\s*(?:and|but|which)\s+|;\s*|,\s+(?=built|created|made|carved|sculpted)", x)
+                keep = [p for p in parts if not bad_in(p)]
+                y = " ".join(keep).strip() if keep and len(parts) > 1 else ""
+                if not y:
+                    # "..., built in 1963 by sculptor X." -> keep the head before the first bad comma clause
+                    head = re.split(r",\s+", x)[0]
+                    y = head if len(parts) == 1 and len(re.split(r",\s+", x)) > 1 and not bad_in(head) else ""
+                if y:
+                    y = y[0].upper() + y[1:]
+                    y = y if y[-1] in ".!?" else y + "."
+                if log:
+                    log(f"  [LOCAL-900B] Stop {_n} '{_t[:40]}': '{bad[0]}' not in the evidence -> "
+                        f"{'clause' if y and len(y.split()) >= 5 else 'sentence'} dropped: \"{x[:90]}\"")
+                if y and len(y.split()) >= 5 and not is_fragment(y):
+                    out.append(y)
+            return out
+        pieces.append(_rewrite_prose(block, fix))
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
 def finalize_898(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                  log: Optional[Callable] = None) -> str:
     """[LOCAL-898] The route text leftovers, in order: creators agree, no emptied body, body above
@@ -1241,9 +1478,13 @@ def finalize_898(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = N
     t = consistent_creators(tour_text, evidence_by_title, log)
     t = consistent_superlatives(t, evidence_by_title, log)          # [LOCAL-900]
     t = cap_unsupported_numbers(t, evidence_by_title, log)          # [LOCAL-900]
+    t = cap_unsupported_facts(t, evidence_by_title, log)            # [LOCAL-900B] years / creators
+    t = drop_unsupported_comparatives(t, evidence_by_title, log)    # [LOCAL-900B]
+    t = drop_fragments(t, log)                                      # [LOCAL-900B] whole sentences only
     t = fill_empty_bodies(t, log)
     t = rebuild_honest_bodies(t, evidence_by_title, log)            # [LOCAL-900]
     t = order_directions_last(t, log)
     t = normalize_directions(t, log)
     t = distinct_type_specialty(t, log)
+    t = drop_fragments(t, log)                                      # [LOCAL-900B] after the rebuilds, too
     return t

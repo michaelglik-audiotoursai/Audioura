@@ -121,7 +121,8 @@ def test_superlative_both_supported_keeps_titled_stop():
           "The Reclining Buddha": "the biggest reclining Buddha in Zedland"}
     out = rc.consistent_superlatives(SUP, ev)
     assert "longest" not in out and "biggest reclining Buddha statue in Zedland" in out
-    assert "20 meters long" in out and "A stair climbs the slope." in out
+    # [LOCAL-900B] the whole sentence goes, never a clause ("The statue is 20 meters long and ..." leaves no stub)
+    assert "20 meters long" not in out and "A stair climbs the slope." in out
 
 
 def test_superlative_only_one_supported():

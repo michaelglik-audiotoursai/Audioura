@@ -1,0 +1,12 @@
+15:23:15 GEO-CHECK: all 8 stops within driving distance (max leg 24.76 km, total 82.01 km, limit 400 km)
+15:29:27 [LOCAL-472] UNGROUNDED entity stop='The Reclining Buddha' entity='Rho Temple' reason='No concrete link ...' (551 Stop 7 still kept a Rho Temple comparison)
+15:33:10 [LOCAL-900] Stop 4: conflicting superlative -> clause dropped: "Gamma Mountain is home to the longest reclining Buddha statue in Southeast Asia."
+15:33:10 [LOCAL-900] Stop 6: conflicting superlative -> clause dropped: "This pagoda is home to the largest Buddha statue in Southeast Asia, measuring 49 meters in"
+15:33:10.37 [LOCAL-900] Stop 5: honest body rebuilt (short name, kind=height, neighbour sentence=yes)
+15:33:10.85 [LOCAL-900] Stop 5: honest body rebuilt (short name, kind=height, neighbour sentence=no)
+--- 552 job ---
+15:36:07 GEO-CHECK: skipped (fewer than 3 stops have coordinates)
+15:36:07 [LOCAL-900] pin check stop=1 dist_km=44.0 action=replaced
+15:36:07 [LOCAL-900] pin check stop=2 dist_km=31.6 action=replaced
+15:36:07 Extracted first POI coordinates: (11.083333, 108.083333)   <- Kappa PROVINCE centroid; real site ~10.81,107.89
+15:38:41 [LOCAL-791C] pin snap Reclining Buddha Statue 875994m -> 13.748056,100.491111 (wikidata_p625)   <- same-named statue in another country

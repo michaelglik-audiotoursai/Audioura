@@ -568,6 +568,26 @@ def snap_pin(title: str,
 
 
 _ROUTE_PLACE_KEEP_M = 3000.0
+_SNAP_RADIUS_KM = {"BUILDING": 15.0, "CORRIDOR": 15.0, "DISTRICT": 15.0, "CITY": 25.0}
+_ROUTE_MARGIN_KM = 10.0
+
+
+def _snap_outside_scope(shipped, ref, scope_precision: str = "", route_box=None) -> str:
+    """[LOCAL-900B] '' when the snap is within scope, else a short reason. ROUTE: the reference must lie inside the
+    route box + 10 km. Otherwise: moving the pin more than the scope radius is rejected (unknown precision or no
+    shipped pin: no distance test)."""
+    import math
+    if route_box and len(route_box) >= 4:
+        m_lat = _ROUTE_MARGIN_KM / 111.0
+        m_lng = _ROUTE_MARGIN_KM / (111.0 * max(0.2, math.cos(math.radians((route_box[0] + route_box[1]) / 2.0))))
+        inside = (route_box[0] - m_lat <= ref[0] <= route_box[1] + m_lat
+                  and route_box[2] - m_lng <= ref[1] <= route_box[3] + m_lng)
+        return "" if inside else "outside the route box + 10 km"
+    radius = _SNAP_RADIUS_KM.get((scope_precision or "").upper())
+    if radius is None or shipped is None:
+        return ""
+    km = _haversine_m(shipped, ref) / 1000.0
+    return f"moves the pin {km:.0f} km > {radius:.0f} km" if km > radius else ""
 
 
 def snap_poi_coordinates(poi_list: List[Dict],
@@ -586,6 +606,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          is_user_stop_fn: Optional[Callable[[Dict], bool]] = None,
                          route_box: Optional[Sequence[float]] = None,
                          route_refs: Optional[Dict[int, Dict]] = None,
+                         scope_precision: str = "",
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -689,8 +710,25 @@ def snap_poi_coordinates(poi_list: List[Dict],
                 row.update({"snapped": True, "new_coordinate": _ref, "reference": _ref, "source": "route_place",
                             "distance_m": _haversine_m(coord, _ref) if coord is not None else None,
                             "reason": f"route place {_rr['place']!r} is the reference ({_rr['why']})"})
+        # [LOCAL-900B] SCOPE GUARD on every snap (authority or not). A same-named place elsewhere in the world must
+        # never win: wave 47 snapped "Reclining Buddha Statue" to the statue in another country (876 km, a Wikidata
+        # P625). A snap that moves the pin farther than the scope radius (DISTRICT/BUILDING/CORRIDOR 15 km, CITY
+        # 25 km), or on a route lands outside the route box + 10 km, is rejected; the shipped pin stays.
+        if row.get("snapped") and row.get("new_coordinate"):
+            _rej = _snap_outside_scope(coord, tuple(row["new_coordinate"]), scope_precision, route_box)
+            if _rej:
+                _dm = row.get("distance_m")
+                if _dm is None and coord is not None:
+                    _dm = _haversine_m(coord, tuple(row["new_coordinate"]))
+                row.update({"snapped": False, "reference": tuple(row["new_coordinate"]), "new_coordinate": None,
+                            "rejected_900b": True,
+                            "reason": f"snap rejected {('%.0f' % _dm) if _dm is not None else '?'}m (outside scope: {_rej})"})
+                emit(f"[LOCAL-900B] snap rejected {title} "
+                     f"{('%.0f' % _dm) if _dm is not None else '?'}m (outside scope)")
         rows.append(row)
-        if row["snapped"] and row["new_coordinate"]:
+        if row.get("rejected_900b"):
+            pass
+        elif row["snapped"] and row["new_coordinate"]:
             lat, lng = row["new_coordinate"]
             poi["coordinates"] = f"{lat:.6f}, {lng:.6f}"
             if "latitude" in poi or "longitude" in poi:
