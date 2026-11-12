@@ -1219,6 +1219,66 @@ def _parse_gen_updated_at(ts):
         return None
 
 
+# [LOCAL-901] A /status reply from the generator with status='processing' and a
+# heartbeat_at / updated_at newer than this is ALIVE, whichever generator instance
+# (or DB fallback) produced it. Belt-and-braces to the generator's durable ticker.
+_POLL_FRESH_SECONDS = 90
+
+
+def _status_ts_age_seconds(ts, now):
+    """Age in seconds of an ISO timestamp from a /status reply, or None.
+    Timezone-aware values are converted to local naive; a timestamp more than 5 s
+    in the FUTURE (clock skew / bad tz) is not trusted as fresh -> None."""
+    if not ts:
+        return None
+    try:
+        s = str(ts)
+        if s.endswith('Z'):
+            s = s[:-1] + '+00:00'
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is not None:
+            dt = dt.astimezone().replace(tzinfo=None)
+        age = (now - dt).total_seconds()
+        return age if age >= -5 else None
+    except Exception:
+        return None
+
+
+class StallWatchdog:
+    """[LOCAL-901] The orchestrator's no-progress watchdog, extracted from the
+    poll loop so it is unit-testable with a fake clock.
+
+    observe() is called with every good /status reply; any of
+      * a changed (progress, updated_at, heartbeat_at) marker (LOCAL-622), or
+      * status='processing' with heartbeat_at/updated_at younger than
+        fresh_seconds (LOCAL-901 belt-and-braces)
+    resets the stall clock. stalled_for() is what the poll loop compares to the
+    5-minute limit."""
+
+    def __init__(self, now, fresh_seconds=_POLL_FRESH_SECONDS):
+        self.fresh_seconds = fresh_seconds
+        self.marker = None
+        self.last_progress_at = now
+
+    def observe(self, status_data, now):
+        progress = status_data.get('progress', 'Processing...')
+        marker = (progress, status_data.get('updated_at'), status_data.get('heartbeat_at'))
+        alive = marker != self.marker
+        self.marker = marker
+        if not alive and (status_data.get('status') or '').strip().lower() == 'processing':
+            for key in ('heartbeat_at', 'updated_at'):
+                age = _status_ts_age_seconds(status_data.get(key), now)
+                if age is not None and age <= self.fresh_seconds:
+                    alive = True
+                    break
+        if alive:
+            self.last_progress_at = now
+        return alive
+
+    def stalled_for(self, now):
+        return now - self.last_progress_at
+
+
 def _tour_already_stored_for_job(job_id):
     """[LOCAL-821] Idempotency guard for resume/sweep: has this orchestrator job
     already been delivered?
@@ -2385,6 +2445,7 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
         _poll_started_at = datetime.now()
         _last_progress_marker = None                  # (progress_str, updated_at)
         _last_progress_at = datetime.now()
+        _stall_wd = StallWatchdog(_last_progress_at)  # [LOCAL-901]
         _POLL_TIMEOUT = 30  # seconds; status endpoint is trivial, this measures event-loop busy-ness
         _poll_failure_start_1 = None
         # [LOCAL-775 / D718] A 404 "Job not found" from the generator is no longer
@@ -2500,10 +2561,10 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
                     # as "the generator is alive and working". updated_at is the
                     # stronger signal (DB-backed store) but may be absent, so the
                     # progress-string change is the always-available fallback.
-                    _marker = (progress, status_data.get('updated_at'), status_data.get('heartbeat_at'))  # heartbeat: worker thread alive (LEAD 2026-10-08)
-                    if _marker != _last_progress_marker:
-                        _last_progress_marker = _marker
-                        _last_progress_at = datetime.now()
+                    # [LOCAL-901] marker change OR a fresh (<=90 s) heartbeat/updated_at on a
+                    # 'processing' reply resets the stall clock (StallWatchdog).
+                    _stall_wd.observe(status_data, datetime.now())
+                    _last_progress_at = _stall_wd.last_progress_at
                     time.sleep(10)
             elif status_response.status_code == 404:
                 # [LOCAL-775 / D718] "Job not found". With the generator_jobs

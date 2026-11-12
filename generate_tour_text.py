@@ -6492,6 +6492,16 @@ _J = _jss.attach_to_module(__name__, {
 _THIN_FACTS_SINK = {}
 
 
+def _hb_beat(job_id, label=""):
+    """[LOCAL-901] Phase/stop heartbeat for the job's durable liveness stamp.
+    No-op without a registered job; never raises (see job_heartbeat.py)."""
+    try:
+        from job_heartbeat import beat as _beat
+        _beat(job_id, label)
+    except Exception:
+        pass
+
+
 def _thin_sink_key(job_id=None, poi_list=None):
     if job_id:
         return ("job", str(job_id))
@@ -10666,7 +10676,7 @@ def _apply_current_affairs_news(final: str) -> str:
         return final
 
 
-def _apply_delivery_hours_guard(result):
+def _apply_delivery_hours_guard(result, job_id=None):
     """[LOCAL-616 item 1] Run the belt-and-braces delivery guards on the FINAL
     delivered text of EVERY delivery path — not just the fresh/first-tour path
     that already called them inline.
@@ -11558,6 +11568,7 @@ def _apply_delivery_hours_guard(result):
         # locality is never the origin's, and Directions carry no minutes / compass without a pin.
         try:
             import route_content_896 as _rc896f
+            _hb_beat(job_id, "route content pass start")   # [LOCAL-901]
             if _rc896f.active():
                 _before896 = final
                 final = _rc896f.strip_origin_locality(final, log=lambda m: print(m, flush=True))
@@ -11565,6 +11576,7 @@ def _apply_delivery_hours_guard(result):
                 # [LOCAL-897] after the locality strip: body minutes / compass, and no emptied stop body
                 final = _rc896f.strip_body_travel(final, log=lambda m: print(m, flush=True))
                 final = _rc896f.fill_empty_bodies(final, log=lambda m: print(m, flush=True))
+                _hb_beat(job_id, "finalize_898 (delivery)")   # [LOCAL-901]
                 final = _rc896f.finalize_898(final, None, log=lambda m: print(m, flush=True))   # [LOCAL-898]
                 if final != _before896:
                     print("  [LOCAL-896] route content pass changed the delivered text", flush=True)
@@ -11573,6 +11585,7 @@ def _apply_delivery_hours_guard(result):
         # [LOCAL-900B] on every path: fragments, the carry-with-you filler, and (single-place) Directions
         try:
             import route_content_896 as _rc900b
+            _hb_beat(job_id, "single-place guards (delivery)")   # [LOCAL-901]
             final = _rc900b.apply_single_place_guards(final, log=lambda m: print(m, flush=True))
         except Exception as _rc900be:  # pragma: no cover
             _import_logger.error(f"[LOCAL-900B] final guards skipped: {_rc900be}")
@@ -12231,7 +12244,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
             _request_as_sent_894, tour_type, output_file, total_stops,
             persona=persona, user_id=user_id, job_id=job_id, forced_stops=forced_stops, harness=harness,
             exclude_titles=exclude_titles,
-        ))
+        ), job_id=job_id)
 
     with _cost_accumulator.tour_scope(job_id=job_id) as _acc:
         result = _generate_tour_text_impl(
@@ -12247,7 +12260,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     _fold_preflight_cost_into_record(_J._LAST_GENERATION_COST, _outer_preflight_cost)
     # [LOCAL-616 item 1] Final hours guard on the delivered text/file for the
     # fresh / cache / overview paths that funnel through _generate_tour_text_impl.
-    return _apply_delivery_hours_guard(result)
+    return _apply_delivery_hours_guard(result, job_id=job_id)
 
 
 def _fold_preflight_cost_into_record(rec, preflight_cost):
@@ -12729,6 +12742,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     # PHASE 1: Analyze user intent with AI
     _phase_timer.start('intent')
     print(f"\nPHASE 1: Analyzing tour intent with AI...")
+    _hb_beat(job_id, "phase 1")
     # BUG 2 FIX: Mobile app hardcodes tour_type="museum" for ALL requests.
     # Check whether LOCATION ALONE encodes the real category (e.g. "restaurant tour
     # in Newton, MA"). If so, suppress the mobile-injected tour_type so GPT doesn't
@@ -13401,6 +13415,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
 
     # -------- PHASE 3A: names + addresses only --------
     print(f"\nPHASE 3A: Fetching {total_stops} candidate POI(s) for {location}...")
+    _hb_beat(job_id, "phase 3A")
 
     # Museum single-venue constraint: use venue_name from PHASE 1 intent (Claude option b).
     # intent['venue_name'] is set by GPT when the request is for a tour inside a single
@@ -17477,6 +17492,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 and tour_category not in ('walking', 'museum')
                 and not _venue_parts_used):
             print(f"\nPHASE 4: Verifying POIs match requested type '{intent['poi_type']}' (parallel)...")
+            _hb_beat(job_id, "phase 4")
             poi_list, excluded_count = _verify_against_intent(poi_list)
             if excluded_count > 0:
                 print(f"\n! PHASE 4 excluded {excluded_count} POI(s)")
@@ -19550,6 +19566,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         merged['display_title'] = orig['display_title']
                     new_list.append(merged)
                 print(f"OK PHASE 3B: ordered {len(new_list)} stop(s) with structured details and directions")
+                _hb_beat(job_id, "phase 3B done")
                 return new_list
             except Exception as e:
                 print(f"! PHASE 3B exception: {e}; keeping current order")
@@ -19939,7 +19956,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     _osm_source_texts_355 = []
                     _osm_source_urls_355 = []
                     if _stops_are_exhibitions:
-                        _venue_query_name = _museum_venue_name or venue_name
+                        # [LOCAL-901] was `or venue_name` (undefined NameError); fall back to the request location
+                        _venue_query_name = _museum_venue_name or location
                         print(f"  [LOCAL-355] [LOCAL-583] Exhibit-museum: querying OSM ONCE for the "
                               f"museum building '{_venue_query_name}' (not per-exhibition — a show has no OSM node)")
                         _venue_osm = fetch_osm_venue_facts(_venue_query_name, _osm_city, venue_hint='museum', budget=_osm_budget)
@@ -20395,6 +20413,16 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     # centre came from and how specific it is; check_pins_against_scope refuses a coarse one.
                     _c900 = locals().get('_center_858')
                     _src900, _prec900 = 'city_center_for_request', 'city'
+                    # [LOCAL-901] a PLACE-level reference (first named place of the request, resolved by
+                    # area_resolver and bounded to the province) beats any city / province centre.
+                    _arp901 = locals().get('_area')
+                    if (_arp901 is not None and getattr(_arp901, 'place_ref_precision', '') == 'place'
+                            and (getattr(_arp901, 'place_ref_lat', 0) or getattr(_arp901, 'place_ref_lng', 0))):
+                        _c900 = (_arp901.place_ref_lat, _arp901.place_ref_lng)
+                        _src900 = getattr(_arp901, 'place_ref_source', '') or 'first_named_place'
+                        _prec900 = 'place'
+                        print(f"  [LOCAL-901] pin check uses place reference {getattr(_arp901, 'place_ref_name', '')!r} "
+                              f"{_c900} ({_src900})")
                     if not _c900:
                         _ar900 = locals().get('_area')
                         if _ar900 is not None and (getattr(_ar900, 'center_lat', 0) or getattr(_ar900, 'center_lng', 0)):
@@ -21037,6 +21065,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             print(f"  [LOCAL-800] customer-voice pass skipped (non-fatal): {_cv800_err}")
 
 
+    _hb_beat(job_id, "D556 replenish+lore")
     # -------- [D556] REPLENISH + LORE for every OTHER tour type --------
     # Michael, 2026-08-30: "fix all tour type as a replenishment is a general
     # process for any tour."
@@ -21111,6 +21140,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 _gn = _gp.get('name', '')
                 if not _gn or _gp.get('_lore'):
                     continue
+                _hb_beat(job_id, f"D556 lore {_gn[:40]}")
                 _gr = fetch_stop_knowledge(_gn, _gp_city, api_key, focus='place')
                 if not _gr.get('ok'):
                     print(f"  [D556] no lore for '{_gn[:40]}': {_gr.get('reason','')[:50]}")
@@ -22421,6 +22451,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
               f"{_l818_err}", flush=True)
 
     print(f"\nPHASE 5: Generating detailed descriptions for each POI (parallel)...")
+    _hb_beat(job_id, "phase 5 start")
 
     # -------- [LOCAL-382/LOCAL-387] Exhibition thesis / venue purpose framing detection --------
     # Moved here (from post-assembly) so _framing_case is bound before _generate_description
@@ -23627,6 +23658,7 @@ Exempt: navigation directions ("Turn left", "Continue past").
         artist = poi["artist"]
         year = poi["year"]
         _sfp.mark_stop_start(idx)  # [LOCAL-3498] per-stop wall-time start (worker thread)
+        _hb_beat(job_id, f"phase 5 stop {idx + 1} start")
 
         print(f"\nGenerating description for Stop {stop_num}: {poi_name} by {artist}, {year}...")
 
@@ -27144,6 +27176,7 @@ Write the story FIRST, then add physical description if space allows.
         for future in as_completed(futures):
             idx, orientation, description, word_count, tokens_used, call_cost = future.result()
             _sfp.close_stop(idx, detail={'words': word_count})  # [LOCAL-3498] per-stop wall time
+            _hb_beat(job_id, f"phase 5 stop {idx + 1} done")
             poi_list[idx]["orientation"] = orientation
             # [LOCAL-22] Strip any "Stop N:" prefix that GPT echoed into description text.
             # This is the ROOT CAUSE of the stop-title corruption: GPT's description response
@@ -27203,6 +27236,7 @@ Write the story FIRST, then add physical description if space allows.
             from story_gate import verify_stop_story, extract_story_sentences, get_classification_cost, reset_classification_cost
             reset_classification_cost()
             print(f"\n  [LOCAL-439] STORY GATE: checking story-units per stop (D394)...")
+            _hb_beat(job_id, "story gate start")
             _l421_all_pass = True
             for _sg_i, _sg_poi in enumerate(poi_list):
                 _sg_desc = _sg_poi.get('description', '')
@@ -27217,6 +27251,7 @@ Write the story FIRST, then add physical description if space allows.
                     if _sg_matched:
                         _sg_credit = _sg_matched.get('credit_line', '')
 
+                _hb_beat(job_id, f"story units {_sg_name[:40]}")
                 _sg_result = verify_stop_story(
                     description=_sg_desc,
                     credit_line=_sg_credit,
@@ -27309,6 +27344,7 @@ Write the story FIRST, then add physical description if space allows.
         try:
             from story_verifier import verify_story_candidate, disambiguate_snippets
             print(f"\n  [LOCAL-423] STORY VERIFICATION: checking claims against sources...")
+            _hb_beat(job_id, "story verification start")
             _l423_all_pass = True
             _l423_any_rejected = False
 
@@ -27342,6 +27378,7 @@ Write the story FIRST, then add physical description if space allows.
                         print(f"    [LOCAL-427] Venue page text injected as verification source "
                               f"({_venue_inject['reason']})")
 
+                _hb_beat(job_id, f"story verification {_sv_name[:40]}")
                 _sv_result = verify_stop_claims(
                     story_text=_sv_desc,
                     snippets=_sv_snippets,
@@ -30695,6 +30732,7 @@ REWRITE RULES (all mandatory):
     # PHASE 6: Assemble the complete tour
     _phase_timer.start('packing')
     print(f"\nPHASE 6: Assembling the complete tour...")
+    _hb_beat(job_id, "phase 6")
     
     # Create a better title that doesn't duplicate information
     # Use tour_category (internally corrected) not tour_type (raw client value) for display
@@ -35862,6 +35900,7 @@ RULES:
                 and os.environ.get('GROUNDING_GATE_ENABLED', '1').strip() != '0'
                 and os.environ.get('KEY_FACT_COVERAGE_ENABLED', '1').strip() != '0'):
             import key_fact_coverage as _kfc889
+            _hb_beat(job_id, "key fact coverage / finalize_tour")   # [LOCAL-901]
             _ev889 = locals().get('_evf') or {}
             complete_tour, _kf_rep = _kfc889.finalize_tour(
                 complete_tour, _ev889, model=os.environ.get(
@@ -35870,6 +35909,7 @@ RULES:
             try:   # [LOCAL-897] unsupported user-list sentences; minutes / compass in a stop body
                 import route_content_896 as _rc897b
                 if _rc897b.active():
+                    _hb_beat(job_id, "route content (897/898) post pass")   # [LOCAL-901]
                     complete_tour = _rc897b.cap_unsupported(complete_tour, _ev889, log=print)
                     complete_tour = _rc897b.strip_body_travel(complete_tour, log=print)
                     complete_tour = _rc897b.finalize_898(complete_tour, _ev889, log=print)   # [LOCAL-898]

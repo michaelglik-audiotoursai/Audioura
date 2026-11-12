@@ -173,6 +173,15 @@ class AreaResolution:
     # scope. Empty when the request named no multi-district clause.
     district_names: List[str] = field(default_factory=list)
     union_bbox: Optional[List[float]] = None
+    # [LOCAL-901] A PLACE-level reference for the request: set only when the full
+    # location string was not on Wikidata (centre fell back to the city) but its
+    # first named place was, and that point lies inside the province/city. The
+    # centre/radius above are NOT changed; this is for the 900B pin check only.
+    place_ref_lat: float = 0.0
+    place_ref_lng: float = 0.0
+    place_ref_name: str = ""
+    place_ref_precision: str = ""      # "place" when set
+    place_ref_source: str = ""         # "first_named_place" when set
 
 
 @dataclass
@@ -191,6 +200,59 @@ class Landmark:
     # alias names the other, or one is located-in the other's entity.
     aliases: List[str] = field(default_factory=list)
     located_in: List[str] = field(default_factory=list)
+
+
+PLACE_REF_MAX_KM = 100.0
+_PLACE_SPLIT = re.compile(r"\s+(?:and|&)\s+|\s*,\s*|\s+[\u2013\u2014-]\s+", re.IGNORECASE)
+
+
+def first_named_place(location: str) -> str:
+    """[LOCAL-901] The first named place of a location string, split on " and ",
+    ",", " - " / en dash: "<Mountain> and the <Statue>, <Province>" -> "<Mountain>".
+    "" when there is nothing usable."""
+    for seg in _PLACE_SPLIT.split((location or "").strip()):
+        seg = re.sub(r"(?i)^(?:the|a|an)\s+", "", seg.strip())
+        if len(seg) >= 3:
+            return seg
+    return ""
+
+
+def first_named_place_reference(location: str, city: str,
+                               coarse_center: Tuple[float, float]) -> Optional[Dict]:
+    """[LOCAL-901] The full location string was not on Wikidata, so the area fell
+    back to the city centre. Try the FIRST NAMED PLACE of the location through the
+    existing ``_wikidata_name_lookup`` and, if its point lies inside the province /
+    city (within PLACE_REF_MAX_KM of the coarse centre, or inside the geocoder bbox
+    of the city), return ``{"name","lat","lng","precision":"place",
+    "source":"first_named_place"}``. A result elsewhere (same-named place abroad)
+    is refused. Best-effort; never raises."""
+    try:
+        name = first_named_place(location)
+        if not name or name.lower() == (location or "").strip().lower() \
+                and not _PLACE_SPLIT.search((location or "").strip()):
+            # A single-name location was already tried whole; nothing new to try.
+            return None
+        hit = _wikidata_name_lookup(name, city)
+        if not hit:
+            return None
+        lat, lng = float(hit.get("lat") or 0.0), float(hit.get("lng") or 0.0)
+        if not (lat or lng):
+            return None
+        inside = _haversine_m(coarse_center, (lat, lng)) / 1000.0 <= PLACE_REF_MAX_KM
+        if not inside:
+            bb = _nominatim_bbox(city)
+            inside = bool(bb) and bb[0] <= lat <= bb[1] and bb[2] <= lng <= bb[3]
+        if not inside:
+            print(f"  [LOCAL-901] place reference '{name}' \u2192 {lat:.4f},{lng:.4f} "
+                  f"REFUSED: outside {city!r} (>{PLACE_REF_MAX_KM:.0f} km from its centre, "
+                  f"not in its bbox)")
+            return None
+        print(f"  [LOCAL-901] place reference '{name}' \u2192 {lat:.4f},{lng:.4f} (first_named_place)")
+        return {"name": name, "lat": lat, "lng": lng,
+                "precision": "place", "source": "first_named_place"}
+    except Exception as e:
+        print(f"  [LOCAL-901] place reference skipped (non-fatal): {e}")
+        return None
 
 
 def resolve_area(location_string: str) -> Optional[AreaResolution]:
@@ -269,6 +331,7 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
     neighborhood_qid = ""
     center_lat, center_lng = city_lat, city_lng
     radius_km = CITY_RADIUS_KM
+    _place_ref = None   # [LOCAL-901]
     
     # [LOCAL-46] If the resolved entity is a region (not a city), use a wider radius.
     # Regions like "French Riviera" cover 50-100km+ of coastline — a 2km radius
@@ -287,8 +350,10 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
                   f"({center_lat:.4f}, {center_lng:.4f})")
         elif neighborhood_qid:
             print(f"  [area_resolver] Neighborhood resolved: {neighborhood} → {neighborhood_qid} (no P625, using city center)")
+            _place_ref = first_named_place_reference(neighborhood, city, (city_lat, city_lng))
         else:
             print(f"  [area_resolver] Neighborhood '{neighborhood}' not on Wikidata — using city center")
+            _place_ref = first_named_place_reference(neighborhood, city, (city_lat, city_lng))
     
     # Detect language from country
     language = _detect_language(city_qid)
@@ -379,6 +444,11 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
         district_names=_district_names,
         union_bbox=_union_bbox,
     )
+    if _place_ref:   # [LOCAL-901]
+        result.place_ref_lat, result.place_ref_lng = _place_ref["lat"], _place_ref["lng"]
+        result.place_ref_name = _place_ref["name"]
+        result.place_ref_precision = "place"
+        result.place_ref_source = "first_named_place"
     print(f"  [area_resolver] Resolved: center=({center_lat:.4f}, {center_lng:.4f}), "
           f"radius={radius_km}km, lang={language}")
     return result

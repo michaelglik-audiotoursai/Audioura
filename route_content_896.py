@@ -1341,8 +1341,106 @@ def drop_carry_filler(tour_text: str, log: Optional[Callable] = None) -> str:
     return "\n".join(out)
 
 
+# ── [LOCAL-901] mood filler on the single-place path (897 cap, as 900B's _supported tightened it) ──────────
+_MOOD = re.compile(
+    r"(?i)\b(?:breeze|echo\w*|whisper\w*|seren(?:e|ity)|tranquil\w*|spiritual\w*|embod\w+|enduring|shifting|"
+    r"tapestry|testament|symboli[sz]\w*|peace\w*|harmon\w+|essence|timeless|reverberat\w+|crossroads|gentl[ey]\w*|"
+    r"creak\w*|exemplified|bygone|ethereal|palpable|enlightenment|passage\s+of|connection\s+between|"
+    r"significance\s+of|natural\s+world|sense\s+of|reminder\s+of|stands?\s+as\s+a)\b")
+_MOOD_DENSE = 2          # this many distinct mood terms and no number: filler whatever it names
+_SUPPORT_LINE = re.compile(r"(?i)^\s*(specific examples|type/specialty)\s*:\s*(.*)$")
+
+
+def mood_terms(sentence: str) -> set:
+    return {m.group(0).lower() for m in _MOOD.finditer(sentence or "")}
+
+
+def is_mood_filler(sentence: str, support: set) -> bool:
+    """[LOCAL-901] A sentence that is mood, not information: no digit AND either dense in mood terms
+    (>= 2) or carrying one and not ``_supported`` by the stop's own title / examples. A sentence with a
+    number, or with no mood term at all, is never filler here."""
+    if re.search(r"\d", sentence or ""):
+        return False
+    hits = mood_terms(sentence)
+    if not hits:
+        return False
+    return len(hits) >= _MOOD_DENSE or not _supported(sentence, support)
+
+
+def cap_single_place_filler(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
+                            log: Optional[Callable] = None) -> str:
+    """[LOCAL-901] The 897 unsupported / mood-filler cap for the single-place path (where the 897 route
+    pass never runs), applied to every stop body AND to the closing paragraph. Support is the stop's own
+    title, its Type / Specific Examples lines and (when given) its evidence; the closing paragraph is
+    supported by every stop's. ``That's N stops`` / the restaurant offer are never touched, and a stop
+    whose whole body would go is left as it was. Pure, free, name-free."""
+    if not tour_text:
+        return tour_text
+    blocks = _stop_blocks(tour_text)
+    if not blocks:
+        return tour_text
+    ev_map = {fold(str(k)): v for k, v in (evidence_by_title or {}).items()}
+
+    def support_of(title: str, block: str) -> set:
+        sup = _content_tokens(title)
+        for ln in block.split("\n"):
+            m = _SUPPORT_LINE.match(ln)
+            if m:
+                sup |= _content_tokens(m.group(2))
+        sup |= _content_tokens(ev_map.get(fold(title), "") or "")
+        return sup
+
+    all_support = set()
+    for s, e, _n, title in blocks:
+        all_support |= support_of(title, tour_text[s:e])
+    pieces, pos = [], 0
+    for bi, (s, e, num, title) in enumerate(blocks):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        sup = support_of(title, block)
+        lines = block.split("\n")
+        dropped, kept_any, changed = [], False, False
+        new_lines = list(lines)
+        for i, ln in enumerate(lines):
+            if i == 0 or not ln.strip() or _KEYED.match(ln):
+                continue
+            sents = split_sentences(ln)
+            # the closing paragraph (a later paragraph of the LAST stop) is supported by every stop's
+            keep, para_sup = [], (all_support if (bi == len(blocks) - 1 and _is_after_body(lines, i)) else sup)
+            for x in sents:
+                if _CLOSING_LINE.match(x):
+                    keep.append(x)
+                elif is_mood_filler(x, para_sup):
+                    dropped.append(x)
+                else:
+                    keep.append(x)
+                    kept_any = True
+            if len(keep) != len(sents):
+                new_lines[i] = " ".join(keep) if keep else None
+                changed = True
+        if changed and not kept_any:
+            if log:
+                log(f"  [LOCAL-901] Stop {num} '{title[:40]}': every body sentence reads as mood filler; body left as it was")
+            pieces.append(block)
+            continue
+        if log:
+            for x in dropped:
+                log(f"  [LOCAL-901] Stop {num} '{title[:40]}': mood filler dropped (no support, no concrete fact): \"{x[:100]}\"")
+        pieces.append(re.sub(r"\n{3,}", "\n\n", "\n".join(x for x in new_lines if x is not None)))
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+def _is_after_body(lines: List[str], i: int) -> bool:
+    """True when line ``i`` is a later paragraph of the block (after the first body line): the closing."""
+    first = next((k for k, ln in enumerate(lines) if k > 0 and ln.strip() and not _KEYED.match(ln)), None)
+    return first is not None and i > first
+
+
 def apply_single_place_guards(tour_text: str, log: Optional[Callable] = None, max_stops: int = 2,
-                              max_km: float = 100.0) -> str:
+                              max_km: float = 100.0,
+                              evidence_by_title: Optional[Dict[str, str]] = None) -> str:
     """[LOCAL-900B] Guards that are not specific to a described route, for the delivery path of any tour: the
     carry-with-you filler goes, fragment sentences go, and a tour of at most ``max_stops`` stops (the single-place
     path, where the 898 normalizer never ran) gets its Directions reduced to the template, with a leg over
@@ -1350,6 +1448,8 @@ def apply_single_place_guards(tour_text: str, log: Optional[Callable] = None, ma
     if not tour_text:
         return tour_text
     t = drop_carry_filler(tour_text, log)
+    if not active() and len(_stop_blocks(t)) <= max_stops:
+        t = cap_single_place_filler(t, evidence_by_title, log)      # [LOCAL-901] mood filler + closing paragraph
     t = drop_fragments(t, log, force=True)
     if not active() and len(_stop_blocks(t)) <= max_stops:
         t = normalize_directions(t, log, force=True, max_km=max_km)

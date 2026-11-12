@@ -223,6 +223,15 @@ def _same_place(a: Dict, b: Dict) -> bool:
       * identical non-empty street address, OR
       * one's distinctive proper-noun core is a (non-empty) subset of the other's.
     """
+    # (0) [LOCAL-901] a distinct named structure (statue / pagoda / temple / station / museum) is never
+    #     "the same place as" the mountain / park / area that contains it, nor as a structure with a
+    #     different proper-noun core. Same QID / shared alias are not vetoed (true duplicates still merge).
+    try:
+        from distinct_sites_901 import distinct_sites as _ds901
+        if _ds901(a, b):
+            return False
+    except Exception:
+        pass
     # (1) identity_dedup authority (QID / proximity / exact fold).
     try:
         from identity_dedup import dedupe_by_location_or_qid as _dloq
