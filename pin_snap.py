@@ -567,6 +567,9 @@ def snap_pin(title: str,
     return out
 
 
+_ROUTE_PLACE_KEEP_M = 3000.0
+
+
 def snap_poi_coordinates(poi_list: List[Dict],
                          scope: str = "",
                          scope_center: Optional[Tuple[float, float]] = None,
@@ -582,6 +585,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          city_centroid: Optional[Tuple[float, float]] = None,
                          is_user_stop_fn: Optional[Callable[[Dict], bool]] = None,
                          route_box: Optional[Sequence[float]] = None,
+                         route_refs: Optional[Dict[int, Dict]] = None,
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -672,6 +676,19 @@ def snap_poi_coordinates(poi_list: List[Dict],
                        tour_language=tour_language,
                        landmark_fn=landmark_fn,
                        venue_fallback_coordinate=venue_fallback_coordinate)
+        # [LOCAL-897] A stop whose title names a route place (or that follows the arrival at the
+        # destination) and found no authority of its own uses that place's geocode as its reference.
+        _rr = (route_refs or {}).get(i)
+        if _rr and row.get("reference") is None and not row.get("snapped"):
+            _ref = tuple(_rr["coord"])
+            if coord is not None and _haversine_m(coord, _ref) <= _ROUTE_PLACE_KEEP_M:
+                row.update({"reference": _ref, "source": "route_place", "distance_m": _haversine_m(coord, _ref),
+                            "reason": f"model pin within {_ROUTE_PLACE_KEEP_M/1000:.0f} km of route place"})
+                emit(f"[LOCAL-897] {title!r}: model pin is near the route place {_rr['place']!r} -- kept")
+            else:
+                row.update({"snapped": True, "new_coordinate": _ref, "reference": _ref, "source": "route_place",
+                            "distance_m": _haversine_m(coord, _ref) if coord is not None else None,
+                            "reason": f"route place {_rr['place']!r} is the reference ({_rr['why']})"})
         rows.append(row)
         if row["snapped"] and row["new_coordinate"]:
             lat, lng = row["new_coordinate"]
@@ -917,4 +934,14 @@ def snap_poi_coordinates(poi_list: List[Dict],
                      f"a different name and no reference; pin cleared")
             emit(f"[LOCAL-858] no coordinate {title}")
 
+    if route_box and len(route_box) >= 4:        # [LOCAL-897] one line per stop: model pin vs route box
+        for _i, _p in enumerate(poi_list):
+            _c0 = coords_all[_i]
+            _where = ("none" if _c0 is None else
+                      ("INSIDE" if (route_box[0] <= _c0[0] <= route_box[1] and route_box[2] <= _c0[1] <= route_box[3])
+                       else "OUTSIDE"))
+            _fin = _poi_coord(_p)
+            emit(f"[LOCAL-897] stop {_i + 1} {_p.get('name', '')!r}: model pin {_c0} {_where} the route box; "
+                 f"final pin {_fin if not _p.get('_no_coordinate') else None} "
+                 f"({_row_for(_i).get('source') or 'no reference'})")
     return poi_list, rows
