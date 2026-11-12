@@ -3952,6 +3952,22 @@ def health_check():
     })
 
 
+def _is_test_truthy(raw):
+    """[LOCAL-899] Strict is_test parse: only True or 'true'/'1'/'yes' count."""
+    if isinstance(raw, bool):
+        return raw
+    return isinstance(raw, str) and raw.strip().lower() in ('true', '1', 'yes')
+
+
+def _is_proof_test_user(user_id):
+    """[LOCAL-899] True when user_id is in env TOUR_TEST_PROOF_USER_IDS (comma-separated, default empty)."""
+    uid = (user_id or '').strip() if isinstance(user_id, str) else ''
+    if not uid:
+        return False
+    allowed = {u.strip() for u in os.getenv('TOUR_TEST_PROOF_USER_IDS', '').split(',') if u.strip()}
+    return uid in allowed
+
+
 @app.route('/generate-complete-tour', methods=['POST'])
 def generate_complete_tour():
     """Generate a complete tour from text to audio to web."""
@@ -4146,7 +4162,13 @@ def generate_complete_tour():
     _is_test_raw = data.get('is_test')
     _server_test_mode = os.getenv('TOUR_TEST_MODE', 'false').lower() == 'true'
     _allow_request_flag = os.getenv('TOUR_TEST_MODE_ALLOW_REQUEST', 'false').lower() == 'true'
+    # [LOCAL-899] Allow-listed proof users may mark their own request is_test=true
+    # even when neither server flag is set (Subscribed cloud). Unlisted users still
+    # cannot; is_test=false is never promoted.
+    _proof_user = _is_proof_test_user(user_id)
     if _is_test_raw and (_server_test_mode or _allow_request_flag):
+        is_test_override = True
+    elif _proof_user and _is_test_truthy(_is_test_raw):
         is_test_override = True
     else:
         is_test_override = None  # None means "use server env default"
@@ -4163,7 +4185,7 @@ def generate_complete_tour():
     print(f"  request_string: {request_string}")
     print(f"  language: {language}")
     print(f"  persona: {persona}")
-    print(f"  is_test: {is_test_override} (raw={_is_test_raw}, server_mode={_server_test_mode}, allow_request={_allow_request_flag})")
+    print(f"  is_test: {is_test_override} (raw={_is_test_raw}, server_mode={_server_test_mode}, allow_request={_allow_request_flag}, proof_user={_proof_user})")
     
     # Validate language parameter
     supported_languages = ['en', 'ru', 'es', 'fr', 'de', 'zh', 'ko']
