@@ -314,7 +314,20 @@ def strip_origin_locality(tour_text: str, log: Optional[Callable] = None) -> str
 
 
 # ── 3. directions on a route ─────────────────────────────────────────────────
-_COORD = re.compile(r"(?mi)^Coordinates:\s*-?\d")
+_COORD = re.compile(r"(?mi)^Coordinates:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
+_MINUTES = re.compile(r"(?i)\b\d+\s*(?:-\s*\d+\s*)?(?:minutes?|mins?)\b")
+
+
+def _km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
+    import math
+    dl = math.radians(b[0] - a[0])
+    dg = math.radians(b[1] - a[1]) * math.cos(math.radians((a[0] + b[0]) / 2))
+    return 6371.0 * math.hypot(dl, dg)
+
+
+def _pin(block: str) -> Optional[Tuple[float, float]]:
+    m = _COORD.search(block)
+    return (float(m.group(1)), float(m.group(2))) if m else None
 
 
 def simplify_directions(tour_text: str, log: Optional[Callable] = None) -> str:
@@ -330,7 +343,20 @@ def simplify_directions(tour_text: str, log: Optional[Callable] = None) -> str:
         pos = e
         if k + 1 < len(blocks):
             nxt = blocks[k + 1]
-            pinned = bool(_COORD.search(block)) and bool(_COORD.search(tour_text[nxt[0]:nxt[1]]))
+            a, b = _pin(block), _pin(tour_text[nxt[0]:nxt[1]])
+            pinned = bool(a and b)
+            if pinned:
+                # pinned on both ends: a model-written "N minutes" that the pins contradict (a base
+                # station 1 km from the previous stop is not "15 minutes" away) is replaced by the
+                # measured straight-line distance
+                dm = re.search(r"(?mi)^Directions:([^\n]*)$", block)
+                if dm and _MINUTES.search(dm.group(1)):
+                    d = _km(a, b)
+                    tail = f", about {d:.0f} km away" if d >= 1.5 else ""
+                    new = block[:dm.start()] + f"Directions: Continue to {nxt[3]}{tail}." + block[dm.end():]
+                    if log:
+                        log(f"  [LOCAL-896] Stop {num}: model minutes replaced by the pinned distance ({d:.1f} km)")
+                    block = new
             if not pinned:
                 new_title = nxt[3]
                 new = re.sub(r"(?mi)^Directions:[^\n]*$", lambda _m: f"Directions: Continue to {new_title}.", block)

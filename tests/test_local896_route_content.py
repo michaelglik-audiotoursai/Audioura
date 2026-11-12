@@ -102,7 +102,7 @@ def test_directions_with_pins_on_both_ends_are_kept():
                ("Two", "Body two here.", "Drive on.", "1.1, 2.1"),
                ("Three", "Body three here.", None, None)])
     out = rc.simplify_directions(t)
-    assert "northwest for about 15 minutes" in out          # pinned both ends
+    assert "Directions: Continue to Two, about 16 km away." in out    # pinned both ends: measured, not guessed
     assert "Directions: Continue to Three." in out          # Two -> Three: Three has no pin
 
 
@@ -367,3 +367,15 @@ def test_orchestrator_sends_the_route_with_the_preview(monkeypatch):
     sent.clear()
     orch._d762_gen_preview("Hilltop", "X")
     assert sent["json"] == {"text": "Hilltop", "city": "X"}
+
+
+def test_pinned_directions_lose_model_minutes_the_pins_contradict():
+    t = _tour([("One", "Body one here.", "Continue driving west for about 10 minutes to the fields.", "10.000, 100.000"),
+               ("Two", "Body two here.", "Drive on.", "10.005, 100.005"),
+               ("Three", "Body three here.", None, "10.5, 100.5")])
+    out = rc.simplify_directions(t)
+    assert "Directions: Continue to Two." in out and "minutes" not in out.split("Stop 2:")[0]
+    assert "Directions: Drive on." in out                       # no minutes claim: kept
+    far = _tour([("One", "Body one here.", "Drive about 5 minutes.", "10.0, 100.0"),
+                 ("Two", "Body two here.", None, "10.05, 100.0")])
+    assert "about 6 km away" in rc.simplify_directions(far)
