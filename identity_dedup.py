@@ -275,6 +275,8 @@ def dedup_by_identity(
                 shared = {s for s in (a.title_sets & b.title_sets) if s}
                 if shared:
                     same, reason = True, "bilingual_title"
+            if same and cands[i].get("_required_902") and cands[j].get("_required_902"):
+                continue      # [LOCAL-905] two required (902) places that collide are both kept
             if same:
                 union(i, j)
 
@@ -296,7 +298,8 @@ def dedup_by_identity(
             out.append(cands[members[0]])
             continue
         # Choose the best-sourced member to KEEP; retain first position.
-        best = max(members, key=lambda i: (_source_rank(cands[i]), -i))
+        best = max(members, key=lambda i: (bool(cands[i].get("_required_902")),   # [LOCAL-905] required wins
+                                           _source_rank(cands[i]), -i))
         kept = dict(cands[best])
         # Carry a QID onto the survivor if any member had one (identity hardening
         # for any later pass), without overwriting an existing one.
@@ -940,6 +943,18 @@ def dedupe_by_location_or_qid(
                 match_idx = i
                 break
 
+        if match_idx is not None and cand.get("_required_902"):
+            # [LOCAL-905] a required (902) place is never dropped: two required stops that collide are both kept;
+            # a required stop that matches an ordinary one takes its place.
+            if kept[match_idx].get("_required_902"):
+                match_idx = None
+            else:
+                dropped.append((str(kept[match_idx].get("name") or ""), name))
+                kept[match_idx] = cand
+                kept_meta[match_idx] = {"qid": qid, "coords": coords, "norm": norm, "folded": folded,
+                                        "distinct": distinct, "user_explicit": user_explicit,
+                                        "fallback_coord": fallback_coord}
+                continue
         if match_idx is not None:
             kept_name = (kept[match_idx].get("name")
                          or kept[match_idx].get("title") or "").strip()

@@ -584,6 +584,16 @@ def maybe_generate_with_pool(
     if not db_url or not total_stops:
         return None
 
+    # [LOCAL-905] Small (single-place) tours never reuse the pool: the saving is negligible and the risk is
+    # shown by wave 50 (a stale pooled pin and an empty body delivered a 1-stop tour). Pool WRITES are unchanged.
+    try:
+        import pool_guards_905 as _pg905
+        if _pg905.skip_pool_for_small_tour(total_stops):
+            print(f"  [LOCAL-905] pool skipped: <= {_pg905.SMALL_TOUR_MAX_STOPS} stops")
+            return None
+    except Exception as _pg905e:  # pragma: no cover
+        logger.warning(f"[LOCAL-905] small-tour pool skip unavailable ({_pg905e})")
+
     try:
         import stop_pool_store as pool
         import stop_pool_assembly as asm
@@ -680,6 +690,18 @@ def maybe_generate_with_pool(
     pooled_rows, _pool_rejected = _revalidate_pooled_scope(
         pooled_rows, location, tour_type, contained)
     K = len(pooled_rows)
+
+    # [LOCAL-905] The same pin / body guards a fresh stop gets (900B scope radius or route box; the verified
+    # place reference on a single-place scope; an empty body). Skip-only: the pool is unchanged.
+    try:
+        import pool_guards_905 as _pg905
+        _ctx905 = {} if contained else _pg905.build_context(location, total_stops)
+        pooled_rows, _rej905 = _pg905.filter_rows(pooled_rows, _ctx905, log=print)
+        if _rej905:
+            _pool_rejected = (_pool_rejected or 0) + _rej905
+        K = len(pooled_rows)
+    except Exception as _pg905e:
+        logger.warning(f"[LOCAL-905] pool row guards skipped ({_pg905e}); pool rows unfiltered")
 
     # [LOCAL-830] Category-scoped reuse — on-category check for a BUSINESS/ACTIVITY
     # request, applied to POOLED stops exactly as the fresh path applies it to new

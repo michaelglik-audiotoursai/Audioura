@@ -48,10 +48,31 @@ def required_places(location: str) -> List[str]:
     return names
 
 
-def _matches(name: str, title: str) -> bool:
+_STRUCTURE_SUFFIX = frozenset({"statue", "statues", "pagoda", "temple", "monument", "memorial", "buddha", "shrine",
+                               "sculpture", "fountain", "gate", "arch", "cross", "waterfall", "tower", "mount",
+                               "mountain", "peak", "hill", "bridge"})
+
+
+def _core(toks: List[str]) -> List[str]:
+    """The name's tokens without the generic structure words (\"<Statue> Statue\" ~ \"<Statue>\")."""
+    c = [w for w in toks if w not in _STRUCTURE_SUFFIX and w.rstrip("s") not in _STRUCTURE_SUFFIX]
+    return c
+
+
+def _matches(name: str, title: str, loose: bool = False) -> bool:
+    """A required name matches a stop title when every token of the name is in the title. [LOCAL-905] ``loose``:
+    or every CORE token (the name without structure words such as statue / mountain) is -- used only for a name
+    no stop matched strictly, and only on a stop no other name claimed."""
     nt = _toks(name)
     tt = set(_toks(title))
-    return bool(nt) and all(w in tt or (w.endswith("s") and w[:-1] in tt) for w in nt)
+    if not nt:
+        return False
+    if all(w in tt or (w.endswith("s") and w[:-1] in tt) for w in nt):
+        return True
+    if not loose:
+        return False
+    core = _core(nt)
+    return bool(core) and all(w in tt or (w.endswith("s") and w[:-1] in tt) for w in core)
 
 
 def ensure_required_stops(poi_list: List[Dict], names: List[str], new_poi: Callable[[str, str], Dict],
@@ -67,13 +88,18 @@ def ensure_required_stops(poi_list: List[Dict], names: List[str], new_poi: Calla
     cap = max_stops if max_stops else max(len(poi_list), len(names))
     out = list(poi_list)
     covered = {}
-    for n in names:
-        for i, p in enumerate(out):
-            if _matches(n, str(p.get("name", ""))):
-                covered[n] = i
-                p["user_explicit"] = True
-                p["_required_902"] = True
-                break
+    for loose in (False, True):
+        for n in names:
+            if n in covered:
+                continue
+            for i, p in enumerate(out):
+                if i in covered.values():
+                    continue
+                if _matches(n, str(p.get("name", "")), loose=loose):
+                    covered[n] = i
+                    p["user_explicit"] = True
+                    p["_required_902"] = True
+                    break
     for n in names:
         if n in covered:
             continue
@@ -94,7 +120,7 @@ def ensure_required_stops(poi_list: List[Dict], names: List[str], new_poi: Calla
     # keep the request's order for the required stops among themselves
     pos = {n: k for k, n in enumerate(names)}
     req = sorted((p for p in out if p.get("_required_902")),
-                 key=lambda p: next((pos[n] for n in names if _matches(n, str(p.get("name", "")))), 99))
+                 key=lambda p: next((pos[n] for n in names if _matches(n, str(p.get("name", "")), loose=True)), 99))
     it = iter(req)
     out = [next(it) if p.get("_required_902") else p for p in out]
     for i, p in enumerate(out):

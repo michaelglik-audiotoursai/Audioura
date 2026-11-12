@@ -11589,6 +11589,13 @@ def _apply_delivery_hours_guard(result, job_id=None):
             final = _rc900b.apply_single_place_guards(final, log=lambda m: print(m, flush=True))
         except Exception as _rc900be:  # pragma: no cover
             _import_logger.error(f"[LOCAL-900B] final guards skipped: {_rc900be}")
+        # [LOCAL-905] on every path (the pool included): a stop with no body is refilled or removed, and the
+        # closing's "That's N stops in all." equals the delivered count.
+        try:
+            import delivery_bodies_905 as _db905
+            final = _db905.ensure_bodies(final, log=lambda m: print(m, flush=True))
+        except Exception as _db905e:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-905] body guard skipped: {_db905e}")
         if final != text and out_file:
             # Rewrite the delivered file so the service (which reads the file,
             # not the return value) ships the cleaned text on every path.
@@ -12229,8 +12236,15 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
                           f"(pool held {_pool_out.get('pooled_before')}); "
                           f"research reused ${_pool_reused_research:.4f}")
                     _J._LAST_DELIVERY_PATH = 'pool'
+                    # [LOCAL-905] the pool path's tour pin is the first DELIVERED stop's pin, never (None, None),
+                    # so the orchestrator cannot fall back to an unchecked pin.
+                    try:
+                        import pool_guards_905 as _pg905
+                        _pool_pin905 = _pg905.first_stop_pin(_pool_out["text"])
+                    except Exception:
+                        _pool_pin905 = (None, None)
                     return _apply_delivery_hours_guard(
-                        (_pool_out["text"], output_file, (None, None)))
+                        (_pool_out["text"], output_file, _pool_pin905))
             except Exception as _pool_err:
                 print(f"  [LOCAL-590] pool path error (falling back to normal gen): {_pool_err}")
 
@@ -19326,8 +19340,18 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             print(f"  [LOCAL-589] site-first fill headroom: carrying {_effective_cap} real "
                   f"exhibition(s) through narration for a {total_stops}-stop request "
                   f"(spare {_effective_cap - total_stops} covers an empty-narration drop)")
+        # [LOCAL-905] a required (902) place is never trimmed by the cap: the cap covers at least the required stops
+        _req_n905 = sum(1 for _p in poi_list if _p.get('_required_902'))
+        if _req_n905 > _effective_cap:
+            _effective_cap = _req_n905
         if len(poi_list) > _effective_cap:
-            poi_list = poi_list[:_effective_cap]
+            keep905 = [i for i, _p in enumerate(poi_list) if _p.get('_required_902')]
+            if keep905:   # keep the required stops, fill the rest in order
+                room905 = _effective_cap - len(keep905)
+                idx905 = sorted(set(keep905) | set([i for i in range(len(poi_list)) if i not in keep905][:max(room905, 0)]))
+                poi_list = [poi_list[i] for i in idx905]
+            else:
+                poi_list = poi_list[:_effective_cap]
         if len(poi_list) == 0:
             print(f"X All POIs were filtered out; cannot continue")
             return None, None, (None, None)
@@ -22288,6 +22312,17 @@ Exempt: navigation directions ("Turn left", "Continue past").
             else:
                 print(f"  [LOCAL-576] Pre-writing scope check: all {_lr576_before} "
                       f"stop(s) within '{_lr576_scope}'.")
+
+    # [LOCAL-905] after every removal above, each required (902) place is still a stop of the tour
+    try:
+        _req905 = locals().get('_req902') or []
+        if _req905 and poi_list is not None and locals().get('_new_poi'):
+            import required_places_902 as _rp905
+            poi_list = _rp905.ensure_required_stops(
+                poi_list, _req905, locals().get('_new_poi'),
+                max_stops=max(total_stops or 0, len(_req905)), log=print)
+    except Exception as _rp905e:
+        print(f"  [LOCAL-905] required places re-check skipped (non-fatal): {_rp905e}")
 
     # ============================================================
     # [LOCAL-835B] FINAL pre-narration activity-provider pass.
