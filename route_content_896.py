@@ -21,6 +21,8 @@ import unicodedata
 from typing import Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 _STATE: Dict = {"origin": "", "destination": "", "through": [], "localities": [], "box": None}
+# [LOCAL-897] geocode of each route place that route_box placed, keyed by the folded place name
+_POINTS: Dict[str, Tuple[float, float]] = {}
 
 
 # ── text helpers ─────────────────────────────────────────────────────────────
@@ -114,7 +116,7 @@ def route_box(places: Iterable[str], region: str = "", geocode_fn: Optional[Call
         from geocode_stops import geocode as geocode_fn          # free Nominatim, no paid call
     import math
     import user_list_integrity as uli
-    pts, fb = [], list(fallbacks)
+    pts, fb, named = [], list(fallbacks), []
     for i, name in enumerate(p for p in places if p and p.strip()):
         hit = None
         for q in [name] + (fb if i == 0 else []):
@@ -129,6 +131,7 @@ def route_box(places: Iterable[str], region: str = "", geocode_fn: Optional[Call
                 break
         if hit:
             pts.append((float(hit[0]), float(hit[1])))
+            named.append((name, pts[-1]))
 
     def _km(a, b):
         dl = math.radians(b[0] - a[0])
@@ -139,6 +142,9 @@ def route_box(places: Iterable[str], region: str = "", geocode_fn: Optional[Call
         pts = keep or pts
     if len(pts) < 2:
         return None, None, len(pts)
+    for nm, pt in named:                      # [LOCAL-897] remember each placed route place's own geocode
+        if pt in pts:
+            _POINTS[fold(nm).strip()] = pt
     s, w, n, e = uli.bbox_covering(pts, margin_km)
     centre = (sum(p[0] for p in pts) / len(pts), sum(p[1] for p in pts) / len(pts))
     return [s, n, w, e], centre, len(pts)
@@ -315,7 +321,7 @@ def strip_origin_locality(tour_text: str, log: Optional[Callable] = None) -> str
 
 # ── 3. directions on a route ─────────────────────────────────────────────────
 _COORD = re.compile(r"(?mi)^Coordinates:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
-_MINUTES = re.compile(r"(?i)\b\d+\s*(?:-\s*\d+\s*)?(?:minutes?|mins?)\b")
+_MINUTES = re.compile(r"(?i)\b(?:\d+\s*(?:-\s*\d+\s*)?|an?\s+|half\s+an\s+)(?:minutes?|mins?|hours?)\b")   # [897] "about a minute"
 
 
 def _km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
@@ -382,15 +388,17 @@ _LEGEND_OBJ = re.compile(r"(?i)\blegends?\s+(?:of|about|that|says?|has\s+it\s+th
 _CAPWORD = re.compile(r"\b[A-ZÀ-Ỹ][^\W\d_]+")
 
 
+_STEEPED = re.compile(r"(?i)\bis\s+steeped\s+in\s+a\s+legend\s+of\b")
+
+
 def is_legend_disclosure(sentence: str) -> bool:
-    return bool(re.match(r"(?i)\s*local\s+legend\b", sentence or "")) and "legend" in (sentence or "").lower()
+    s = sentence or ""
+    if re.match(r"(?i)\s*local\s+legend\b", s) and "legend" in s.lower():
+        return True
+    return bool(_STEEPED.search(s))                 # [LOCAL-897] the evidence's own wording
 
 
-def legend_disclosure(title: str, evidence: str) -> Optional[str]:
-    """ONE sentence framed as legend, from an evidence sentence that names the stop and calls its
-    story a legend ("Local legend ties <stop> to ..., a story told by locals rather than documented
-    history"). None when the evidence has no such sentence or no usable object. Never states the
-    story as fact (D760: a disclosed legend beats an empty stop)."""
+def _legend_object(title: str, evidence: str) -> Optional[str]:
     tw = [w for w in _words(title) if len(w) >= 4 and w not in _NOISE]
     best = None
     for s in split_sentences(re.sub(r"\s+", " ", evidence or "")):
@@ -407,7 +415,320 @@ def legend_disclosure(title: str, evidence: str) -> Optional[str]:
         caps = len(_CAPWORD.findall(obj))
         if caps and (best is None or caps > best[0]):
             best = (caps, obj)
-    if not best:
+    return best[1] if best else None
+
+
+def legend_disclosure(title: str, evidence: str) -> Optional[str]:
+    """ONE sentence framed as legend, in the evidence's own wording (\"<stop> is steeped in a legend
+    of <object>\"), from an evidence sentence that names the stop and calls its story a legend.
+    None when the evidence has no such sentence or no usable object. Never states the story as
+    fact (D760). [LOCAL-897] The 896 form (\"a story told by locals rather than documented
+    history\") claimed more than the evidence says -- the audit flagged it as unsupported."""
+    tw = [w for w in _words(title) if len(w) >= 4 and w not in _NOISE]
+    for sent in split_sentences(re.sub(r"\s+", " ", evidence or "")):     # the evidence's own sentence, verbatim
+        if _STEEPED.search(sent) and len(sent.split()) <= 30 and (not tw or any(w in _words(sent) for w in tw)):
+            return sent.strip()
+    obj = _legend_object(title, evidence)
+    return f"{title.strip()} is steeped in a legend of {obj}." if obj else None
+
+
+def legend_fact(title: str, evidence: str) -> Optional[str]:
+    """[LOCAL-897] A fact the evidence states PLAINLY about the same people as the legend (e.g. a
+    royal recognition) is kept as fact: the evidence sentence that names the stop and shares a
+    capitalised name with the legend object but does not itself say 'legend'."""
+    obj = _legend_object(title, evidence)
+    if not obj:
         return None
-    return (f"Local legend ties {title.strip()} to {best[1]}, a story told by locals "
-            f"rather than documented history.")
+    names = {w.lower() for w in _CAPWORD.findall(obj)}
+    tw = [w for w in _words(title) if len(w) >= 4 and w not in _NOISE]
+    for s in split_sentences(re.sub(r"\s+", " ", evidence or "")):
+        if "legend" in s.lower() or len(s) > 260:
+            continue
+        if tw and not any(w in _words(s) for w in tw):
+            continue
+        if len(names & {w.lower() for w in _CAPWORD.findall(s)}) >= 2:
+            return s.strip()
+    return None
+
+
+def legend_sentences(title: str, evidence: str) -> List[str]:
+    ld = legend_disclosure(title, evidence)
+    if not ld:
+        return []
+    fact = legend_fact(title, evidence)
+    return ([fact] if fact else []) + [ld]
+
+
+# ── 6. [LOCAL-897] route places as a stop's own reference ────────────────────
+def _title_tokens(text: str) -> set:
+    return {w for w in _words(text) if w not in _NOISE}
+
+
+def place_point(name: str) -> Optional[Tuple[float, float]]:
+    return _POINTS.get(fold(name).strip())
+
+
+def _names(title: str, place: str) -> bool:
+    core = _KIND_TAIL.sub("", place.strip()) or place
+    need = _title_tokens(core)
+    return bool(need) and need <= _title_tokens(title)
+
+
+def _collapsed(name: str, km: float = 5.0) -> bool:
+    """[LOCAL-897 live] A route place whose geocode sits on top of ANOTHER route place's geocode is a
+    geocoder fallback (the destination resolved to the through-town's centre), not the place."""
+    pt = place_point(name)
+    if not pt:
+        return False
+    for other, opt in _POINTS.items():
+        if other != fold(name).strip() and _km(pt, opt) <= km:
+            return True
+    return False
+
+
+def stop_references(titles: Sequence[str], user_pins: Optional[Dict[int, Tuple[float, float]]] = None
+                    ) -> Dict[int, Dict]:
+    """{stop index: {"coord": (lat, lng), "place": name, "why": ...}} -- a stop whose title names
+    the route's destination (or another route place) uses that place's own geocode as its
+    reference; the stops from the first one that names the DESTINATION onward are on the
+    destination (a cable car, a statue and a summit view on the mountain you have reached).
+    Generic: only the request's own place strings are used (D769)."""
+    if not active():
+        return {}
+    o, d = endpoints()
+    out: Dict[int, Dict] = {}
+    arrived = None
+    user_pins = user_pins or {}
+    for i, t in enumerate(titles):                     # where the listener arrives at the destination
+        if _names(t, d):
+            arrived = i
+            break
+    dpt = place_point(d)
+    if dpt and _collapsed(d):
+        # the destination's geocode is another route place's: use the listener's own pin of a stop
+        # at / after the arrival instead (a pin the user gave is authoritative), else no reference
+        later = [user_pins[k] for k in sorted(user_pins) if arrived is not None and k >= arrived]
+        dpt = tuple(later[0]) if later else None
+    arrived = None
+    for i, t in enumerate(titles):
+        for pl in [*_STATE["through"], d]:
+            pt = dpt if pl == d else (None if _collapsed(pl) else place_point(pl))
+            if pt and _names(t, pl):
+                out[i] = {"coord": pt, "place": pl, "why": "title names the route place"}
+                if pl == d:
+                    arrived = i if arrived is None else arrived
+                break
+    if arrived is not None and dpt:
+        for i in range(arrived + 1, len(titles)):
+            out.setdefault(i, {"coord": dpt, "place": d, "why": "stop follows the arrival at the destination"})
+    return out
+
+
+# ── 7. [LOCAL-897] minutes / distances / compass inside a stop BODY ──────────
+_TRAVEL = re.compile(
+    r"(?i)\b\d+(?:\.\d+)?\s*(?:-\s*\d+(?:\.\d+)?\s*)?(?:minutes?|mins?|km|kilomet(?:er|re)s?|miles?)\s+"
+    r"(?:away|drive|ride|from\b|north|south|east|west)"
+    r"|\b(?:takes?|about|roughly|approximately|within)\s+(?:an?\s+)?\d+\s*(?:-\s*\d+\s*)?(?:minutes?|mins?)\b"
+    r"|\b(?:to|toward|towards|on|from|in)\s+the\s+(?:north|south|east|west)(?:ern)?(?:east|west)?\b"
+    r"(?!\s+(?:asia|china|coast|side))"
+    r"|\b(?:north|south|east|west)(?:ward)?\s+(?:of|from)\b"
+    r"|\bdrive\s+(?:north|south|east|west)\b")
+
+
+def _has_travel(sentence: str) -> bool:
+    return bool(_TRAVEL.search(sentence))
+
+
+def repair_travel_sentence(sentence: str) -> Optional[str]:
+    """Drop the comma-bounded clause that carries a minutes / km / compass claim; None when the claim
+    is the sentence's own frame (it cannot be repaired and the sentence goes)."""
+    if not _has_travel(sentence):
+        return sentence
+    parts = re.split(r"(?<=,)\s+|\s+(?=—)|(?<=—)\s+", sentence)
+    if len(parts) < 2:
+        return None
+    keep = [p for p in parts if not _has_travel(p)]
+    if not keep or keep[0] != parts[0]:
+        return None                       # the opening clause is the claim
+    out = " ".join(keep).strip().rstrip(",—").rstrip()
+    if not re.search(r"[.!?]$", out):
+        out += "."
+    return out if len(_words(out)) >= 5 and not _has_travel(out) else None
+
+
+def _names_unpinned(sentence: str) -> bool:
+    """The sentence names the origin's locality or the origin (not a pinned route place)."""
+    f = fold(sentence)
+    for l in _STATE["localities"]:
+        if re.search(r"\b" + re.escape(l) + r"\b", f):
+            return True
+    o = _KIND_TAIL.sub("", _STATE["origin"] or "").strip()
+    return bool(o) and not place_point(_STATE["origin"]) and fold(o) in f
+
+
+def strip_body_travel(tour_text: str, log: Optional[Callable] = None) -> str:
+    """No \"N minutes/km away\" or compass direction in a stop BODY unless both ends are pinned (the
+    stop, and the route place the sentence names). Directions lines are handled by
+    ``simplify_directions``."""
+    if not active() or not tour_text:
+        return tour_text
+    places = [p for p in (_STATE["destination"], *_STATE["through"]) if place_point(p)]
+    pieces, pos = [], 0
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        pinned = _pin(block) is not None
+
+        def fix(sents: List[str], _n=num, _t=title, _pinned=pinned) -> List[str]:
+            out = []
+            for x in sents:
+                _other = [p for p in places if _names(x, p) and not _names(_t, p)]
+                # a TIME claim ("N minutes") is never measured by two pins (896 rule for Directions): it always goes
+                _time = bool(_MINUTES.search(x))
+                if _has_travel(x) and (_time or not (_pinned and _other and not _names_unpinned(x))):
+                    y = repair_travel_sentence(x)
+                    if log:
+                        log(f"  [LOCAL-897] Stop {_n} '{_t[:40]}': body distance/time/compass without both ends "
+                            f"pinned -> {'clause dropped' if y else 'sentence dropped'}: \"{x[:90]}\"")
+                    if y is None:
+                        continue
+                    x = y
+                out.append(x)
+            if not out:        # never an empty stop: the D760 honest body
+                import strict_grounding_gate as _sgg
+                out = _sgg.sensory_body(_t, [_sgg.NO_HISTORY_DISCLOSURE], _sgg.MIN_NO_EVIDENCE_SENTENCES - 1,
+                                        register="driving")
+            return out
+        pieces.append(_rewrite_prose(block, fix))
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+# ── 8. [LOCAL-897] a user-list sentence the evidence does not support ────────
+_CLOSING_LINE = re.compile(r"(?i)^(?:from .{3,160}? this route is the one you chose|that['\u2019]s \d+ stops?|"
+                           r"if you would like to eat)")
+
+
+def _supported(sentence: str, support: set) -> bool:
+    return bool(_content_tokens(sentence) & support)
+
+
+def cap_unsupported(tour_text: str, evidence_by_title: Dict[str, str], log: Optional[Callable] = None) -> str:
+    """On a route (user-list) tour: a sentence with NO support in the stop's own evidence AND no
+    concrete noun from the evidence or the title is dropped (\"This tension between preservation and
+    progress is etched into the land\" has neither). Evidence about another place has been set aside
+    first. A stop whose evidence is thin keeps only the honest non-factual body + the D760
+    disclosure -- not mood-only text. Pure, free, name-free."""
+    if not active() or not tour_text:
+        return tour_text
+    import strict_grounding_gate as sgg
+    ev_map = {fold(str(k)): v for k, v in (evidence_by_title or {}).items()}
+    pieces, pos = [], 0
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        ev = ev_map.get(fold(title), "") or ""
+        try:
+            import aboutness as _ab
+            ev = _ab.strip_other_place_evidence(ev)[0]
+        except Exception:
+            pass
+        thin = sgg._evidence_is_thin(ev)
+        support = _content_tokens(ev) | _content_tokens(title)
+        tpl = [fold(t.format(t=title))[:30] for t in sgg._SENSORY_TEMPLATES_DRIVING + sgg._SENSORY_TEMPLATES]
+        disc = fold(sgg.NO_HISTORY_DISCLOSURE)[:30]
+
+        def fix(sents: List[str], _n=num, _t=title, _thin=thin, _sup=support) -> List[str]:
+            if sents and _CLOSING_LINE.match(sents[0]):
+                return sents
+            out = []
+            for x in sents:
+                fx = fold(x)
+                if (fx[:30] in tpl or disc in fx or is_legend_disclosure(x)
+                        or _CLOSING_LINE.match(x) or _supported(x, _sup)):
+                    out.append(x)
+                elif log:
+                    log(f"  [LOCAL-897] Stop {_n} '{_t[:40]}': dropped (no support in the evidence, no concrete "
+                        f"noun from evidence or title): \"{x[:100]}\"")
+            return out
+
+        lines = block.split("\n")
+        # the route closing (and anything after it) rides on the last stop: split it off, never touched
+        tail: List[str] = []
+        for i, ln in enumerate(lines):
+            if i == 0 or not ln.strip() or _KEYED.match(ln):
+                continue
+            sents = split_sentences(ln)
+            ci = next((k for k, x in enumerate(sents) if _CLOSING_LINE.match(x)), None)
+            if ci is not None:
+                lines[i] = " ".join(sents[:ci])
+                tail = [" ".join(sents[ci:])] + [x for x in lines[i + 1:] if x.strip()]
+                lines = lines[:i + 1]
+                break
+        body_idx = [i for i, ln in enumerate(lines) if i > 0 and ln.strip() and not _KEYED.match(ln)]
+        for i in body_idx:
+            lines[i] = " ".join(fix(split_sentences(lines[i])))
+        body_idx = [i for i in body_idx if lines[i].strip()]
+        if thin and not any("legend" in lines[i].lower() for i in body_idx):
+            # no evidence for this stop (or an emptied body): the D760 honest body, not mood-only text
+            honest = sgg.sensory_body(title, [sgg.NO_HISTORY_DISCLOSURE], sgg.MIN_NO_EVIDENCE_SENTENCES - 1,
+                                      register="driving")
+            if fold(" ".join(lines[i] for i in body_idx)) != fold(" ".join(honest)) and log:
+                log(f"  [LOCAL-897] Stop {num} '{title[:40]}': no evidence for this destination -> honest "
+                    f"non-factual body + disclosure (D760), not mood-only text")
+            if body_idx:
+                lines[body_idx[0]] = " ".join(honest)
+                for i in body_idx[1:]:
+                    lines[i] = None
+            else:
+                # before the Directions line when there is one, else at the end of the block
+                di = next((i for i, ln in enumerate(lines) if ln and re.match(r"(?i)^directions\s*:", ln)), None)
+                if di is None:
+                    while lines and lines[-1] is not None and not lines[-1].strip():
+                        lines.pop()
+                    lines += ["", " ".join(honest), ""]
+                else:
+                    lines[di:di] = [" ".join(honest), ""]
+        if tail:
+            while lines and lines[-1] is not None and not lines[-1].strip():
+                lines.pop()
+            lines += [""] + [x for t_ in tail for x in (t_, "")]
+        new_block = "\n".join(ln for ln in lines if ln is not None)
+        pieces.append(re.sub(r"\n{3,}", "\n\n", new_block))
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)
+
+
+def fill_empty_bodies(tour_text: str, log: Optional[Callable] = None) -> str:
+    """[LOCAL-897 live] D760 on the delivered text: a route stop whose body ended up empty (the last stop
+    lost its honest body when the closing was rebuilt) gets the honest non-factual body + disclosure."""
+    if not active() or not tour_text:
+        return tour_text
+    import strict_grounding_gate as sgg
+    pieces, pos = [], 0
+    for s, e, num, title in _stop_blocks(tour_text):
+        pieces.append(tour_text[pos:s])
+        block = tour_text[s:e]
+        pos = e
+        lines = block.split("\n")
+        prose = [ln for i, ln in enumerate(lines) if i > 0 and ln.strip() and not _KEYED.match(ln)
+                 and not _CLOSING_LINE.match(ln.strip())]
+        if not prose:
+            honest = " ".join(sgg.sensory_body(title, [sgg.NO_HISTORY_DISCLOSURE],
+                                               sgg.MIN_NO_EVIDENCE_SENTENCES - 1, register="driving"))
+            at = next((i for i, ln in enumerate(lines) if i > 0 and (re.match(r"(?i)^directions\s*:", ln)
+                                                                  or _CLOSING_LINE.match(ln.strip()))), None)
+            if at is None:
+                while len(lines) > 1 and not lines[-1].strip():
+                    lines.pop()
+                lines += ["", honest, "", ""]
+            else:
+                lines[at:at] = [honest, ""]
+            if log:
+                log(f"  [LOCAL-897] Stop {num} '{title[:40]}': empty body on delivery -> honest body + D760 disclosure")
+            block = "\n".join(lines)
+        pieces.append(block)
+    pieces.append(tour_text[pos:])
+    return "".join(pieces)

@@ -11562,6 +11562,9 @@ def _apply_delivery_hours_guard(result):
                 _before896 = final
                 final = _rc896f.strip_origin_locality(final, log=lambda m: print(m, flush=True))
                 final = _rc896f.simplify_directions(final, log=lambda m: print(m, flush=True))
+                # [LOCAL-897] after the locality strip: body minutes / compass, and no emptied stop body
+                final = _rc896f.strip_body_travel(final, log=lambda m: print(m, flush=True))
+                final = _rc896f.fill_empty_bodies(final, log=lambda m: print(m, flush=True))
                 if final != _before896:
                     print("  [LOCAL-896] route content pass changed the delivered text", flush=True)
         except Exception as _rc896e:  # pragma: no cover
@@ -30610,6 +30613,26 @@ REWRITE RULES (all mandatory):
         except Exception as _mb_err:
             print(f"  [LOCAL-813] museum building pin lookup skipped "
                   f"(non-fatal): {_mb_err}")
+        _route_refs_897 = None
+        try:   # [LOCAL-897] stops that name (or follow the arrival at) a route place
+            import route_content_896 as _rc897
+            if _rc897.active():
+                _up897 = {}
+                for _k897, _p897 in enumerate(poi_list):
+                    from pin_snap import _is_user_pin as _iup897
+                    if _iup897(_p897):
+                        try:
+                            _la, _lo = [float(x) for x in str(_p897.get('coordinates')).split(',')[:2]]
+                            _up897[_k897] = (_la, _lo)
+                        except Exception:
+                            pass
+                _route_refs_897 = _rc897.stop_references(
+                    [str((_p or {}).get('name', '')) for _p in poi_list], user_pins=_up897)
+                print(f"  [LOCAL-897] route-place references: "
+                      f"{ {k + 1: v['place'] for k, v in _route_refs_897.items()} }")
+        except Exception as _e897:
+            print(f"  [LOCAL-897] route-place references skipped (non-fatal): {_e897}")
+            _route_refs_897 = None
         print(f"  [LOCAL-791C] pin snap: scope={_pin_scope_791c!r} "
               f"center={_pin_center_791c} bbox={_pin_bbox_803} "
               f"venue_fallback={_pin_venue_fallback_813} "
@@ -30619,6 +30642,7 @@ REWRITE RULES (all mandatory):
             scope_bbox=_pin_bbox_803, tour_language="en",
             venue_fallback_coordinate=_pin_venue_fallback_813,
             city_centroid=_pin_center_791c, route_box=_route_box_896,
+            route_refs=_route_refs_897,
             is_user_stop_fn=lambda _p: bool(
                 _p.get('user_explicit') or _p.get('_anchor')
                 or _is_user_stop_title(_p.get('name'))),
@@ -35811,6 +35835,13 @@ RULES:
                 complete_tour, _ev889, model=os.environ.get(
                     "GROUNDING_GATE_MODEL", "gpt-4.1-mini"), log=print,
                 user_list=bool(_get_user_stop_titles()))
+            try:   # [LOCAL-897] unsupported user-list sentences; minutes / compass in a stop body
+                import route_content_896 as _rc897b
+                if _rc897b.active():
+                    complete_tour = _rc897b.cap_unsupported(complete_tour, _ev889, log=print)
+                    complete_tour = _rc897b.strip_body_travel(complete_tour, log=print)
+            except Exception as _e897b:
+                print(f"  [LOCAL-897] route body pass skipped (non-fatal): {_e897b}")
             _tot = sum(r.get("K", 0) for r in _kf_rep["stops"])
             _got = sum(r.get("k", 0) for r in _kf_rep["stops"])
             print(f"  [LOCAL-889] coverage total: {_got}/{_tot} key facts over "

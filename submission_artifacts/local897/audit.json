@@ -1,0 +1,677 @@
+{
+  "unsupported": [
+    {
+      "stop": "Leaving Mui Ne – the fishing coast and Ham Tien strip",
+      "claim": "The coast here stretches for approximately 50 kilometers and has developed into a resort destination since the mid-1990s.",
+      "why": "The evidence supports that Mui Ne and other wards of Phan Thiet stretch along the coast for approximately 50 kilometers and have been transformed into a resort destination since the mid-1990s, but does not specifically state that 'the coast here' (i.e., at this stop) stretches for 50 kilometers. The claim is ambiguous as to whether it refers to the entire Phan Thiet/Mui Ne area or just Mui Ne."
+    },
+    {
+      "stop": "Leaving Mui Ne – the fishing coast and Ham Tien strip",
+      "claim": "Mũi Né ward, borders the South China Sea and includes two beaches, Ganh Beach and Suoi Nuoc Beach, with resorts and shops.",
+      "why": "The evidence states that Mũi Né ward borders the South China Sea and has two beaches, Ganh Beach and Suoi Nuoc Beach, both with a number of resorts and a few shops and restaurants. The claim is supported except for the explicit naming of 'resorts and shops' at both beaches, which is only implied."
+    },
+    {
+      "stop": "Phan Thiet and the Ca Ty River",
+      "claim": "The Ca Ty River, originally known as the Phan River when the town was established, stretches about 7.2 kilometers.",
+      "why": "Supported by evidence: 'The Ca Ty River, about 7.2 km long, was originally named Phan River when the Phan Thiet town was established.'"
+    },
+    {
+      "stop": "Phan Thiet and the Ca Ty River",
+      "claim": "One remarkable moment in Phan Thiet’s recent history unfolded in 1995, when a total solar eclipse cast its shadow over the city.",
+      "why": "Supported by evidence: '24 October 1995 is considered to be the birth of tourism in Phan Thiết, when thousands visited Mũi Né to witness the total solar eclipse.'"
+    },
+    {
+      "stop": "Dragon fruit country – the plantations along the road",
+      "claim": "Binh Thuan is actually the country's largest area for dragon fruit cultivation.",
+      "why": "Supported by evidence: 'Binh Thuan is the country's largest dragon fruit-growing region.'"
+    },
+    {
+      "stop": "Dragon fruit country – the plantations along the road",
+      "claim": "Vietnam is the only country in Southeast Asia that grows dragon fruit on a commercial scale.",
+      "why": "Supported by evidence: 'Vietnam stands out as the sole country in Southeast Asia to cultivate dragon fruit on a commercial scale.'"
+    },
+    {
+      "stop": "Dragon fruit country – the plantations along the road",
+      "claim": "Most of this commercial cultivation happens right here in Binh Thuan.",
+      "why": "Supported by evidence: 'with a focus primarily in Binh Thuan.'"
+    },
+    {
+      "stop": "Dragon fruit country – the plantations along the road",
+      "claim": "Besides dragon fruit, the region also grows other tropical fruits like mangosteen, mango, and orange.",
+      "why": "Supported by evidence: 'Binh Thuan province, Vietnam is a country with strong agriculture with many tropical fruits grown widely such as Dragon fruit, Mangosteen, Mango, Orange.'"
+    },
+    {
+      "stop": "Arriving at Ta Cu – the mountain and its legends",
+      "claim": "You are at Ta Cu Mountain, an extinct volcano located in Ham Thuan Nam District, about 40 minutes and Phan Thiet City.",
+      "why": "The evidence supports that Ta Cu Mountain is an extinct volcano located in Ham Thuan Nam District and about 40 minutes away from Phan Thiet City. The phrase 'about 40 minutes and Phan Thiet City' is likely a typo, but the factual content is supported."
+    },
+    {
+      "stop": "Arriving at Ta Cu – the mountain and its legends",
+      "claim": "This mountain is the most famous spiritual attraction in Binh Thuan, known for spiritual practice atop its summit.",
+      "why": "Supported by evidence: 'The most famous spiritual attraction in Binh Thuan. ... spiritual practice atop Ta Cu Mountain.'"
+    },
+    {
+      "stop": "Arriving at Ta Cu – the mountain and its legends",
+      "claim": "You can take a modern cable car to reach the top of Ta Cu Mountain, where two famous pagodas stand: Linh Son Truong Tho and Long Doan.",
+      "why": "Supported by evidence: 'will take a modern cable car to discover Ta Cu Mountain ... There are two famous pagodas on the top of Ta Cu Mountain: Linh Son Truong Tho pagoda and Long Doan pagoda.'"
+    },
+    {
+      "stop": "Arriving at Ta Cu – the mountain and its legends",
+      "claim": "Here, you find the longest reclining Buddha statue in Southeast Asia, one of the biggest and most unique statues in the region.",
+      "why": "Supported by evidence: 'Ta Cu Mountain has the longest reclining Buddha statue in Southeast Asia. ... At the top of Ta Cu Mountain, visitors can admire one of the most unique and biggest statues in Southeast Asia.'"
+    },
+    {
+      "stop": "Arriving at Ta Cu – the mountain and its legends",
+      "claim": "Ta Cu Mountain is located in Thuan Nam Town within Ham Thuan Nam District, making it accessible for visitors from nearby cities.",
+      "why": "Supported by evidence: 'Ta Cu Mountain is located in Thuan Nam town, Ham Thuan Nam district.'"
+    },
+    {
+      "stop": "Linh Son Truong Tho Pagoda",
+      "claim": "You are standing at Linh Son Truong Tho Pagoda, also known as the Mountain Pagoda, located on Ta Cu Mountain in Thuan Nam town, Ham Thuan Nam district, Binh Thuan province.",
+      "why": "Supported by evidence: 'Linh Son Truong Tho Pagoda, popularly referred to as the Mountain Pagoda, is located in Thuan Nam Town, Ham Thuan Nam District, Binh Thuan ... is also known as Chùa Núi and is located on Ta Cu Mountain in Thuan Nam town, Ham Thuan Nam district, Binh Thuan province.'"
+    },
+    {
+      "stop": "Linh Son Truong Tho Pagoda",
+      "claim": "This pagoda was founded by Master Tran Huu Duc at the end of the 19th century and received royal recognition from Emperor Tu Duc after Master Duc successfully treated Empress Dowager Tu Du.",
+      "why": "Supported by evidence: 'Linh Son Truong Tho Pagoda was founded by Master Huu Duc at the end of the 19th century. ... Linh Son Truong Tho Pagoda was conferred royal recognition by Emperor Tu Duc after Master Tran Huu Duc successfully treated Empress Dowager Tu Du.'"
+    },
+    {
+      "stop": "Linh Son Truong Tho Pagoda",
+      "claim": "The emperor named this pagoda Linh Son Truong Tho Pagoda as a sign of gratitude for the healing.",
+      "why": "Supported by evidence: 'the emperor to bestow the name Linh Son Truong Tho Pagoda as gratitude.'"
+    },
+    {
+      "stop": "Linh Son Truong Tho Pagoda",
+      "claim": "Behind the main hall, you can see a reclining Buddha statue that is 49 meters long and 11 meters high, installed during the 1963 restoration.",
+      "why": "Supported by evidence: 'During the 1963 restoration, a reclining Buddha statue 49 meters long and 11 meters high was installed behind the main hall.'"
+    },
+    {
+      "stop": "Linh Son Truong Tho Pagoda",
+      "claim": "The pagoda is situated at an elevation of 400 meters and is one of two pagodas on Ta Cu Mountain, making it a popular pilgrimage destination.",
+      "why": "Supported by evidence: 'Chùa Linh Sơn Trường Thọ ... nằm ở độ cao 400 mét ... Linh Son Truong Tho Pagoda is one of the two pagodas on Ta Cu Mountain and is a popular pilgrimage destination.'"
+    },
+    {
+      "stop": "Linh Son Truong Tho Pagoda",
+      "claim": "After Master Huu Duc passed away in 1887, another pagoda called Linh Son Long Doan, or Lower Pagoda, was built below, while this one is known as the Upper Pagoda.",
+      "why": "Supported by evidence: 'After Master Huu Duc passed away in 1887, Venerable Tam Hien established a new pagoda below, called Linh Son Long Doan or Lower Pagoda, while Linh Son Truong Tho is called the Upper Pagoda.'"
+    },
+    {
+      "stop": "Linh Son Truong Tho Pagoda",
+      "claim": "Linh Son Truong Tho Pagoda is steeped in a legend of healing that is still passed down among the locals.",
+      "why": "Supported by evidence: 'Linh Son Truong Tho Pagoda is steeped in a legend of healing that is still passed down among the locals.'"
+    },
+    {
+      "stop": "The Reclining Buddha",
+      "claim": "You are standing at the Reclining Buddha on Ta Cu Mountain, Vietnam. It is the biggest reclining Buddha statue in Vietnam.",
+      "why": "Supported by evidence: 'The Reclining Buddha statue on Ta Cu Mountain is the biggest reclining Buddha statue in Vietnam.'"
+    },
+    {
+      "stop": "The Reclining Buddha",
+      "claim": "Around you, the Reclining Buddha Pagoda features several worship halls, three entrances, intricate animal sculptures, and colorful paintings of deities.",
+      "why": "Supported by evidence: 'The Reclining Buddha Pagoda on Mount Ta Cu has several worship halls, three entrances, intricate animal sculptures, and colorful paintings of deities.'"
+    },
+    {
+      "stop": "The Reclining Buddha",
+      "claim": "The mountain is covered in lush green forest and offers beautiful scenery.",
+      "why": "Supported by evidence: 'The mountain where the Reclining Buddha is located is surrounded by lush green forest and beautiful scenery.'"
+    },
+    {
+      "stop": "The Reclining Buddha",
+      "claim": "The site is open all year round and can be reached by cable car or a 1.5 to 2 hour uphill hike if you choose to trek.",
+      "why": "Supported by evidence: 'The Reclining Buddha on Mount Ta Cu is open all year round. ... the trekking option involves a 1.5–2 hour uphill hike.'"
+    }
+  ],
+  "_model": "gpt-4.1",
+  "_usage": {
+    "prompt_tokens": 8333,
+    "completion_tokens": 2340,
+    "total_tokens": 10673,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "audio_tokens": 0,
+      "accepted_prediction_tokens": 0,
+      "rejected_prediction_tokens": 0
+    }
+  },
+  "evidence_chars": {
+    "The cable car ascent": 825,
+    "Dragon fruit country – the plantations along the road": 795,
+    "Arriving at Ta Cu – the mountain and its legends": 1217,
+    "Phan Thiet and the Ca Ty River": 6959,
+    "The Reclining Buddha": 1032,
+    "Leaving Mui Ne – the fishing coast and Ham Tien strip": 7435,
+    "Linh Son Truong Tho Pagoda": 3459
+  },
+  "offtopic_mechanical": [],
+  "items_by_stop": {
+    "The cable car ascent": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (17x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (7x)"
+      }
+    ],
+    "Dragon fruit country – the plantations along the road": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (10x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (11x)"
+      }
+    ],
+    "Arriving at Ta Cu – the mountain and its legends": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (5x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (7x)"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (1x)"
+      }
+    ],
+    "Phan Thiet and the Ca Ty River": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "own_article",
+        "source": "Phan Thiết (city)",
+        "why": "the stop's own article"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (7x)"
+      }
+    ],
+    "The Reclining Buddha": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (9x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 3x"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 3x"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop 3x"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (3x)"
+      }
+    ],
+    "Leaving Mui Ne – the fishing coast and Ham Tien strip": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E8",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E9",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E10",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E11",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E12",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E13",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E14",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E15",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E16",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E17",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E18",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E19",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E20",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E21",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E22",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E23",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E24",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E25",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E26",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E27",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E28",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E29",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop"
+      },
+      {
+        "id": "E30",
+        "about_stop": true,
+        "kind": "local_edition",
+        "source": "Mũi Né",
+        "why": "its lead's subject is the stop (infobox)"
+      },
+      {
+        "id": "E31",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (13x)"
+      },
+      {
+        "id": "E32",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (8x)"
+      },
+      {
+        "id": "E33",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (3x)"
+      }
+    ],
+    "Linh Son Truong Tho Pagoda": [
+      {
+        "id": "E1",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (15x)"
+      },
+      {
+        "id": "E2",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (20x)"
+      },
+      {
+        "id": "E3",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (23x)"
+      },
+      {
+        "id": "E4",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (20x)"
+      },
+      {
+        "id": "E5",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (21x)"
+      },
+      {
+        "id": "E6",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (20x)"
+      },
+      {
+        "id": "E7",
+        "about_stop": true,
+        "kind": "snippet",
+        "source": "snippet",
+        "why": "names the stop in its first sentence (1x)"
+      }
+    ]
+  }
+}

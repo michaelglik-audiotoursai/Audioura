@@ -138,8 +138,8 @@ EV_LEGEND = ("Delta Shrine is steeped in a legend of healing that is still passe
 
 def test_legend_is_disclosed_as_a_legend_with_one_sentence():
     s = rc.legend_disclosure("Delta Shrine", EV_LEGEND)
-    assert s and s.startswith("Local legend ") and "Queen Mother Omega" in s
-    assert "rather than documented history" in s and len(rc.split_sentences(s)) == 1
+    assert s and s.startswith("Delta Shrine is steeped in a legend of ")   # [897]
+    assert len(rc.split_sentences(s)) == 1
     assert rc.is_legend_disclosure(s)
 
 
@@ -155,12 +155,12 @@ def test_gate_adds_the_legend_once_and_only_on_a_route():
     ev = {"Delta Shrine": EV_LEGEND}
     nop = lambda *a, **k: (None, 0, 0)  # noqa: E731
     out, rep = g.ground_tour_text(t, ev, location="x", classify_fn=nop, register="driving")
-    assert out.count("Local legend ties Delta Shrine") == 1
+    assert out.count("Delta Shrine is steeped in a legend of") == 1
     out2, _ = g.ground_tour_text(out, ev, location="x", classify_fn=nop, register="driving")
-    assert out2.count("Local legend ties Delta Shrine") == 1             # idempotent
+    assert out2.count("Delta Shrine is steeped in a legend of") == 1             # idempotent
     rc.clear_route()
     out3, _ = g.ground_tour_text(t, ev, location="x", classify_fn=nop, register="driving")
-    assert "Local legend" not in out3
+    assert "steeped in a legend" not in out3
 
 
 def test_a_disclosed_legend_survives_the_855b_legend_gate():
@@ -311,8 +311,7 @@ class TestReplay894B:
 
     def test_legend_disclosed_as_legend(self, out):
         st = self._stops(out)[6]
-        assert re.search(r"(?i)local legend ties Linh Son Truong Tho Pagoda", st)
-        assert "documented history" in st
+        assert re.search(r"(?i)Linh Son Truong Tho Pagoda is steeped in a legend of", st)   # [897] evidence wording
 
     def test_no_filler_stop_8(self, out):
         st = self._stops(out)[8].lower()

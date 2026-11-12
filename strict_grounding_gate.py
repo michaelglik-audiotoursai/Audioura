@@ -833,7 +833,10 @@ def sensory_body(title: str, kept: List[str], target: int,
                  else _SENSORY_TEMPLATES)
         if i >= len(_tpls):
             break
-        cand = _tpls[i].format(t=title)
+        # [LOCAL-897] "As you pass The cable car ascent," read as two sentences to the broken-join
+        # repair ("As you pass. The cable car ...") -- a leading article is lower-cased mid-sentence
+        _t = re.sub(r"^(The|A|An)\s", lambda m: m.group(1).lower() + " ", (title or "").strip())
+        cand = _tpls[i].format(t=_t)
         i += 1
         if not any(_fold(cand)[:30] == _fold(b)[:30] for b in base):
             base.append(cand)
@@ -1142,15 +1145,18 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
         import route_content_896 as _rc896l
         if _rc896l.active():
             for _n, _t, _b in _split_blocks(new_text):
-                _ld = _rc896l.legend_disclosure(_t, _lookup(norm_ev, _t) or "")
+                _lds = _rc896l.legend_sentences(_t, _lookup(norm_ev, _t) or "")
+                _ld = _lds[-1] if _lds else None
                 if not _ld:
                     continue
                 _cur = _content_sentences(_block_body_prose(_block_for(new_text, _n) or ""))
                 if any(_rc896l.is_legend_disclosure(x) for x in _cur):
                     continue
+                # [LOCAL-897] a fact the evidence states plainly beside the legend stays a fact
+                _lds = [x for x in _lds if not any(_fold(x) == _fold(c) for c in _cur)]
                 _dis = [i for i, x in enumerate(_cur) if _fold(NO_HISTORY_DISCLOSURE)[:30] in _fold(x)]
                 _at = _dis[0] if _dis else len(_cur)
-                new_text = _replace_block_body(new_text, _n, _cur[:_at] + [_ld] + _cur[_at:])
+                new_text = _replace_block_body(new_text, _n, _cur[:_at] + _lds + _cur[_at:])
                 rep["legends_disclosed"] = rep.get("legends_disclosed", 0) + 1
                 if log:
                     log(f"  [LOCAL-896] Stop {_n} '{_t[:40]}': evidence calls it a legend -> disclosed as "
