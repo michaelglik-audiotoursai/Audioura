@@ -310,6 +310,35 @@ def _article_text(ev: str, title: str, entries: List[Dict]) -> Tuple[str, str]:
     return " ".join(art), " ".join(web)
 
 
+def _object_words(x: str) -> set:
+    """Content words of a sentence that name WHAT is measured (statue, reclining, buddha ...)."""
+    stop = set("the a an and of in on at is are was were with this that which it its to for from by as has have had be "
+               "long high tall wide deep meters metres meter metre feet foot km you see here there can one about around "
+               "stretching measuring reaching standing behind main hall".split())
+    return {w for w in re.findall(r"[a-z]{4,}", (x or "").lower()) if w not in stop}
+
+
+def other_stops_article_values(st_title: str, sentence: str, dim: str, all_: List[Dict], ev_map: Dict,
+                               min_shared: int = 2) -> List[Dict]:
+    """[LOCAL-906O] This stop's evidence holds no article value for the dimension: the tour's OTHER stops' ARTICLE evidence
+    about the same object (a sentence sharing >= ``min_shared`` object words with the sentence, same dimension)."""
+    mine = _object_words(sentence)
+    out: List[Dict] = []
+    for o in all_:
+        t = o.get("title", "")
+        if t == st_title:
+            continue
+        ev = rc._ev_for(ev_map, t) or ""
+        if not ev.strip():
+            continue
+        art, _web = _article_text(ev, t, c._entries_for(t))
+        for sent in rc.split_sentences(art):
+            if len(mine & _object_words(sent)) < min_shared:
+                continue
+            out.extend(mm for mm in measures(sent) if mm["dim"] == dim)
+    return out
+
+
 def resolve_measure_conflicts(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                               log: Optional[Callable] = None) -> str:
     """A body measure ("11 meters high") whose stop evidence holds ANOTHER value for the same dimension ("7 meters high"):
@@ -350,6 +379,12 @@ def resolve_measure_conflicts(tour_text: str, evidence_by_title: Optional[Dict[s
                             if not any(_same(v["m"], d["m"]) for d in out_):
                                 out_.append(v)
                         return out_
+                    if not av:       # [LOCAL-906O] no article value here: the same object's article value elsewhere in the tour
+                        fb = _distinct(other_stops_article_values(title, x, dim, _all, ev_map))
+                        if len(fb) == 1 and not any(_same(mm["m"], v["m"]) for v in fb):
+                            av = fb
+                            emit(f'  [LOCAL-906O] Stop {st["num"]}: no article value for the {dim} in its own evidence; '
+                                 f'the same object\'s article value from another stop is used')
                     if av and len(_distinct(av)) == 1:
                         v = av[0]
                         s, e = mm["span"]

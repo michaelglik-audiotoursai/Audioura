@@ -66,6 +66,9 @@ def set_dest_reference(pt: Optional[Pt], name: str = "") -> None:
     if pt and (pt[0] or pt[1]):
         _STATE["dest_ref"] = (float(pt[0]), float(pt[1]))
         _STATE["dest_ref_name"] = name or ""
+        ep = _STATE.get("endpoints")        # [LOCAL-906O] the far end cached BEFORE the reference existed is replaced now
+        if ep and ep[0] is not None:
+            _STATE["endpoints"] = (ep[0], _STATE["dest_ref"])
 
 
 def dest_reference() -> Optional[Pt]:
@@ -80,21 +83,28 @@ def destination_reference(area=None, dest: str = "", resolve_fn: Optional[Callab
     try:
         if not dest:
             return None
-        pt = None
+        pt, src = None, ""
         if area is not None and getattr(area, "place_ref_precision", "") == "place" \
                 and (getattr(area, "place_ref_lat", 0) or getattr(area, "place_ref_lng", 0)) \
                 and _names(getattr(area, "place_ref_name", "") or "", dest):
             pt = (float(area.place_ref_lat), float(area.place_ref_lng))
+            src = "901 area place reference"
         if pt is None and resolve_fn is not None:
             got = resolve_fn(dest)
             if isinstance(got, dict) and (got.get("lat") or got.get("lng")):
                 pt = (float(got["lat"]), float(got["lng"]))
+                src = str(got.get("source") or "place reference chain")
             elif got and not isinstance(got, dict):
                 pt = (float(got[0]), float(got[1]))
+                src = "place reference chain"
         if pt:
             set_dest_reference(pt, dest)
+            emit(f"  [LOCAL-906O] destination {dest!r} -> {pt[0]:.4f},{pt[1]:.4f} via {src}")
             emit(f"  [LOCAL-906M] destination {dest!r} place reference {pt[0]:.4f},{pt[1]:.4f} "
                  f"(preferred over a geocoded street address)")
+        else:
+            emit(f"  [LOCAL-906O] destination {dest!r} -> no place reference (901 / 906D chain found nothing); "
+                 f"the geocoded address stays")
         return pt
     except Exception as err:  # pragma: no cover
         emit(f"  [LOCAL-906M] destination reference skipped (non-fatal): {err}")
@@ -167,17 +177,23 @@ def max_backtrack(ts: Sequence[Optional[float]]) -> float:
     return max([0.0] + [known[i] - known[i + 1] for i in range(len(known) - 1)])
 
 
-def order_stops(pins: Sequence[Optional[Pt]], a: Pt, b: Pt, dest_idx: Optional[int] = None) -> List[int]:
+def order_stops(pins: Sequence[Optional[Pt]], a: Pt, b: Pt, dest_idx: Optional[int] = None,
+                sub_idx: Sequence[int] = ()) -> List[int]:
     """Indices in A->B order: sorted by projection, the destination stop last. A stop with no pin keeps its place
-    right after the stop that preceded it in the given order (never dropped). Deterministic: ties on the index."""
+    right after the stop that preceded it in the given order (never dropped). Deterministic: ties on the index.
+    [LOCAL-906O] A SUB-STOP of the destination (``sub_idx``: it is on / at the destination) goes after every other
+    stop and before the destination itself, whatever its pin says."""
     n = len(pins)
+    subs = {i for i in sub_idx if i != dest_idx and 0 <= i < n}
     ts = [None if p is None else along(p, a, b) for p in pins]
-    known = sorted((i for i in range(n) if ts[i] is not None and i != dest_idx), key=lambda i: (ts[i], i))
+    known = sorted((i for i in range(n) if ts[i] is not None and i != dest_idx and i not in subs),
+                   key=lambda i: (ts[i], i))
     out: List[int] = list(known)
+    out += sorted(subs, key=lambda i: (1, ts[i] if ts[i] is not None else 9e9, i))
     if dest_idx is not None:
         out.append(dest_idx)
     for i in range(n):
-        if ts[i] is not None or i == dest_idx:
+        if (ts[i] is not None and i not in subs) or i == dest_idx or i in subs:
             continue
         prev = next((j for j in range(i - 1, -1, -1) if j in out), None)
         at = 0 if prev is None else out.index(prev) + 1
@@ -189,6 +205,32 @@ def order_stops(pins: Sequence[Optional[Pt]], a: Pt, b: Pt, dest_idx: Optional[i
 
 def _names(title: str, place: str) -> bool:
     return rc._names(title, place)
+
+
+_SUB_FIELDS = ("address", "description", "summary", "blurb", "why", "location_hint", "wiki_extract", "context", "type")
+
+
+def dest_substops(poi_list: Sequence[Dict], destination: str, extra_text: Optional[Dict[str, str]] = None) -> List[int]:
+    """[LOCAL-906O] Indices of the stops that are ON / AT the destination (not the destination stop itself): the stop's
+    name, address or own description names the destination (\"Linh Son Pagoda ... on <Mountain>\"). Such a stop is the
+    destination's sub-stop and belongs after the others (before the destination), never first."""
+    out: List[int] = []
+    if not destination:
+        return out
+    di = dest_index([str(p.get("name", "")) for p in poi_list or []], destination)
+    for i, p in enumerate(poi_list or []):
+        if i == di or not isinstance(p, dict):
+            continue
+        name = str(p.get("name", ""))
+        if _names(name, destination):
+            out.append(i)
+            continue
+        text = " ".join(str(p.get(k) or "") for k in _SUB_FIELDS)
+        if extra_text:
+            text += " " + str(extra_text.get(name, ""))
+        if text.strip() and _names(text, destination):
+            out.append(i)
+    return out
 
 
 def dest_index(titles: Sequence[str], destination: str) -> Optional[int]:
@@ -350,11 +392,14 @@ def reorder_on_pins(poi_list: List[Dict], a: Pt, b: Pt, destination: str, log: O
     pins = [_poi_pin(p) for p in poi_list]
     ts = [None if pt is None else along(pt, a, b) for pt in pins]
     di = dest_index([str(p.get("name", "")) for p in poi_list], destination)
+    subs = dest_substops(poi_list, destination)
+    tail_ok = not subs or all(k > max([j for j in range(len(poi_list)) if j not in subs and j != di] or [-1])
+                              for k in subs)       # [LOCAL-906O] every sub-stop after the ordinary stops
     back = max_backtrack(ts)
-    if only_if_backtrack and back <= MAX_BACKTRACK and (di is None or di == len(poi_list) - 1):
+    if only_if_backtrack and back <= MAX_BACKTRACK and (di is None or di == len(poi_list) - 1) and tail_ok:
         emit(f"  {TAG} route order kept (largest step back {back * 100:.0f}% <= {MAX_BACKTRACK * 100:.0f}%)")
         return poi_list
-    order = order_stops(pins, a, b, di)
+    order = order_stops(pins, a, b, di, subs)
     new = [poi_list[i] for i in order]
     if order != list(range(len(poi_list))):
         emit(f"  {TAG} route ordered along the origin->destination line (was doubling back {back * 100:.0f}%): "
@@ -430,7 +475,11 @@ def order_poi_list(poi_list: List[Dict], geocode_fn: Optional[Callable] = None, 
                     pass
             pins.append(pt)
         di = dest_index([str(p.get("name", "")) for p in poi_list], info["destination"])
-        order = order_stops(pins, a, b, di)
+        subs = dest_substops(poi_list, info["destination"])
+        if subs:
+            emit(f"  [LOCAL-906O] sub-stop(s) of the destination ordered after the others: "
+                 f"{[str(poi_list[k].get('name', '')) for k in subs]}")
+        order = order_stops(pins, a, b, di, subs)
         new = [poi_list[i] for i in order]
         back = max_backtrack([None if pins[i] is None else along(pins[i], a, b) for i in order])
         if order != list(range(len(poi_list))):
