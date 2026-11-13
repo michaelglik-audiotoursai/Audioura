@@ -6490,6 +6490,9 @@ _J = _jss.attach_to_module(__name__, {
 # else the id() of the job's poi list) and reset at the top of each generation,
 # so concurrent jobs in one process never read each other's facts.
 _THIN_FACTS_SINK = {}
+# [LOCAL-906J] {job key: {stop title: [SOURCE passages]}}: the page passage / search snippet each thin fact was read from.
+# The fact text itself may be a model paraphrase; only these passages are delivery evidence.
+_THIN_PASSAGES_SINK = {}
 
 
 def _hb_beat(job_id, label=""):
@@ -6520,6 +6523,11 @@ def _thin_sink_record(key, title, facts):
                 cur.append(t)
         if cur:
             bucket[title] = cur
+        pb = _THIN_PASSAGES_SINK.setdefault(key, {})
+        for f in facts or []:
+            ps = (f.get("passage", "") if isinstance(f, dict) else "").strip()
+            if ps and all(ps != x.get("text") for x in pb.setdefault(title, [])):
+                pb[title].append({"text": ps, "url": str(f.get("url", "") or ""), "kind": "web"})
     except Exception:
         pass
 
@@ -11764,6 +11772,7 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
         _sink_key = _thin_sink_key(job_id=job_id, poi_list=forced_stops)
         _J._THIN_SINK_KEY = _sink_key
         _THIN_FACTS_SINK[_sink_key] = {}
+        _THIN_PASSAGES_SINK[_sink_key] = {}     # [LOCAL-906J]
         _SIGNATURE_STORY_SINK[_sink_key] = {}  # [LOCAL-880] per-job signature sink
         _WIKI_EVIDENCE_SINK[_sink_key] = {}    # [LOCAL-884] per-job wiki-evidence sink
     except Exception:
@@ -22093,12 +22102,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     poi_list,
                 ),
             )
-            try:   # [LOCAL-906H] the fact sheets' confirmed facts are per-stop evidence for the delivery guards
-                import delivery_evidence_906h as _de906h
-                _de906h.add({str(_n): [str(x) for x in (fs.get('confirmed_facts') or [])]
-                             for _n, fs in zip(_poi_names, _storied_fact_sheets or []) if fs}, "fact-sheet")
-            except Exception:
-                pass
+            # [LOCAL-906J] the fact sheets' confirmed_facts are model-written: NEVER delivery evidence (D771 / LOCAL-892)
             if _storied_fact_sheets:
                 _valid_sheets = sum(1 for fs in _storied_fact_sheets if fs is not None)
                 print(f"  [Storied] Fact sheets: {_valid_sheets}/{len(_poi_names)} generated")
@@ -36040,7 +36044,33 @@ RULES:
                 _rc904.set_evidence_904(_evf)
                 try:   # [LOCAL-906H] the 889 key-fact evidence (thin facts + direct snippets + wiki) is the delivery evidence
                     import delivery_evidence_906h as _de906h
-                    _de906h.add(_evf, "889")
+                    # [LOCAL-906J] SOURCE text only: the search snippets + wiki articles + the thin facts' own source
+                    # passages. NOT _evf as a whole (its thin-fact entries are model paraphrases), never the fact sheet,
+                    # the 880 signature story or a refill sentence.
+                    _pure906j = {}
+                    for _sk, _sv in (_THIN_PASSAGES_SINK.get(_J._THIN_SINK_KEY, {}) or {}).items():
+                        _pure906j[str(_sk)] = list(_sv)
+                    for _sk, _items in dict(_WIKI_EVIDENCE_SINK.get(_J._THIN_SINK_KEY, {}) or {}).items():
+                        for _x in (_items or []):
+                            if str(_x).strip():
+                                _isart = "wikipedia" in str(_x)[:200].lower()
+                                _pure906j.setdefault(str(_sk), []).append(
+                                    {"text": str(_x), "kind": "article" if _isart else "web",
+                                     "url": "https://en.wikipedia.org/" if _isart else ""})
+                    for _sk, _snips in dict(getattr(_J, "_DIRECT_SNIPPETS_PER_STOP", {}) or {}).items():
+                        if str(_sk).startswith("__stop_"):
+                            continue
+                        import llm_evidence as _le906j
+                        for _s in _le906j.filter_records(_snips):
+                            if isinstance(_s, dict):
+                                _u = str(_s.get("url") or _s.get("link") or "")
+                                for _f in ("title", "snippet"):
+                                    if _s.get(_f):
+                                        _pure906j.setdefault(str(_sk), []).append(
+                                            {"text": str(_s.get(_f)), "url": _u, "kind": "web"})
+                            else:
+                                _pure906j.setdefault(str(_sk), []).append({"text": str(_s), "kind": "web"})
+                    _de906h.add(_pure906j, "889")
                 except Exception:
                     pass
                 try:   # [LOCAL-906] the first-stop tone guard reads the stops' signature stories

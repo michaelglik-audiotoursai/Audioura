@@ -46,8 +46,9 @@ def _run(text, **kw):
 def test_no_evidence_arg_but_store_filled_drops_unsupported_superlative():
     de.add(EV, "889")                      # what the mocked 889 key-fact step does
     out, logs = _run(TOUR)                 # NO evidence argument
-    assert "in all of <Region>" not in out
-    assert any("[LOCAL-906C]" in m and "superlative scope unsupported" in m for m in logs), logs
+    # [LOCAL-906J] the evidence HEDGES the same superlative and scope: the claim is rewritten to the hedge, not dropped
+    assert "is the largest reclining" not in out and "It is one of the largest reclining Buddhas in all of <Region>." in out
+    assert any("[LOCAL-906J]" in m and "superlative hedged to match the evidence" in m for m in logs), logs
     assert any("[LOCAL-906H] delivery evidence: 1/2 stops (889:1)" in m for m in logs), logs
 
 
@@ -71,17 +72,18 @@ def test_summary_line_counts_stops_and_changes():
     assert re.search(r"\d+ change\(s\)", line[0])
 
 
-def test_904_stash_fills_the_store():
+def test_904_stash_does_not_fill_the_store_but_still_judges():
+    # [LOCAL-906J] the 904 blob carries model-written thin facts: it is NOT delivery evidence in the store (purity)
     rc.set_evidence_904(EV)
-    assert de.get() == EV
+    assert de.get() == {}
     out, _ = _run(TOUR)
-    assert "in all of <Region>" not in out
+    assert "is the largest reclining" not in out          # the stash still reaches the guards, which hedge the claim
 
 
 def test_explicit_evidence_still_wins():
     de.add({"<Statue>": "The <Statue> is the largest reclining Buddha in all of <Region>."}, "889")
     out, _ = _run(TOUR, evidence_by_title=EV)
-    assert "in all of <Region>" not in out
+    assert "is the largest reclining" not in out and "one of the largest reclining Buddhas" in out
 
 
 def test_store_is_job_scoped():
@@ -105,7 +107,7 @@ def test_drop_unsupported_claims_uses_store():
     import route_leftovers_906 as l906
     de.add(EV, "889")
     out = l906.drop_unsupported_claims(TOUR, None, log=lambda m: None)
-    assert "in all of <Region>" not in out
+    assert "is the largest reclining" not in out            # [LOCAL-906J] hedged (or dropped), never the unhedged claim
 
 
 # ── item 3 ───────────────────────────────────────────────────────────────────────────────────────────────

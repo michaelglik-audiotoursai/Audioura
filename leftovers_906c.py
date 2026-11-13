@@ -15,6 +15,7 @@ HTML comments (``<!-- ... -->``) are never body sentences here.
 """
 from __future__ import annotations
 
+import functools
 import re
 from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
@@ -127,6 +128,17 @@ def scope_covers(evidence_scope: str, claim_scope: str) -> bool:
 
 
 def scoped_claim(sentence: str, include_hedged: bool = False) -> Optional[Dict]:
+    """Cached wrapper: the result is read-only to every caller ([LOCAL-906J]: the delivery pass asks about the same sentence
+    several times). See ``_scoped_claim``."""
+    return _scoped_claim_cached(sentence or "", bool(include_hedged))
+
+
+@functools.lru_cache(maxsize=4096)
+def _scoped_claim_cached(sentence: str, include_hedged: bool) -> Optional[Dict]:
+    return _scoped_claim(sentence, include_hedged)
+
+
+def _scoped_claim(sentence: str, include_hedged: bool = False) -> Optional[Dict]:
     """{'word', 'cls', 'scope', 'rank', 'toks', 'hedged'} for a sentence that makes a superlative / exclusivity claim
     for a named area (\"the longest reclining Buddha in <Region>\", \"the only country in <Region> to grow <fruit>\",
     \"the largest X in all of <Region>\", \"<Region>'s largest X\").
@@ -160,6 +172,13 @@ def scoped_claim(sentence: str, include_hedged: bool = False) -> Optional[Dict]:
     if pm:
         w = pm.group("w").lower()
         scope = pm.group("s").strip()
+        if _ONE_OF.search(x[:pm.start()].rstrip() + " "):          # [LOCAL-906J] "one of <Region>'s largest X"
+            if not include_hedged:
+                return None
+            stripped = x[:pm.start()] + " " + x[pm.end():]
+            toks = {t for t in rc._content_tokens(_plain(stripped)) if t not in _NOISE_C}
+            return {"word": w, "cls": _CLASS.get(w, w), "scope": re.sub(r"(?i)^the\s+", "", scope),
+                    "rank": scope_rank(scope), "toks": toks, "hedged": True}
         stripped = x[:pm.start()] + " " + x[pm.end():]
         toks = {t for t in rc._content_tokens(_plain(stripped)) if t not in _NOISE_C}
         return {"word": w, "cls": _CLASS.get(w, w), "scope": re.sub(r"(?i)^the\s+", "", scope),
@@ -204,6 +223,177 @@ def check_claim(sentence: str, evidence: str, title: str = "") -> Tuple[str, Opt
     return "bad", narrower
 
 
+# ══ 1b. [LOCAL-906J] a hedge anywhere wins ═══════════════════════════════════════════════════════════════
+_J = "[LOCAL-906J]"
+_SIZE_CLASSES = {"size", "length", "height", "age", "depth", "width", "small"}
+
+
+def _plural(word: str) -> str:
+    w = word or ""
+    lw = w.lower()
+    if not w or lw.endswith("s") and not lw.endswith("ss"):
+        return w                                   # already plural ("statues")
+    if re.search(r"(?i)[^aeiou]y$", w):
+        return w[:-1] + "ies"
+    if re.search(r"(?i)(?:s|x|z|ch|sh)$", w):
+        return w + "es"
+    return w + "s"
+
+
+def _hedge_text(x: str) -> Optional[str]:
+    """``x`` (an unhedged size superlative for a scope) rewritten as the hedged form, grammar included:
+    "This statue is the largest reclining Buddha in <Region>." -> "... is one of the largest reclining Buddhas in <Region>."
+    None when the sentence has no such shape."""
+    m = _SUP_RX.search(x)
+    if m and m.group(1).lower() in {"largest", "biggest", "greatest", "longest", "tallest", "highest", "oldest", "deepest",
+                                    "widest", "smallest"}:
+        rest = x[m.end():]
+        sm = _SCOPE_RX.search(rest)
+        if not sm:
+            return None
+        np_ = rest[:sm.start()]
+        # the head noun: the last word before " of " when there is one, else the last word of the noun phrase
+        if re.search(r"\bof\b", np_):
+            head = re.match(r"(?s)^(.*?)(\b[\w'’\-]+)(\s+of\b.*)$", np_)
+            np2 = (head.group(1) + _plural(head.group(2)) + head.group(3)) if head else np_
+        else:
+            wm = re.search(r"([\w'’\-]+)(\s*)$", np_)
+            np2 = (np_[:wm.start()] + _plural(wm.group(1)) + wm.group(2)) if wm else np_
+        lead = x[:m.start()]
+        return lead + "one of the " + m.group(1).lower() + np2 + rest[sm.start():]
+    pm = _POSS_RX.search(x)
+    if pm and pm.group("w").lower() in {"largest", "biggest", "greatest", "longest", "tallest", "highest", "oldest", "deepest",
+                                         "widest", "smallest"}:
+        after = x[pm.end():]
+        nm = re.match(r"((?:\s+[\w'’\-]+)+?)(?=\s+(?:in|on|at|of|with|by|for|from|to|that|which|and|is|are|was)\b|\s*[.,;:!?]|\s*$)", after)
+        if nm:
+            np_ = nm.group(1)
+            wm = re.search(r"([\w'’\-]+)$", np_)
+            after = np_[:wm.start()] + _plural(wm.group(1)) + after[nm.end():]
+        return x[:pm.start()] + "one of " + x[pm.start():pm.end()] + after
+    return None
+
+
+def hedged_by_evidence(sentence: str, evidence: str, title: str = "") -> Optional[str]:
+    """The hedged rewrite of an UNHEDGED size superlative when ANY evidence sentence hedges the same superlative class for
+    the same scope ("one of the largest ... in <Region>", "among the largest ..."); None otherwise. A hedge anywhere wins."""
+    c = scoped_claim(sentence)
+    if not c or c["hedged"] or c["cls"] not in _SIZE_CLASSES or _local_scope(c, title):
+        return None
+    for es in rc.split_sentences(evidence or ""):
+        e = scoped_claim(es, include_hedged=True)
+        if not e or not e["hedged"] or e["cls"] != c["cls"]:
+            continue
+        if _scope_key(e["scope"]) != _scope_key(c["scope"]):
+            continue
+        ct = c["toks"] - set(rc._content_tokens(title))
+        et = e["toks"] - set(rc._content_tokens(title))
+        if not (ct and et and len(ct & et) >= min(2, len(ct))) and ct and et:
+            continue
+        new = _hedge_text(sentence)
+        if new and new != sentence:
+            return new
+    return None
+
+
+# ══ 1c. [LOCAL-906J] record claims are scoped claims ═════════════════════════════════════════════════════
+_REC_WORDS = r"(?:highest|longest|largest|tallest|biggest|deepest|oldest|widest|fastest|steepest|smallest|most)"
+_RECORD_RX = re.compile(
+    r"(?i)\b(?:(?:world|guinness|national|all-time|official)[\s-]records?\b"
+    r"|record[\s-]breaking\b"
+    r"|(?:holds?|held|holding|owns?|set|sets|setting|broke|breaks|breaking)\s+(?:the\s+|a\s+)?(?:[\w\-]+\s+){0,2}?records?\b"
+    r"|records?\s+for\s+(?:the\s+)?" + _REC_WORDS + r"\b)")
+_REC_NOISE = {"record", "records", "holds", "hold", "held", "world", "guinness", "official", "breaking", "highest", "longest",
+              "largest", "tallest", "biggest", "deepest", "oldest", "widest", "fastest", "steepest", "smallest", "national",
+              "alltime", "this", "that", "which", "title"}
+
+
+def record_claim(sentence: str) -> Optional[Dict]:
+    """{'scope', 'rank', 'toks', 'kind'} for a record claim ("holds the (world) record for ...", "a (Guinness) world record",
+    "record-breaking", "record for the highest ...", "the world's highest / longest ..."); the scope is the WORLD unless
+    stated otherwise. A hedged "one of the ..." is not a record claim. None for anything else."""
+    x = sentence or ""
+    m = _RECORD_RX.search(x)
+    kind = "record"
+    scope = "world"
+    if m:
+        if re.search(r"(?i)\bnational", m.group(0)):
+            scope = "country"
+        sm = _SCOPE_RX.search(x[m.end():])
+        if sm:
+            scope = (sm.group("s") or sm.group("s2") or "").strip() or scope
+        stripped = x[:m.start()] + " " + x[m.end():]
+    else:
+        c = scoped_claim(x)
+        if not c or c["hedged"] or c["cls"] not in _SIZE_CLASSES or c["rank"] != 6.0:
+            return None                        # only the world's superlatives are record claims here
+        kind, scope, stripped = "world-superlative", c["scope"], None
+    if _ONE_OF.search(x[:m.start()].rstrip() + " " if m else ""):
+        return None
+    toks = ({t for t in rc._content_tokens(_plain(stripped)) if t not in _NOISE_C and t not in _REC_NOISE}
+            if stripped is not None else {t for t in c["toks"] if t not in _REC_NOISE})
+    return {"scope": scope, "rank": scope_rank(scope), "toks": toks, "kind": kind, "cls": (scoped_claim(x) or {}).get("cls")}
+
+
+def record_support(sentence: str, evidence: str, title: str = "", entries: Optional[List[Dict]] = None) -> str:
+    """'na' (not a record claim / the stop's own venue) | 'ok' | 'bad'. Supported only when a NON-LLM source for this stop
+    states a record for the same object. For WORLD scope that source must be a reference (encyclopedia, an official /
+    record body page) OR two independent web domains; one web snippet is not enough. ``entries`` are the delivery
+    store's per-entry provenance ({text, kind, domain}); without them (a caller-passed plain evidence string) the text
+    alone is judged."""
+    c = record_claim(sentence)
+    if not c:
+        return "na"
+    if c["scope"] and rc._content_tokens(_plain(c["scope"])) and rc._content_tokens(_plain(c["scope"])) <= rc._content_tokens(title):
+        return "na"
+
+    def states(text: str) -> bool:
+        for es in rc.split_sentences(text or ""):
+            e = record_claim(es)
+            if not e:
+                continue
+            if c["kind"] == "world-superlative" and e["kind"] == "world-superlative" and e["cls"] != c["cls"]:
+                continue
+            if not (e["scope"] and c["scope"]) or (c["rank"] is not None and e["rank"] is not None and e["rank"] < c["rank"]):
+                continue
+            shared = len(c["toks"] & e["toks"])
+            if shared >= min(2, len(c["toks"])) and (shared >= 1 or not c["toks"]):
+                return True
+        return False
+    ents = [en for en in (entries or []) if (en.get("kind") in ("article", "web", "user-article"))]
+    if not ents:
+        return "ok" if states(evidence) else "bad"
+    sup = [en for en in ents if states(en.get("text", ""))]
+    if not sup:
+        return "bad"
+    if c["rank"] is not None and c["rank"] < 6.0 and c["scope"] != "world":
+        return "ok"                                            # a narrower stated scope: any non-LLM statement
+    try:
+        import delivery_evidence_906h as _de
+        ref = any(en.get("kind") == "article" or _de.is_reference_domain(en.get("domain", "")) for en in sup)
+    except Exception:  # pragma: no cover
+        ref = any(en.get("kind") == "article" for en in sup)
+    domains = {en.get("domain") for en in sup if en.get("domain")}
+    return "ok" if ref or len(domains) >= 2 else "bad"
+
+
+
+def _entries_for(title: str) -> List[Dict]:
+    """The delivery store's per-entry provenance for a stop title (exact, else a folded key that contains / is contained)."""
+    try:
+        import delivery_evidence_906h as _de
+        allv = _de.entries()
+        f = rc.fold(title)
+        out: List[Dict] = []
+        for k, v in allv.items():
+            fk = rc.fold(k)
+            if fk == f or (fk and f and (fk in f or f in fk)):
+                out.extend(v)
+        return out
+    except Exception:  # pragma: no cover
+        return []
+
+
 def drop_unsupported_scope_claims(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                                   log: Optional[Callable] = None, require_evidence_map: bool = True) -> str:
     """Item 2. On ANY tour: a scoped superlative / exclusivity sentence whose scope the stop's evidence does not
@@ -232,6 +422,18 @@ def drop_unsupported_scope_claims(tour_text: str, evidence_by_title: Optional[Di
                 out: List[str] = []
                 for x in sents:
                     if rc._CLOSING_LINE.match(x):
+                        out.append(x)
+                        continue
+                    hedged = hedged_by_evidence(x, _ev, _t)           # [LOCAL-906J] a hedge anywhere wins
+                    if hedged:
+                        emit(f'  {_J} Stop {_n}: superlative hedged to match the evidence: "{x[:80]}"')
+                        x = hedged
+                    rec = record_support(x, _ev, _t, _entries_for(_t)) if (record_claim(x) and (_ev or not no_map)) else "na"
+                    if rec == "bad":
+                        emit(f'  {_J} Stop {_n}: record claim unsupported by a non-LLM source (reference or 2 domains for '
+                             f'world scope): "{x[:80]}"')
+                        continue
+                    if rec == "ok":
                         out.append(x)
                         continue
                     status, narrower = check_claim(x, _ev, _t)
@@ -704,6 +906,86 @@ def repair_pronoun_opener(tour_text: str, log: Optional[Callable] = None) -> str
         return tour_text
 
 
+# ══ 4. [LOCAL-906J] a thing referent with no antecedent ══════════════════════════════════════════════════
+_THING_HEADS = frozenset(
+    "pagoda temple statue church cathedral tower shrine mosque monastery palace castle bridge monument mausoleum fountain "
+    "gate fort lighthouse building hall tomb museum market station garden park cave waterfall lake".split())
+_THING_OPEN = re.compile(r"^The\s+(?P<head>" + "|".join(sorted(_THING_HEADS)) + r")(?P<poss>['\u2019]s)?\b(?P<rest>.*)$", re.S | re.I)
+_NAME_TOK = r"(?:<[^>]{1,40}>|[A-ZÀ-Ỹ][\w'’\-]*)"
+
+
+def _named_things(evidence: str, head: str) -> List[str]:
+    """Names in the evidence that end with the generic ``head`` ("Shwe Pagoda", "<Pagoda>"), one per distinct name."""
+    H = head.capitalize()
+    found: List[str] = []
+    for m in re.finditer(r"(?:<[^>]{0,38}\b" + H + r"\b[^>]{0,38}>|<" + H + r">|(?:" + _NAME_TOK + r"\s+(?:(?:of|de|da)\s+)?){1,3}" + H + r"\b)",
+                         evidence or ""):
+        n = re.sub(r"^(?:The|A|An)\s+", "", m.group(0).strip())
+        if n and rc.fold(n) not in {rc.fold(x) for x in found}:
+            found.append(n)
+    # one thing under two spellings: a name whose words are a subset of another's is the same
+    keep: List[str] = []
+    for n in sorted(found, key=lambda z: -len(z)):
+        wn = set(rc._words(re.sub(r"[<>]", " ", n)))
+        if not any(wn <= set(rc._words(re.sub(r"[<>]", " ", k))) for k in keep):
+            keep.append(n)
+    return keep
+
+
+def repair_thing_referent(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
+                          log: Optional[Callable] = None) -> str:
+    """A body sentence that opens "The <generic noun>'s ..." / "The <generic noun> ..." (pagoda / temple / statue / ...) when
+    that noun (or a name ending in it) is in neither the stop title nor an earlier sentence of the stop has no antecedent.
+    When the stop's own evidence names exactly one such thing it is named ("The <Pagoda>'s presence ..."); else the
+    sentence is dropped."""
+    emit = _emit(log)
+    if not tour_text:
+        return tour_text
+    try:
+        ev_map = _ev_map(evidence_by_title)
+        n_stops = len(_stops_info(tour_text))
+        for k in range(n_stops):
+            infos = _stops_info(tour_text)
+            if k >= len(infos):
+                break
+            info = infos[k]
+            sents = list(info["sents"])
+            if not sents:
+                continue
+            ev = rc._ev_for(ev_map, info["title"]) or ""
+            title_f = " " + " ".join(rc.fold(re.sub(r"[<>]", " ", info["title"] or "")).split()) + " "
+            new: List[str] = []
+            changed = False
+            for x in sents:
+                m = _THING_OPEN.match(x)
+                if not m:
+                    new.append(x)
+                    continue
+                head = m.group("head").lower()
+                seen = title_f + " ".join(rc.fold(re.sub(r"[<>]", " ", y)) for y in new)
+                if re.search(r"\b" + head + r"s?\b", seen):
+                    new.append(x)
+                    continue
+                cands = _named_things(ev, head)
+                if len(cands) == 1:
+                    name = cands[0]
+                    fixed = "The " + name + (m.group("poss") or "") + m.group("rest")
+                    emit(f'  {_J} Stop {info["num"]}: "The {head}" had no antecedent; named from the evidence ({name}): "{x[:80]}"')
+                    new.append(fixed)
+                else:
+                    emit(f'  {_J} Stop {info["num"]}: "The {head}" had no antecedent and the evidence names '
+                         f'{"none" if not cands else "several"} -> sentence dropped: "{x[:80]}"')
+                changed = True
+            if changed and new:
+                tour_text = _set_body(tour_text, info, new)
+            elif changed and not new:
+                tour_text = _set_body(tour_text, info, [])
+        return tour_text
+    except Exception as err:  # pragma: no cover
+        emit(f"  {_J} thing-referent repair skipped (non-fatal): {err}")
+        return tour_text
+
+
 # ══ the pass ═════════════════════════════════════════════════════════════════════════════════════════════
 def final_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                log: Optional[Callable] = None) -> str:
@@ -722,6 +1004,7 @@ def final_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = Non
         _emit(log)(f"  [LOCAL-906F] pass skipped (non-fatal): {err}")
     t = drop_unsupported_scope_claims(t, evidence_by_title, log)
     t = repair_you_see_here(t, log)
+    t = repair_thing_referent(t, evidence_by_title, log)      # [LOCAL-906J]
     t = distinct_filler_bodies(t, evidence_by_title, log)
     t = repair_pronoun_opener(t, log)         # [LOCAL-906E]
     try:   # [LOCAL-906F] what the removals above left must not open with a person pronoun or an orphan compound

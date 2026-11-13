@@ -335,14 +335,20 @@ def _passages_naming_stop(text: str, name: str, aliases: Sequence[str],
 class Fact:
     """A single extracted fact and the source URL it came from."""
 
-    __slots__ = ("text", "url")
+    __slots__ = ("text", "url", "passage")
 
-    def __init__(self, text: str, url: str = ""):
+    def __init__(self, text: str, url: str = "", passage: str = ""):
         self.text = (text or "").strip()
         self.url = (url or "").strip()
+        # [LOCAL-906J] the SOURCE text the fact was read from (a page passage / the search snippet). ``text`` may be
+        # the model's paraphrase; only ``passage`` is ever delivery evidence.
+        self.passage = (passage or "").strip()
 
     def as_dict(self) -> Dict[str, str]:
-        return {"text": self.text, "url": self.url}
+        d = {"text": self.text, "url": self.url}
+        if self.passage:
+            d["passage"] = self.passage
+        return d
 
     def __repr__(self) -> str:  # pragma: no cover - debug only
         return f"Fact({self.text[:40]!r}, {self.url!r})"
@@ -582,7 +588,7 @@ def escalate_thin_stop(
         if not text or len(text) < 120:
             # fetch failed or too thin — fall back to the snippet (still sourced)
             if r["snippet"]:
-                snippet_facts.append(Fact(r["snippet"], url))
+                snippet_facts.append(Fact(r["snippet"], url, r["snippet"]))
             continue
         # GEO-GATE: drop a page that names a famous same-name place elsewhere
         # and never names the tour's city (how 547 got Sydney).
@@ -595,7 +601,7 @@ def escalate_thin_stop(
         for p in kept[:6]:
             passages.append((url, p))
         if not kept and r["snippet"]:
-            snippet_facts.append(Fact(r["snippet"], url))
+            snippet_facts.append(Fact(r["snippet"], url, r["snippet"]))
 
     # 6. one cheap LLM extraction pass over the kept passages (respect the cap)
     facts: List[Fact] = list(snippet_facts)
@@ -619,15 +625,16 @@ def escalate_thin_stop(
                 except Exception:
                     fi = -1
                 src = passages[fi][0] if 0 <= fi < len(passages) else ""
+                src_passage = passages[fi][1] if 0 <= fi < len(passages) else ""
                 # only keep a fact that still names the stop or carries a specific
                 if snippet_names_stop(name, "", txt, aliases=all_aliases) or \
                         _YEAR_RE.search(txt) or _SPECIFIC_CUE.search(txt):
-                    facts.append(Fact(txt, src))
+                    facts.append(Fact(txt, src, src_passage))
         else:
             log(f"[LOCAL-873] LLM extraction skipped for {name!r} "
                 f"(cost cap ${cost_cap:.3f})")
             for url, p in passages[:6]:
-                facts.append(Fact(p, url))
+                facts.append(Fact(p, url, p))
 
     facts = _dedupe_facts(facts)
     report["facts"] = [f.as_dict() for f in facts]
