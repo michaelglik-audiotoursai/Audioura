@@ -200,3 +200,12 @@ def test_replay_stop_1():
     assert "Orla Mountain lies off National Route 1" in b1 or "rises off National Route 1" in b1, b1
     assert "is a mountain located" not in out and "Mount Mount" not in out
     assert len(rc.split_sentences(b1)) >= 4, b1
+
+
+def test_lead_verbatim_never_drops_a_qualifier():
+    """[LEAD review] 'the largest' is not the evidence's 'one of the largest'; 'was built' is not 'was not built'."""
+    import key_fact_coverage as kfc
+    ev = "The statue is one of the largest reclining Buddhas in <Region>, 49 meters long. The pagoda was not built in 1872 by the monk."
+    assert kfc.verbatim_supported("The statue is the largest reclining Buddhas in <Region>, 49 meters long.", ev) is None
+    assert kfc.verbatim_supported("The pagoda was built in 1872 by the monk himself.", ev) is None
+    assert kfc.verbatim_supported("The statue is one of the largest reclining Buddhas in <Region>, 49 meters long.", ev)
