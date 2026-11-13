@@ -1054,6 +1054,11 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
     except Exception as _e906m:  # pragma: no cover
         _emit(log)(f"  [LOCAL-906M] pass skipped (non-fatal): {_e906m}")
     t = drop_driving_practical(t, log)
+    try:   # [LOCAL-906O] a stop "actually located in" another city, ticket / hours / queue / half-day-tour copy, and the
+        import scope_906o as _s906o       # template closing on EVERY route / drive path (the 906M closing guard only ran in content_pass)
+        t = _s906o.run_pass(t, log)
+    except Exception as _e906o:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906O] pass skipped (non-fatal): {_e906o}")
     try:   # [LOCAL-906N] one builder, one spelling (before the cross-stop check sees "Tri" vs "Y" as a conflict)
         import nits_906n as _n906n
         t = _n906n.unify_builder_names(t, evidence_by_title, log)

@@ -10453,19 +10453,31 @@ def _get_user_stop_titles() -> set:
 
 
 def _anchors906m(title, poi_list) -> list:
-    """[LOCAL-906M] The anchors of a stop whose title names no place (\"The cable car ascent\"): the request's route
-    destination, else the previous / next NAMED stop. [] for a stop that names itself. Never raises."""
+    """[LOCAL-906M/906O] The anchors of a stop whose title names no place (\"The cable car ascent\", \"Dragon fruit
+    country\"): PLACE NAMES only (the request's destination, its province / country, the proper-name core of the
+    previous / next NAMED stop), never a neighbour's whole title. [] for a stop that names itself. Never raises."""
     try:
         import anchor_evidence_906m as _a
         if not _a.is_generic_title(title):
             return []
-        _dest = ''
+        _dest, _region = '', ''
         try:
             import route_order_909 as _r
-            _dest = ((_r.route() or {}).get('destination') or '')
+            _ri = _r.route() or {}
+            _dest, _region = (_ri.get('destination') or ''), (_ri.get('region') or '')
         except Exception:
-            _dest = ''
-        return _a.anchors_for(title, [str(p.get('name', '')) for p in (poi_list or [])], destination=_dest)
+            pass
+        if not _dest or not _region:     # [LOCAL-906O] a described route ("a driving tour from X to Y ..."): rc896 / job state
+            try:
+                import route_content_896 as _rcx
+                _dest = _dest or (_rcx.endpoints()[1] if _rcx.active() else '')
+                _inf = getattr(_J, '_ROUTE_INFO', None) or {}
+                _dest = _dest or (_inf.get('destination') or '')
+                _region = _region or (_inf.get('region') or '')
+            except Exception:
+                pass
+        return _a.anchors_for(title, [str(p.get('name', '')) for p in (poi_list or [])], destination=_dest,
+                              region=_region)
     except Exception:
         return []
 
@@ -30944,20 +30956,59 @@ REWRITE RULES (all mandatory):
                 from geocode_stops import geocode as _geo909c, reverse_is_land as _land909c
                 try:   # [LOCAL-906M] the destination's 901 / 906D PLACE reference beats a geocoded street address
                     import area_resolver as _ar906m
+                    _area906o = locals().get('_area')
                     _info906m = _r909c.route() or {}
                     _reg906m = _info906m.get('region') or ''
-                    def _res906m(_d, _ar=_ar906m, _reg=_reg906m):
+                    def _res906m(_d, _ar=_ar906m, _reg=_reg906m, _qid=getattr(_area906o, 'city_qid', '') or '',
+                                 _ctry=locals().get('_country_906d', '') or ''):
+                        # [LOCAL-906O] the SAME chain as a single-place tour (901 -> 906D local-language Wikidata -> the
+                        # province-box-checked geocoder): the area's city_qid (the local language) and the country were
+                        # never passed on this path, so the retry only tried English names and found nothing.
                         if not _coarse_center_902:
                             return None
+                        _qid906o = _qid
+                        _prov906o = _prov_name_906d or (_reg.split(',')[0].strip() if _reg else '')
+                        _ctry906o = _ctry
+                        try:
+                            if not _ctry906o and _reg:
+                                from city_scope import is_country_name as _icn906o
+                                _t906o = [x.strip() for x in _reg.split(',') if x.strip()]
+                                _ctry906o = _t906o[-1] if _t906o and _icn906o(_t906o[-1]) else ''
+                        except Exception:
+                            pass
                         return _ar.first_named_place_reference(
-                            f"{_d}, {_reg}" if _reg else f"{_d}, {_prov_name_906d}", _prov_name_906d,
-                            tuple(_coarse_center_902), country=_country_906d,
+                            f"{_d}, {_reg}" if _reg else f"{_d}, {_prov906o}", _prov906o,
+                            tuple(_coarse_center_902), city_qid=_qid906o, country=_ctry906o,
                             province_box_fn=None if not _prov_box_906d else (lambda *_a: {'box': _prov_box_906d}))
                     _r909c.destination_reference(locals().get('_area'), _info906m.get('destination') or '',
                                                  _res906m, log=print)
                 except Exception as _e906m:
                     print(f"  [LOCAL-906M] destination reference skipped (non-fatal): {_e906m}")
                 _a909, _b909 = _r909c.endpoints_pts(_geo909c, log=print)
+                try:   # [LOCAL-906O] a stop whose own text puts it in another city (pin outside the province box) goes
+                    import scope_906o as _s906o
+                    _ri906o = _r909c.route() or {}
+                    _home906o = _s906o.home_terms(_ri906o.get('origin') or '', _ri906o.get('destination') or '',
+                                                  _ri906o.get('region') or '', [])
+                    _box906o = _prov_box_906d or _route_box_896
+                    if _box906o and len(poi_list) >= 3:
+                        _kept906o = _s906o.reject_stops(
+                            poi_list, _box906o, _home906o,
+                            text_fn=lambda _p: ' '.join(str(_p.get(_k) or '') for _k in
+                                                        ('text', 'narration', 'story', 'content', 'full_text')),
+                            protect=lambda _p: bool(_p.get('user_explicit') or _p.get('_anchor')
+                                                    or _is_user_stop_title(_p.get('name'))
+                                                    or _r909c.dest_index([str(_p.get('name', ''))],
+                                                                         _ri906o.get('destination') or '') == 0),
+                            log=print)
+                        if 2 <= len(_kept906o) < len(poi_list):
+                            _keep_names906o = {str(_p.get('name', '')) for _p in _kept906o}
+                            _snap_rows_791c = [_r for _p, _r in zip(poi_list, _snap_rows_791c)
+                                               if str(_p.get('name', '')) in _keep_names906o] \
+                                if len(_snap_rows_791c) == len(poi_list) else _snap_rows_791c
+                            poi_list = _kept906o
+                except Exception as _e906o:
+                    print(f"  [LOCAL-906O] other-city stop guard skipped (non-fatal): {_e906o}")
                 _n909 = [str(_p.get('name', '')) for _p in poi_list]
                 poi_list = _r909c.finalize_route_pins(
                     poi_list, _snap_rows_791c, _r909c.route(), _a909, _b909, box=_prov_box_906d or _route_box_896,

@@ -69,9 +69,70 @@ def _core(title: str) -> str:
     return t
 
 
-def anchors_for(title: str, titles: Sequence[str] = (), destination: str = "", area: str = "") -> List[str]:
-    """Anchors of a generic-title stop, best first: the request's destination, the area, then the previous / next NAMED
-    stop. [] for a stop that names itself (or when nothing anchors it)."""
+_CONN = frozenset("of the de la le du des del della da do dos das di van von".split())
+# a title naming a kind of PLACE / structure: its facts belong to the destination's site
+_LANDMARK_NOUN = re.compile(r"(?i)\b(?:ascent|cable\s*car|ropeway|gondola|summit|peak|view(?:s|point)?|temple|pagoda|shrine|"
+                            r"church|cathedral|mosque|museum|gallery|castle|palace|fort(?:ress)?|tower|bridge|beach|"
+                            r"lake|river|falls?|waterfall|cave|island|garden|park|statue|buddha|monument|gate|market|"
+                            r"harbou?r|port|dune|dunes|trail|climb|hike|drive\s+home|road)\b")
+
+
+def is_topic_like(title: str) -> bool:
+    """[LOCAL-906O] A generic title that is a TOPIC of the region, not a site: a crop, a dish, a craft (\"Dragon fruit
+    country\"): no landmark noun. Its facts are the province's / the country's."""
+    return is_generic_title(title) and not _LANDMARK_NOUN.search(_head(title or ""))
+
+
+def name_cores(title: str) -> List[str]:
+    """[LOCAL-906O] The proper-name cores of a NAMED stop title, never the whole title: \"Phan Thiet and the Ca Ty River\" ->
+    [\"Phan Thiet\", \"Ca Ty River\"]; \"Leaving Mui Ne – the fishing coast\" -> [\"Mui Ne\"]. Runs of capitalised words (small
+    linking words allowed inside a run)."""
+    head = _LEAD.sub("", _head(re.sub(r"https?\S+", " ", title or "")).strip()).strip()
+    out: List[str] = []
+    for piece in re.split(r"\s+(?:and|&)\s+|,|;|/", head):
+        run: List[str] = []
+        runs: List[List[str]] = []
+        for w in re.findall(r"[^\W\d_][\w'’\-]*|\d[\w\-]*", piece):
+            if w[:1].isupper() or w[:1].isdigit():
+                run.append(w)
+            elif w.lower() in _CONN and run:
+                run.append(w)
+            else:
+                if run:
+                    runs.append(run)
+                run = []
+        if run:
+            runs.append(run)
+        for r in runs:
+            while r and r[-1].lower() in _CONN:
+                r = r[:-1]
+            name = " ".join(r).strip()
+            if name and _fold(name) and name not in out:
+                out.append(name)
+    return out
+
+
+def region_names(region: str) -> Dict[str, str]:
+    """``{"province": ..., "country": ...}`` of a request region (\"Binh Thuan, Vietnam\", \"Binh Thuan province\")."""
+    parts = [x.strip() for x in re.split(r"[,;]", region or "") if x.strip()]
+    country = ""
+    try:
+        from city_scope import is_country_name
+        if parts and is_country_name(parts[-1]):
+            country = parts.pop()
+    except Exception:
+        if len(parts) >= 2:
+            country = parts.pop()
+    province = parts[0] if parts else ""
+    return {"province": province, "country": country}
+
+
+def anchors_for(title: str, titles: Sequence[str] = (), destination: str = "", area: str = "",
+                region: str = "") -> List[str]:
+    """[LOCAL-906O] Anchors of a generic-title stop, best first. PLACE NAMES only, never a whole user title: the
+    request's destination, its province / region and country, and the proper-name cores of the previous / next NAMED
+    stop. A page naming ANY of them is accepted. A TOPIC-like title (a crop, a dish, a craft) is anchored by the
+    province, then the country (then the destination and the neighbours' names). [] for a stop that names itself."""
     if not is_generic_title(title):
         return []
     out: List[str] = []
@@ -81,22 +142,34 @@ def anchors_for(title: str, titles: Sequence[str] = (), destination: str = "", a
         if x and _fold(x) and _fold(x) not in {_fold(o) for o in out}:
             out.append(x)
 
-    add(destination)
-    add(area)
+    rn = region_names(region)
+    province = rn["province"] or (area or "")
+    country = rn["country"]
+    neigh: List[str] = []
     ts = [str(t) for t in titles or []]
     try:
         i = next(k for k, t in enumerate(ts) if _fold(t) == _fold(title))
     except StopIteration:
         i = None
     if i is not None:
-        for j in range(i - 1, -1, -1):
-            if _named(ts[j]):
-                add(_core(ts[j]))
-                break
-        for j in range(i + 1, len(ts)):
-            if _named(ts[j]):
-                add(_core(ts[j]))
-                break
+        for rng in (range(i - 1, -1, -1), range(i + 1, len(ts))):
+            for j in rng:
+                if _named(ts[j]):
+                    neigh.extend(name_cores(ts[j]))
+                    break
+    if is_topic_like(title):
+        add(province)
+        add(country)
+        add(destination)
+        for n in neigh:
+            add(n)
+    else:
+        add(destination)
+        add(area)
+        for n in neigh:
+            add(n)
+        if not out:
+            add(province)
     return out
 
 
