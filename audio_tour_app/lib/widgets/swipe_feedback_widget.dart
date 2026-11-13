@@ -39,6 +39,11 @@ class SwipeFeedbackWidget extends StatefulWidget {
   /// falls back to a generic phrasing; behaviour is otherwise unchanged.
   final String? stopName;
 
+  /// [LOCAL-907E] Title of the region topic playing between two stops, or null
+  /// when a stop is playing. While set, the label reads "Topic · <title>" (not
+  /// "This stop"), because the audio now playing is not the stop.
+  final String? topicTitle;
+
   /// Called when a swipe is registered (for parent notification, e.g. haptics).
   final void Function(int swipe)? onSwipe;
 
@@ -49,8 +54,17 @@ class SwipeFeedbackWidget extends StatefulWidget {
     this.jobId,
     required this.tourPath,
     this.stopName,
+    this.topicTitle,
     this.onSwipe,
   });
+
+  /// [LOCAL-907E] The label above the thumbs.
+  static String labelFor({String? stopName, String? topicTitle}) {
+    final t = topicTitle?.trim() ?? '';
+    if (t.isNotEmpty) return 'Topic · $t';
+    final n = stopName?.trim() ?? '';
+    return n.isNotEmpty ? 'This stop: $n' : 'This stop:';
+  }
 
   @override
   State<SwipeFeedbackWidget> createState() => SwipeFeedbackWidgetState();
@@ -258,10 +272,10 @@ class SwipeFeedbackWidgetState extends State<SwipeFeedbackWidget>
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 4, left: 32),
                   child: Text(
-                    (widget.stopName != null &&
-                            widget.stopName!.trim().isNotEmpty)
-                        ? 'This stop: ${widget.stopName}'
-                        : 'This stop:',
+                    SwipeFeedbackWidget.labelFor(
+                        stopName: widget.stopName,
+                        topicTitle: widget.topicTitle),
+                    key: const ValueKey('swipe_label'),
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

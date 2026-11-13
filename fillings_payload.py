@@ -3,7 +3,9 @@
 
     "fillings": [{"leg": 0, "after_stop": 1, "minutes": 37.4,
                   "items": [{"segment_id": 12, "title": "...", "theme": "history",
-                             "minutes": 12.7, "audio_url": "...|null", "credit_line": "..."}]}]
+                             "minutes": 12.7, "audio_url": "...", "credit_line": "...",
+                             "language": "en", "sources": [{"title": "...", "url": "..."}],
+                             "source_url": "...|null", "sentence_ends": [4.2, 9.8]}]}]
 
 ``leg`` is 0-based (leg 0 = Stop 1 -> Stop 2); ``after_stop`` is the 1-based number of the stop
 the leg follows. The first item is the default auto-play. Old apps ignore the key; nothing else in
@@ -11,6 +13,7 @@ the payload is touched (``attach_fillings`` only ADDS ``fillings``).
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 from typing import Any, Callable, Dict, List, Optional
@@ -47,8 +50,55 @@ def audio_url(audio_path: Optional[str]) -> Optional[str]:
     return base.rstrip("/") + "/" + audio_path.lstrip("/")
 
 
+def clean_sources(sources: Any) -> List[Dict[str, str]]:
+    """[LOCAL-907E] ``[{title, url}]`` from a row's ``sources`` JSON; http(s) urls only."""
+    if isinstance(sources, str):
+        try:
+            sources = json.loads(sources)
+        except ValueError:
+            return []
+    out = []
+    for s in sources if isinstance(sources, list) else []:
+        if not isinstance(s, dict):
+            continue
+        url = str(s.get("url") or "").strip()
+        if not re.match(r"(?i)^https?://\S+$", url):
+            continue
+        out.append({"title": str(s.get("title") or url), "url": url})
+    return out
+
+
+def clean_sentence_ends(ends: Any) -> List[float]:
+    """[LOCAL-907E] seconds, one per sentence end, ascending; [] when not rendered with timing."""
+    if isinstance(ends, str):
+        try:
+            ends = json.loads(ends)
+        except ValueError:
+            return []
+    try:
+        vals = [round(float(x), 2) for x in (ends or [])]
+    except (TypeError, ValueError):
+        return []
+    return vals
+
+
+def _item(p: Dict[str, Any]) -> Dict[str, Any]:
+    sources = clean_sources(p.get("sources"))
+    return {"segment_id": p["segment_id"], "title": p["title"], "theme": p["theme"],
+            "minutes": p["minutes"], "audio_url": audio_url(p.get("audio_path")),
+            "credit_line": p["credit_line"], "language": p.get("language") or "en",
+            "sources": sources, "source_url": sources[0]["url"] if sources else None,
+            "sentence_ends": clean_sentence_ends(p.get("sentence_ends"))}
+
+
 def build_fillings(tour: Dict[str, Any], listener_weights: Optional[Dict[str, float]] = None, *,
                    segments=None, recent_segment_ids=(), store=None) -> List[Dict[str, Any]]:
+    # [LOCAL-907E] the player cannot play text: a segment with no audio is never picked (so the
+    # leg is filled with segments that DO have audio, not left short by items dropped afterwards)
+    if segments is None and store is not None:
+        segments = store.list_segments(None, tour.get("language") or "en", "ready")
+    if segments is not None:
+        segments = [s for s in segments if s.get("audio_path")]
     picks = tp.pick_fillings(tour, listener_weights, segments=segments,
                              recent_segment_ids=recent_segment_ids, store=store)
     out = []
@@ -57,10 +107,30 @@ def build_fillings(tour: Dict[str, Any], listener_weights: Optional[Dict[str, fl
         out.append({
             "leg": leg, "after_stop": leg + 1,
             "minutes": round(tp.leg_minutes(tour, leg) or 0.0, 1),
-            "items": [{"segment_id": p["segment_id"], "title": p["title"], "theme": p["theme"],
-                       "minutes": p["minutes"], "audio_url": audio_url(p.get("audio_path")),
-                       "credit_line": p["credit_line"]} for p in items]})
+            "items": [_item(p) for p in items if p.get("audio_path")]})
     return out
+
+
+def add_fillings_to_zip(zip_path: str, fillings: Optional[List[Dict[str, Any]]],
+                        log: Callable[[str], None] = print) -> bool:
+    """[LOCAL-907E] Append ``fillings.json`` (``{"fillings": [...]}``) to a tour ZIP.
+    Append mode: every existing entry is left byte-identical. No fillings => no file.
+    Never raises (a failure is logged and the tour is delivered as before)."""
+    if not fillings:
+        return False
+    try:
+        import zipfile
+        with zipfile.ZipFile(zip_path, "a") as zf:
+            if "fillings.json" in zf.namelist():
+                return False
+            zf.writestr("fillings.json",
+                        json.dumps({"fillings": fillings}, ensure_ascii=False).encode("utf-8"))
+        log(f"[LOCAL-907E] fillings.json: {len(fillings)} legs, "
+            f"{sum(len(l.get('items') or []) for l in fillings)} items")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log(f"[LOCAL-907E] fillings.json not written: {exc}")
+        return False
 
 
 def attach_fillings(payload: Dict[str, Any], fillings: Optional[List[Dict[str, Any]]]) -> Dict[str, Any]:

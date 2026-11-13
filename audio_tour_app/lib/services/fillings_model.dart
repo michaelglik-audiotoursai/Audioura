@@ -52,6 +52,19 @@ class FillingItem {
     this.language,
   });
 
+  /// [LOCAL-907E] The same item playing from [url] (a file saved in the tour folder).
+  FillingItem withAudioUrl(String url) => FillingItem(
+        segmentId: segmentId,
+        title: title,
+        theme: theme,
+        minutes: minutes,
+        audioUrl: url,
+        creditLine: creditLine,
+        sentenceEnds: sentenceEnds,
+        sources: sources,
+        language: language,
+      );
+
   /// Whole minutes for display ("12 min"), never below 1.
   int get minutesLabel => minutes < 1 ? 1 : minutes.round();
 

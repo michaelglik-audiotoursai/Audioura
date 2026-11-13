@@ -24,6 +24,7 @@ import '../services/single_playback_controller.dart';
 import '../services/player_session.dart';
 import '../services/player_bar_js.dart';
 import '../services/fillings_model.dart';
+import '../services/topic_audio_downloader.dart';
 import '../services/listening_events_queue.dart';
 import '../services/on_the_way_controller.dart';
 import '../services/on_the_way_js.dart';
@@ -229,6 +230,8 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
       final lang = await _tourLanguage();
       var plan = await FillingsPlan.loadFromTourDir(widget.tourPath);
       plan = plan.forLanguage(lang, keepForeign: settings.showEnglishNotice);
+      // [LOCAL-907E] prefer the topic audio saved in the tour folder; hide failed ones
+      plan = await TopicAudioDownloader.applyLocal(plan, widget.tourPath);
       if (plan.isEmpty || !mounted) {
         settings.dispose();
         return; // old payload / nothing playable: no change at all
@@ -1023,16 +1026,24 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                   ),
                 ),
                 // Swipe feedback widget — always visible at bottom
-                SwipeFeedbackWidget(
-                  currentStopIndex: _currentStopIndex,
-                  tourId: widget.tourId ?? _deriveTourId(),
-                  jobId: widget.jobId,
-                  tourPath: widget.tourPath,
-                  stopName: _currentStopName,
-                  onSwipe: (swipe) {
-                    // Light haptic feedback on swipe
-                    HapticFeedback.lightImpact();
-                  },
+                // [LOCAL-907E] "Topic · <title>" while a region topic plays; the
+                // stop again once the controller is back on the stop.
+                ListenableBuilder(
+                  listenable: Listenable.merge([if (_otw != null) _otw!]),
+                  builder: (context, _) => SwipeFeedbackWidget(
+                    currentStopIndex: _currentStopIndex,
+                    tourId: widget.tourId ?? _deriveTourId(),
+                    jobId: widget.jobId,
+                    tourPath: widget.tourPath,
+                    stopName: _currentStopName,
+                    topicTitle: _otw?.mode == OtwMode.topic
+                        ? _otw?.item?.title
+                        : null,
+                    onSwipe: (swipe) {
+                      // Light haptic feedback on swipe
+                      HapticFeedback.lightImpact();
+                    },
+                  ),
                 ),
               ],
             );

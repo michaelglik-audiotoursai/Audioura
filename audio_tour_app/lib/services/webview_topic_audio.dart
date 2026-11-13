@@ -9,8 +9,8 @@ import 'fillings_model.dart';
 import 'on_the_way_controller.dart';
 
 /// `audio_url` from 907 may be relative ("/topic-audio/..."): join it to the
-/// orchestrator base (907 hosts nothing yet — LEAD decides where the audio is
-/// served; absolute URLs pass through unchanged).
+/// map-delivery base (LOCAL-907E serves GET /topic-audio/<path> there; absolute
+/// and file:// URLs pass through unchanged).
 String joinTopicAudioUrl(String base, String raw) {
   final r = raw.trim();
   // Any absolute URL (https://, http://, or file:// for audio kept on the
@@ -26,7 +26,7 @@ class WebViewTopicAudio implements TopicAudioOutput {
   final JsRunner run;
   final Future<String> Function() baseUrl;
   WebViewTopicAudio({required this.run, Future<String> Function()? baseUrl})
-      : baseUrl = baseUrl ?? (() => Endpoints.base(Service.orchestrator));
+      : baseUrl = baseUrl ?? (() => Endpoints.base(Service.mapDelivery));
 
   @override
   Future<void> play(FillingItem item, {double startSec = 0}) async {

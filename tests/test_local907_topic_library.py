@@ -387,13 +387,13 @@ def test_render_audio_via_mocked_kokoro(tmp_path):
         seen.append((len(text), voice))
         return b"MP3"
     done = tb.run_render_audio(REGION_KEY, store=store, out_dir=str(tmp_path), render_fn=render,
-                               log=lambda m: None)
+                               log=lambda m: None, duration_fn=lambda b: 1.0)
     store2 = store.get_segment(ids[0])
     # ready_english sets audio_path on both; clear the first so it needs rendering
     assert done == []                                              # both already have audio
     store._rows[ids[0]]["audio_path"] = None
     done = tb.run_render_audio(REGION_KEY, store=store, out_dir=str(tmp_path), render_fn=render,
-                               log=lambda m: None)
+                               log=lambda m: None, duration_fn=lambda b: 1.0)
     assert done == [ids[0]] and seen and seen[0][1] == "Joanna"
     rel = store.get_segment(ids[0])["audio_path"]
     assert open(os.path.join(str(tmp_path), rel), "rb").read().startswith(b"MP3") and store2
@@ -648,10 +648,10 @@ def test_payload_is_additive_and_old_fields_unchanged():
     f = new["fillings"][0]
     assert f["leg"] == 0 and f["after_stop"] == 1 and f["minutes"] == pytest.approx(40.1, abs=0.5)
     it = f["items"][0]
-    assert set(it) == {"segment_id", "title", "theme", "minutes", "audio_url", "credit_line"}
+    assert set(it) >= {"segment_id", "title", "theme", "minutes", "audio_url", "credit_line"}
     assert it["audio_url"].endswith(".mp3") and it["credit_line"] == tl.CREDIT_LINE
     no_audio = fp.build_fillings(car_tour(18.0), segments=[seg(1, audio_path=None)] * 1)
-    assert no_audio[0]["items"][0]["audio_url"] is None
+    assert no_audio == []                                   # [LOCAL-907E] text-only items are left out
 
 
 def test_orchestrator_wiring_is_additive():
@@ -696,7 +696,7 @@ def test_fillings_for_tour_reads_only_and_disabled_by_env(monkeypatch):
                     last = outer.sql[-1][0]
                     if "FROM topic_segments" in last:
                         return [(1, REGION_KEY, "history", "Seg 1", "en", "", 1800, 12.0, [], tl.CREDIT_LINE,
-                                 CENTRE[0], CENTRE[1], 40.0, "a.mp3", None, "ready", 0.01, None)]
+                                 CENTRE[0], CENTRE[1], 40.0, "a.mp3", [3.0, 7.5], None, "ready", 0.01, None)]
                     return []
 
                 def fetchone(self):

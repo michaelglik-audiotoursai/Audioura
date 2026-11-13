@@ -1219,25 +1219,73 @@ def _chunks_for_tts(text: str, max_chars: int = 2500) -> List[str]:
     return chunks
 
 
+_SENT_RE = re.compile(r"(?:(?<=[.!?])|(?<=[.!?][\"')\]]))\s+(?=[\"'(\[]*[A-Z0-9])")
+
+
+def split_sentences(text: str) -> List[str]:
+    """[LOCAL-907E] Spoken sentences in reading order (paragraphs first, then sentence ends)."""
+    out = []
+    for para in re.split(r"\n\s*\n", text or ""):
+        para = " ".join(para.split())
+        if para:
+            out.extend(x.strip() for x in _SENT_RE.split(para) if x.strip())
+    return out
+
+
+def mp3_seconds(mp3: bytes) -> float:
+    """Duration of an MP3 byte string (mutagen, else ffprobe). Host-side only."""
+    import io
+    try:
+        from mutagen.mp3 import MP3
+        return float(MP3(io.BytesIO(mp3)).info.length)
+    except ImportError:
+        import subprocess
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".mp3") as fh:
+            fh.write(mp3)
+            fh.flush()
+            r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                                "-of", "csv=p=0", fh.name], capture_output=True, text=True, check=True)
+        return float(r.stdout.strip())
+
+
+def render_with_timing(text: str, voice: str, render_fn: Callable, duration_fn: Callable
+                       ) -> Tuple[bytes, List[float]]:
+    """[LOCAL-907E] Render sentence by sentence; the MP3 is the concatenation of the sentence
+    MP3s, so ``sentence_ends`` (running sum of the durations, seconds) is exact."""
+    parts, ends, total = [], [], 0.0
+    for sentence in split_sentences(text):
+        mp3 = render_fn(sentence, voice)
+        total += float(duration_fn(mp3))
+        parts.append(mp3)
+        ends.append(round(total, 2))
+    return b"".join(parts), ends
+
+
 def run_render_audio(region_key: str, *, store, out_dir: str, render_fn: Callable = default_render,
                      voice: Optional[str] = None, language: str = "en",
-                     log: Callable[[str], None] = print) -> List[int]:
+                     log: Callable[[str], None] = print,
+                     duration_fn: Callable = mp3_seconds) -> List[int]:
     """Render ready English segments that have no audio. The stored audio_path is relative to
-    ``out_dir`` (TOPIC_AUDIO_DIR). Kokoro runs on the host: no paid call."""
+    ``out_dir`` (TOPIC_AUDIO_DIR). Kokoro runs on the host: no paid call. [LOCAL-907E] Also
+    stores ``sentence_ends``. Only UPDATEs the row by id; nothing is deleted."""
     voice = voice or os.environ.get("TOPIC_VOICE", "Joanna")
     rendered = []
     for seg in store.list_segments(region_key, language, "ready"):
         if seg.get("audio_path"):
             continue
-        mp3 = b"".join(render_fn(c, voice) for c in _chunks_for_tts(seg["text"]))
+        mp3, ends = render_with_timing(seg["text"], voice, render_fn, duration_fn)
+        if not mp3:
+            continue
         rel = os.path.join(region_key, language, f"segment_{seg['id']}.mp3")
         full = os.path.join(out_dir, rel)
         os.makedirs(os.path.dirname(full), exist_ok=True)
         with open(full, "wb") as fh:
             fh.write(mp3)
-        store.set_audio_path(seg["id"], rel)
+        store.set_audio_path(seg["id"], rel, ends)
         rendered.append(seg["id"])
-        log(f"audio #{seg['id']} -> {rel} ({len(mp3)} bytes)")
+        log(f"audio #{seg['id']} -> {rel} ({len(mp3)} bytes, {len(ends)} sentences, "
+            f"{ends[-1] if ends else 0}s)")
     return rendered
 
 
