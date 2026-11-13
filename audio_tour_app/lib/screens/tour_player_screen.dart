@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'voice_methods.dart';
 import 'debug_log_viewer_screen.dart';
 import 'tour_map_screen.dart';
@@ -19,6 +23,15 @@ import '../widgets/tour_buy_sheet.dart';
 import '../services/single_playback_controller.dart';
 import '../services/player_session.dart';
 import '../services/player_bar_js.dart';
+import '../services/fillings_model.dart';
+import '../services/listening_events_queue.dart';
+import '../services/on_the_way_controller.dart';
+import '../services/on_the_way_js.dart';
+import '../services/on_the_way_notification.dart';
+import '../services/on_the_way_settings.dart';
+import '../services/stop_proximity.dart';
+import '../services/webview_topic_audio.dart';
+import '../widgets/on_the_way_panel.dart';
 
 class TourPlayerScreen extends StatefulWidget {
   final String tourPath;
@@ -110,6 +123,13 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
   // [LOCAL-677B] How many opening stops play free as a preview on a locked tour.
   int _freePreviewStops = 1;
 
+  // [LOCAL-908] "On the way" topics between stops. Null for a tour with no
+  // `fillings` (or none playable): then nothing below is created and the player
+  // is exactly what it was.
+  OnTheWayController? _otw;
+  StreamSubscription<Position>? _otwPositionSub;
+  String _otwLastNotification = '';
+
   // [LOCAL-877] Identity of this player in the app-wide PlayerSession.
   final Object _sessionOwner = Object();
   bool _sessionAttached = false;
@@ -138,9 +158,13 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
           positionSeconds: widget.initialPositionSeconds,
         ),
         commands: PlayerCommands(
-          play: () => _barJs('play()'),
-          pause: () => _barJs('pause()'),
-          next: () => _barJs('next()'),
+          play: () => _otw?.mode == OtwMode.topic
+              ? _topicJs('resume()')
+              : _barJs('play()'),
+          pause: () => _otw?.mode == OtwMode.topic
+              ? _topicJs('pause()')
+              : _barJs('pause()'),
+          next: () => _handleMediaNext(fromHardware: false),
           previous: () => _barJs('previous()'),
           navigator: nav,
           route: route,
@@ -158,12 +182,223 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
     }
   }
 
+  Future<void> _topicJs(String call) async {
+    try {
+      await _controller?.evaluateJavascript(
+          source: 'window.__audTopic && window.__audTopic.$call');
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('TOUR_PLAYER: topic command $call failed: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _initializeWebView();
     initializeVoiceControl();
     _loadUnlockState();
+    unawaited(_initOnTheWay());
+    OnTheWayNotification.menuRequests.addListener(_openOtwMenu);
+  }
+
+  // ─── [LOCAL-908] On the way ────────────────────────────────────────────────
+
+  /// The tour's language for the topics-in-English rule: a downloaded
+  /// translation's own language, else the original language.
+  Future<String?> _tourLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      for (final raw in prefs.getStringList('saved_tours') ?? const <String>[]) {
+        final r = jsonDecode(raw);
+        if (r is Map && r['path'] == widget.tourPath) {
+          final lang = (r['is_translation'] == true ? r['language'] : null) ??
+              r['original_language'];
+          if (lang is String && lang.trim().isNotEmpty) return lang.trim();
+        }
+      }
+    } catch (_) {}
+    return widget.originalLanguage;
+  }
+
+  static final RegExp _stopPrefix =
+      RegExp(r'^\s*stop\s*\d+\s*[:.\-–—]\s*', caseSensitive: false);
+
+  Future<void> _initOnTheWay() async {
+    try {
+      final settings = await OnTheWaySettings.load();
+      final lang = await _tourLanguage();
+      var plan = await FillingsPlan.loadFromTourDir(widget.tourPath);
+      plan = plan.forLanguage(lang, keepForeign: settings.showEnglishNotice);
+      if (plan.isEmpty || !mounted) {
+        settings.dispose();
+        return; // old payload / nothing playable: no change at all
+      }
+      final c = OnTheWayController(
+        plan: plan,
+        settings: settings,
+        tourLanguage: lang,
+        totalStops: _totalStops,
+        stopTitle: (i) {
+          if (i != _currentStopIndex) return null;
+          final n = _currentStopName?.replaceFirst(_stopPrefix, '').trim();
+          return (n == null || n.isEmpty) ? null : n;
+        },
+        audio: WebViewTopicAudio(run: (src) async {
+          await _controller?.evaluateJavascript(source: src);
+        }),
+        playStop: (i) => _barJs('go($i, 0)'),
+        onEvent: _postListeningEvent,
+      );
+      c.addListener(_onOtwChanged);
+      setState(() => _otw = c);
+      await _syncOtwToPage();
+      unawaited(_startOtwLocation());
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('OTW: init failed (topics off): $e');
+    }
+  }
+
+  /// Events never block playback: the queue stores them and flushes in the
+  /// background.
+  void _postListeningEvent(String action, FillingItem item, double atSec) {
+    unawaited(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await ListeningEventsQueue.instance.enqueue(
+          userId: prefs.getString('user_id') ?? 'unknown',
+          tourId: widget.tourId ?? _deriveTourId(),
+          segmentId: item.segmentId,
+          action: action,
+          atSec: atSec,
+        );
+      } catch (_) {}
+    }());
+  }
+
+  Future<void> _startOtwLocation() async {
+    try {
+      final stops = await StopProximityDetector.loadFromTourDir(widget.tourPath);
+      if (stops.isEmpty) return;
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        return; // no GPS: topics still work; arrival just is not automatic
+      }
+      final detector = StopProximityDetector(stops);
+      _otwPositionSub = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high, distanceFilter: 10),
+      ).listen((pos) {
+        for (final idx in detector.onPosition(pos.latitude, pos.longitude)) {
+          _otw?.onArrival(idx);
+        }
+      }, onError: (_) {});
+    } catch (e) {
+      await DebugLogHelper.addDebugLog('OTW: location unavailable: $e');
+    }
+  }
+
+  void _onOtwChanged() {
+    final c = _otw;
+    if (c == null || !mounted) return;
+    unawaited(_syncOtwToPage());
+    if (c.mode == OtwMode.stop) {
+      _otwLastNotification = '';
+      unawaited(OnTheWayNotification.clear());
+    } else {
+      final it = c.item;
+      final body = c.mode == OtwMode.topic && it != null
+          ? 'Now: ${otwNowLine(it)}'
+          : (c.mode == OtwMode.countdown && it != null
+              ? 'Next: ${it.title}'
+              : 'Quiet · tap Topics to choose');
+      final title = otwHeadline(c);
+      final key = '$title|$body';
+      if (key != _otwLastNotification) {
+        _otwLastNotification = key;
+        unawaited(OnTheWayNotification.show(title: title, body: body));
+      }
+    }
+  }
+
+  /// Tell the page which stops to hold after, and whether "next" means "skip
+  /// topic" right now.
+  Future<void> _syncOtwToPage() async {
+    final c = _otw;
+    final ctl = _controller;
+    if (c == null || ctl == null) return;
+    try {
+      await ctl.evaluateJavascript(source:
+          'window.__audTopic && (window.__audTopic.setHold(${jsonEncode(c.holdAfterStops)}),'
+          ' window.__audTopic.setMediaNext(${c.mediaNextIsTopicSkip}))');
+    } catch (_) {}
+  }
+
+  /// The media-session "next" (Bluetooth / CarPlay / Android Auto / wheel) and
+  /// the bar's next button. See [mapMediaNext].
+  Future<void> _handleMediaNext({bool fromHardware = true}) async {
+    final c = _otw;
+    var action = c?.mediaNext ?? MediaNextAction.nextStop;
+    // A deliberate tap on the screen in silence goes to the next stop; only a
+    // hardware press is ignored there.
+    if (action == MediaNextAction.ignore && !fromHardware) {
+      action = MediaNextAction.nextStop;
+    }
+    switch (action) {
+      case MediaNextAction.nextStop:
+        await _barJs('next()');
+        break;
+      case MediaNextAction.skipTopic:
+        c?.skip();
+        break;
+      case MediaNextAction.ignore:
+        break;
+    }
+  }
+
+  void _openOtwMenu() {
+    final c = _otw;
+    if (c == null || !mounted || !c.active) return;
+    showOnTheWaySheet(context, c);
+  }
+
+  Future<void> _openSources(String url) async {
+    try {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  /// Handlers the page calls for topics (registered with the other handlers).
+  void _registerOtwHandlers(InAppWebViewController controller) {
+    controller.addJavaScriptHandler(
+      handlerName: 'onStopEnded',
+      callback: (args) {
+        final idx = args.isNotEmpty
+            ? (args[0] is num ? (args[0] as num).toInt() : int.tryParse('${args[0]}'))
+            : null;
+        if (idx != null) _otw?.onStopFinished(idx);
+      },
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'onTopicEvent',
+      callback: (args) {
+        if (args.length < 3) return;
+        final kind = '${args[0]}';
+        final pos = args[1] is num ? (args[1] as num).toDouble() : 0.0;
+        final c = _otw;
+        if (c == null) return;
+        if (kind == 'tick' || kind == 'playing') c.onTopicPosition(pos);
+        if (kind == 'ended') c.onTopicEnded();
+        if (kind == 'error') c.onTopicFailed();
+      },
+    );
+    controller.addJavaScriptHandler(
+      handlerName: 'onMediaNext',
+      callback: (args) => _handleMediaNext(fromHardware: true),
+    );
   }
 
   /// [LOCAL-677 / 677B / 677C] Resolve the tour's unlock/preview state.
@@ -386,6 +621,16 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
 
   @override
   void dispose() {
+    OnTheWayNotification.menuRequests.removeListener(_openOtwMenu);
+    _otwPositionSub?.cancel();
+    final otw = _otw;
+    if (otw != null) {
+      final settings = otw.settings;
+      otw.removeListener(_onOtwChanged);
+      otw.dispose();
+      settings.dispose();
+      unawaited(OnTheWayNotification.clear());
+    }
     PlayerSession.instance.detach(_sessionOwner);
     disposeVoice();
     _consoleLogger.flush();
@@ -469,6 +714,14 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                 // rest is locked until the listener buys. Shown only while the
                 // tour is paid and not yet unlocked.
                 if (_unlockState?.locked == true) _buildBuyBanner(),
+                // [LOCAL-908] What is playing: a stop, or an optional topic on
+                // the way. Absent entirely when the tour has no topics.
+                if (_otw != null)
+                  OnTheWayPanel(
+                    controller: _otw!,
+                    onOpenMenu: _openOtwMenu,
+                    onOpenSources: _openSources,
+                  ),
                 Expanded(
                   child: InAppWebView(
                     initialUrlRequest: URLRequest(url: WebUri(snapshot.data!)),
@@ -560,6 +813,7 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                         handlerName: 'onBarState',
                         callback: (args) => _onBarState(args),
                       );
+                      _registerOtwHandlers(controller);
                       controller.addJavaScriptHandler(
                         handlerName: 'onTourEnded',
                         callback: (args) {
@@ -713,6 +967,17 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
                       } catch (e) {
                         await DebugLogHelper.addDebugLog('TOUR_PLAYER: bar bridge install failed: $e');
                       }
+                      // [LOCAL-908] Topic audio + hold + media-session bridge.
+                      // Only when this tour has topics; otherwise the page is
+                      // left exactly as it was.
+                      if (_otw != null) {
+                        try {
+                          await controller.evaluateJavascript(source: kOnTheWayJs);
+                          await _syncOtwToPage();
+                        } catch (e) {
+                          await DebugLogHelper.addDebugLog('OTW: bridge install failed: $e');
+                        }
+                      }
 
                       // Auto-start tour playback
                       await Future.delayed(Duration(milliseconds: 2000)); // Wait longer for page to fully load
@@ -806,6 +1071,11 @@ class _TourPlayerScreenState extends State<TourPlayerScreen> with VoiceMethods {
       positionSeconds: asDbl(args[2]),
       durationSeconds: asDbl(args[3]),
     );
+    // [LOCAL-908] A stop playing ends any topic on the way.
+    if (total > 0) _otw?.totalStops = total;
+    if (playing) {
+      _otw?.onStopStarted(idx);
+    }
     // Keep the per-stop thumbs on the stop that is actually playing.
     if (mounted && (idx != _currentStopIndex || (name != null && name != _currentStopName))) {
       setState(() {

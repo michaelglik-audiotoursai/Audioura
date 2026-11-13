@@ -19,13 +19,25 @@ class NotificationService {
     // Request no permissions at init time (the app prompts separately where it
     // already handles permission_handler); just satisfy the platform contract
     // so the plugin initialises. Defaults are safe.
-    const DarwinInitializationSettings darwinSettings =
+    final DarwinInitializationSettings darwinSettings =
         DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
+      // [LOCAL-908] iOS notification category carrying the "Topics" action.
+      notificationCategories: [
+        DarwinNotificationCategory(
+          'otw_category',
+          actions: <DarwinNotificationAction>[
+            DarwinNotificationAction.plain('otw_menu', 'Topics',
+                options: <DarwinNotificationActionOption>{
+                  DarwinNotificationActionOption.foreground
+                }),
+          ],
+        ),
+      ],
     );
-    return const InitializationSettings(
+    return InitializationSettings(
       android: androidSettings,
       iOS: darwinSettings,
       macOS: darwinSettings,
