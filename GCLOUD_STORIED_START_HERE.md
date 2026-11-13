@@ -54,6 +54,8 @@ has lapsed twice and Michael has had to ask twice.
 - Michael's own regen is held until LEAD says go.
 - Flutter for Android = flutter-3.41.6.
 
+# ▶️ WAVE 55 RE-RUN — 2026-11-13 ~15:50 EST (wdvrdazju0, LEAD's re-run comment) — LIVE @ 70c596ea: gen 00057-lcp / orch 00035-qbv (traffic follows latest). 552 alone, after a 5-min wait: completed 349 s, $0.095, all 7 bar items pass; 551 passed earlier on this revision. Wave total $0.443. Proofs hidden (backup wave55b_proof_hide_20261113); rows 444. Rollback = gen 00055-j8h / orch 00033-n6x. Watch cron d55cc212 (looks for waves newer than 55).
+
 # ▶️ WAVE 55 — 2026-11-13 ~15:30 EST (wdvrdazju0) — DEPLOYED then ROLLED BACK. 70c596ea (build d85f34be, bsub63) = gen 00057-lcp / orch 00035-qbv, now idle; traffic PINNED to gen 00055-j8h / orch 00033-n6x. Failed bar (1): proof 552 GeneratorGiveUpError. The worker instance …f0276c81 went silent after Overpass timeouts at 20:12:37Z, and Cloud Run started …cab6ad1b, which took the /status polls. 551 passed 8/8. Spend $0.348. Proofs hidden (backup wave55_proof_hide_20261113); rows 444. Asked LEAD: re-run or fix first. Watch cron d2c9ce92 was replaced (see the newest cron; it skips 54 and 55).
 
 # ▶️ WAVE 54 — 2026-11-13 ~11:00 EST (wdvrdazjdn) — DEPLOYED then ROLLED BACK. c00dd708 (build 3806fd1e, bsub62) = gen 00056-qvk / orch 00034-626, now idle; traffic is PINNED to gen 00055-j8h / orch 00033-n6x (use --to-latest next deploy). Failed bar (2): 552 Stop 2 "the largest reclining Buddha in Southeast Asia" where the evidence says "one of the largest". 906H 2/2 + 8/8 OK; 0 5xx. Spend $0.423. Proofs hidden (backup wave54_proof_hide_20261113); rows 444. Watch cron 47ecd405: the next wave is newer than wdvrdazjdn.
