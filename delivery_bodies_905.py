@@ -113,6 +113,11 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
             out.append("\n".join(lines))
         out.append(text[pos:])
         final = "".join(out)
+        try:   # [LOCAL-906C] on every path: scope-matched claims, the "You see X here is" opener, distinct filler bodies
+            import leftovers_906c as _c906c
+            final = _c906c.final_pass(final, evidence_by_title, emit)
+        except Exception as _e906c:  # pragma: no cover
+            emit(f"  [LOCAL-906C] final pass skipped (non-fatal): {_e906c}")
         return fix_counts(final, emit, renumber=bool(removed))
     except Exception as err:  # pragma: no cover
         emit(f"  [LOCAL-905] body guard skipped (non-fatal): {err}")

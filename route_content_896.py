@@ -425,6 +425,72 @@ def _stop_blocks(text: str) -> List[Tuple[int, int, int, str]]:
     return res
 
 
+def _split_clauses(x: str, rx: "re.Pattern") -> Tuple[List[str], List[str]]:
+    """Split a sentence at the connectors of ``rx`` and KEEP the connectors: (parts, separators), len(seps) ==
+    len(parts) - 1. ``rx`` must not hold capturing groups."""
+    parts, seps, pos = [], [], 0
+    for m in rx.finditer(x):
+        parts.append(x[pos:m.start()])
+        seps.append(m.group(0))
+        pos = m.end()
+    parts.append(x[pos:])
+    return parts, seps
+
+
+_VERB_OPEN = frozenset(
+    "is are was were be been being has have had do does did can could will would may might must shall should "
+    "measures measure stands stand stretches stretch spans span rises rise lies lie sits sit covers cover "
+    "contains contain holds hold features feature includes include offers offer sits shows show".split())
+
+
+def _independent_clause(part: str, sep: str) -> bool:
+    """A clause that can stand as a sentence of its own: joined by "and" / "but" / ";" (not a relative "which" or a
+    participle) and opening with a subject, not a verb."""
+    if not re.match(r"(?i)^(?:,\s*(?:and|but)\s+|;\s*)$", sep or ""):
+        return False
+    words = re.findall(r"[^\W\d_]+", part or "")
+    if not words:
+        return False
+    w = words[0].lower()
+    return w not in _VERB_OPEN and not w.endswith("ing") and not (w.endswith("ed") and len(words) > 1 and w not in ("red",))
+
+
+def _join_kept_clauses(parts: List[str], seps: List[str], is_bad: Callable[[str], bool]) -> str:
+    """[LOCAL-906C] Re-join the good clauses of a sentence whose bad clauses were cut. The old code joined every good
+    part with a bare space, which ate the connector: "You see the statue here, which is 49 meters long, and ..." came out
+    as "You see the statue here is 49 meters long." (tour 552). Now two neighbouring good clauses keep their own
+    connector; a good clause that follows a cut one stays only if it can stand alone ("and you can reach it by cable
+    car" does; "which is 49 meters long" does not) and then starts a new sentence."""
+    sents: List[str] = []
+    cur = ""
+    gap = False
+    for i, p in enumerate(parts):
+        if is_bad(p):
+            gap = True
+            continue
+        sep = seps[i - 1] if i else ""
+        if cur and not gap:
+            cur += sep + p
+        elif i == 0:
+            cur = p
+        elif _independent_clause(p, sep):
+            if cur:
+                sents.append(cur.strip())
+            cur = p
+        gap = False
+    if cur:
+        sents.append(cur.strip())
+    out = []
+    for n, x in enumerate(sents):
+        x = x.rstrip(" ,;")
+        if n and x:
+            x = x[0].upper() + x[1:]
+        if n < len(sents) - 1 and x and x[-1] not in ".!?":
+            x += "."
+        out.append(x)
+    return " ".join(out).strip()
+
+
 def _rewrite_prose(block: str, fn: Callable[[List[str]], List[str]]) -> str:
     lines = block.split("\n")
     for i, ln in enumerate(lines):
@@ -1450,9 +1516,8 @@ def cap_unsupported_numbers(tour_text: str, evidence_by_title: Optional[Dict[str
                 if not bad:
                     out.append(x)
                     continue
-                parts = re.split(r"(?i),\s*(?:and|but|which)\s+|;\s*", x)
-                keep = [p for p in parts if not any(m.group(0) in p for m in bad)]
-                y = " ".join(keep).strip() if keep and len(parts) > 1 else ""
+                parts, seps = _split_clauses(x, re.compile(r"(?i),\s*(?:and|but|which)\s+|;\s*"))
+                y = _join_kept_clauses(parts, seps, lambda p: any(m.group(0) in p for m in bad)) if len(parts) > 1 else ""
                 if y:
                     y = y[0].upper() + y[1:]
                     y = y if y[-1] in ".!?" else y + "."
@@ -1871,13 +1936,20 @@ def specificity(sentence: str) -> int:
     return 3 * len(_YEAR4_906B.findall(x)) + nums + caps
 
 
-def drop_within_stop_duplicates(tour_text: str, log: Optional[Callable] = None) -> str:
+def drop_within_stop_duplicates(tour_text: str, log: Optional[Callable] = None,
+                                evidence_by_title: Optional[Dict[str, str]] = None) -> str:
     """[LOCAL-906B] Within ONE stop, two sentences giving the same fact (``same_fact``, a different date included)
     are one too many: the more specific one stays (later one on a tie), the other is dropped and logged. A stop is
-    never emptied (one of the pair always stays)."""
+    never emptied (one of the pair always stays).
+    [LOCAL-906C] Scope first: a sentence whose superlative scope the stop's evidence does not support (the wider claim
+    "longest ... in <Region>" next to the true "largest ... in <Country>") is never the one kept; specificity decides
+    only when scope does not."""
     if not tour_text:
         return tour_text
     try:
+        import leftovers_906c as _c906c
+        _evm = {fold(str(k)): v for k, v in {**dict(_EVIDENCE_904), **{str(k): str(v) for k, v in
+                                                                      (evidence_by_title or {}).items()}}.items()}
         blocks = _stop_blocks(tour_text)
         pieces, pos = [], 0
         for k, (s, e, num, title) in enumerate(blocks):
@@ -1894,7 +1966,15 @@ def drop_within_stop_duplicates(tour_text: str, log: Optional[Callable] = None) 
                     xa, xb = sents[a][1], sents[b][1]
                     if a in drop or b in drop or not same_fact(xa, xb, title):
                         continue
-                    la, lb = (a, b) if specificity(xa) < specificity(xb) else (b, a)
+                    if _c906c.claim_vs_plain(xa, xb):          # [LOCAL-906C] a ranking claim and a measurement
+                        continue
+                    _lose = _c906c.prefer_supported(xa, xb, _ev_for(_evm, title) or "", title)
+                    if _lose == "a":
+                        la, lb = a, b
+                    elif _lose == "b":
+                        la, lb = b, a
+                    else:
+                        la, lb = (a, b) if specificity(xa) < specificity(xb) else (b, a)
                     drop.add(la)
                     if log:
                         log(f'  [LOCAL-906B] Stop {num}: dropped "{sents[la][1][:80]}" (same fact as '
@@ -2171,9 +2251,9 @@ def cap_unsupported_facts(tour_text: str, evidence_by_title: Optional[Dict[str, 
                 if not bad:
                     out.append(x)
                     continue
-                parts = re.split(r"(?i),\s*(?:and|but|which)\s+|;\s*|,\s+(?=built|created|made|carved|sculpted)", x)
-                keep = [p for p in parts if not bad_in(p)]
-                y = " ".join(keep).strip() if keep and len(parts) > 1 else ""
+                parts, seps = _split_clauses(
+                    x, re.compile(r"(?i),\s*(?:and|but|which)\s+|;\s*|,\s+(?=built|created|made|carved|sculpted)"))
+                y = _join_kept_clauses(parts, seps, bad_in) if len(parts) > 1 else ""
                 if not y:
                     # "..., built in 1963 by sculptor X." -> keep the head before the first bad comma clause
                     head = re.split(r",\s+", x)[0]

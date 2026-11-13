@@ -1,0 +1,25 @@
+<Mountain> and the <Statue> - Walking Tour
+Tour-Category: walking
+
+Stop 1: <Mountain>
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Mountain and cultural site
+
+<Mountain> rises 649 meters above the plain. A cable car and a forest trail lead up to the summit. Two pagodas stand near the top.
+
+Directions: Walk on to <Statue>.
+
+Stop 2: <Statue>
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Reclining Buddha statue
+
+You see the reclining Buddha statue here is 49 meters long and 7 meters high. This statue is also the longest reclining Buddha in <Region>. It is the largest reclining Buddha statue in <Country>. The statue lies on a terrace near the summit.
+
+That's 2 stops in all.
+
+If you would like to eat nearby we can build you a restaurant tour.
+<!-- LOCAL-628:stop-editor:v1 -->
