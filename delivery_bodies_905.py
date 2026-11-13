@@ -142,6 +142,13 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
             final = _c906c.final_pass(final, evidence_by_title, emit)
         except Exception as _e906c:  # pragma: no cover
             emit(f"  [LOCAL-906C] final pass skipped (non-fatal): {_e906c}")
+        try:   # [LOCAL-906I] a stop left with <= 3 sentences by the removals is refilled from its evidence (up to 5)
+            import leftovers_906f as _c906f2
+            _thin = _c906f2.refill_thin_stops(final, evidence_by_title, emit)
+            if _thin != final:
+                final = _c906f2.run_pass(_thin, evidence_by_title, emit)
+        except Exception as _e906i:  # pragma: no cover
+            emit(f"  [LOCAL-906I] thin-stop refill skipped (non-fatal): {_e906i}")
         return fix_counts(final, emit, renumber=bool(removed))
     except Exception as err:  # pragma: no cover
         emit(f"  [LOCAL-905] body guard skipped (non-fatal): {err}")

@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import leftovers_906c as c
@@ -87,6 +88,9 @@ _PLACE_END = frozenset("temple pagoda mountain mount hill lake river island beac
 _PLACE_PREP = re.compile(r"(?i)\b(?:in|at|near|from|to|off|on|of|across|around|toward|towards|into|within|by|outside)\s+(?:the\s+)?$")
 
 
+_PRONOUN_WORDS = frozenset("he she they it we i you his her him them this that these those there here who".split())
+
+
 def _cand_names(text: str) -> List[str]:
     """Person names the text states with a cue (a role word before, a person verb after, a possessive person noun)."""
     out: List[str] = []
@@ -98,30 +102,98 @@ def _cand_names(text: str) -> List[str]:
             if n.startswith("<") and not _PERSON_PH.fullmatch(n):
                 continue
             ws = rc._words(n)
-            if not ws or ws[0] in _MONTHS or ws[0] in rc._NOISE:
+            if not ws or ws[0] in _MONTHS or ws[0] in rc._NOISE or ws[0] in _PRONOUN_WORDS:
                 continue
             out.append(n)
     return out
 
 
-def _distinct(names: Sequence[str], title: str) -> List[str]:
-    """Merge names whose tokens are a subset of another's; set aside names that are the stop's own title words."""
-    tt = set(rc._words(title))
-    uniq: List[str] = []
-    for n in names:
-        toks = set(rc._words(n)) if not n.startswith("<") else {n}
-        if not n.startswith("<") and toks and toks <= tt:
+_ALIAS_RX = re.compile(
+    r"(?P<n>" + _NAME + r")\s*,?\s*(?:also\s+)?(?:known|called|named|referred\s+to)\s+(?:by\s+|as\s+)?(?:(?:his|her|the)\s+)?"
+    r"(?:(?:Dharma|religious|monastic|birth|given|pen|art|stage|temple)\s+)?(?:name|title)?\s*(?P<a>" + _NAME + r")"
+    r"(?:\s*(?:,|and)\s*(?:(?:his|her)\s+)?(?:(?:Dharma|religious|monastic)\s+)?(?:name|title)?\s*(?P<b>" + _NAME + r"))?")
+_ALIAS_STOP = frozenset("the a an in on at of his her their its this that".split())
+
+
+def _key(n: str) -> Tuple[str, ...]:
+    """A name as folded tokens (diacritics and case folded; a <Placeholder> by its words)."""
+    return tuple(rc._words(re.sub(r"[<>]", " ", n or "")))
+
+
+def _ascii(n: str) -> str:
+    """The plain spoken form of a name: diacritics removed, case kept."""
+    out = []
+    for ch in n:
+        if ch in "đĐ":
+            out.append("d" if ch == "đ" else "D")
             continue
-        for i, u in enumerate(uniq):
-            ut = set(rc._words(u)) if not u.startswith("<") else {u}
-            if toks <= ut:
-                break
-            if ut <= toks:
-                uniq[i] = n
-                break
-        else:
-            uniq.append(n)
-    return uniq
+        d = unicodedata.normalize("NFD", ch)
+        out.append("".join(x for x in d if not unicodedata.combining(x)) or ch)
+    return "".join(out)
+
+
+def _alias_pairs(text: str) -> List[Tuple[Tuple[str, ...], Tuple[str, ...]]]:
+    """[LOCAL-906I] \"<X>, known by his Dharma name <Y> and title <Z>\" / \"also called <Y>\": X, Y and Z are one person."""
+    out = []
+    for m in _ALIAS_RX.finditer(text or ""):
+        n = _key(m.group("n"))
+        for g in ("a", "b"):
+            v = m.group(g)
+            if v and n and _key(v) and _key(v)[0] not in _ALIAS_STOP:
+                out.append((n, _key(v)))
+    return out
+
+
+def _distinct(names: Sequence[str], title: str, context: str = "", prefer: str = "") -> List[str]:
+    """[LOCAL-906I] One entry per PERSON. Names are folded (diacritics, case); a name whose tokens are a subset of another's
+    is the same person; a name the ``context`` introduces as \"known by his Dharma name / title / also called <X>\" is an
+    alias. The entry is the plain spoken form: the longest folded-ASCII variant that ``prefer`` (the tour text) uses, else
+    the longest variant. The stop's own title words are set aside."""
+    tt = set(rc._words(re.sub(r"[<>]", " ", title or "")))
+    items: List[Tuple[str, Tuple[str, ...]]] = []
+    for n in names:
+        k = _key(n)
+        if not k:
+            continue
+        if not n.startswith("<") and set(k) <= tt:
+            continue
+        if all(n != x for x, _k in items):
+            items.append((n, k))
+    if not items:
+        return []
+    parent = list(range(len(items)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i, j):
+        parent[find(i)] = find(j)
+
+    for i, (_n, ki) in enumerate(items):
+        for j, (_m, kj) in enumerate(items):
+            if i < j and (set(ki) <= set(kj) or set(kj) <= set(ki)):
+                union(i, j)
+    for ka, kb in _alias_pairs(context):
+        ia = [i for i, (_n, k) in enumerate(items) if set(k) <= set(ka) or set(ka) <= set(k)]
+        ib = [i for i, (_n, k) in enumerate(items) if set(k) <= set(kb) or set(kb) <= set(k)]
+        for i in ia + ib:
+            union(i, (ia + ib)[0])
+    pref = rc.fold(prefer or "")
+    groups: Dict[int, List[int]] = {}
+    for i in range(len(items)):
+        groups.setdefault(find(i), []).append(i)
+    out = []
+    for _r, members in sorted(groups.items(), key=lambda kv: min(kv[1])):
+        def rank(i):
+            n, k = items[i]
+            used = bool(pref) and (" ".join(k) in pref)
+            return (used, len(k), len(n))
+        best = items[max(members, key=rank)][0]
+        out.append(best if best.startswith("<") else _ascii(best))
+    return out
 
 
 def _persony_names(text: str, title: str) -> bool:
@@ -134,7 +206,7 @@ def _persony_names(text: str, title: str) -> bool:
         s = sm.group(0)
         lead = len(s) - len(s.lstrip())
         for m in re.finditer(r"(?<![\w<])" + _NAME + r"(?![\w>])", s):
-            n = m.group(0)
+            n = re.sub(r"['’]s?$", "", m.group(0))          # [LOCAL-906I] "Orla Mountain's" is the title
             if n.startswith("<"):
                 continue
             toks = n.split()
@@ -203,10 +275,11 @@ def repair_person_pronoun(tour_text: str, evidence_by_title: Optional[Dict[str, 
                     before += " " + x
                     continue
                 rest = " ".join(y for _i, _j, y in flat[pos + 1:])
-                cands = _distinct(_cand_names(rest), title)
+                ctx = before + " " + " ".join(y for _i, _j, y in flat) + " " + ev
+                cands = _distinct(_cand_names(rest), title, ctx, tour_text)
                 src = "the stop's own text"
                 if not cands:
-                    cands = _distinct(_cand_names(ev), title)
+                    cands = _distinct(_cand_names(ev), title, ctx, tour_text)
                     src = "the evidence"
                 new = _name_pronoun(x, cands[0]) if len(cands) == 1 else None
                 if new and new != x:
@@ -564,22 +637,58 @@ _LEAD = re.compile(
     r"\b(?:located|situated|found|lying|lies|sits|set)\b")
 
 
+_LEAD_REST = re.compile(r"\b(?:located|situated|found|lying|lies|sits|set)\s+(?P<rest>(?:off|in|on|at|near|along|about|just|some|above|"
+                        r"beside|outside)\b[^\n]*)$")
+
+
+def _spoken_lead(sentence: str, title: str) -> Optional[str]:
+    """[LOCAL-906I] \"<X> is a mountain located off of Route 1 in the town of <T>.\" -> \"<X> lies off Route 1 in the town of
+    <T>.\" (a subject that ends in the generic head \"Mount\" takes the stop's title when that is the same name)."""
+    m = _LEAD.match(sentence)
+    r = _LEAD_REST.search(sentence)
+    if not m or not r or r.start() < m.end() - 12:
+        return None
+    subj = m.group("subj").strip()
+    words = subj.split()
+    if words and rc.fold(words[-1]) in ("mount", "mt", "mountain") and len(words) > 1:
+        tw = rc._words(title)
+        if tw and rc._words(" ".join(words[:-1])) == tw[:len(words) - 1] and rc.fold(title.split()[-1]) in (
+                "mount", "mountain", "mt"):
+            subj = title.strip()
+    rest = re.sub(r"(?i)^(off|outside|near|beside)\s+of\b", r"\1", r.group("rest").strip())
+    if len(rest.split()) < 3:
+        return None
+    return _clean_names(f"{subj} lies {rest}")
+
+
 def drop_encyclopedia_leads(tour_text: str, log: Optional[Callable] = None) -> str:
-    """6c. The first body sentence "<X> is a mountain located off ..." (an encyclopedia lead) goes when another sentence of
-    the stop already says where the place is, and the stop keeps at least two sentences."""
+    """6c / [LOCAL-906I] An encyclopedia lead \"<X> is a mountain located off ...\" (anywhere in the body): dropped when
+    another sentence of the stop already says where the place is (and the stop keeps at least two sentences); otherwise
+    spoken as a location (\"<X> lies off ...\")."""
     emit = _emit(log)
     if not tour_text:
         return tour_text
     try:
         def fn(st: Dict, _all: List[Dict]):
             flat = st["flat"]
-            if len(flat) < 3 or not _LEAD.match(flat[0][2]):
-                return {}
-            if not any(_WHERE.search(x) for _i, _j, x in flat[1:]):
-                return {}
-            emit(f'  {TAG} Stop {st["num"]}: encyclopedia lead dropped (the stop already says where it is): '
-                 f'"{flat[0][2][:80]}"')
-            return {(flat[0][0], flat[0][1]): []}
+            edits: Dict[Tuple[int, int], List[str]] = {}
+            left = len(flat)
+            for k, (i, j, x) in enumerate(flat):
+                if not _LEAD.match(x):
+                    continue
+                if left >= 3 and any(_WHERE.search(y) for kk, (_a, _b, y) in enumerate(flat) if kk != k
+                                     and (_a, _b) not in edits):
+                    emit(f'  {TAG} Stop {st["num"]}: encyclopedia lead dropped (the stop already says where it is): '
+                         f'"{x[:80]}"')
+                    edits[(i, j)] = []
+                    left -= 1
+                    continue
+                spoken = _spoken_lead(x, st["title"])
+                if spoken:
+                    emit(f'  {TAG} Stop {st["num"]}: [LOCAL-906I] encyclopedia lead spoken as a location: "{x[:70]}" -> '
+                         f'"{spoken[:70]}"')
+                    edits[(i, j)] = [spoken]
+            return edits
         return _each_stop(tour_text, fn)
     except Exception as err:  # pragma: no cover
         emit(f"  {TAG} lead guard skipped (non-fatal): {err}")
@@ -637,6 +746,205 @@ def fix_duplicate_names(tour_text: str, log: Optional[Callable] = None) -> str:
         return tour_text
 
 
+# ══ [LOCAL-906I] 4. no "The <Proper Name>" ═══════════════════════════════════════════════════════════════
+_GEO_HEAD = r"(?:Mountain|Mount|Mt\.?|Hill|Peak|Volcano|Lake|Island|Beach)"
+_PLAIN_ADJ = frozenset("great old new little holy sacred big high grand royal golden white black blue red green upper lower "
+                       "northern southern eastern western central reclining sleeping standing".split())
+_THE_PROPER = re.compile(r"\b(?P<the>[Tt]he)\s+(?P<name>(?:[A-ZÀ-Ỹ][\wÀ-ỹ'’\-]*\s+){1,3}" + _GEO_HEAD + r")\b(?![\wÀ-ỹ])")
+_THE_PH = re.compile(r"(?:(?<=^)|(?<=[.!?]\s))The\s+(?P<name><[^>]{1,40}>)")
+
+
+def strip_proper_article(sentence: str) -> str:
+    """A proper name takes no article: \"The Ta Cu Mountain's most striking feature\" -> \"Ta Cu Mountain's most ...\",
+    \"The <Mountain>'s\" -> \"<Mountain>'s\". A common-noun head (\"The Reclining Buddha\") and a name that starts with a plain
+    adjective (\"The Great Hill\") keep it."""
+    def _real(m):
+        first = rc.fold(m.group("name").split()[0])
+        if first in _PLAIN_ADJ:
+            return m.group(0)
+        return m.group("name")
+    y = _THE_PROPER.sub(_real, sentence)
+    y = _THE_PH.sub(lambda m: m.group("name") if m.group("name").strip("<>").strip().lower() not in _SCOPE_PH
+                    and not _COMMON_PH.match(m.group("name").strip("<>").strip().lower()) else m.group(0), y)
+    if y != sentence and y[:1].islower():
+        y = y[0].upper() + y[1:]
+    return y
+
+
+_COMMON_PH = re.compile(r"^(?:statue|cave|cable car|tower|bridge|market|gate|wall)s?\b")
+
+
+def fix_proper_article(tour_text: str, log: Optional[Callable] = None) -> str:
+    emit = _emit(log)
+    if not tour_text:
+        return tour_text
+    try:
+        def fn(st: Dict, _all: List[Dict]):
+            edits = {}
+            for i, j, x in st["flat"]:
+                y = strip_proper_article(x)
+                if y != x:
+                    emit(f'  {TAG} Stop {st["num"]}: [LOCAL-906I] article before a proper name removed: "{x[:60]}" -> '
+                         f'"{y[:60]}"')
+                    edits[(i, j)] = [y]
+            return edits
+        return _each_stop(tour_text, fn)
+    except Exception as err:  # pragma: no cover
+        emit(f"  {TAG} proper-article repair skipped (non-fatal): {err}")
+        return tour_text
+
+
+# ══ [LOCAL-906I] 3. one fact, one stop ═══════════════════════════════════════════════════════════════════
+_NUM_UNIT = re.compile(r"(?<![\w.])(\d[\d,]*(?:\.\d+)?)(?:\s|-)*([A-Za-z]{2,})")
+_TRAIL_CLAUSE = re.compile(r"\s*,\s*(?:which|that|measuring|spanning|standing|reaching)\b[^,]*\d[^,]*?(?=[.!?]?$)")
+_UNITLESS = frozenset("the and of in at on to a an as is was by or for from with".split())
+
+
+def _facts(sentence: str) -> frozenset:
+    """{(number, unit stem)} a sentence states: \"49 meters long\" / \"49-meter-long\" -> (49, mete)."""
+    out = set()
+    for m in _NUM_UNIT.finditer(sentence or ""):
+        u = rc.fold(m.group(2))
+        if u in _UNITLESS or re.fullmatch(r"(?:st|nd|rd|th)", u):
+            continue
+        out.add((m.group(1).replace(",", ""), u[:4]))
+    return frozenset(out)
+
+
+def _title_words(title: str) -> List[str]:
+    return [w for w in rc._words(re.sub(r"[<>]", " ", title or "")) if w not in _UNITLESS and len(w) >= 3]
+
+
+def _owner(sentence: str, titles: Sequence[str]) -> Optional[int]:
+    """The stop whose title object the number in ``sentence`` is about: the title with a word closest before the first
+    number (ties: the longer title)."""
+    m = _NUM_UNIT.search(sentence)
+    if not m:
+        return None
+    before = rc._words(sentence[:m.start()])
+    best, best_key = None, None
+    for k, t in enumerate(titles):
+        tw = _title_words(t)
+        if not tw or not all(w in rc._words(sentence) for w in tw):
+            continue
+        pos = max((i for i, w in enumerate(before) if w in tw), default=-1)
+        if pos < 0:
+            continue
+        key = (pos, len(tw))
+        if best_key is None or key > best_key:
+            best, best_key = k, key
+    return best
+
+
+def drop_cross_stop_fact(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
+                         log: Optional[Callable] = None) -> str:
+    """[LOCAL-906I] A sentence of stop A whose numbers (with their unit nouns) are the main fact of stop B's title object --
+    B says the same numbers about the same object -- is B's fact: the trailing clause is cut from A (or the sentence is
+    dropped when nothing remains of it), unless A would be left with nothing else. Generic; ``same_fact`` also counts."""
+    emit = _emit(log)
+    if not tour_text:
+        return tour_text
+    try:
+        infos = _stops(tour_text)
+        if len(infos) < 2:
+            return tour_text
+        titles = [st["title"] for st in infos]
+
+        def fn(st: Dict, all_: List[Dict]):
+            me = next((k for k, o in enumerate(all_) if o["num"] == st["num"] and o["title"] == st["title"]), None)
+            edits: Dict[Tuple[int, int], List[str]] = {}
+            left = len(st["flat"])
+            for i, j, x in st["flat"]:
+                fx = _facts(x)
+                if not fx or me is None:
+                    continue
+                own = _owner(x, titles)
+                if own is None or own == me:
+                    continue
+                other = all_[own]
+                if not any(fx <= _facts(y) and (_owner(y, titles) in (own, None) or rc.same_fact(x, y, other["title"]))
+                           for _a, _b, y in other["flat"]):
+                    continue
+                cut = _TRAIL_CLAUSE.sub("", x)
+                if cut != x and len(cut.split()) >= 5 and not _facts(cut) & fx:
+                    cut = cut if cut[-1:] in ".!?" else cut + "."
+                    emit(f'  {TAG} Stop {st["num"]}: [LOCAL-906I] fact belongs to stop {other["num"]} '
+                         f'("{other["title"][:30]}"): clause cut: "{x[:70]}" -> "{cut[:70]}"')
+                    edits[(i, j)] = [cut]
+                elif left > 1:
+                    emit(f'  {TAG} Stop {st["num"]}: [LOCAL-906I] fact belongs to stop {other["num"]} '
+                         f'("{other["title"][:30]}") -> sentence dropped: "{x[:80]}"')
+                    edits[(i, j)] = []
+                    left -= 1
+            return edits
+        return _each_stop(tour_text, fn)
+    except Exception as err:  # pragma: no cover
+        emit(f"  {TAG} cross-stop fact guard skipped (non-fatal): {err}")
+        return tour_text
+
+
+# ══ [LOCAL-906I] 6. a thin stop is refilled from its evidence ═════════════════════════════════════════
+THIN_MAX, THIN_TARGET = 3, 5
+_FIRST_PERSON = re.compile(r"(?i)\b(?:i|we|our|us|you|your)\b")
+
+
+def refill_thin_stops(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
+                      log: Optional[Callable] = None) -> str:
+    """[LOCAL-906I] A stop with <= 3 body sentences after the 906C/F removals gets supported evidence sentences (one that
+    is not denied, not a blocked claim, not the same fact as a sentence already in the tour, no person pronoun, no promo)
+    up to 5 sentences. Evidence order; nothing is invented, so a stop with no usable evidence stays as it is."""
+    emit = _emit(log)
+    if not tour_text:
+        return tour_text
+    try:
+        import key_fact_coverage as kfc
+        ev_map = c._ev_map(evidence_by_title)
+        if not ev_map:
+            return tour_text
+        titles = [st["title"] for st in _stops(tour_text)]
+
+        def fn(st: Dict, all_: List[Dict]):
+            flat = st["flat"]
+            if not flat or len(flat) > THIN_MAX:
+                return {}
+            title = st["title"]
+            blob = rc._ev_for(ev_map, title) or ""
+            if not blob.strip():
+                return {}
+            pool = kfc.own_prose_sentences(blob, title) or rc.split_sentences(blob)
+            have = [x for _i, _j, x in flat]
+            others = [y for o in all_ if o["title"] != title for _a, _b, y in o["flat"]]
+            added: List[str] = []
+            for cand in pool:
+                if len(have) + len(added) >= THIN_TARGET:
+                    break
+                n = len(cand.split())
+                if not (6 <= n <= 40) or cand[-1:] not in ".!?" or rc.is_fragment(cand) or rc.is_mood_filler(cand, set()):
+                    continue
+                if _PRON.search(cand) or _FIRST_PERSON.search(cand) or is_promo(cand) or _LEAD.match(cand):
+                    continue
+                if kfc.is_denied(title, cand, blob) or kfc.deterministic_unsupported(cand, blob, title):
+                    continue
+                cur = have + added
+                if any(rc.same_fact(cand, y, title) for y in cur + others):
+                    continue
+                fc = _facts(cand)
+                me = next((k for k, o in enumerate(all_) if o["num"] == st["num"]), None)
+                if fc and any(fc <= _facts(y) for y in others) and _owner(cand, titles) != me:
+                    continue
+                added.append(cand)
+            if not added:
+                return {}
+            i, j, last = flat[-1]
+            emit(f"  {TAG} Stop {st['num']} '{title[:40]}': [LOCAL-906I] thin after removals ({len(flat)} body sentence(s)) "
+                 f"-> {len(added)} supported evidence sentence(s) added")
+            return {(i, j): [last] + added}
+        return _each_stop(tour_text, fn)
+    except Exception as err:  # pragma: no cover
+        emit(f"  {TAG} thin-stop refill skipped (non-fatal): {err}")
+        return tour_text
+
+
 # ══ the pass ═════════════════════════════════════════════════════════════════════════════════════════════
 def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
              log: Optional[Callable] = None) -> str:
@@ -647,8 +955,10 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
     t = strip_blocked(t, evidence_by_title, log)
     t = drop_promo(t, evidence_by_title, log)
     t = resolve_cross_stop(t, evidence_by_title, log)
+    t = drop_cross_stop_fact(t, evidence_by_title, log)
     t = drop_encyclopedia_leads(t, log)
     t = fix_duplicate_names(t, log)
+    t = fix_proper_article(t, log)
     t = fix_orphan_compounds(t, log)
     t = repair_person_pronoun(t, evidence_by_title, log)
     return t
