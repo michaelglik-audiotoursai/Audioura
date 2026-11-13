@@ -155,7 +155,7 @@ def classify_theme(*texts: str) -> Optional[str]:
 # ── segment store ────────────────────────────────────────────────────────────
 SEGMENT_COLUMNS = ["id", "region_key", "theme", "title", "language", "text", "word_count",
                    "est_minutes", "sources", "credit_line", "centroid_lat", "centroid_lng",
-                   "radius_km", "audio_path", "source_segment_id", "status", "cost_usd",
+                   "radius_km", "audio_path", "sentence_ends", "source_segment_id", "status", "cost_usd",
                    "created_at"]
 
 
@@ -198,8 +198,10 @@ class MemorySegmentStore:
             out.append(dict(s))
         return sorted(out, key=lambda r: r["id"])
 
-    def set_audio_path(self, segment_id: int, audio_path: str) -> None:
+    def set_audio_path(self, segment_id: int, audio_path: str, sentence_ends=None) -> None:
         self._rows[segment_id]["audio_path"] = audio_path
+        if sentence_ends is not None:
+            self._rows[segment_id]["sentence_ends"] = list(sentence_ends)
 
 
 class PgSegmentStore:
@@ -224,7 +226,7 @@ class PgSegmentStore:
 
     def insert_segment(self, seg: Dict[str, Any]) -> int:
         cols = [c for c in SEGMENT_COLUMNS if c not in ("id", "created_at") and c in seg]
-        vals = [json.dumps(seg[c]) if c == "sources" else seg[c] for c in cols]
+        vals = [json.dumps(seg[c]) if c in ("sources", "sentence_ends") and seg[c] is not None else seg[c] for c in cols]
         sql = ("INSERT INTO topic_segments (" + ", ".join(cols) + ") VALUES ("
                + ", ".join("%s" for _ in cols) + ") RETURNING id")
         cur = self.conn.cursor()
@@ -239,7 +241,7 @@ class PgSegmentStore:
     def update_segment(self, segment_id: int, seg: Dict[str, Any]) -> None:
         """UPDATE one row by id (LOCAL-907D rebuild). Never deletes; id / created_at untouched."""
         cols = [c for c in SEGMENT_COLUMNS if c not in ("id", "created_at") and c in seg]
-        vals = [json.dumps(seg[c]) if c == "sources" else seg[c] for c in cols]
+        vals = [json.dumps(seg[c]) if c in ("sources", "sentence_ends") and seg[c] is not None else seg[c] for c in cols]
         sql = ("UPDATE topic_segments SET " + ", ".join(f"{c} = %s" for c in cols)
                + " WHERE id = %s")
         cur = self.conn.cursor()
@@ -264,11 +266,16 @@ class PgSegmentStore:
             + (" WHERE " + " AND ".join(where) if where else "") + " ORDER BY id"
         return self._rows(sql, tuple(params))
 
-    def set_audio_path(self, segment_id: int, audio_path: str) -> None:
+    def set_audio_path(self, segment_id: int, audio_path: str, sentence_ends=None) -> None:
+        """UPDATE by id (never DELETE). [LOCAL-907E] also stores the per-sentence end times."""
         cur = self.conn.cursor()
         try:
-            cur.execute("UPDATE topic_segments SET audio_path = %s WHERE id = %s",
-                        (audio_path, segment_id))
+            if sentence_ends is None:
+                cur.execute("UPDATE topic_segments SET audio_path = %s WHERE id = %s",
+                            (audio_path, segment_id))
+            else:
+                cur.execute("UPDATE topic_segments SET audio_path = %s, sentence_ends = %s::jsonb "
+                            "WHERE id = %s", (audio_path, json.dumps(list(sentence_ends)), segment_id))
         finally:
             cur.close()
         self.conn.commit()

@@ -108,7 +108,10 @@ def _rank_score(seg: Dict[str, Any], mid, fit: frozenset, weights: Dict[str, flo
 def segment_ref(seg: Dict[str, Any], score: float) -> Dict[str, Any]:
     return {"segment_id": seg["id"], "title": seg["title"], "theme": seg["theme"],
             "minutes": float(seg["est_minutes"]), "audio_path": seg.get("audio_path"),
-            "credit_line": seg.get("credit_line", ""), "score": round(score, 4)}
+            "credit_line": seg.get("credit_line", ""), "score": round(score, 4),
+            # [LOCAL-907E] what the phone needs to show sources and highlight the sentence
+            "language": seg.get("language") or "en", "sources": seg.get("sources") or [],
+            "sentence_ends": seg.get("sentence_ends")}
 
 
 def pick_fillings(tour: Dict[str, Any], listener_weights: Optional[Dict[str, float]] = None, *,

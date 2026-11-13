@@ -41,6 +41,10 @@ services:
       - "5005:5005"
     volumes:
       - ./tours:/app/tours
+      # [LOCAL-907E] pre-rendered region-topic audio, served read-only at /topic-audio/<path>
+      - ./topic_audio:/app/topic_audio:ro
+    environment:
+      - TOPIC_AUDIO_DIR=/app/topic_audio
     command: python map_delivery_service.py
 
   coordinates:

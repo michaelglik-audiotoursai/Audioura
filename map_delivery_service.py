@@ -284,6 +284,40 @@ def health_check():
     sys.stdout.flush()
     return jsonify({"status": "healthy", "service": "map_delivery", "req012": "active"})
 
+def _topic_audio_root():
+    return os.path.realpath(os.getenv('TOPIC_AUDIO_DIR', 'topic_audio'))
+
+
+def resolve_topic_audio(rel_path):
+    """[LOCAL-907E] Absolute path of a topic MP3 under TOPIC_AUDIO_DIR, else None.
+    Refuses empty/absolute paths, '..', backslashes, NULs, non-.mp3 names, symlinks that
+    leave the directory, and anything that is not a regular file."""
+    if not rel_path or '\x00' in rel_path or '\\' in rel_path or rel_path.startswith('/'):
+        return None
+    parts = rel_path.split('/')
+    if any(p in ('', '.', '..') for p in parts) or not rel_path.lower().endswith('.mp3'):
+        return None
+    root = _topic_audio_root()
+    full = os.path.realpath(os.path.join(root, *parts))
+    if os.path.commonpath([root, full]) != root or not os.path.isfile(full):
+        return None
+    return full
+
+
+@app.route('/topic-audio/<path:rel_path>', methods=['GET', 'HEAD'])
+def topic_audio(rel_path):
+    """[LOCAL-907E] Read-only: serves the pre-rendered region-topic MP3s (fillings) with Range
+    support. Lives here because map-delivery is the service the app already downloads tours
+    from (so a relative /topic-audio/... url resolves against the same base) and it is a
+    stateless read-only service; the orchestrator holds job state and is not app-facing."""
+    full = resolve_topic_audio(rel_path)
+    if full is None:
+        return jsonify({'error': 'not found'}), 404
+    resp = send_file(full, mimetype='audio/mpeg', conditional=True)
+    resp.headers['Accept-Ranges'] = 'bytes'
+    return resp
+
+
 @app.route('/version-test', methods=['GET'])
 def version_test():
     """Simple version test endpoint"""

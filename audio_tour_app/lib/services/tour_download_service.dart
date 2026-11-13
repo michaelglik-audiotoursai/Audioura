@@ -29,6 +29,7 @@ import 'downloaded_tour_meta.dart';
 import 'remote_audio_fetcher.dart';
 import 'tour_pricing_service.dart';
 import 'saved_tours_store.dart';
+import 'topic_audio_downloader.dart';
 
 /// The outcome of a community-page download attempt.
 enum TourDownloadStatus {
@@ -417,6 +418,8 @@ class TourDownloadService {
             errorMessage: _namedErrorMessage(e));
       }
 
+      _startTopicAudioDownload(path); // [LOCAL-907E] topics follow the tour's own audio
+
       // 4) Bump the saved record's version/updated_at (and stop count) IN PLACE —
       // same title, same path, so Listen keeps the one entry and now opens v2.
       record['version'] = newVersion;
@@ -602,6 +605,10 @@ class TourDownloadService {
           editTourId, prefs,
           onProgress: onAudioProgress, cancelToken: cancelToken);
 
+      // [LOCAL-907E] The tour's own audio is saved: now fetch the region-topic
+      // audio in the background. A failed topic never fails the tour.
+      _startTopicAudioDownload(tourDirPath);
+
       int actualStops;
       if (backendStopsCount != null && backendStopsCount > 0) {
         actualStops = backendStopsCount;
@@ -772,6 +779,12 @@ class TourDownloadService {
       await _fetchRemoteAudioDevice(zipBytes, tourDirPath,
           onProgress: onProgress, cancelToken: cancelToken);
     }
+  }
+
+  /// [LOCAL-907E] Background, fire-and-forget; never throws, never delays the save.
+  static void _startTopicAudioDownload(String tourDirPath) {
+    if (kIsWeb) return;
+    unawaited(TopicAudioDownloader.downloadForTour(tourDirPath).catchError((_) => <int>[]));
   }
 
   /// Parse remote_audio.json from the ZIP into an ordered {stopNumber: url} map,

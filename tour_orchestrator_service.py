@@ -2895,6 +2895,20 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
                 print(f"Added tour_content.txt to ZIP file")
             except Exception as zip_error:
                 print(f"Warning: Could not add tour_content.txt to ZIP: {zip_error}")
+
+        # [LOCAL-907E] Fillings must be computed BEFORE the ZIP is stored/delivered so the phone
+        # gets fillings.json inside the downloaded tour. Read-only, never raises; appended to the
+        # ZIP (existing entries untouched). The same list is kept on the job for /status below.
+        _f907 = []
+        try:
+            import fillings_payload as _fp907
+            _f907 = _fp907.fillings_for_tour(tour_content or "", tour_type=tour_type or "",
+                                             user_id=user_id, language=language)
+            if _f907:
+                _fp907.add_fillings_to_zip(zip_path, _f907)
+        except Exception as _e907:
+            _f907 = []
+            print(f"[LOCAL-907E] fillings.json skipped: {_e907}")
         
         # [LOCAL-306] Score the final tour before delivery.
         # Gates NOTHING — a catastrophic score still delivers unchanged.
@@ -3524,9 +3538,7 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
         # [LOCAL-907 / D772] ADDITIVE: topic-library "fillings" for the long legs between stops.
         # Read-only, never raises, [] when the library is not built/migrated; old apps ignore it.
         try:
-            import fillings_payload as _fp907
-            _f907 = _fp907.fillings_for_tour(tour_content, tour_type=tour_type or "",
-                                             user_id=user_id, language=language)
+            # [LOCAL-907E] computed above (before the ZIP is stored); reused here
             if _f907:
                 ACTIVE_JOBS[job_id]["fillings"] = _f907
         except Exception as _e907:
