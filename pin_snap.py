@@ -1142,8 +1142,13 @@ def verify_addresses(poi_list: List[Dict], rows: List[Dict], scope: str = "",
         except Exception:
             return 0
     dropped = 0
-    for poi, row in zip(poi_list, rows):
+    verdict: Dict[int, bool] = {}          # stop index -> True when its address was checked and dropped
+    moved: List[int] = []
+    for idx, (poi, row) in enumerate(zip(poi_list, rows)):
         try:
+            if isinstance(poi.get("_pin_moved_to_stop"), int):
+                moved.append(idx)          # [LOCAL-906B] a stop moved to another stop's verified pin: decided below
+                continue
             addr = str(poi.get("address") or "").strip()
             ref = row.get("new_coordinate") if row.get("snapped") else row.get("reference")
             if not addr or not ref or row.get("rejected_900b") or "refused" in (row.get("reason") or ""):
@@ -1154,8 +1159,32 @@ def verify_addresses(poi_list: List[Dict], rows: List[Dict], scope: str = "",
             if not address_agrees(addr, rev, scope):
                 poi["address"] = ""
                 dropped += 1
+                verdict[idx] = True
                 emit(f"[LOCAL-902] address dropped for {poi.get('name')!r}: {addr!r} disagrees with the "
                      f"reference's reverse geocode ({rev[:80]!r})")
+            else:
+                verdict[idx] = False
         except Exception as e:
             emit(f"[LOCAL-902] address check skipped for {poi.get('name')!r} (non-fatal): {e}")
+    # [LOCAL-906B] The address check covers every stop. A stop moved to another stop's verified pin (903 agreement)
+    # stands on that pin now: when the address was dropped there it is dropped here too (tour 552 kept
+    # "Address: <Mountain>, <Wrong District>, <Province>" on Stop 2 while Stop 1's was dropped).
+    for idx in moved:
+        poi = poi_list[idx]
+        try:
+            donor = poi.get("_pin_moved_to_stop")
+            addr = str(poi.get("address") or "").strip()
+            if addr and donor not in verdict and 0 <= donor < len(rows):
+                # the donor had no address of its own to judge: judge this one on the pin it now stands on
+                dref = rows[donor].get("new_coordinate") if rows[donor].get("snapped") else rows[donor].get("reference")
+                drev = (reverse_fn(dref[0], dref[1]) or "") if dref else ""
+                if drev and not address_agrees(addr, drev, scope):
+                    verdict[donor] = True
+            if addr and verdict.get(donor):
+                poi["address"] = ""
+                dropped += 1
+                emit(f"[LOCAL-906B] address dropped for {poi.get('name')!r}: {addr!r}: the stop moved to stop "
+                     f"{donor + 1}'s verified pin and inherits that stop's address verdict (dropped there)")
+        except Exception as e:
+            emit(f"[LOCAL-906B] address verdict skipped for {poi.get('name')!r} (non-fatal): {e}")
     return dropped

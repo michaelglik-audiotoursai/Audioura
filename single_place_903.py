@@ -23,7 +23,11 @@ def _coord(poi: Dict) -> Optional[Tuple[float, float]]:
     return pin_snap._poi_coord(poi)
 
 
-def _set_coord(poi: Dict, pt: Tuple[float, float]) -> None:
+def _set_coord(poi: Dict, pt: Tuple[float, float], donor: Optional[int] = None) -> None:
+    """Write ``pt`` as the stop's pin. ``donor`` is the index of the stop whose verified pin it was moved to
+    ([LOCAL-906B]: a moved stop inherits that stop's address verdict, see ``pin_snap.verify_addresses``)."""
+    if donor is not None:
+        poi["_pin_moved_to_stop"] = int(donor)
     poi["coordinates"] = f"{pt[0]:.6f}, {pt[1]:.6f}"
     if "latitude" in poi or "longitude" in poi:
         poi["latitude"], poi["longitude"] = pt[0], pt[1]
@@ -87,7 +91,7 @@ def repin_to_snapped_place(poi_list: List[Dict], rows: List[Dict], place_name: s
             km = _hav_km(c, apt)
             if km < 0.05:
                 continue
-            _set_coord(p, apt)
+            _set_coord(p, apt, donor=ai)
             moved += 1
             emit(f"  [LOCAL-903] stop={j + 1} re-pinned to the snapped place '{place_name}' "
                  f"(was the place reference, {km:.1f} km off)")
@@ -117,7 +121,7 @@ def agree_single_place(poi_list: List[Dict], rows: List[Dict], scope_precision: 
                  f"{'both' if va else 'neither'} verified -- left as is")
             return 0
         keep, move = (0, 1) if va else (1, 0)
-        _set_coord(poi_list[move], (a, b)[keep])
+        _set_coord(poi_list[move], (a, b)[keep], donor=keep)
         emit(f"  [LOCAL-903] single-place agreement: stops {km:.1f} km apart; stop={move + 1} "
              f"moved to the verified stop={keep + 1} pin")
         return 1

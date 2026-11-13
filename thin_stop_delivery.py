@@ -601,10 +601,30 @@ def _parse_blocks(tour_text: str):
         yield line_no, m.group(1), m.group(2).strip(), start, end
 
 
+# [LOCAL-906B] The tour's closing rides on the LAST stop's block (the thematic recap, "That's N stops in all.", the
+# restaurant offer). It is not the stop's body: rebuilt facts appended to it were cut away by the 619B conclusion
+# rebuild (tour 552 Stop 2: 3 grounded sentences vanished with no log line).
+_CLOSING_START_RE = re.compile(
+    r"(?i)^(?:that['\u2019]s\s+(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+stops?\b"
+    r"|across\s+(?:these|the)\s+stops\b|taken\s+together\b|together,?\s+these\b|what\s+connects\b"
+    r"|the\s+(?:works|stops)\s+on\s+this\s+tour\b|on\s+this\s+tour\b|this\s+tour\b"
+    r"|from\s+.{3,160}?(?:you\s+have\s+followed\s+the\s+thread|this\s+route\s+is\s+the\s+one\s+you\s+chose)"
+    r"|if\s+you\s+would\s+like\s+to\s+eat\b|as\s+this\s+journey\s+comes\s+to\s+a\s+close\b)")
+
+
+def _closing_start(lines: List[str], start: int, end: int) -> int:
+    """Index of the first closing line of the block (``end`` when it has none)."""
+    for i in range(start, end):
+        if _CLOSING_START_RE.match(lines[i].strip()):
+            return i
+    return end
+
+
 def _body_line_indices(lines: List[str], start: int, end: int) -> List[int]:
     """Indices of the stop's standalone narration paragraphs (NOT the Orientation
-    label line, field lines, Directions or Sources)."""
+    label line, field lines, Directions, Sources, or the tour's closing)."""
     out = []
+    end = _closing_start(lines, start, end)           # [LOCAL-906B]
     for i in range(start, end):
         ln = lines[i]
         s = ln.strip()
@@ -783,8 +803,8 @@ def rebuild_thin_delivered_stops(
                 for j in body_idx[1:]:
                     lines[j] = ""
             else:
-                insert_at = end
-                for i in range(start, end):
+                insert_at = _closing_start(lines, start, end)      # [LOCAL-906B] never after the closing
+                for i in range(start, insert_at):
                     if _DIRECTIONS_RE.match(lines[i].strip()):
                         insert_at = i
                         break
@@ -894,8 +914,8 @@ def rebuild_thin_delivered_stops(
                 lines[tgt] = f"{cur}{sep} {add_text}".strip()
         else:
             # insert before the Directions line, else at end of block
-            insert_at = end
-            for i in range(start, end):
+            insert_at = _closing_start(lines, start, end)          # [LOCAL-906B] never after the closing
+            for i in range(start, insert_at):
                 if _DIRECTIONS_RE.match(lines[i].strip()):
                     insert_at = i
                     break

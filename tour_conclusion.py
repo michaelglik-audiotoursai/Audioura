@@ -2014,6 +2014,8 @@ def drop_orphan_work_paragraphs(tour_text: str) -> "tuple[str, Dict]":
             continue
         if _paragraph_names_only_undelivered_work(seg, delivered_titles):
             dropped += 1
+            _log906b(None, f'  [LOCAL-620] Stop {headers[-1].group(0).strip()[5:].split(":")[0].strip() or "?"}: '
+                           f'dropped "{seg.strip()[:80]}" (one-sentence paragraph naming a work that is not a stop)')
             continue
         out_paras.append(seg)
     report["dropped"] = dropped
@@ -2025,7 +2027,77 @@ def drop_orphan_work_paragraphs(tour_text: str) -> "tuple[str, Dict]":
     return new_text, report
 
 
-def _split_tail(tour_text: str):
+def _log906b(log, msg: str) -> None:
+    try:
+        (log or (lambda m: print(m, flush=True)))(msg)
+    except Exception:
+        pass
+
+
+def _sentences906b(text: str) -> List[str]:
+    return [x.strip() for x in re.split(r'(?<=[.!?])\s+', text or "") if x.strip()]
+
+
+_RECAP_CUE_906B = re.compile(
+    r"(?i)\b(?:these\s+stops|this\s+tour|this\s+route|you\s+have\s+followed|the\s+thread|taken\s+together|"
+    r"across\s+the\s+stops|one\s+you\s+might\s+carry|along\s+the\s+way)\b")
+_OFFER_906B = re.compile(r"(?i)\bIf you would like to eat nearby\b[^.!?]*[.!?]")
+
+
+def _salvage_after_count(cut_text: str, other_titles: Optional[List[str]] = None) -> Tuple[List[str], List[str]]:
+    """[LOCAL-906B] ``cut_text`` is everything from the first closing opener to the end. The old conclusion ends
+    with the count sentence ("That's N stops in all.") and the restaurant offer. Prose that is NOT conclusion but
+    sits in that span is a stop sentence that landed in the closing (tour 552: 3 grounded Stop 2 sentences, gone
+    with no log line). It is kept when
+      * it follows the restaurant offer (the offer is the closing's last sentence, nothing after it is closing), or
+      * it follows the count sentence, names no OTHER stop, and reads as neither a recap nor a list/label block.
+    Returns (salvaged sentences, dropped sentences)."""
+    others = [re.sub(r'\s+', ' ', t).strip().lower() for t in (other_titles or []) if len((t or '').strip()) >= 4]
+
+    def stop_like(x: str) -> bool:
+        low = x.lower()
+        return (len(re.findall(r"[^\W\d_]+", x)) >= 4 and not _THREAD_OPENER.match(x) and not _COUNT_OPENER.search(x)
+                and not _RECAP_CUE_906B.search(x))
+
+    offers = list(_OFFER_906B.finditer(cut_text))
+    ms = list(_COUNT_OPENER.finditer(cut_text))
+    if not offers and not ms:
+        return [], _sentences906b(cut_text)
+    off_start = offers[-1].start() if offers else len(cut_text)
+    off_end = offers[-1].end() if offers else len(cut_text)
+    if ms:
+        m = re.compile(r'[.!?]').search(cut_text, ms[-1].end())
+        count_end = m.end() if m else len(cut_text)
+    else:
+        count_end = off_end
+    count_end = min(count_end, off_start) if offers else count_end
+    head = cut_text[:count_end]
+    regions = [(cut_text[count_end:off_start], False), (cut_text[off_end:], True)]   # (text, follows the offer)
+
+    keep, gone = [], list(_sentences906b(head))
+    for rest, after_offer in regions:
+        for pat in _TRAILING_OFFER_PATTERNS:
+            rest = pat.sub(" ", rest)
+        rest = strip_epilog(rest)
+        # a legacy list / label block ("Along the way:" + bullets) is part of the old closing, not a stop sentence
+        paras = []
+        for para in re.split(r'\n\s*\n', rest):
+            lns = [ln for ln in para.split("\n") if ln.strip()]
+            if lns and (lns[0].rstrip().endswith(":") or re.match(r'(?i)^\s*along the way\b', lns[0])
+                        or any(re.match(r'^\s*(?:[-\u2022*]|\d+[.)])\s', ln) for ln in lns)):
+                gone.append(para.strip().replace("\n", " "))
+            else:
+                paras.append(para)
+        for x in _sentences906b("\n\n".join(paras)):
+            low = re.sub(r'\s+', ' ', x).lower()
+            if stop_like(x) and (after_offer or not any(t in low for t in others)):
+                keep.append(x)
+            else:
+                gone.append(x)
+    return keep, gone
+
+
+def _split_tail(tour_text: str, log=None):
     """Split the tour into (body_before_conclusion, sources_block).
 
     The conclusion/recap and the Sources block live AFTER the last stop body.
@@ -2057,6 +2129,22 @@ def _split_tail(tour_text: str):
 
     body = text[:cut]
 
+    # [LOCAL-906B] a stop sentence that sits in the closing is moved back into the last stop's body, and every
+    # sentence of the replaced conclusion is logged (no silent removal).
+    if cut < len(text) and headers:
+        _num = re.search(r'\d+', headers[-1].group(0))
+        _n = _num.group(0) if _num else "?"
+        _others = [re.sub(r',\s*\d{3,4}\s*$', '', (h.group(2) if h.lastindex and h.lastindex >= 2 else h.group(0))).strip()
+                   for h in headers[:-1]]
+        _kept, _gone = _salvage_after_count(text[cut:], _others)
+        for x in _gone:
+            _log906b(log, f'  [LOCAL-619B] Stop {_n}: dropped "{x[:80]}" (old conclusion replaced by the rebuilt one)')
+        if _kept:
+            body = body.rstrip() + "\n\n" + " ".join(_kept)
+            for x in _kept:
+                _log906b(log, f'  [LOCAL-906B] Stop {_n}: kept "{x[:80]}" (stop sentence found after the closing; '
+                              f'moved back into the stop body)')
+
     # The old conclusion could have leaked a "Closing:" label or sign-off/treat/
     # news sentences into the body tail (fresh path spliced them inline). Sweep
     # any epilog spans and trailing offer patterns out of the body tail so the
@@ -2085,6 +2173,7 @@ def rebuild_conclusion(
     use_llm: bool = False,
     llm_fn=None,
     api_key: Optional[str] = None,
+    log=None,
 ) -> str:
     """The single finalization pass: replace any trailing conclusion with the one
     built from the FINAL text.
@@ -2111,7 +2200,7 @@ def rebuild_conclusion(
     if count_delivered_stops(tour_text) <= 0:
         return tour_text
 
-    body, sources_block = _split_tail(tour_text)
+    body, sources_block = _split_tail(tour_text, log)
     conclusion = build_conclusion(
         tour_text,
         venue_name=venue_name,
