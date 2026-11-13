@@ -98,13 +98,76 @@ def _is_admin_row(row: Dict) -> bool:
         or (cls == "place" and typ in _ADMIN_TYPES)
 
 
+# [LOCAL-906E] A province box must be a PROVINCE: lower admin levels (a city ward that took the old province's name in a
+# reform), tiny areas, and boxes that miss the area resolver's coarse centre are rejected. Generic numbers only.
+MIN_PROVINCE_KM2 = 1000.0
+SNAP_PAD_KM = 20.0
+_PROVINCE_ADDR_TYPES = {"state", "province", "region"}
+_LOWER_ADDR_TYPES = {"city", "town", "village", "hamlet", "suburb", "city_district", "district", "borough", "quarter",
+                     "neighbourhood", "neighborhood", "ward", "municipality", "county", "state_district", "locality",
+                     "isolated_dwelling", "commune", "subdistrict"}
+
+
+def box_area_km2(box: Box) -> float:
+    """Approximate area of a [south, north, west, east] box in km2."""
+    h = (box[1] - box[0]) * 111.0
+    w = (box[3] - box[2]) * 111.0 * math.cos(math.radians((box[0] + box[1]) / 2.0))
+    return abs(h * w)
+
+
+def pad_box(box: Optional[Box], km: float = SNAP_PAD_KM) -> Optional[List[float]]:
+    """The box grown by ``km`` on every side (the snap-scope test of a FALLBACK box)."""
+    if not box or len(box) < 4:
+        return None
+    m_lat = km / 111.0
+    m_lng = km / (111.0 * max(0.2, math.cos(math.radians((box[0] + box[1]) / 2.0))))
+    return [box[0] - m_lat, box[1] + m_lat, box[2] - m_lng, box[3] + m_lng]
+
+
+def _admin_level(row: Dict) -> Optional[int]:
+    for src in (row, row.get("extratags") if isinstance(row.get("extratags"), dict) else {}):
+        v = (src or {}).get("admin_level")
+        if v not in (None, ""):
+            try:
+                return int(str(v).strip())
+            except ValueError:
+                return None
+    return None
+
+
+def province_level_problem(row: Dict) -> str:
+    """'' when the geocoder row is a province/state level boundary; else why not."""
+    lvl = _admin_level(row)
+    addr = str(row.get("addresstype") or "").lower()
+    if lvl is not None:
+        return "" if lvl == 4 else f"admin_level {lvl} is not province/state level (4)"
+    if addr:
+        if addr in _PROVINCE_ADDR_TYPES:
+            return ""
+        return f"addresstype {addr!r} is not a province/state"
+    typ = str(row.get("type") or "").lower()
+    if typ in _LOWER_ADDR_TYPES:
+        return f"type {typ!r} is not a province/state"
+    return ""          # a bare boundary/administrative row: the area and centre checks judge it
+
+
+def box_problem(box: Box, coarse_center=None) -> str:
+    """'' when the box is plausible for a province; else why not (area, coarse centre)."""
+    area = box_area_km2(box)
+    if area < MIN_PROVINCE_KM2:
+        return f"area {area:,.0f} km2 < {MIN_PROVINCE_KM2:,.0f} km2 (not a province)"
+    if coarse_center is not None and not in_box(coarse_center, box):
+        return (f"does not contain the area resolver's centre {coarse_center[0]:.4f},{coarse_center[1]:.4f}")
+    return ""
+
+
 def _default_search_rows(query: str) -> List[Dict]:
     """Nominatim, several rows, administrative areas preferred (featuretype=state). Never raises."""
     try:
         import requests
         resp = requests.get("https://nominatim.openstreetmap.org/search",
                             params={"q": query, "format": "jsonv2", "limit": "5", "featuretype": "state",
-                                    "accept-language": "en"},
+                                    "extratags": "1", "accept-language": "en"},
                             headers={"User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)"},
                             timeout=8)
         return resp.json() if resp.status_code == 200 else []
@@ -112,8 +175,10 @@ def _default_search_rows(query: str) -> List[Dict]:
         return []
 
 
-def _default_wikidata_area(name: str) -> Optional[Tuple[float, float, float]]:
-    """(lat, lng, area_km2) of the best Wikidata item for ``name`` that has P625 and P2046. Never raises."""
+def _default_wikidata_area(name: str) -> Optional[List[Tuple[float, float, float]]]:
+    """[(lat, lng, area_km2)] of every Wikidata item for ``name`` that has P625 and P2046, province-sized first. A
+    dissolved/former province keeps both claims (P576 is its dissolution date). Never raises."""
+    out: List[Tuple[float, float, float]] = []
     try:
         import requests
         ua = {"User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)"}
@@ -129,42 +194,69 @@ def _default_wikidata_area(name: str) -> Optional[Tuple[float, float, float]]:
             p625 = (cl.get("P625") or [{}])[0].get("mainsnak", {}).get("datavalue", {}).get("value", {})
             p2046 = (cl.get("P2046") or [{}])[0].get("mainsnak", {}).get("datavalue", {}).get("value", {})
             if p625.get("latitude") is not None and p2046.get("amount"):
-                return float(p625["latitude"]), float(p625["longitude"]), abs(float(p2046["amount"]))
+                out.append((float(p625["latitude"]), float(p625["longitude"]), abs(float(p2046["amount"]))))
     except Exception:
         pass
-    return None
+    out.sort(key=lambda h: -h[2])
+    return out or None
 
 
 def province_box(province: str, country: str = "", search_fn: Optional[Callable] = None,
-                 wikidata_fn: Optional[Callable] = None, log: Optional[Callable] = None) -> Optional[Dict]:
+                 wikidata_fn: Optional[Callable] = None, log: Optional[Callable] = None,
+                 coarse_center=None) -> Optional[Dict]:
     """The province/state's bounding box and centre: ``{"box": [s, n, w, e], "center": (lat, lng), "source": str,
     "name": province}`` or None. The geocoder's ADMINISTRATIVE row (a railway station or a mountain of the same
-    name is not the province); fallback: Wikidata P625 + area (P2046) as a square. Never raises."""
+    name is not the province); fallback: Wikidata P625 + area (P2046) as a square.
+
+    [LOCAL-906E] Each candidate is sanity-checked: province/state level (admin_level 4 / addresstype state or
+    province, never a city, ward or municipality), at least ``MIN_PROVINCE_KM2``, and containing the area
+    resolver's ``coarse_center`` when there is one. A row that fails falls through to the Wikidata entity (a
+    dissolved province keeps P625 + P2046); if everything fails: None (no box) and
+    ``[LOCAL-906E] province box rejected: <why>``. Never raises."""
     prov = (province or "").strip()
     if not prov:
         return None
+    why: List[str] = []
+    cc = tuple(coarse_center) if coarse_center else None
     try:
         q = f"{prov}, {country}".strip(", ") if country else prov
         rows = (search_fn or _default_search_rows)(q) or []
         for row in rows:
-            if isinstance(row, dict) and _is_admin_row(row):
-                box = _box_from_row(row)
-                if box:
-                    try:
-                        ctr = (float(row["lat"]), float(row["lon"] if "lon" in row else row["lng"]))
-                    except (KeyError, TypeError, ValueError):
-                        ctr = ((box[0] + box[1]) / 2.0, (box[2] + box[3]) / 2.0)
-                    return {"box": box, "center": ctr, "source": "geocoder_admin_boundary", "name": prov}
+            if not (isinstance(row, dict) and _is_admin_row(row)):
+                continue
+            box = _box_from_row(row)
+            if not box:
+                continue
+            bad = province_level_problem(row) or box_problem(box, cc)
+            if bad:
+                why.append(f"geocoder row {bad}")
+                continue
+            try:
+                ctr = (float(row["lat"]), float(row["lon"] if "lon" in row else row["lng"]))
+            except (KeyError, TypeError, ValueError):
+                ctr = ((box[0] + box[1]) / 2.0, (box[2] + box[3]) / 2.0)
+            return {"box": box, "center": ctr, "source": "geocoder_admin_boundary", "name": prov}
         hit = (wikidata_fn or _default_wikidata_area)(prov)
-        if hit:
-            lat, lng, area = float(hit[0]), float(hit[1]), float(hit[2])
+        hits = [hit] if hit and isinstance(hit[0], (int, float)) else list(hit or [])
+        for h in hits:
+            lat, lng, area = float(h[0]), float(h[1]), float(h[2])
+            if area < MIN_PROVINCE_KM2:
+                why.append(f"wikidata area {area:,.0f} km2 < {MIN_PROVINCE_KM2:,.0f} km2")
+                continue
             half = max(5.0, math.sqrt(max(area, 1.0)) / 2.0)
             d_lat = half / 111.0
             d_lng = half / (111.0 * max(0.2, math.cos(math.radians(lat))))
-            return {"box": [lat - d_lat, lat + d_lat, lng - d_lng, lng + d_lng], "center": (lat, lng),
-                    "source": "wikidata_p625_area", "name": prov}
+            box = [lat - d_lat, lat + d_lat, lng - d_lng, lng + d_lng]
+            if cc is not None and not in_box(cc, box):
+                why.append("wikidata square " + box_problem(box, cc))
+                continue
+            return {"box": box, "center": (lat, lng), "source": "wikidata_p625_area", "name": prov}
+        if not hits:
+            why.append("no administrative boundary row and no Wikidata P625 + P2046 entity")
     except Exception as e:
         _log(log, f"  [LOCAL-906D] province box for {prov!r} skipped (non-fatal): {e}")
+        return None
+    _log(log, f"  [LOCAL-906E] province box rejected: {prov!r}: " + "; ".join(why or ["no usable boundary"]))
     return None
 
 
@@ -456,13 +548,19 @@ def _in_province_reference(rows: List[Dict], poi_list: List[Dict], box: Box, ski
 
 
 def last_resort_pins(poi_list: List[Dict], rows: List[Dict], box: Optional[Box], center,
-                     province: str, log: Optional[Callable] = None) -> List[int]:
+                     province: str, log: Optional[Callable] = None, pad_km: float = 0.0) -> List[int]:
     """After the snap: a stop whose unverified pin is still outside the province box moves to the best in-province
     reference another stop has, else to the province centre (flagged approximate). Returns the moved indices.
-    Never leaves a pin outside the scope province."""
+
+    [LOCAL-906E] The box is a FALLBACK: a pin within ``pad_km`` of it is not far. The centre is a last resort for a
+    pin that is far from everything: it is used only when no stop has an accepted reference, and never when it
+    would put the pin farther from the stop's own reference than it already is."""
     moved: List[int] = []
     if not box:
         return moved
+    if pad_km:
+        box = pad_box(box, pad_km)
+    any_accepted = any(isinstance(r, dict) and r.get("snapped") and r.get("new_coordinate") for r in (rows or []))
     for i, p in enumerate(poi_list or []):
         try:
             c = _pin(p)
@@ -482,13 +580,26 @@ def last_resort_pins(poi_list: List[Dict], rows: List[Dict], box: Optional[Box],
             found = _in_province_reference(rows, poi_list, box, i)
             if found:
                 j, pt = found
+                if row.get("reference") and hav_km(pt, row["reference"]) > hav_km(c, row["reference"]):
+                    _log(log, f"  [LOCAL-906E] stop={i + 1} pin kept: stop={j + 1}'s reference is farther from its "
+                              f"own reference than the pin is")
+                    continue
                 _set_pin(p, pt, donor=j)
                 _log(log, f"  [LOCAL-906D] stop={i + 1} pin {c[0]:.4f},{c[1]:.4f} outside {province}: moved to "
                           f"stop={j + 1}'s in-province reference {pt[0]:.4f},{pt[1]:.4f} (approximate)")
             else:
+                if any_accepted:
+                    _log(log, f"  [LOCAL-906E] stop={i + 1} pin {c[0]:.4f},{c[1]:.4f} kept: a stop has an accepted "
+                              f"reference, so the {province} centre is not used")
+                    continue
                 ctr = tuple(center) if center else ((box[0] + box[1]) / 2.0, (box[2] + box[3]) / 2.0)
                 if not in_box(ctr, box):
                     ctr = ((box[0] + box[1]) / 2.0, (box[2] + box[3]) / 2.0)
+                own_ref = row.get("reference")
+                if own_ref and hav_km(ctr, own_ref) > hav_km(c, own_ref):
+                    _log(log, f"  [LOCAL-906E] stop={i + 1} pin kept: the {province} centre is farther from its "
+                              f"own reference than the pin is")
+                    continue
                 _set_pin(p, ctr)
                 p["_pin_province_centre_906d"] = True
                 _log(log, f"  [LOCAL-906D] stop={i + 1} pin {c[0]:.4f},{c[1]:.4f} outside {province} and no "
@@ -515,6 +626,11 @@ def address_follows_pin(poi: Dict, province: str, country: str = "", reverse_fn:
         parts = [x.strip() for x in addr.split(",") if x.strip()]
         rev = ""
         c = _pin(poi)
+        # [LOCAL-906E] an APPROXIMATE pin (the province centre, or another stop's reference) is not this stop's
+        # place: its reverse geocode names whatever street is there, so nothing is adopted from it.
+        approx_pin = bool(poi.get("_pin_province_centre_906d") or poi.get("_pin_moved_to_stop") is not None)
+        if approx_pin:
+            reverse_fn = None
         if reverse_fn is not None and c is not None:
             try:
                 rev = reverse_fn(c[0], c[1]) or ""
@@ -536,6 +652,18 @@ def address_follows_pin(poi: Dict, province: str, country: str = "", reverse_fn:
                 kept.append(part)                              # confirmed by the reverse geocode of the new pin
             else:
                 dropped.append(part)
+        if approx_pin:
+            nm = str(poi.get("name") or "").strip() or parts[0]
+            kept = [nm] + ([province] if province else [])
+            if country:
+                kept.append(country)
+            new_addr = ", ".join(kept)
+            if new_addr == addr:
+                return False
+            poi["address"] = new_addr
+            _log(log, f"  [LOCAL-906E] address of {poi.get('name')!r} is not adopted from an approximate pin: "
+                      f"{addr!r} -> {new_addr!r}")
+            return True
         if not dropped:
             return False
         has_prov = any(_PROVINCE_PREFIX.sub("", fold(x)) == prov_f for x in kept) if prov_f else True

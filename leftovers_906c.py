@@ -578,6 +578,71 @@ def repair_you_see_here(tour_text: str, log: Optional[Callable] = None) -> str:
         return tour_text
 
 
+# ══ 5. [LOCAL-906E] a body that opens with a pronoun with nothing before it ════════════════════════════
+_PRON_OPEN = re.compile(r"^(?P<pron>Its|It|They|Their|This|These)\b\s*(?P<rest>.*)$", re.S)
+_PRON_VERB = rc._VERB_OPEN | {"represents", "represent", "captures", "capture", "remains", "remain", "became",
+                              "becomes", "reaches", "reach", "dates", "date", "draws", "draw", "serves", "serve",
+                              "looks", "look", "gives", "give", "makes", "make", "belongs", "belong"}
+
+
+def _title_toks(title: str) -> Set[str]:
+    return {w for w in rc.fold(title).split() if len(w) >= 4}
+
+
+def repair_pronoun_opener(tour_text: str, log: Optional[Callable] = None) -> str:
+    """When earlier sentences were dropped, a stop body can open with "Its white color stands out ..." -- a pronoun
+    with nothing before it. The pronoun is replaced by the stop's title: "Its X" -> "The <Title>'s X";
+    "It is/stands ..." and "They ..." -> "The <Title> ..."; "This <title word> ..." -> "The <Title> ..." (a "This"
+    followed by a noun the title does not hold carries its own noun and is left). Only the FIRST body sentence."""
+    emit = _emit(log)
+    if not tour_text:
+        return tour_text
+    try:
+        blocks = rc._stop_blocks(tour_text)
+        pieces, pos = [], 0
+        for k, (s, e, num, title) in enumerate(blocks):
+            pieces.append(tour_text[pos:s])
+            pos = e
+            block = tour_text[s:e]
+            title = (title or "").strip()
+            idx = _body_idx(block.split("\n"), k == len(blocks) - 1)[:1]
+            if not title or not idx:
+                pieces.append(block)
+                continue
+            lines = block.split("\n")
+            sents = rc.split_sentences(lines[idx[0]])
+            m = _PRON_OPEN.match(sents[0]) if sents else None
+            if not m:
+                pieces.append(block)
+                continue
+            pron, rest = m.group("pron"), m.group("rest")
+            first = rest.split(" ", 1)[0].lower().strip(",.;:") if rest else ""
+            the = "The " + title
+            if pron == "Its" or pron == "Their":
+                fixed = f"{the}'s {rest}" if the.endswith(("s", "S")) is False else f"{the}' {rest}"
+            elif pron in ("It", "They"):
+                fixed = f"{the} {rest}"
+            elif first in _PRON_VERB:                            # "This is ..."
+                fixed = f"{the} {rest}"
+            elif first and first in _title_toks(title):          # "This statue ..." -> the title names it
+                fixed = f"{the} {rest.split(' ', 1)[1] if ' ' in rest else ''}".strip()
+            else:
+                pieces.append(block)
+                continue
+            if fixed == sents[0]:
+                pieces.append(block)
+                continue
+            emit(f'  [LOCAL-906E] Stop {num}: body opened with a pronoun, repaired with the title: "{sents[0][:60]}"')
+            sents[0] = fixed
+            lines[idx[0]] = " ".join(sents)
+            pieces.append("\n".join(lines))
+        pieces.append(tour_text[pos:])
+        return "".join(pieces)
+    except Exception as err:  # pragma: no cover
+        emit(f"  [LOCAL-906E] pronoun opener repair skipped (non-fatal): {err}")
+        return tour_text
+
+
 # ══ the pass ═════════════════════════════════════════════════════════════════════════════════════════════
 def final_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                log: Optional[Callable] = None) -> str:
@@ -585,4 +650,5 @@ def final_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = Non
     t = drop_unsupported_scope_claims(tour_text, evidence_by_title, log)
     t = repair_you_see_here(t, log)
     t = distinct_filler_bodies(t, evidence_by_title, log)
+    t = repair_pronoun_opener(t, log)         # [LOCAL-906E]
     return t

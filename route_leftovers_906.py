@@ -607,6 +607,7 @@ def content_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = N
         import leftovers_906c as _c       # case never leaves an identical body twice); "You see the X here is" repaired
         t = _c.repair_you_see_here(t, log)
         t = _c.distinct_filler_bodies(t, evidence_by_title, log)
+        t = _c.repair_pronoun_opener(t, log)          # [LOCAL-906E]
     except Exception as _e906c:  # pragma: no cover
         _emit(log)(f"  [LOCAL-906C] filler guard skipped (non-fatal): {_e906c}")
     t = drop_repeated_sentences(t, log)

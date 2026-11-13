@@ -30782,9 +30782,13 @@ REWRITE RULES (all mandatory):
                         _prov_name_906d = _tail906d[-2] if _country_906d else _tail906d[-1]
                 except Exception:
                     pass
-                _pb906d = _pf906d.province_box(_prov_name_906d, _country_906d) if _prov_name_906d else None
+                # [LOCAL-906E] sanity-checked (province level, >= 1000 km2, holds the coarse centre) or no box at all;
+                # a FALLBACK: padded by 20 km for the snap-scope test and it never refuses what the earlier rules accept
+                _pb906d = (_pf906d.province_box(_prov_name_906d, _country_906d, log=print,
+                                                coarse_center=_coarse_center_902)
+                           if _prov_name_906d else None)
                 if _pb906d:
-                    _prov_box_906d, _prov_ctr_906d = _pb906d['box'], _pb906d['center']
+                    _prov_box_906d, _prov_ctr_906d = _pf906d.pad_box(_pb906d['box']), _pb906d['center']
                     _pin_bbox_803 = list(_prov_box_906d)
                     # (the centre stays None: a province centre would make 791C's 15 km scope-sanity refuse the
                     # real site of a mountain 26 km from it; the box is the scope test)
@@ -30806,6 +30810,7 @@ REWRITE RULES (all mandatory):
             scope_precision=((intent.get('scope_precision') or '') if isinstance(intent, dict) else ''),
             coarse_center=_coarse_center_902,
             province_box=_prov_box_906d,
+            scope_bbox_is_fallback=bool(_prov_box_906d),
             is_user_stop_fn=lambda _p: bool(
                 _p.get('user_explicit') or _p.get('_anchor')
                 or _is_user_stop_title(_p.get('name'))),
