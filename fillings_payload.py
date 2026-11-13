@@ -24,6 +24,8 @@ import topic_picker as tp
 _STOP_RE = re.compile(r"(?mi)^Stop\s+(\d+):\s*(.+?)\s*$")
 _COORD_RE = re.compile(r"(?mi)^Coordinates:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)")
 _TYPE_RE = re.compile(r"(?mi)^Type/Specialty:\s*(.+?)\s*$")
+_DIR_RE = re.compile(r"(?mi)^Directions:\s*(.+?)\s*$")
+_STATED_KM = re.compile(r"(?i)\b(?:roughly|about|approximately|around)\s+(\d+(?:\.\d+)?)\s*(?:km|kilomet(?:er|re)s?)\b")
 
 
 def stops_from_tour_text(tour_text: str) -> List[Dict[str, Any]]:
@@ -40,6 +42,13 @@ def stops_from_tour_text(tour_text: str) -> List[Dict[str, Any]]:
         if t:
             stop["type_specialty"] = t.group(1)
         stops.append(stop)
+    for i, stop in enumerate(stops[:-1]):       # [LOCAL-909] a road distance the Directions state ("roughly 51 km")
+        d = _DIR_RE.search(tour_text[heads[i].end(): heads[i + 1].start()])
+        nxt = re.sub(r"\s*\(.*?\)\s*", " ", stops[i + 1]["title"]).strip().lower()
+        for sent in re.split(r"(?<=[.!?])\s+", d.group(1)) if d else []:
+            km = _STATED_KM.search(sent)
+            if km and nxt and nxt in sent.lower():       # the sentence that names the NEXT stop and its distance
+                stop["leg_distance_km"] = float(km.group(1))
     return stops
 
 
@@ -104,9 +113,12 @@ def build_fillings(tour: Dict[str, Any], listener_weights: Optional[Dict[str, fl
     out = []
     for leg in sorted(picks):
         items = picks[leg]
+        mins, src = tp.leg_minutes_source(tour, leg)
+        print(f"[LOCAL-909] leg {leg} {mins or 0.0:.1f} min (source: {src}; "
+              f"mode {tp.normalise_mode(tour)})", flush=True)
         out.append({
             "leg": leg, "after_stop": leg + 1,
-            "minutes": round(tp.leg_minutes(tour, leg) or 0.0, 1),
+            "minutes": round(mins or 0.0, 1),
             "items": [_item(p) for p in items if p.get("audio_path")]})
     return out
 

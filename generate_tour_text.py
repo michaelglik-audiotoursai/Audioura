@@ -11590,6 +11590,11 @@ def _apply_delivery_hours_guard(result, job_id=None):
                     print("  [LOCAL-896] route content pass changed the delivered text", flush=True)
         except Exception as _rc896e:  # pragma: no cover
             _import_logger.error(f"[LOCAL-896] route content pass skipped: {_rc896e}")
+        try:   # [LOCAL-909] "A to B": every stop keeps its Coordinates; the first Directions start at the origin
+            import route_order_909 as _r909f
+            final = _r909f.finalize_text(final, log=lambda m: print(m, flush=True))
+        except Exception as _r909fe:  # pragma: no cover
+            _import_logger.error(f"[LOCAL-909] delivery pass skipped: {_r909fe}")
         # [LOCAL-900B] on every path: fragments, the carry-with-you filler, and (single-place) Directions
         try:
             import route_content_896 as _rc900b
@@ -12885,6 +12890,14 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     transport_mode = _transport_keyword if _transport_keyword != 'on_foot' else _transport_from_intent
     _country_scope = intent.get('country_scope') if intent else None
     print(f"  [TRANSPORT] mode={transport_mode}, country_scope={_country_scope} (keyword={_transport_keyword}, intent={_transport_from_intent})")
+    try:   # [LOCAL-909] the transport mode (driving drops transit/schedule advice) and the "A to B" request
+        import route_order_909 as _r909
+        _r909_info = _r909.set_request(location, transport_mode)
+        if _r909_info:
+            print(f"  [LOCAL-909] A-to-B request: origin={_r909_info['origin']!r} "
+                  f"destination={_r909_info['destination']!r} region={_r909_info['region']!r} mode={transport_mode}")
+    except Exception as _e909a:
+        print(f"  [LOCAL-909] route request not parsed (non-fatal): {_e909a}")
 
     # Guardrail: detect potential unrecognized transport modes in the location text
     _unrecognized_mode_re = re.compile(r'\b(\w+)(?:back)?\s+(?:riding|ridding|sledding|drawn)\s+tour\b', re.IGNORECASE)
@@ -22271,6 +22284,17 @@ Exempt: navigation directions ("Turn left", "Continue past").
                   f"(start={_lr576_order_info['start']!r}, end={_lr576_order_info['end']!r}, "
                   f"loop={_lr576_order_info['is_loop']}): {_lr576_post}")
 
+    try:   # [LOCAL-909] "A to B": the stops run from A toward B (projection on the A->B line), B last
+        import route_order_909 as _r909b
+        if _r909b.route() and not _forced_stops_active and not getattr(_J, '_KEEP_GIVEN_ORDER', False):
+            try:
+                from geocode_stops import geocode as _geo909, reverse_is_land as _land909
+            except Exception:
+                _geo909 = _land909 = None
+            poi_list = _r909b.order_poi_list(poi_list, _geo909, _land909, log=print)
+    except Exception as _e909b:
+        print(f"  [LOCAL-909] route order skipped (non-fatal): {_e909b}")
+
     # ============================================================
     # [LOCAL-576] SCOPE CHECK **BEFORE WRITING**, then REPLENISH.
     # ============================================================
@@ -30894,6 +30918,25 @@ REWRITE RULES (all mandatory):
                     _pf906d3.address_follows_pin(_p906d, _prov_name_906d, _country_906d, reverse_fn=_rev906d, log=print)
         except Exception as _e906d3:
             print(f"  [LOCAL-906D] address follow skipped (non-fatal): {_e906d3}")
+        try:   # [LOCAL-909] water check, a pin for every stop of an A-to-B route, order on the final pins
+            import route_order_909 as _r909c
+            if _r909c.route():
+                from geocode_stops import geocode as _geo909c, reverse_is_land as _land909c
+                _a909, _b909 = _r909c.endpoints_pts(_geo909c, log=print)
+                _n909 = [str(_p.get('name', '')) for _p in poi_list]
+                poi_list = _r909c.finalize_route_pins(
+                    poi_list, _snap_rows_791c, _r909c.route(), _a909, _b909, box=_prov_box_906d or _route_box_896,
+                    route_refs=_route_refs_897, land_fn=_land909c, log=print)
+                if [str(_p.get('name', '')) for _p in poi_list] != _n909:
+                    # the snap rows are indexed like the OLD list: re-index them with the stops
+                    _pos909 = {n: k for k, n in enumerate(_n909)}
+                    _snap_rows_791c = [_snap_rows_791c[_pos909[str(_p.get('name', ''))]]
+                                       for _p in poi_list if str(_p.get('name', '')) in _pos909
+                                       and _pos909[str(_p.get('name', ''))] < len(_snap_rows_791c)]
+                    first_poi_coordinates = _sp903.tour_pin(poi_list, first_poi_coordinates) \
+                        if '_sp903' in locals() else first_poi_coordinates
+        except Exception as _e909c:
+            print(f"  [LOCAL-909] route pin pass skipped (non-fatal): {_e909c}")
         _n_snapped_791c = sum(1 for r in _snap_rows_791c if r.get("snapped"))
         _n_noref_791c = sum(1 for r in _snap_rows_791c if r.get("reference") is None)
         # [LOCAL-858] Stops whose centroid pin was cleared (never shipped as a real
@@ -36141,6 +36184,11 @@ RULES:
                     complete_tour = _rc897b.finalize_898(complete_tour, _ev889, log=print)   # [LOCAL-898]
             except Exception as _e897b:
                 print(f"  [LOCAL-897] route body pass skipped (non-fatal): {_e897b}")
+            try:   # [LOCAL-909] "A to B": every stop keeps its Coordinates; the first Directions start at the origin
+                import route_order_909 as _r909g
+                complete_tour = _r909g.finalize_text(complete_tour, log=print)
+            except Exception as _e909g:
+                print(f"  [LOCAL-909] delivery pass skipped (non-fatal): {_e909g}")
             _tot = sum(r.get("K", 0) for r in _kf_rep["stops"])
             _got = sum(r.get("k", 0) for r in _kf_rep["stops"])
             print(f"  [LOCAL-889] coverage total: {_got}/{_tot} key facts over "

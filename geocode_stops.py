@@ -1489,3 +1489,29 @@ def reverse_address(lat, lng):
     except Exception as e:
         logging.warning("[GEOCODE] reverse lookup failed for %r,%r: %s", lat, lng, e)
         return ""
+
+
+def reverse_is_land(lat, lng):
+    """[LOCAL-909] Free reverse geocode (the same Nominatim host): True when the point has a land address / admin
+    area, False when the geocoder answers "Unable to geocode" (open water), None when the lookup itself failed
+    (network / timeout: unknown, never read as water)."""
+    global _last_request_at
+    try:
+        elapsed = time.time() - _last_request_at
+        if elapsed < _MIN_INTERVAL_S:
+            time.sleep(_MIN_INTERVAL_S - elapsed)
+        url = NOMINATIM_URL.replace("/search", "/reverse") + "?" + urllib.parse.urlencode({
+            "lat": f"{float(lat):.6f}", "lon": f"{float(lng):.6f}", "format": "jsonv2", "zoom": 10})
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+            payload = json.load(resp)
+        _last_request_at = time.time()
+        if not isinstance(payload, dict):
+            return None
+        if payload.get("error"):
+            return False
+        addr = payload.get("address") or {}
+        return bool(addr.get("country") or addr.get("state") or addr.get("county") or payload.get("display_name"))
+    except Exception as e:
+        logging.warning("[GEOCODE] land check failed for %r,%r: %s", lat, lng, e)
+        return None
