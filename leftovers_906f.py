@@ -925,6 +925,10 @@ def refill_thin_stops(tour_text: str, evidence_by_title: Optional[Dict[str, str]
                     continue
                 if kfc.is_denied(title, cand, blob) or kfc.deterministic_unsupported(cand, blob, title):
                     continue
+                if c.record_claim(cand) and c.record_support(cand, blob, title, c._entries_for(title)) == "bad":
+                    continue                       # [LOCAL-906J] a record the sources do not carry is not a refill either
+                if c.check_claim(cand, blob, title)[0] == "bad":
+                    continue
                 cur = have + added
                 if any(rc.same_fact(cand, y, title) for y in cur + others):
                     continue

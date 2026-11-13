@@ -18,13 +18,87 @@ _SOURCES: Dict[str, int] = rc._ScopedDict(dict)     # {source name: stops it fil
 _LOGGED: Dict[str, bool] = rc._ScopedDict(dict)     # {"done": True} once the per-job line was logged
 
 
-def add(ev: Optional[Dict[str, object]], source: str) -> int:
-    """Add evidence (a str or a list of str per title) from ``source``. Returns the number of stops touched."""
+# [LOCAL-906J] Evidence PURITY. The store holds SOURCE text only. Every entry is tagged with its source kind; a kind the
+# model can produce is impossible (``add`` refuses it, ``assert_pure`` proves it). D771 / LOCAL-892: LLM output is never
+# evidence, and a delivery guard that reads it vouches for the narrator with the narrator's own words.
+SOURCE_KINDS = frozenset({"article", "web", "user-article"})        # an encyclopedia article, a web snippet / page, the user stop's article
+LLM_KINDS = frozenset({"fact-sheet", "signature", "refill", "rewrite", "llm", "knowledge_fallback", "parametric", "spine",
+                       "thin-fact", "tour"})
+# the legacy source labels the generator passes (their material is source text; the generator only hands over passages)
+_DEFAULT_KIND = {"889": "web", "904": "web", "user-stop": "user-article", "article": "article", "web": "web",
+                 "user-article": "user-article"}
+_KINDS: Dict[str, Dict[str, int]] = rc._ScopedDict(dict)   # {source kind: {stop title: entries}}
+_REFUSED: Dict[str, int] = rc._ScopedDict(dict)            # {refused kind: entries}, for the log and the tests
+_ENTRIES: Dict[str, list] = rc._ScopedDict(dict)           # {stop title: [{"text", "kind", "domain"}]}: provenance per entry
+_REFERENCE_DOMAINS = ("wikipedia.org", "wikidata.org", "britannica.com", "guinnessworldrecords.com", "recordsetter.com",
+                      "worldrecordacademy.org", "recordholders.org")
+_TWO_PART_TLDS = frozenset("co com org net gov edu ac or ne go".split())
+
+
+def domain_of(url: str) -> str:
+    """The registrable domain of a URL ("https://en.m.wikipedia.org/wiki/X" -> "wikipedia.org"); "" when none."""
+    m = re.match(r"(?i)^\s*(?:[a-z][a-z0-9+.-]*://)?(?:[^/@\s]*@)?([a-z0-9.-]+\.[a-z]{2,})(?::\d+)?(?:[/?#]|$)", str(url or ""))
+    if not m:
+        return ""
+    parts = m.group(1).lower().strip(".").split(".")
+    if len(parts) >= 3 and len(parts[-1]) == 2 and parts[-2] in _TWO_PART_TLDS:
+        return ".".join(parts[-3:])
+    return ".".join(parts[-2:])
+
+
+def is_reference_domain(domain: str) -> bool:
+    """An encyclopedia or an official / record-body page: a reference for a world-scope record."""
+    d = (domain or "").lower()
+    return d in _REFERENCE_DOMAINS or bool(re.search(r"(?:^|\.)(?:gov|gob|gouv|go)\.[a-z]{2}$|\.gov$|\.int$", d))
+
+
+def entries(title: Optional[str] = None):
+    """The per-entry provenance: {stop title: [{text, kind, domain}]}, or the list for one title (exact key)."""
+    if title is not None:
+        return list(_ENTRIES.get(str(title), []))
+    return {k: list(v) for k, v in _ENTRIES.items()}
+
+
+def kind_for(source: str, kind: Optional[str] = None) -> Optional[str]:
+    k = (kind or _DEFAULT_KIND.get(str(source or "").strip().lower()) or "").strip().lower()
+    return k if k in SOURCE_KINDS else None
+
+
+def add(ev: Optional[Dict[str, object]], source: str, kind: Optional[str] = None) -> int:
+    """Add SOURCE text (a str or a list of str per title) from ``source``. Returns the number of stops touched.
+    ``kind`` (article / web / user-article; derived from ``source`` when omitted) tags the entry. An LLM kind, or a source
+    whose kind is unknown, is refused: nothing is stored (a fact-sheet fact, a signature story, a refill sentence, a model
+    rewrite). Registered LLM passages (``llm_evidence``) are scrubbed out of what is stored."""
     n = 0
     try:
+        k_ = kind_for(source, kind)
+        if k_ is None:
+            _REFUSED[str(kind or source)] = _REFUSED.get(str(kind or source), 0) + sum(1 for _ in (ev or {}))
+            return 0
+        try:
+            import llm_evidence as _le
+        except Exception:  # pragma: no cover
+            _le = None
         for k, v in (ev or {}).items():
-            blob = " ".join(str(x) for x in v) if isinstance(v, (list, tuple, set)) else str(v or "")
-            blob = blob.strip()
+            items = list(v) if isinstance(v, (list, tuple, set)) else [v]
+            texts = []
+            for it in items:
+                # an item is a str, or {"text", "url", "kind"} (the url gives the entry its domain; the kind overrides)
+                txt = str(it.get("text") or "") if isinstance(it, dict) else str(it or "")
+                if _le is not None:
+                    txt = _le.scrub(txt)
+                txt = txt.strip()
+                if not txt:
+                    continue
+                ik = (kind_for(source, it.get("kind")) if isinstance(it, dict) and it.get("kind") else None) or k_
+                dom = domain_of(it.get("url") or it.get("domain") or "") if isinstance(it, dict) else ""
+                if dom == "" and isinstance(it, dict) and it.get("domain"):
+                    dom = str(it.get("domain")).lower()
+                _ENTRIES.setdefault(str(k), []).append({"text": txt, "kind": ik, "domain": dom})
+                by = _KINDS.setdefault(ik, {})
+                by[str(k)] = by.get(str(k), 0) + 1
+                texts.append(txt)
+            blob = " ".join(texts).strip()
             if not blob or not str(k).strip():
                 continue
             cur = _STORE.get(str(k), "")
@@ -39,6 +113,21 @@ def add(ev: Optional[Dict[str, object]], source: str) -> int:
     return n
 
 
+def kinds() -> Dict[str, int]:
+    """{source kind: entries stored}; only SOURCE kinds can appear."""
+    return {k: sum(v.values()) for k, v in _KINDS.items()}
+
+
+def refused() -> Dict[str, int]:
+    return dict(_REFUSED)
+
+
+def assert_pure() -> None:
+    """Raises AssertionError when any stored entry carries a non-source kind (cannot happen through ``add``)."""
+    bad = [k for k in _KINDS if k not in SOURCE_KINDS]
+    assert not bad, f"LLM / unknown evidence kinds in the delivery store: {bad}"
+
+
 def get() -> Dict[str, str]:
     return dict(_STORE)
 
@@ -46,6 +135,9 @@ def get() -> Dict[str, str]:
 def clear() -> None:
     _STORE.clear()
     _SOURCES.clear()
+    _KINDS.clear()
+    _REFUSED.clear()
+    _ENTRIES.clear()
     _LOGGED.clear()
 
 
@@ -75,7 +167,8 @@ def report(text: str, log: Optional[Callable[[str], None]] = None,
             return
         k, n = coverage(text, resolve(evidence_by_title))
         srcs = ", ".join(f"{s}:{c}" for s, c in sorted(_SOURCES.items())) or "none"
-        log(f"  {TAG} delivery evidence: {k}/{n} stops ({srcs})")
+        kd = ", ".join(f"{a}:{b}" for a, b in sorted(kinds().items())) or "none"
+        log(f"  {TAG} delivery evidence: {k}/{n} stops ({srcs}) kinds {kd}")
         _LOGGED["done"] = True
     except Exception:
         pass
