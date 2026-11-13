@@ -1679,6 +1679,9 @@ def _lower_lead(seg: str) -> str:
         return s
     first = s.split()[0]
     # Keep capitalised proper nouns (weekdays, Month names) and symbol/number leads.
+    nxt = s.split()[1] if len(s.split()) > 1 else ""
+    if nxt[:1].isupper() and not nxt.isupper():      # [LOCAL-906N] "Ta Cu Mountain ...": a multi-word name keeps its capital
+        return s
     if first[:1].isupper() and not first.isupper() and first[1:].islower():
         # Weekday/Month proper nouns stay capitalised; a plain word like "Open"
         # becomes lower-case to continue the sentence.

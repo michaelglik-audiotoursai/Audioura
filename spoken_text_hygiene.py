@@ -302,6 +302,20 @@ _ALREADY_DISCLOSED_RE = re.compile(
     r"some say|tradition holds|folklore)\b")
 
 
+_COMMON_OPENERS_906N = frozenset(
+    "the this that these those it its they their he she his her there here a an in on at as when while after before during "
+    "one some many most each every people visitors locals legend story tradition according".split())
+
+
+def _lower_if_common_opener(s: str) -> str:
+    """[LOCAL-906N] Lower-case the first letter only when the sentence opens with a common word: a proper name
+    (\"Ta Cu Mountain is said ...\") keeps its capital."""
+    m = re.match(r"[^\W\d_]+", s)
+    if m and m.group(0).lower() in _COMMON_OPENERS_906N and s[:1].isupper():
+        return s[0].lower() + s[1:]
+    return s
+
+
 def disclose_or_drop_folklore(text: str, *, drop: bool = False,
                               evidence_text: str = "") -> tuple:
     """[LOCAL-880 §3] Disclose a flatly-stated miracle/legend sentence (D760) by
@@ -354,7 +368,7 @@ def disclose_or_drop_folklore(text: str, *, drop: bool = False,
                     lead = f"A story told in {ev_year} holds that "
                 else:
                     lead = "A story told by visitors holds that "
-                low = ps[0].lower() + ps[1:]
+                low = _lower_if_common_opener(ps)      # [LOCAL-906N] "Ta Cu Mountain ..." keeps its capital
                 new_parts.append(lead + low)
                 changed += 1
             else:

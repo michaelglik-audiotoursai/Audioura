@@ -1054,6 +1054,11 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
     except Exception as _e906m:  # pragma: no cover
         _emit(log)(f"  [LOCAL-906M] pass skipped (non-fatal): {_e906m}")
     t = drop_driving_practical(t, log)
+    try:   # [LOCAL-906N] one builder, one spelling (before the cross-stop check sees "Tri" vs "Y" as a conflict)
+        import nits_906n as _n906n
+        t = _n906n.unify_builder_names(t, evidence_by_title, log)
+    except Exception as _e906n:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906N] builder unify skipped (non-fatal): {_e906n}")
     t = resolve_cross_stop(t, evidence_by_title, log)
     t = drop_cross_stop_fact(t, evidence_by_title, log)
     t = drop_encyclopedia_leads(t, log)
@@ -1062,4 +1067,9 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
     t = fix_orphan_compounds(t, log)
     t = repair_person_pronoun(t, evidence_by_title, log)
     t = _k906.run_pass(t, evidence_by_title, log)          # [LOCAL-906K] mode words, conflicting measures
+    try:   # [LOCAL-906N] a proper name lowercased by an earlier rewrite gets its capitals back
+        import nits_906n as _n906n
+        t = _n906n.restore_proper_case(t, log)
+    except Exception as _e906n:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906N] case guard skipped (non-fatal): {_e906n}")
     return t

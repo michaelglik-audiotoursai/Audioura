@@ -207,11 +207,37 @@ def is_driving(tour_text: str) -> bool:
     return bool(_DRIVING.search(tour_text or ""))
 
 
+_DET_AFTER = r"(?=\s+(?:the|a|an|this|that|these|those|its|their|<))"
+
+
+def _cap_at_start(whole: str, pos: int, rep: str) -> str:
+    """[LOCAL-906N] A replacement that lands at a sentence start is capitalised."""
+    before = whole[:pos]
+    if (not before.strip() or re.search(r"[.!?:]\s*$", before)) and rep[:1].islower():
+        return rep[0].upper() + rep[1:]
+    return rep
+
+
 def _mode_fix(x: str) -> str:
-    y = _AS_WALK.sub("here", x)
-    y = _AS_WALK2.sub("here", y)
-    y = _WALK_AROUND.sub("look around", y)
-    y = re.sub(r"\s+,", ",", re.sub(r"(?i)\bhere\s+here\b", "here", y))
+    """[LOCAL-906N] \"As you walk around the market, ...\" -> \"Around the market, ...\" (was \"here the market, ...\");
+    \"As you walk here, ...\" -> \"Here, ...\"; \"walk around\" -> \"look around\"; every rewrite at a sentence start is
+    re-capitalised."""
+    def sub(rx, rep, s):
+        out, last = [], 0
+        for m in rx.finditer(s):
+            r = rep(m) if callable(rep) else rep
+            out.append(s[last:m.start()])
+            out.append(_cap_at_start("".join(out), len("".join(out)), r))
+            last = m.end()
+        out.append(s[last:])
+        return "".join(out)
+    y = sub(re.compile(_AS_WALK.pattern + _DET_AFTER, re.I), "around", x)       # "as you walk here the market" -> "around the market"
+    y = sub(_AS_WALK, "here", y)
+    y = sub(_AS_WALK2, "around", y)
+    y = sub(_WALK_AROUND, "look around", y)
+    y = re.sub(r"\s+,", ",", re.sub(r"(?i)\b(here|around)\s+\1\b", r"\1", y))
+    if y != x and y[:1].islower():
+        y = y[0].upper() + y[1:]
     return y
 
 
