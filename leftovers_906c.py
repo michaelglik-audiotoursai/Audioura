@@ -186,6 +186,44 @@ def _scoped_claim(sentence: str, include_hedged: bool = False) -> Optional[Dict]
     return None
 
 
+_CLAUSE_SPLIT = re.compile(r"(?i)\s*;\s*|\s*,\s*|\s+(?:and|but|while|whereas)\s+|\s+(?=(?:also\s+)?remains\b)|\s+(?=(?:is|are)\s+also\b)")
+_SIZE_ONE = {"size", "length"}          # [LOCAL-906K] largest / biggest / longest count as ONE size class
+
+
+def cls_eq(a: Optional[str], b: Optional[str]) -> bool:
+    return a == b or (a in _SIZE_ONE and b in _SIZE_ONE)
+
+
+def scoped_claims(sentence: str, include_hedged: bool = False) -> List[Dict]:
+    """[LOCAL-906K] EVERY superlative clause of a sentence (split on and / but / while / ; / , and "remains" / "is also"),
+    the whole-sentence claim first. A clause's tokens carry the whole sentence's subject words, so ``remains one of the
+    largest in <Region>`` still names the reclining Buddha of its first clause."""
+    x = sentence or ""
+    out: List[Dict] = []
+    seen = set()
+    first = scoped_claim(x, include_hedged)
+    if first:
+        out.append(first)
+        seen.add((first["word"], first["scope"], first["hedged"]))
+    parts = [p for p in _CLAUSE_SPLIT.split(x) if p and p.strip()]
+    if len(parts) < 2:
+        return out
+    whole = {t for t in rc._content_tokens(_plain(x)) if t not in _NOISE_C}
+    for part in parts:
+        e = scoped_claim(part, include_hedged)
+        if not e:
+            continue
+        key = (e["word"], e["scope"], e["hedged"])
+        if key in seen:
+            continue
+        seen.add(key)
+        scope_t = rc._content_tokens(_plain(e["scope"]))
+        e = dict(e)
+        e["toks"] = set(e["toks"]) | (whole - scope_t)
+        out.append(e)
+    return out
+
+
 def _local_scope(claim: Dict, title: str) -> bool:
     """The scope is the stop's own venue / place (a name inside the stop title): not a regional claim."""
     st = rc._content_tokens(_plain(claim["scope"]))
@@ -202,15 +240,12 @@ def check_claim(sentence: str, evidence: str, title: str = "") -> Tuple[str, Opt
     if not c or _local_scope(c, title):
         return "na", None
     narrower = None
-    for es in rc.split_sentences(evidence or ""):
-        e = scoped_claim(es, include_hedged=True)
-        if not e:
-            continue
+    for es, e in ((es_, e_) for es_ in rc.split_sentences(evidence or "") for e_ in scoped_claims(es_, include_hedged=True)):
         if e["hedged"] and not c["hedged"]:
             continue                       # "one of the largest" does not back "the largest"
         shared = len(c["toks"] & e["toks"])
         _ovl = _overlap_ok(c["toks"], e["toks"]) or (c["hedged"] and not c["toks"])
-        if e["cls"] == c["cls"] and scope_covers(e["scope"], c["scope"]) and _ovl:
+        if e["cls"] == c["cls"] and scope_covers(e["scope"], c["scope"]) and _ovl:   # (one size class: hedges only)
             return "ok", None
         if c["hedged"]:
             continue
@@ -260,7 +295,9 @@ def _hedge_text(x: str) -> Optional[str]:
             wm = re.search(r"([\w'’\-]+)(\s*)$", np_)
             np2 = (np_[:wm.start()] + _plural(wm.group(1)) + wm.group(2)) if wm else np_
         lead = x[:m.start()]
-        return lead + "one of the " + m.group(1).lower() + np2 + rest[sm.start():]
+        tail = re.sub(r"(?i)^(\b(?:in|across|within|throughout)\s+)(?:all|whole|entire)\s+(?!of\b)",
+                      r"\1", rest[sm.start():])      # [LOCAL-906K] "in all <Region>" -> "in <Region>": the hedge carries no "all"
+        return lead + "one of the " + m.group(1).lower() + np2 + tail
     pm = _POSS_RX.search(x)
     if pm and pm.group("w").lower() in {"largest", "biggest", "greatest", "longest", "tallest", "highest", "oldest", "deepest",
                                          "widest", "smallest"}:
@@ -280,9 +317,8 @@ def hedged_by_evidence(sentence: str, evidence: str, title: str = "") -> Optiona
     c = scoped_claim(sentence)
     if not c or c["hedged"] or c["cls"] not in _SIZE_CLASSES or _local_scope(c, title):
         return None
-    for es in rc.split_sentences(evidence or ""):
-        e = scoped_claim(es, include_hedged=True)
-        if not e or not e["hedged"] or e["cls"] != c["cls"]:
+    for e in (e_ for es_ in rc.split_sentences(evidence or "") for e_ in scoped_claims(es_, include_hedged=True)):
+        if not e["hedged"] or not cls_eq(e["cls"], c["cls"]):      # [LOCAL-906K] a hedge in ANY clause, one size class
             continue
         if _scope_key(e["scope"]) != _scope_key(c["scope"]):
             continue
@@ -302,7 +338,10 @@ _RECORD_RX = re.compile(
     r"(?i)\b(?:(?:world|guinness|national|all-time|official)[\s-]records?\b"
     r"|record[\s-]breaking\b"
     r"|(?:holds?|held|holding|owns?|set|sets|setting|broke|breaks|breaking)\s+(?:the\s+|a\s+)?(?:[\w\-]+\s+){0,2}?records?\b"
-    r"|records?\s+for\s+(?:the\s+)?" + _REC_WORDS + r"\b)")
+    r"|records?\s+for\s+(?:the\s+)?" + _REC_WORDS + r"\b"
+    # [LOCAL-906K] exclusivity is a record class: "the only country in <Region> that ...", "the sole place ..."
+    r"|\bthe\s+(?:only|sole)\s+(?:[\w\-]+\s+){0,2}?(?:countr(?:y|ies)|nations?|places?|cit(?:y|ies)|towns?|provinces?|regions?|"
+    r"islands?|sites?|locations?|spots?|areas?|states?|villages?|temples?|pagodas?|statues?)\b)")
 _REC_NOISE = {"record", "records", "holds", "hold", "held", "world", "guinness", "official", "breaking", "highest", "longest",
               "largest", "tallest", "biggest", "deepest", "oldest", "widest", "fastest", "steepest", "smallest", "national",
               "alltime", "this", "that", "which", "title"}
@@ -316,6 +355,8 @@ def record_claim(sentence: str) -> Optional[Dict]:
     m = _RECORD_RX.search(x)
     kind = "record"
     scope = "world"
+    if m and re.search(r"(?i)\b(?:only|sole)\b", m.group(0)):
+        kind = "exclusivity"
     if m:
         if re.search(r"(?i)\bnational", m.group(0)):
             scope = "country"
@@ -354,6 +395,10 @@ def record_support(sentence: str, evidence: str, title: str = "", entries: Optio
                 continue
             if c["kind"] == "world-superlative" and e["kind"] == "world-superlative" and e["cls"] != c["cls"]:
                 continue
+            if (c["kind"] == "exclusivity") != (e["kind"] == "exclusivity"):
+                continue                                       # [LOCAL-906K] "the only X" is backed only by "the only X"
+            if c["kind"] == "exclusivity" and not scope_covers(e["scope"], c["scope"]):
+                continue                                       # ... and for a scope that covers the claim's
             if not (e["scope"] and c["scope"]) or (c["rank"] is not None and e["rank"] is not None and e["rank"] < c["rank"]):
                 continue
             shared = len(c["toks"] & e["toks"])
@@ -366,7 +411,7 @@ def record_support(sentence: str, evidence: str, title: str = "", entries: Optio
     sup = [en for en in ents if states(en.get("text", ""))]
     if not sup:
         return "bad"
-    if c["rank"] is not None and c["rank"] < 6.0 and c["scope"] != "world":
+    if c["kind"] != "exclusivity" and c["rank"] is not None and c["rank"] < 6.0 and c["scope"] != "world":
         return "ok"                                            # a narrower stated scope: any non-LLM statement
     try:
         import delivery_evidence_906h as _de
@@ -652,7 +697,8 @@ def _set_body(text: str, info: Dict, new_sents: List[str]) -> str:
     return text[:info["s"]] + block + text[info["e"]:]
 
 
-def _borrow_sentence(info: Dict, infos: List[Dict], ev_map: Dict[str, str], taken: List[Set[str]]) -> Optional[str]:
+def _borrow_sentence(info: Dict, infos: List[Dict], ev_map: Dict[str, str], taken: List[Set[str]],
+                     _tour: Optional[str] = None, _log: Optional[Callable] = None) -> Optional[str]:
     """(a) A not-yet-delivered evidence sentence of a neighbouring stop (or the tour's scope) that names THIS stop's
     subject (D771: the sentence is grounded in evidence, not written). None when there is none."""
     try:
@@ -673,6 +719,12 @@ def _borrow_sentence(info: Dict, infos: List[Dict], ev_map: Dict[str, str], take
                 continue
             if rc.is_mood_filler(x, set()) or rc._has_travel(x) or rc.is_offsite_suggestion(x, set()):
                 continue
+            try:       # [LOCAL-906K] the refill quality bar: a search snippet's junk is not unused evidence
+                import refill_quality_906k as _k
+                if _k.reject_logged(x, info["title"], _tour, _log, info["num"], _k.source_of(x, blob, key), info.get("type", "")):
+                    continue
+            except Exception:  # pragma: no cover
+                pass
             usable.append(x)
         got = pn.neighbour_sentence(short, [" ".join(usable)], rc.split_sentences) if usable else None
         if got:
@@ -750,7 +802,7 @@ def distinct_filler_bodies(tour_text: str, evidence_by_title: Optional[Dict[str,
             others = [keys[j] for j in range(len(infos)) if j != k]
             taken = [set(rc._words(" ".join(i["sents"]))) for j, i in enumerate(infos) if j != k]
             head = f"  {TAG} Stop {info['num']} '{info['title'][:40]}': filler body repeats Stop {infos[prior]['num']}"
-            borrowed = _borrow_sentence(info, infos, ev_map, taken)
+            borrowed = _borrow_sentence(info, infos, ev_map, taken, text, emit)
             var = _pick_variant(filler_kind(info["title"], info["type"]), info, others)
             if borrowed:
                 body = [borrowed] + (var[2] if var else []) + [next((x for x in info["sents"] if _is_disclosure(x)), "")]
@@ -914,6 +966,11 @@ _THING_OPEN = re.compile(r"^The\s+(?P<head>" + "|".join(sorted(_THING_HEADS)) + 
 _NAME_TOK = r"(?:<[^>]{1,40}>|[A-ZÀ-Ỹ][\w'’\-]*)"
 
 
+_SELF_ANCHOR = re.compile(
+    r"^\s+(?:at|on|of|in|near|by|beside|above|atop|inside|outside)\s+(?:(?:the|a)\s+)?(?:[a-z][\w'’\-]*\s+){0,3}?"
+    r"(?:<[^>]{1,40}>|[A-ZÀ-Ỹ][\w'’\-]*)")
+
+
 def _named_things(evidence: str, head: str) -> List[str]:
     """Names in the evidence that end with the generic ``head`` ("Shwe Pagoda", "<Pagoda>"), one per distinct name."""
     H = head.capitalize()
@@ -962,6 +1019,9 @@ def repair_thing_referent(tour_text: str, evidence_by_title: Optional[Dict[str, 
                     new.append(x)
                     continue
                 head = m.group("head").lower()
+                if _SELF_ANCHOR.match(m.group("rest") or ""):          # [LOCAL-906K] "The statue at <Name> ..." names itself
+                    new.append(x)
+                    continue
                 seen = title_f + " ".join(rc.fold(re.sub(r"[<>]", " ", y)) for y in new)
                 if re.search(r"\b" + head + r"s?\b", seen):
                     new.append(x)

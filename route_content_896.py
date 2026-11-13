@@ -2136,6 +2136,12 @@ def refill_thin_stops(before: str, after: str, evidence_by_title: Optional[Dict[
                     return False
                 if is_mood_filler(x, set()) or _has_travel(x) or is_offsite_suggestion(x, set()):
                     return False
+                try:       # [LOCAL-906K] the refill quality bar
+                    import refill_quality_906k as _k906
+                    if _k906.reject_logged(x, title, text, log, num, _k906.source_of(x, _ev_for(ev_map, title) or "", title), "", True):
+                        return False
+                except Exception:
+                    pass
                 if any(_near(x, d) for d in lost) or any(same_fact(x, h, title) for h in (_have or have)):
                     return False   # [LOCAL-906B] same fact, a different date, counts
                 return fold(x) not in used
