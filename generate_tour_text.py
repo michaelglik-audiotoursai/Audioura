@@ -11593,7 +11593,8 @@ def _apply_delivery_hours_guard(result, job_id=None):
         # closing's "That's N stops in all." equals the delivered count.
         try:
             import delivery_bodies_905 as _db905
-            final = _db905.ensure_bodies(final, log=lambda m: print(m, flush=True))
+            import delivery_evidence_906h as _de906h   # [LOCAL-906H] hand the job's evidence over explicitly
+            final = _db905.ensure_bodies(final, _de906h.get(), log=lambda m: print(m, flush=True))
         except Exception as _db905e:  # pragma: no cover
             _import_logger.error(f"[LOCAL-905] body guard skipped: {_db905e}")
         if final != text and out_file:
@@ -22092,6 +22093,12 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                     poi_list,
                 ),
             )
+            try:   # [LOCAL-906H] the fact sheets' confirmed facts are per-stop evidence for the delivery guards
+                import delivery_evidence_906h as _de906h
+                _de906h.add({str(_n): [str(x) for x in (fs.get('confirmed_facts') or [])]
+                             for _n, fs in zip(_poi_names, _storied_fact_sheets or []) if fs}, "fact-sheet")
+            except Exception:
+                pass
             if _storied_fact_sheets:
                 _valid_sheets = sum(1 for fs in _storied_fact_sheets if fs is not None)
                 print(f"  [Storied] Fact sheets: {_valid_sheets}/{len(_poi_names)} generated")
@@ -35427,6 +35434,13 @@ RULES:
                     complete_tour, _us_titles_862, location,
                     api_key=api_key, log=print, aliases_by_title=_aliases_862)
                 _use862.LAST_REPORT = _enrich_rep_862
+                try:   # [LOCAL-906H] the user-stop article / site / snippet material is per-stop evidence at delivery
+                    import delivery_evidence_906h as _de906h
+                    _de906h.add({str(_t): _use862.material_lines(_m, limit=40)
+                                 for _t, _m in ((_enrich_rep_862 or {}).get("material_by_title") or {}).items() if _m},
+                                "user-stop")
+                except Exception:
+                    pass
                 print(f"  [LOCAL-862] enrichment: "
                       f"{_enrich_rep_862.get('specifics_ge2', 0)} narrated stop(s), "
                       f"{len(_enrich_rep_862.get('precomposed', []))} thin; cost "
@@ -36024,6 +36038,11 @@ RULES:
             try:   # [LOCAL-904] the delivery guards' thin-stop refill reads the same per-stop evidence
                 import route_content_896 as _rc904
                 _rc904.set_evidence_904(_evf)
+                try:   # [LOCAL-906H] the 889 key-fact evidence (thin facts + direct snippets + wiki) is the delivery evidence
+                    import delivery_evidence_906h as _de906h
+                    _de906h.add(_evf, "889")
+                except Exception:
+                    pass
                 try:   # [LOCAL-906] the first-stop tone guard reads the stops' signature stories
                     import route_leftovers_906 as _l906s
                     _l906s.set_signature_stories(dict(_SIGNATURE_STORY_SINK.get(_J._THIN_SINK_KEY, {}) or {}))

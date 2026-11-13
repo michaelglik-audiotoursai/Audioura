@@ -62,6 +62,12 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
         blocks = rc._stop_blocks(text)
         if not blocks:
             return text
+        try:   # [LOCAL-906H] no evidence passed -> the job's delivery-evidence store (filled by every producer)
+            import delivery_evidence_906h as _de906h
+            evidence_by_title = _de906h.resolve(evidence_by_title)
+            _de906h.report(text, emit, evidence_by_title)
+        except Exception:  # pragma: no cover
+            pass
         try:   # [LOCAL-906F] removals first (blocked claims, promo, cross-stop conflicts ...): a stop they empty is refilled below
             import leftovers_906f as _c906f
             text = _c906f.run_pass(text, evidence_by_title, emit)
@@ -165,4 +171,10 @@ def fix_counts(text: str, log: Optional[Callable[[str], None]] = None, renumber:
             return m.group(0)
         emit(f"  [LOCAL-905] closing count {m.group(1)} -> {n} (delivered stops)")
         return f"That's {n} {'stop' if n == 1 else 'stops'} in all"
-    return _COUNT.sub(_sub, final)
+    final = _COUNT.sub(_sub, final)
+    try:   # [LOCAL-906H] exactly one count sentence per tour
+        import delivery_evidence_906h as _de906h
+        final = _de906h.dedupe_count_sentences(final, emit)
+    except Exception:  # pragma: no cover
+        pass
+    return final
