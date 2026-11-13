@@ -125,9 +125,17 @@ def drop_unsupported_claims(tour_text: str, evidence_by_title: Optional[Dict[str
     stop's own evidence does not state is dropped (the whole sentence). Evidence is the 904 stash plus
     ``evidence_by_title``; a stop with no evidence states nothing, so both go. 905's floor refills an emptied stop."""
     emit = _emit(log)
-    if not tour_text or not in_scope(tour_text):
+    if not tour_text:
+        return tour_text
+    try:   # [LOCAL-906C] a regional superlative / exclusivity claim needs evidence for the SAME or a wider scope, on ANY tour
+        import leftovers_906c as _c
+        tour_text = _c.drop_unsupported_scope_claims(tour_text, evidence_by_title, log)
+    except Exception as _e906c:  # pragma: no cover
+        emit(f"  [LOCAL-906C] scope-claim guard skipped (non-fatal): {_e906c}")
+    if not in_scope(tour_text):
         return tour_text
     try:
+        import leftovers_906c as _c
         ev_map = _merged_evidence(evidence_by_title)
         blocks = rc._stop_blocks(tour_text)
         pieces, pos = [], 0
@@ -137,6 +145,8 @@ def drop_unsupported_claims(tour_text: str, evidence_by_title: Optional[Dict[str
             ev = _ev_for(ev_map, title) or ""
 
             def keep(x: str, _ev=ev, _t=title, _n=num) -> bool:
+                if _c.check_claim(x, _ev, _t)[0] == "ok":
+                    return True                      # [LOCAL-906C] scope-matched evidence states it
                 if is_exclusivity_claim(x) and not exclusivity_in_evidence(x, _ev):
                     emit(f"  {TAG} Stop {_n} '{_t[:40]}': exclusivity claim not in the stop's evidence "
                          f"-> sentence dropped: \"{x[:100]}\"")
@@ -593,8 +603,14 @@ def content_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = N
         return tour_text
     t = drop_unsupported_claims(tour_text, evidence_by_title, log)
     t = drop_contradicting_orientation(t, log)
+    try:   # [LOCAL-906C] no two stops share a filler body (before the repeated-sentence guard, so the 906 "left as is"
+        import leftovers_906c as _c       # case never leaves an identical body twice); "You see the X here is" repaired
+        t = _c.repair_you_see_here(t, log)
+        t = _c.distinct_filler_bodies(t, evidence_by_title, log)
+    except Exception as _e906c:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906C] filler guard skipped (non-fatal): {_e906c}")
     t = drop_repeated_sentences(t, log)
-    t = rc.drop_within_stop_duplicates(t, log)          # [LOCAL-906B] the same fact twice in one stop
+    t = rc.drop_within_stop_duplicates(t, log, evidence_by_title)   # [LOCAL-906B] the same fact twice in one stop
     t = tone_first_stop(t, None, log)
     t = drop_template_closing(t, log)
     return t

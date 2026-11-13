@@ -2034,8 +2034,20 @@ def _log906b(log, msg: str) -> None:
         pass
 
 
+_HTML_COMMENT_906C = re.compile(r'<!--.*?-->', re.S)
+
+
+def _split_markers_906c(text: str) -> Tuple[str, List[str]]:
+    """[LOCAL-906C] (text with every ``<!-- ... -->`` marker removed, the markers). A marker is an internal flag, not a
+    sentence: it is neither kept as a stop sentence nor counted, nor named in a log line."""
+    found = _HTML_COMMENT_906C.findall(text or "")
+    return _HTML_COMMENT_906C.sub(" ", text or ""), found
+
+
 def _sentences906b(text: str) -> List[str]:
-    return [x.strip() for x in re.split(r'(?<=[.!?])\s+', text or "") if x.strip()]
+    text = _HTML_COMMENT_906C.sub(" ", text or "")           # [LOCAL-906C] markers are never sentences
+    return [x.strip() for x in re.split(r'(?<=[.!?])\s+', text) if x.strip()
+            and re.search(r"[^\W\d_]", x)]
 
 
 _RECAP_CUE_906B = re.compile(
@@ -2052,10 +2064,13 @@ def _salvage_after_count(cut_text: str, other_titles: Optional[List[str]] = None
       * it follows the restaurant offer (the offer is the closing's last sentence, nothing after it is closing), or
       * it follows the count sentence, names no OTHER stop, and reads as neither a recap nor a list/label block.
     Returns (salvaged sentences, dropped sentences)."""
+    cut_text, _markers = _split_markers_906c(cut_text)     # [LOCAL-906C] markers: neither kept nor dropped nor counted
     others = [re.sub(r'\s+', ' ', t).strip().lower() for t in (other_titles or []) if len((t or '').strip()) >= 4]
 
     def stop_like(x: str) -> bool:
         low = x.lower()
+        if _HTML_COMMENT_906C.search(x) or x.lstrip().startswith("<!--"):
+            return False
         return (len(re.findall(r"[^\W\d_]+", x)) >= 4 and not _THREAD_OPENER.match(x) and not _COUNT_OPENER.search(x)
                 and not _RECAP_CUE_906B.search(x))
 
@@ -2097,7 +2112,7 @@ def _salvage_after_count(cut_text: str, other_titles: Optional[List[str]] = None
     return keep, gone
 
 
-def _split_tail(tour_text: str, log=None):
+def _split_tail(tour_text: str, log=None, markers_out: Optional[List[str]] = None):
     """Split the tour into (body_before_conclusion, sources_block).
 
     The conclusion/recap and the Sources block live AFTER the last stop body.
@@ -2136,7 +2151,10 @@ def _split_tail(tour_text: str, log=None):
         _n = _num.group(0) if _num else "?"
         _others = [re.sub(r',\s*\d{3,4}\s*$', '', (h.group(2) if h.lastindex and h.lastindex >= 2 else h.group(0))).strip()
                    for h in headers[:-1]]
-        _kept, _gone = _salvage_after_count(text[cut:], _others)
+        _tail_clean, _tail_markers = _split_markers_906c(text[cut:])
+        if markers_out is not None:
+            markers_out.extend(_tail_markers)            # [LOCAL-906C] a marker in the closing stays at the end
+        _kept, _gone = _salvage_after_count(_tail_clean, _others)
         for x in _gone:
             _log906b(log, f'  [LOCAL-619B] Stop {_n}: dropped "{x[:80]}" (old conclusion replaced by the rebuilt one)')
         if _kept:
@@ -2200,7 +2218,8 @@ def rebuild_conclusion(
     if count_delivered_stops(tour_text) <= 0:
         return tour_text
 
-    body, sources_block = _split_tail(tour_text, log)
+    _markers: List[str] = []
+    body, sources_block = _split_tail(tour_text, log, _markers)
     conclusion = build_conclusion(
         tour_text,
         venue_name=venue_name,
@@ -2218,7 +2237,11 @@ def rebuild_conclusion(
         parts.append(conclusion)
     if sources_block:
         parts.append(sources_block)
-    return "\n\n".join(p for p in parts if p).strip() + "\n"
+    out = "\n\n".join(p for p in parts if p).strip() + "\n"
+    for _m in _markers:                                  # [LOCAL-906C] markers stay where they were: the end
+        if _m not in out:
+            out = out.rstrip("\n") + "\n" + _m + "\n"
+    return out
 
 
 # ── Count-dependent text recompute helpers (late-gate consistency) ───────────

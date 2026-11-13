@@ -1,0 +1,77 @@
+<Resort> to <Mountain> - Driving Tour
+Tour-Category: driving
+
+Stop 1: <Ward> and the <Beach> strip
+
+Coordinates: 10.981999, 108.251183
+
+Type/Specialty: Coastal area
+
+You are standing near <Ward>, known for its <Ward> Market, a local hub for travelers. The strip is lined with cafes and fishing boats. The morning light is soft along the water.
+
+Directions: Continue to <Province>, the <fruit> plantations along the road.
+
+Stop 2: <Province>, the <fruit> plantations along the road
+
+Coordinates: 10.9150, 108.1290
+
+Type/Specialty: Agricultural area
+
+You are standing in <Province>, <Country>'s largest <fruit>-growing region. <Country> is the only country in <Region> to grow <fruit> on a commercial scale. Here in <Province>, thousands of local farmers cultivate <fruit> thanks to the sunny, dry climate.
+
+Directions: Continue to <Mountain>.
+
+Stop 3: Arriving at <Mountain>, the mountain and its legends
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Mountain and cultural site
+
+<Mountain> is an extinct volcano near the coastal city of <Town>, reached from the national road. You can reach the top of <Mountain> by two ways, including a modern cable car ride. At the top of <Mountain> you will find two famous pagodas.
+
+Directions: Walk on to the cable car ascent.
+
+Stop 4: The cable car ascent
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Cable car experience
+
+The cable car climbs through the forest in about 20 gondolas. At the upper station a path leads to the first pagoda. The ride takes you above the tree line.
+
+Directions: Walk on to the summit views.
+
+Stop 5: The summit views
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Viewpoint
+
+At the summit views, look out at the view and notice how far the land opens below you. Feel the height and the cooler, thinner air, and listen for the wind. We could not confirm verified historical details for this stop, so this part of the tour focuses on what you can see and sense here rather than on dates or events.
+
+Directions: Walk on to the terrace.
+
+Stop 6: The terrace
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Viewpoint
+
+<Viewpoint> is the last stop on the terrace, with a railing and a few benches facing the coast. It is a short walk from the statue.
+
+Directions: Walk on to the lookout.
+
+Stop 7: The lookout
+
+Coordinates: 10.813277, 107.894085
+
+Type/Specialty: Viewpoint
+
+At the lookout, look out at the view and notice how far the land opens below you. Feel the height and the cooler, thinner air, and listen for the wind. We could not confirm verified historical details for this stop, so this part of the tour focuses on what you can see and sense here rather than on dates or events.
+
+From <Resort> to <Mountain>, this route is the one you chose, your own path in your own order.
+
+That's 7 stops in all.
+
+If you would like to eat nearby we can build you a restaurant tour.
+<!-- LOCAL-628:stop-editor:v1 -->
