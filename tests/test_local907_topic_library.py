@@ -185,13 +185,38 @@ def make_llm(text, in_tok=3000, out_tok=2700):
     return llm
 
 
+def part_llm(good=40, bad=6, in_tok=3000, out_tok=1500):
+    """LOCAL-907D writer mock: writes from the passages of the part it is asked for (the writer
+    only sees its own slice of the source), the hook in part 1 only."""
+    calls = []
+
+    def llm(system, user, model, max_tokens):
+        calls.append(user)
+        passages = user.split("SOURCE passages (PART):")[1].split("OVERVIEW")[0]
+        src = list(dict.fromkeys(x.strip() for x in re.findall(r"In \d+ the harbour town[^.]*\.", passages)))
+        part = int(re.search(r"PART: (\d+) of", user).group(1))
+        fake = [f"In {1900 + k} smugglers dug a secret tunnel number {k + 40} beneath Exampleport harbour."
+                for k in range(bad)]
+        allv = []
+        for i in range(max(good, bad)):
+            if i < good and i < len(src):
+                allv.append(src[i])
+            if i < bad:
+                allv.append(fake[i])
+        if part == 1:
+            allv[0] = "Hear how Exampleport grew from a muddy landing into a great port of the world."
+        return "\n\n".join(" ".join(allv[i:i + 5]) for i in range(0, len(allv), 5)), in_tok, out_tok
+    llm.calls = calls
+    return llm
+
+
 def topic_for(region):
     return tb.plan_topics(region, "en", 1, fetch_fn=fake_article)[0]
 
 
 def test_write_and_ground_drops_unsupported_and_fills_fields(region):
     topic = topic_for(region)
-    llm = make_llm(written_text(good=75, bad=12))
+    llm = part_llm(good=40, bad=6)
     meter = tb.BuildMeter(budget_usd=5.0)
     row = tb.build_segment(topic, region, "en", fetch_fn=fake_article, llm_fn=llm,
                            classify_fn=fake_judge, meter=meter)
@@ -200,7 +225,7 @@ def test_write_and_ground_drops_unsupported_and_fills_fields(region):
     assert row["text"].rstrip().endswith(tl.CREDIT_LINE)             # credit line present, last
     assert row["credit_line"] == tl.CREDIT_LINE
     assert row["ground_stats"]["dropped"] >= 12
-    assert tb.NARRATION_MODEL in llm.calls
+    assert len(llm.calls) == 2                                       # LOCAL-907D: written in parts
     src = row["sources"][0]
     assert src["url"].startswith("https://en.wikipedia.org/wiki/") and src["title"]
     assert src["revision_id"] and src["licence"] == "CC BY-SA 4.0"
@@ -273,7 +298,7 @@ def test_real_build_refuses_without_any_limit():
 def test_rerun_skips_segments_already_built(region):
     store = tl.MemorySegmentStore()
     kw = dict(max_segments=2, budget_usd=5.0, store=store, fetch_fn=fake_article,
-              llm_fn=make_llm(written_text(75, 0)), classify_fn=fake_judge, log=lambda m: None)
+              llm_fn=part_llm(good=40, bad=0), classify_fn=fake_judge, log=lambda m: None)
     first = tb.run_build(REGION_KEY, "en", **kw)
     n_calls = len(kw["llm_fn"].calls)
     second = tb.run_build(REGION_KEY, "en", **kw)

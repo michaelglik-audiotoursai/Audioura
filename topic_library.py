@@ -176,6 +176,12 @@ class MemorySegmentStore:
         self._rows[seg["id"]] = seg
         return seg["id"]
 
+    def update_segment(self, segment_id: int, seg: Dict[str, Any]) -> None:
+        """Replace a row's content in place (same id); id is never changed."""
+        new = dict(self._rows[segment_id])
+        new.update({k: v for k, v in seg.items() if k not in ("id", "created_at")})
+        self._rows[segment_id] = new
+
     def get_segment(self, segment_id: int) -> Optional[Dict[str, Any]]:
         return dict(self._rows[segment_id]) if segment_id in self._rows else None
 
@@ -229,6 +235,19 @@ class PgSegmentStore:
             cur.close()
         self.conn.commit()
         return sid
+
+    def update_segment(self, segment_id: int, seg: Dict[str, Any]) -> None:
+        """UPDATE one row by id (LOCAL-907D rebuild). Never deletes; id / created_at untouched."""
+        cols = [c for c in SEGMENT_COLUMNS if c not in ("id", "created_at") and c in seg]
+        vals = [json.dumps(seg[c]) if c == "sources" else seg[c] for c in cols]
+        sql = ("UPDATE topic_segments SET " + ", ".join(f"{c} = %s" for c in cols)
+               + " WHERE id = %s")
+        cur = self.conn.cursor()
+        try:
+            cur.execute(sql, tuple(vals) + (segment_id,))
+        finally:
+            cur.close()
+        self.conn.commit()
 
     def get_segment(self, segment_id: int) -> Optional[Dict[str, Any]]:
         rows = self._rows(self._SELECT + " WHERE id = %s", (segment_id,))
