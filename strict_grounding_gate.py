@@ -500,7 +500,8 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
                          *, classify_fn: Optional[Callable] = None,
                          model: str = GROUNDING_MODEL,
                          log: Optional[Callable] = None,
-                         deny_check: bool = True
+                         deny_check: bool = True,
+                         trust_verbatim: bool = False
                          ) -> Tuple[str, Dict]:
     """Ground ONE stop's body prose against its evidence. Returns (new_prose,
     report). report carries kept/contradicted/unsupported/labelled counts, the
@@ -696,6 +697,12 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
                 out.append(_disclose_legend(s))
                 rep["disclosed"] += 1
                 rep["kept"] += 1
+            elif trust_verbatim and _verbatim_906i(s, evidence):
+                # [LOCAL-906I] the evidence states it word for word: a judge that flaked does not remove it
+                out.append(s)
+                rep["kept"] += 1
+                if log:
+                    log(f"      [LOCAL-906I] kept (UNSUPPORTED by the judge, but the evidence states it): {s[:90]}")
             else:
                 rep["unsupported"] += 1
                 rep["dropped"].append(("UNSUPPORTED", s[:80]))
@@ -715,6 +722,14 @@ def apply_grounding_gate(title: str, body_prose: str, evidence: str,
         for why, frag in rep["dropped"]:
             log(f"      [LOCAL-883] dropped ({why}): {frag}")
     return new_prose, rep
+
+
+def _verbatim_906i(sentence: str, evidence: str) -> bool:
+    try:
+        import key_fact_coverage as _kfc
+        return bool(_kfc.verbatim_supported(sentence, evidence))
+    except Exception:
+        return False
 
 
 # ── block parsing / rebuild (same grammar as signature_story) ─────────────────
@@ -1031,7 +1046,7 @@ def ground_tour_text(tour_text: str, evidence_by_title: Dict[str, str],
                                   "sentences_after": 0, "cost_usd": 0.0}
         else:
             grounded, grep = apply_grounding_gate(
-                title, body, ev or "", classify_fn=classify_fn, model=model, log=log)
+                title, body, ev or "", classify_fn=classify_fn, model=model, log=log, trust_verbatim=True)
         rep["cost_usd"] += grep.get("cost_usd", 0.0)
         rep["total_dropped"] += len(grep.get("dropped", []))
         rep["total_labelled"] += grep.get("labelled", 0)

@@ -370,10 +370,11 @@ def test_item6c_encyclopedia_lead_and_duplicate_name():
     out = f906.run_pass(t, {}, logs.append)
     assert "is a mountain located" not in out and "rises above the coast" in out
     assert any("encyclopedia lead dropped" in x for x in logs)
-    # the lead is kept when the stop says nothing else about where it is
+    # [LOCAL-906I] the lead is spoken as a location when the stop says nothing else about where it is
     t2 = _stop("<Mountain>", "<Mountain> is a mountain located off National Route 1. The summit trail starts behind the gate. "
                              "Mist covers the slope.", "Mountain")
-    assert "is a mountain located" in f906.drop_encyclopedia_leads(t2, None)
+    o2 = f906.drop_encyclopedia_leads(t2, None)
+    assert "is a mountain located" not in o2 and "<Mountain> lies off National Route 1." in o2
 
 
 @pytest.mark.parametrize("before,after", [

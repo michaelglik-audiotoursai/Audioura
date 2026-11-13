@@ -169,6 +169,27 @@ def _near_verbatim(sentence: str, evidence: str, title: str) -> bool:
     return False
 
 
+def verbatim_supported(sentence: str, evidence: str) -> Optional[str]:
+    """[LOCAL-906I] The evidence sentence that STATES ``sentence`` (None otherwise): >= 85% of the sentence's folded words
+    (3+ letters, diacritics folded, names included) and EVERY number sit in ONE evidence sentence. A judge that flaked on
+    a sentence the evidence says word for word does not get to remove it. Pure."""
+    toks = [w for w in _fold(sentence).split() if len(w) >= 3 or w.isdigit()]
+    if len(toks) < 6 or not evidence:
+        return None
+    stop = {"the", "and", "his", "her", "this", "that", "with", "from", "was", "were", "has", "had", "for", "which"}
+    want = {w for w in toks if w not in stop}
+    nums = {w for w in want if w.isdigit()}
+    if len(want) < 5:
+        return None
+    for x in _sents(evidence):
+        have = set(_fold(x).split())
+        if not nums <= have:
+            continue
+        if len(want & have) >= math.ceil(0.85 * len(want)):
+            return x
+    return None
+
+
 def is_denied(title: str, sentence: str, evidence: str = "") -> Optional[Dict]:
     """The recorded removed claim ``sentence`` repeats, else None. A match needs >= 2
     shared specific tokens, >= 60% of the recorded key and >= 50% of the new one, and
