@@ -112,3 +112,7 @@ _local887_meterlogs/
 _local888_meterlogs/
 _local889_meterlogs/
 _local890_meterlogs/
+
+# LOCAL-907 cached Wikipedia source pages (never commit)
+topic_source_cache/
+topic_audio/
