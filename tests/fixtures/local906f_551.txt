@@ -1,0 +1,32 @@
+<Resort> to <Mountain> - Driving Tour
+Tour-Category: driving
+
+Stop 5: <Mountain> cable car
+
+Coordinates: 10.2000, 106.2000
+
+Type/Specialty: Cable car
+
+The ride is a thrilling experience, taking a -long cable car over the forest. The cabins glide above the treetops. The upper station opens onto a terrace.
+
+Directions: Continue to the statue.
+
+Stop 6: <Statue>
+
+Coordinates: 10.2100, 106.2100
+
+Type/Specialty: Statue
+
+The statue was constructed in 1963 by sculptor <Person A>. It is the longest reclining Buddha in <Country>. Pilgrims climb the steps in the morning.
+
+Directions: Continue to the hall.
+
+Stop 7: <Statue> hall
+
+Coordinates: 10.2200, 106.2200
+
+Type/Specialty: Reclining Buddha
+
+You can take a half-day tour here that includes a cable car ride. <Person B> began carving this 49-meter-long Reclining Buddha statue. It is also one of the largest in the world. It is home to a quiet garden.
+
+That's 3 stops in all.

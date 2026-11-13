@@ -140,7 +140,7 @@ def test_item1_no_evidence_map_on_an_ordinary_tour_is_left_alone(plain):
     ("It is the tallest tower in Alpha Land.", "It is the tallest tower in Beta Land.", "bad"),     # unknown names: exact
     ("It is the tallest tower in Alpha Land.", "It is the tallest tower in Alpha Land.", "ok"),
     ("It is the oldest temple in <Province>.", "", "bad"),                                          # no evidence
-    ("It is one of the largest statues in <Region>.", "", "na"),                                    # hedged
+    ("It is one of the largest statues in <Region>.", "", "bad"),                                   # hedged: [LOCAL-906F] scope-checked too
     ("It is the largest statue in <Statue Park>.", "", "na"),                                       # the stop's own place
     ("Wood is the first material mentioned here.", "", "na"),                                        # no area
     ("<Country> is the sole producer of <fruit> in <Region>.", "", "bad"),

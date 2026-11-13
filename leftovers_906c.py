@@ -64,9 +64,18 @@ _NO_OTHER = re.compile(r"(?i)\bno\s+other\b")
 _ONE_OF = re.compile(r"(?i)\b(?:one|among|some)\s+of\s*$|\b(?:among|one\s+of)\s+$")
 _NAME = r"(?:<[^>]{1,40}>|[A-ZÀ-Ỹ][\w'’\-]*)"
 _GEN = r"(?:[Ww]orld|[Cc]ountry|[Nn]ation|[Rr]egion|[Cc]ontinent|[Pp]rovince|[Ss]tate|[Cc]ity|[Tt]own|[Ii]sland)\b"
+# [LOCAL-906F] "in all of X", "across all of X", "in the whole of X", "anywhere in X" name the same scope as "in X"
+_QUANT = r"(?:(?:all\s+of|the\s+whole\s+of|the\s+entire|the\s+whole|all|whole|entire)\s+)?"
 _SCOPE_RX = re.compile(
-    r"\b(?:in|across|within|throughout)\s+(?:the\s+)?(?P<s>" + _NAME + r"(?:\s+" + _NAME + r")*|" + _GEN + r")"
+    r"\b(?:in|across|within|throughout|anywhere\s+in|anywhere\s+within)\s+" + _QUANT +
+    r"(?:the\s+)?(?P<s>" + _NAME + r"(?:\s+" + _NAME + r")*|" + _GEN + r")"
     r"|\bof\s+(?:the\s+)?(?P<s2><[^>]{1,40}>|[Ww]orld\b)")
+_SIZE_WORDS = r"largest|biggest|greatest|longest|tallest|highest|oldest|deepest|widest|smallest"
+# [LOCAL-906F] "<area>'s largest ..." / "the world's longest ..."
+_POSS_RX = re.compile(
+    r"(?P<s>(?:" + _NAME + r"(?:\s+" + _NAME + r")*)|[Tt]he\s+[Ww]orld|[Ww]orld)['\u2019]s\s+"
+    r"(?:(?:very|joint|single)\s+)?(?:[\w\-]+\s+){0,2}?(?P<w>" + _SIZE_WORDS + r")\b")
+_MOST_RX = re.compile(r"(?i)\bone\s+of\s+the\s+most\s+(?P<w>[a-z\-]{4,})\b")
 _CLASS = {"largest": "size", "biggest": "size", "greatest": "size", "longest": "length", "tallest": "height",
           "highest": "height", "oldest": "age", "deepest": "depth", "widest": "width", "smallest": "small",
           "only": "only", "sole": "only", "no other": "only", "first": "first"}
@@ -112,27 +121,45 @@ def scope_covers(evidence_scope: str, claim_scope: str) -> bool:
     return re_ is not None and rcl is not None and rcl < re_
 
 
-def scoped_claim(sentence: str) -> Optional[Dict]:
-    """{'word', 'cls', 'scope', 'rank', 'toks'} for a sentence that makes a superlative / exclusivity claim for a
-    named area ("the longest reclining Buddha in <Region>", "the only country in <Region> to grow <fruit>");
-    None for anything else (no scope phrase, or a hedged "one of the largest")."""
+def scoped_claim(sentence: str, include_hedged: bool = False) -> Optional[Dict]:
+    """{'word', 'cls', 'scope', 'rank', 'toks', 'hedged'} for a sentence that makes a superlative / exclusivity claim
+    for a named area (\"the longest reclining Buddha in <Region>\", \"the only country in <Region> to grow <fruit>\",
+    \"the largest X in all of <Region>\", \"<Region>'s largest X\").
+    A hedged \"one of the largest ... in <area>\" is returned (``hedged`` True) only with ``include_hedged``
+    [LOCAL-906F]; None for anything else (no scope phrase)."""
     x = sentence or ""
     m = _SUP_RX.search(x)
     no = _NO_OTHER.search(x)
     cue = m or no
-    if not cue:
-        return None
-    if _ONE_OF.search(x[:cue.start()].rstrip() + " ") and m:
-        return None
-    word = m.group(1).lower() if m else "no other"
-    rest = x[cue.end():]
-    sm = _SCOPE_RX.search(rest)
-    if not sm:
-        return None
-    scope = (sm.group("s") or sm.group("s2") or "").strip()
-    stripped = x[:cue.start()] + " " + rest[:sm.start()] + " " + rest[sm.end():]
-    toks = {t for t in rc._content_tokens(_plain(stripped)) if t not in _NOISE_C}
-    return {"word": word, "cls": _CLASS.get(word, word), "scope": scope, "rank": scope_rank(scope), "toks": toks}
+    hedged = False
+    if cue and m and _ONE_OF.search(x[:cue.start()].rstrip() + " "):
+        hedged = True
+        if not include_hedged:
+            return None
+    word = (m.group(1).lower() if m else "no other") if cue else ""
+    if not cue and include_hedged:
+        mo = _MOST_RX.search(x)
+        if mo:
+            cue, hedged, word = mo, True, "most-" + mo.group("w").lower()
+    if cue:
+        rest = x[cue.end():]
+        sm = _SCOPE_RX.search(rest)
+        if sm:
+            scope = (sm.group("s") or sm.group("s2") or "").strip()
+            stripped = x[:cue.start()] + " " + rest[:sm.start()] + " " + rest[sm.end():]
+            toks = {t for t in rc._content_tokens(_plain(stripped)) if t not in _NOISE_C}
+            return {"word": word, "cls": _CLASS.get(word, word), "scope": scope, "rank": scope_rank(scope),
+                    "toks": toks, "hedged": hedged}
+        # also the scope BEFORE the cue: "In <Region>, this is the largest ..." is not handled (no cue-relative rule)
+    pm = _POSS_RX.search(x)
+    if pm:
+        w = pm.group("w").lower()
+        scope = pm.group("s").strip()
+        stripped = x[:pm.start()] + " " + x[pm.end():]
+        toks = {t for t in rc._content_tokens(_plain(stripped)) if t not in _NOISE_C}
+        return {"word": w, "cls": _CLASS.get(w, w), "scope": re.sub(r"(?i)^the\s+", "", scope),
+                "rank": scope_rank(scope), "toks": toks, "hedged": False}
+    return None
 
 
 def _local_scope(claim: Dict, title: str) -> bool:
@@ -147,17 +174,22 @@ def _overlap_ok(a: Set[str], b: Set[str]) -> bool:
 
 def check_claim(sentence: str, evidence: str, title: str = "") -> Tuple[str, Optional[str]]:
     """('na' | 'ok' | 'bad', narrower supported evidence sentence or None). ``na``: not a scoped claim."""
-    c = scoped_claim(sentence)
+    c = scoped_claim(sentence, include_hedged=True)       # [LOCAL-906F] a hedged claim is scope-checked too
     if not c or _local_scope(c, title):
         return "na", None
     narrower = None
     for es in rc.split_sentences(evidence or ""):
-        e = scoped_claim(es)
+        e = scoped_claim(es, include_hedged=True)
         if not e:
             continue
+        if e["hedged"] and not c["hedged"]:
+            continue                       # "one of the largest" does not back "the largest"
         shared = len(c["toks"] & e["toks"])
-        if e["cls"] == c["cls"] and scope_covers(e["scope"], c["scope"]) and _overlap_ok(c["toks"], e["toks"]):
+        _ovl = _overlap_ok(c["toks"], e["toks"]) or (c["hedged"] and not c["toks"])
+        if e["cls"] == c["cls"] and scope_covers(e["scope"], c["scope"]) and _ovl:
             return "ok", None
+        if c["hedged"]:
+            continue
         # a narrower version of the same fact: the evidence states a superlative of the same thing for a smaller area
         if (narrower is None and e["cls"] in _SIZE_FAMILY | {"only", "first"} and c["cls"] in _SIZE_FAMILY | {"only", "first"}
                 and e["rank"] is not None and c["rank"] is not None and e["rank"] < c["rank"]
@@ -198,7 +230,7 @@ def drop_unsupported_scope_claims(tour_text: str, evidence_by_title: Optional[Di
                         out.append(x)
                         continue
                     status, narrower = check_claim(x, _ev, _t)
-                    if no_map and status == "bad" and (scoped_claim(x) or {}).get("cls") not in ("only", "first"):
+                    if no_map and status == "bad" and (scoped_claim(x, include_hedged=True) or {}).get("cls") not in ("only", "first"):
                         status = "na"       # no evidence at all was handed in: a plain superlative cannot be judged
                     if status != "bad":
                         out.append(x)
@@ -223,7 +255,7 @@ def prefer_supported(xa: str, xb: str, evidence: str, title: str = "") -> Option
     """Which of two same-fact sentences LOSES: 'a' / 'b' when exactly one makes a scope claim the evidence does not
     support (the narrower, supported one stays); when both do (or neither has evidence to judge by) the one with the
     wider known scope loses; None when scope does not decide (then specificity does)."""
-    ca, cb = scoped_claim(xa), scoped_claim(xb)
+    ca, cb = scoped_claim(xa, include_hedged=True), scoped_claim(xb, include_hedged=True)
     if not ca and not cb:
         return None
     sa = check_claim(xa, evidence, title)[0] if ca else "na"
@@ -589,6 +621,30 @@ def _title_toks(title: str) -> Set[str]:
     return {w for w in rc.fold(title).split() if len(w) >= 4}
 
 
+_COMMON_HEADS_906F = frozenset(
+    "statue pagoda temple church cathedral museum bridge tower castle palace market park garden station hotel beach building "
+    "house gate fort monastery shrine mosque cave waterfall lake river square harbor harbour port gallery theater theatre "
+    "monument mausoleum lighthouse fountain library school university stadium airport resort villa tomb arch wall zoo "
+    "aquarium cable cableway tram trail path road street avenue boulevard hill mountain island bay valley canyon".split())
+
+
+def definite_name(title: str) -> str:
+    """[LOCAL-906F] "The <Title>" for a title with a common-noun head ("The Reclining Buddha Statue"); the bare title for a
+    proper name with none (a capitalised multi-word name, a placeholder, "Mount X"): "The <Mountain> is home to ..." was wrong."""
+    t = (title or "").strip()
+    if not t or re.match(r"(?i)^(?:the|a|an)\s", t):
+        return t if t else "The stop"
+    words = re.findall(r"[^\W\d_][\w'’\-]*", re.sub(r"<[^>]*>", " ", t))
+    if not words:                                         # a bare placeholder: a proper name
+        return t
+    if not all(w[:1].isupper() for w in words) and not t.startswith("<"):
+        return "The " + t
+    head = rc.fold(words[-1])
+    if t.endswith(">") or head not in _COMMON_HEADS_906F:
+        return t
+    return "The " + t
+
+
 def repair_pronoun_opener(tour_text: str, log: Optional[Callable] = None) -> str:
     """When earlier sentences were dropped, a stop body can open with "Its white color stands out ..." -- a pronoun
     with nothing before it. The pronoun is replaced by the stop's title: "Its X" -> "The <Title>'s X";
@@ -617,7 +673,7 @@ def repair_pronoun_opener(tour_text: str, log: Optional[Callable] = None) -> str
                 continue
             pron, rest = m.group("pron"), m.group("rest")
             first = rest.split(" ", 1)[0].lower().strip(",.;:") if rest else ""
-            the = "The " + title
+            the = definite_name(title)             # [LOCAL-906F] no article before a proper name
             if pron == "Its" or pron == "Their":
                 fixed = f"{the}'s {rest}" if the.endswith(("s", "S")) is False else f"{the}' {rest}"
             elif pron in ("It", "They"):
@@ -647,8 +703,20 @@ def repair_pronoun_opener(tour_text: str, log: Optional[Callable] = None) -> str
 def final_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                log: Optional[Callable] = None) -> str:
     """Scope claims, the opener repair and the filler bodies, on ANY tour (the last thing before the 905 recount)."""
-    t = drop_unsupported_scope_claims(tour_text, evidence_by_title, log)
+    t = tour_text
+    try:   # [LOCAL-906F] blocked claims, promo, cross-stop conflicts, leads, names, hyphens, person pronouns
+        import leftovers_906f as _f
+        t = _f.run_pass(t, evidence_by_title, log)
+    except Exception as err:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906F] pass skipped (non-fatal): {err}")
+    t = drop_unsupported_scope_claims(t, evidence_by_title, log)
     t = repair_you_see_here(t, log)
     t = distinct_filler_bodies(t, evidence_by_title, log)
     t = repair_pronoun_opener(t, log)         # [LOCAL-906E]
+    try:   # [LOCAL-906F] what the removals above left must not open with a person pronoun or an orphan compound
+        import leftovers_906f as _f
+        t = _f.repair_person_pronoun(t, evidence_by_title, log)
+        t = _f.fix_orphan_compounds(t, log)
+    except Exception as err:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906F] closing repair skipped (non-fatal): {err}")
     return t

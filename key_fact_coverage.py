@@ -102,7 +102,11 @@ def _lower_toks(sentence: str) -> frozenset:
     return frozenset(out)
 
 
-_DENY: Dict[str, List[Dict]] = {}
+try:   # [LOCAL-906F] the deny-set is JOB-scoped (like the 906 route state): one job's blocked claims never leak into the next
+    import route_content_896 as _rc906f
+    _DENY: Dict[str, List[Dict]] = _rc906f._ScopedDict(dict)
+except Exception:  # pragma: no cover
+    _DENY = {}
 _DENY_LOCK = threading.Lock()
 
 
@@ -140,7 +144,8 @@ def deny_claims(title: str) -> List[Dict]:
 # (Phase 5.17 "removed by gates", off-pin, foreign-entity, filler) are not: the 889
 # live run showed them carrying the stop's sourced 30 April 1975 event and its
 # architect credit, which a deny-set must never block.
-_HARD = ("gate:deterministic", "contested", "880-scrub-former-use")
+_HARD = ("gate:deterministic", "contested", "880-scrub-former-use",
+         "229-contradicted")      # [LOCAL-906F] LOCAL-229's CONTRADICTED block: a verdict on the claim, stays blocked
 _SOFT = ("gate:CONTRADICTED", "gate:UNSUPPORTED")
 
 

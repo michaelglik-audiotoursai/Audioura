@@ -34,11 +34,20 @@ def _has_content(lines: List[str], last: bool, rc) -> bool:
     return False
 
 
+def _blocked_906f(title: str, sentence: str) -> bool:
+    """[LOCAL-906F] The sentence repeats a claim a contradiction gate blocked: a refill never brings it back."""
+    try:
+        import key_fact_coverage as _kfc
+        return bool(_kfc.is_denied(title, sentence, ""))
+    except Exception:
+        return False
+
+
 def _own_evidence_sentence(title: str, ev_map: Dict[str, str], rc) -> Optional[str]:
     blob = ev_map.get(rc.fold(title)) or ""
     for s in rc.split_sentences(blob):
         if (6 <= len(s.split()) <= 40 and s[-1:] in ".!?" and not rc.is_fragment(s)
-                and not rc.is_mood_filler(s, set())):
+                and not rc.is_mood_filler(s, set()) and not _blocked_906f(title, s)):
             return s
     return None
 
@@ -53,6 +62,12 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
         blocks = rc._stop_blocks(text)
         if not blocks:
             return text
+        try:   # [LOCAL-906F] removals first (blocked claims, promo, cross-stop conflicts ...): a stop they empty is refilled below
+            import leftovers_906f as _c906f
+            text = _c906f.run_pass(text, evidence_by_title, emit)
+            blocks = rc._stop_blocks(text)
+        except Exception as _e906f:  # pragma: no cover
+            emit(f"  [LOCAL-906F] pre-pass skipped (non-fatal): {_e906f}")
         ev = dict(getattr(rc, "_EVIDENCE_904", {}) or {})
         ev.update({str(k): v for k, v in (evidence_by_title or {}).items()})
         ev_map = {rc.fold(k): v for k, v in ev.items()}
@@ -76,6 +91,9 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                 except Exception:
                     neigh = None
                 body, how = neigh, "neighbour sentence"
+            if body and _blocked_906f(title, body):
+                emit(f"  [LOCAL-906F] Stop {num}: refill sentence repeats a blocked claim -> not used")
+                body = None
             if not body:
                 try:
                     import strict_grounding_gate as sgg
