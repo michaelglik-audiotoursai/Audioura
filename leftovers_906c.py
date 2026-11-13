@@ -324,8 +324,8 @@ def hedged_by_evidence(sentence: str, evidence: str, title: str = "") -> Optiona
             continue
         ct = c["toks"] - set(rc._content_tokens(title))
         et = e["toks"] - set(rc._content_tokens(title))
-        if not (ct and et and len(ct & et) >= min(2, len(ct))) and ct and et:
-            continue
+        if not (ct and et and len(ct & et) >= min(2, len(ct))) and ct and et and not (c["toks"] & e["toks"]):
+            continue                    # [LEAD 906L] the stop's own object words (title included) shared is enough
         new = _hedge_text(sentence)
         if new and new != sentence:
             return new

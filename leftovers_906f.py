@@ -220,6 +220,12 @@ def _persony_names(text: str, title: str) -> bool:
                 continue
             if _PLACE_PREP.search(s[:m.start()]):
                 continue
+            # [LEAD 906L] "the Linh Son Truong Tho Pagoda": a long name the place noun follows, or "the <Name>", is a place
+            nxt = re.match(r"\s+([A-Za-z]+)", s[m.end():])
+            if nxt and nxt.group(1).lower() in _PLACE_END:
+                continue
+            if re.search(r"(?i)\bthe\s+$", s[:m.start()]):
+                continue
             return True
     return False
 
@@ -978,6 +984,9 @@ def refill_thin_stops(tour_text: str, evidence_by_title: Optional[Dict[str, str]
             if not pool:
                 pool, _src = rc.split_sentences(blob), "snippet"        # [LOCAL-906K] a search snippet must clear a higher bar
             have = [x for _i, _j, x in flat]
+            if any(re.search(r"(?i)could\s+not\s+confirm\s+verified|no\s+verified\s+(?:history|historical)", x) for x in have):
+                emit(f"  {TAG} Stop {st['num']}: thin but carries the no-history disclosure -> no refill (it would contradict it)")
+                return {}                          # [LEAD 906L] D760 disclosure: adding "built in 1955" would contradict it
             others = [y for o in all_ if o["title"] != title for _a, _b, y in o["flat"]]
             added: List[str] = []
             for cand in pool:

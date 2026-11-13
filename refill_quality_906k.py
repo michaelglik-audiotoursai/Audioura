@@ -175,6 +175,8 @@ _VENUE_PROMO = [re.compile(p) for p in (
     r"(?:try|taste|sample|eat|buy|shop|stay|drink|dine|grab)\b[^.!?]*?\byou\s+(?:can|could|may|might)\b",
     r"(?i)\bchoose\b[^.!?]{0,90}\bwith\s+or\s+without\s+(?:a\s+)?(?:guide|tour\s+guide)\b",
     r"(?i)\bwith\s+or\s+without\s+(?:a\s+)?(?:tour\s+)?guide\b",
+    r"(?i)\b(?:hotel\s+)?pick-?\s?ups?\s+(?:is|are)\s+(?:also\s+)?(?:available|included|offered|provided)\b",   # [LEAD 906L]
+    r"(?i)\b(?:hotel\s+)?(?:transfers?|drop-?offs?)\s+(?:is|are)\s+(?:also\s+)?(?:available|included|offered|provided)\b",
 )]
 _VENUE_TITLE = re.compile(r"(?i)\b" + _VENUE_NOUN + r"\b|\bmarket\b|\bfood\b|\bkitchen\b|\bbrewery\b|\bwinery\b")
 
