@@ -84,8 +84,8 @@ def is_topic_like(title: str) -> bool:
 
 
 def name_cores(title: str) -> List[str]:
-    """[LOCAL-906O] The proper-name cores of a NAMED stop title, never the whole title: \"Phan Thiet and the Ca Ty River\" ->
-    [\"Phan Thiet\", \"Ca Ty River\"]; \"Leaving Mui Ne – the fishing coast\" -> [\"Mui Ne\"]. Runs of capitalised words (small
+    """[LOCAL-906O] The proper-name cores of a NAMED stop title, never the whole title: \"<City> and the <Name> River\" ->
+    [\"<City>\", \"<Name> River\"]; \"Leaving <Town> – the fishing coast\" -> [\"<Town>\"]. Runs of capitalised words (small
     linking words allowed inside a run)."""
     head = _LEAD.sub("", _head(re.sub(r"https?\S+", " ", title or "")).strip()).strip()
     out: List[str] = []
@@ -113,7 +113,7 @@ def name_cores(title: str) -> List[str]:
 
 
 def region_names(region: str) -> Dict[str, str]:
-    """``{"province": ..., "country": ...}`` of a request region (\"Binh Thuan, Vietnam\", \"Binh Thuan province\")."""
+    """``{"province": ..., "country": ...}`` of a request region (\"<Province>, <Country>\", \"<Province> province\")."""
     parts = [x.strip() for x in re.split(r"[,;]", region or "") if x.strip()]
     country = ""
     try:

@@ -212,7 +212,7 @@ _SUB_FIELDS = ("address", "description", "summary", "blurb", "why", "location_hi
 
 def dest_substops(poi_list: Sequence[Dict], destination: str, extra_text: Optional[Dict[str, str]] = None) -> List[int]:
     """[LOCAL-906O] Indices of the stops that are ON / AT the destination (not the destination stop itself): the stop's
-    name, address or own description names the destination (\"Linh Son Pagoda ... on <Mountain>\"). Such a stop is the
+    name, address or own description names the destination (\"<Pagoda> ... on <Mountain>\"). Such a stop is the
     destination's sub-stop and belongs after the others (before the destination), never first."""
     out: List[int] = []
     if not destination:
