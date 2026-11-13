@@ -279,7 +279,7 @@ def _gemini_facts(work, venue, timeout=45, focus='object'):
         return None, f"gemini error: {e}"
 
 
-def _web_evidence(work, venue, max_results=8, focus='object'):
+def _web_evidence(work, venue, max_results=8, focus='object', anchors=()):
     """Targeted web search for THIS object, using the existing Serper path.
 
     **This is what makes the fallback grounded rather than parametric**, and the
@@ -298,6 +298,8 @@ def _web_evidence(work, venue, max_results=8, focus='object'):
     except Exception:
         return []
     bare = re.sub(r'\s*\([^)]*\)\s*', ' ', work or '').strip()
+    if anchors:   # [LOCAL-906M] a stop whose title names no place is searched WITH the tour's anchor
+        bare = f"{bare} {anchors[0]}".strip()
     venue_short = (venue or '').split(',')[0].strip()
     if focus == 'restaurant':
         # [D545] Ask for the lore, not the listing. "provenance" returns catalogue
@@ -322,6 +324,13 @@ def _web_evidence(work, venue, max_results=8, focus='object'):
         for r in results[:max_results]:
             sn = (r.get('snippet') or '').strip()
             if sn and sn not in seen:
+                if anchors:   # [LOCAL-906M] a result that never names the anchor is another site's
+                    try:
+                        import anchor_evidence_906m as _a906m
+                        if _a906m.reject_evidence('?', anchors, f"{r.get('title', '')} {sn}", r.get('url', '')):
+                            continue
+                    except Exception:
+                        pass
                 seen.add(sn)
                 out.append({'snippet': sn, 'url': r.get('url', ''),
                             'title': r.get('title', '')})
@@ -425,7 +434,7 @@ _SYSTEM_RESTAURANT = (
 
 @_sub_timed('fetch_stop_knowledge')
 def fetch_stop_knowledge(work, venue, api_key, prefer_gemini=True, timeout=45,
-                         focus='object'):
+                         focus='object', anchors=()):
     """Facts about one object when grounded retrieval came back empty.
 
     Returns {'facts': [{'fact','confidence'}], 'provider': str, 'sources': [...],
@@ -440,8 +449,9 @@ def fetch_stop_knowledge(work, venue, api_key, prefer_gemini=True, timeout=45,
         return out
 
     parsed, provider = None, ''
+    llm_work = f"{work}, {anchors[0]}" if anchors else work   # [LOCAL-906M] the model is told WHICH site
     if prefer_gemini and os.environ.get('GEMINI_API_KEY'):
-        parsed, provider = _gemini_facts(work, venue, timeout, focus=focus)
+        parsed, provider = _gemini_facts(llm_work, venue, timeout, focus=focus)
         if parsed is None:
             out['reason'] = f'gemini: {provider}; '
             parsed = None
@@ -450,9 +460,9 @@ def fetch_stop_knowledge(work, venue, api_key, prefer_gemini=True, timeout=45,
             out['reason'] += 'no OPENAI_API_KEY'
             return out
         # Ground it in the web before falling back to memory alone.
-        evidence = _web_evidence(work, venue, focus=focus)
+        evidence = _web_evidence(work, venue, focus=focus, anchors=anchors)
         out['sources'] = [e['url'] for e in evidence if e.get('url')][:6]
-        parsed, provider = _openai_facts(work, venue, api_key, timeout=timeout,
+        parsed, provider = _openai_facts(llm_work, venue, api_key, timeout=timeout,
                                          evidence=evidence, focus=focus)
         if evidence:
             provider = f"{provider}+web({len(evidence)})"

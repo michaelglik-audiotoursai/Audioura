@@ -563,6 +563,19 @@ _PROMO = [re.compile(p) for p in (
     r"(?i)\btours?\s+(?:are\s+)?(?:available|offered|depart|leave|start\s+from|can\s+be\s+booked)\b",
     r"(?i)\bprices?\s+(?:start|begin)\s+(?:at|from)\b",
     r"(?i)\bfor\s+more\s+information,?\s+(?:visit|contact|call|check)\b",
+    # [LOCAL-906M] tour-operator / review copy
+    r"(?i)\bmany\s+(?:local\s+)?(?:tour\s+operators?|travel\s+agenc\w+|operators)\b[^.!?]{0,80}?"
+    r"\b(?:advertis\w*|offer|run|sell|organi[sz]e|promote|market)\b",
+    r"(?i)\byou\s+(?:can|could|may)\s+(?:also\s+)?join\s+(?:an?\s+|the\s+|one\s+of\s+the\s+)?(?:[\w\-]+\s+){0,3}?tours?\b",
+    r"(?i)\b(?:many|most|some)\s+(?:of\s+the\s+)?tours?\s+(?:often\s+|usually\s+|typically\s+)?combine\b",
+    r"(?i)\bflexible\s+options\s+(?:are\s+)?available\b[^.!?]{0,60}\btours?\b",
+    r"(?i)\bwithin\s+walking\s+distance\s+(?:from|of)\s+(?:some|several|many|a\s+few)\s+(?:of\s+the\s+)?hotels\b",
+    r"(?i)\bif\s+you\s+(?:stay|are\s+staying)\s+(?:nearby|near|close|in\s+the\s+area)\b[^.!?]{0,60}\bhotel\s+rooms?\b",
+    r"(?i)\bsome\s+hotel\s+rooms?\s+(?:offer|have|provide|boast)\b",
+    r"(?i)\b(?:getting|reaching|climbing|driving)\s+(?:to|up|here)\b[^.!?]{0,60}\bwas\s+an\s+adventure\b",
+    r"(?i)\bwas\s+an\s+adventure,?\s+(?:and\s+)?(?:it\s+was\s+|it's\s+|that\s+was\s+)?(?:well\s+)?worth\s+it\b",
+    r"(?i)\b(?:we|i)\s+(?:absolutely\s+|really\s+|totally\s+|all\s+)?(?:loved|enjoyed|adored)\b",
+    r"(?i)\bi\s+(?:would\s+|'d\s+)?(?:highly\s+|strongly\s+)?recommend\b",
 )]
 _TICKETED = re.compile(r"(?i)\b(?:museum|gallery|castle|palace|temple|pagoda|cable\s*car|observatory|zoo|aquarium|garden|"
                        r"theme\s+park|attraction|monument|cathedral|fort|cave|tower|theat(?:er|re)|opera|exhibition)\b")
@@ -1034,6 +1047,12 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
     t = tour_text
     t = strip_blocked(t, evidence_by_title, log)
     t = drop_promo(t, evidence_by_title, log)
+    try:   # [LOCAL-906M] other-site landmarks in a generic-title stop; Directions name only the leg's own end
+        import anchor_evidence_906m as _a906m
+        t = _a906m.drop_other_site_landmarks(t, evidence_by_title, log)
+        t = _a906m.trim_directions(t, log)
+    except Exception as _e906m:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906M] pass skipped (non-fatal): {_e906m}")
     t = drop_driving_practical(t, log)
     t = resolve_cross_stop(t, evidence_by_title, log)
     t = drop_cross_stop_fact(t, evidence_by_title, log)

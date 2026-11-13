@@ -10452,6 +10452,24 @@ def _get_user_stop_titles() -> set:
         return set()
 
 
+def _anchors906m(title, poi_list) -> list:
+    """[LOCAL-906M] The anchors of a stop whose title names no place (\"The cable car ascent\"): the request's route
+    destination, else the previous / next NAMED stop. [] for a stop that names itself. Never raises."""
+    try:
+        import anchor_evidence_906m as _a
+        if not _a.is_generic_title(title):
+            return []
+        _dest = ''
+        try:
+            import route_order_909 as _r
+            _dest = ((_r.route() or {}).get('destination') or '')
+        except Exception:
+            _dest = ''
+        return _a.anchors_for(title, [str(p.get('name', '')) for p in (poi_list or [])], destination=_dest)
+    except Exception:
+        return []
+
+
 def _is_user_stop_title(name) -> bool:
     import unicodedata as _ud
     folded = _get_user_stop_titles()
@@ -21206,7 +21224,8 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                 if not _gn or _gp.get('_lore'):
                     continue
                 _hb_beat(job_id, f"D556 lore {_gn[:40]}")
-                _gr = fetch_stop_knowledge(_gn, _gp_city, api_key, focus='place')
+                _gr = fetch_stop_knowledge(_gn, _gp_city, api_key, focus='place',
+                                           anchors=_anchors906m(_gn, poi_list))
                 if not _gr.get('ok'):
                     print(f"  [D556] no lore for '{_gn[:40]}': {_gr.get('reason','')[:50]}")
                     continue
@@ -24680,7 +24699,8 @@ MANDATORY INCLUSION — work this surprising detail into the description natural
                         poi=poi, pin=_ts_pin, aliases=_ts_al,
                         places_type=poi.get('type_specialty') or '',
                         wikidata_instance_of=poi.get('_wikidata_instance_of') or '',
-                        topics=_ts_topics894)
+                        topics=_ts_topics894,
+                        anchors=_anchors906m(poi_name, poi_list), stop_num=stop_num)
                     # [LOCAL-894] Report whether the evidence found supports the topics.
                     if _ts_topics894:
                         try:
@@ -30922,6 +30942,21 @@ REWRITE RULES (all mandatory):
             import route_order_909 as _r909c
             if _r909c.route():
                 from geocode_stops import geocode as _geo909c, reverse_is_land as _land909c
+                try:   # [LOCAL-906M] the destination's 901 / 906D PLACE reference beats a geocoded street address
+                    import area_resolver as _ar906m
+                    _info906m = _r909c.route() or {}
+                    _reg906m = _info906m.get('region') or ''
+                    def _res906m(_d, _ar=_ar906m, _reg=_reg906m):
+                        if not _coarse_center_902:
+                            return None
+                        return _ar.first_named_place_reference(
+                            f"{_d}, {_reg}" if _reg else f"{_d}, {_prov_name_906d}", _prov_name_906d,
+                            tuple(_coarse_center_902), country=_country_906d,
+                            province_box_fn=None if not _prov_box_906d else (lambda *_a: {'box': _prov_box_906d}))
+                    _r909c.destination_reference(locals().get('_area'), _info906m.get('destination') or '',
+                                                 _res906m, log=print)
+                except Exception as _e906m:
+                    print(f"  [LOCAL-906M] destination reference skipped (non-fatal): {_e906m}")
                 _a909, _b909 = _r909c.endpoints_pts(_geo909c, log=print)
                 _n909 = [str(_p.get('name', '')) for _p in poi_list]
                 poi_list = _r909c.finalize_route_pins(

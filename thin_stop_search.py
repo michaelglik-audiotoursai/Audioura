@@ -445,6 +445,7 @@ def escalate_thin_stop(
         llm_fn: Optional[Callable] = None, escalate_fn: Optional[Callable] = None,
         wiki_fetch_fn: Optional[Callable] = None, log: Optional[Callable] = None,
         use_cache: bool = True, topics: Sequence[str] = (),
+        anchors: Sequence[str] = (), stop_num: object = "?",
         ) -> Dict:
     """Escalate a THIN stop to a real web search + page fetch, returning a bundle:
 
@@ -534,6 +535,15 @@ def escalate_thin_stop(
         name, city, local_name=local_alias, kind_words_en=kw_en,
         kind_words_local=kw_local, local_lang=dominant, max_queries=max_queries,
         topics=topics)
+    # [LOCAL-906M] a stop whose title names no place is searched WITH the tour's anchor (destination / area / the
+    # neighbouring named stop), and a page or snippet that never names the anchor is rejected for it.
+    anchors = [a for a in (anchors or ()) if a]
+    if anchors:
+        try:
+            import anchor_evidence_906m as _a906m
+            queries = _a906m.anchored_queries(queries, anchors)
+        except Exception:
+            anchors = []
     report["queries"] = queries
     if not queries:
         return report
@@ -585,6 +595,16 @@ def escalate_thin_stop(
         except Exception as e:
             log(f"[LOCAL-873] page fetch failed {url!r}: {e}")
             text = ""
+        if anchors:
+            try:
+                import anchor_evidence_906m as _a906m
+                if not text or len(text) < 120:
+                    if _a906m.reject_evidence(stop_num, anchors, f"{r['title']} {r['snippet']}", url, log):
+                        continue
+                elif _a906m.reject_evidence(stop_num, anchors, f"{r['title']} {text}", url, log):
+                    continue
+            except Exception:
+                pass
         if not text or len(text) < 120:
             # fetch failed or too thin — fall back to the snippet (still sourced)
             if r["snippet"]:

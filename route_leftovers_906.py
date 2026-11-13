@@ -572,7 +572,11 @@ def tone_first_stop(tour_text: str, signature_by_title: Optional[Dict[str, str]]
 # ── 7. template closing filler ────────────────────────────────────────────────────────────────────────────
 _FILLER_CLOSING = re.compile(
     r"(?i)^(?:across\s+these\s+stops\b|taken\s+together,?\s+the\s+stops\s+add\s+up\b|"
-    r"together,?\s+these\s+stops\s+(?:add\s+up|form|tell)\b)")
+    r"together,?\s+these\s+stops\s+(?:add\s+up|form|tell)\b|"
+    # [LOCAL-906M] \"Together, these stops highlight ...\" / \"All in all, these stops ...\" / \"These stops (together) showcase ...\"
+    r"(?:together|all\s+in\s+all|taken\s+together|in\s+all|overall),?\s+(?:these|the)\s+stops\b|"
+    r"these\s+stops(?:,?\s+together,?)?\s+(?:highlight|showcase|capture|reveal|illustrate|reflect|celebrate|"
+    r"represent|offer|tell|show|paint|weave|bring|combine|form|add\s+up)\b)")
 
 
 def drop_template_closing(tour_text: str, log: Optional[Callable] = None) -> str:

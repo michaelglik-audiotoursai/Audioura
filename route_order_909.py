@@ -60,6 +60,47 @@ def route() -> Optional[Dict]:
     return _STATE.get("route")
 
 
+def set_dest_reference(pt: Optional[Pt], name: str = "") -> None:
+    """[LOCAL-906M] The destination's PLACE reference (901 / 906D: Wikidata or a province-bounded lookup). It wins over
+    a geocoded street address for the destination stop and is the route's far end."""
+    if pt and (pt[0] or pt[1]):
+        _STATE["dest_ref"] = (float(pt[0]), float(pt[1]))
+        _STATE["dest_ref_name"] = name or ""
+
+
+def dest_reference() -> Optional[Pt]:
+    return _STATE.get("dest_ref")
+
+
+def destination_reference(area=None, dest: str = "", resolve_fn: Optional[Callable] = None,
+                          log: Optional[Callable] = None) -> Optional[Pt]:
+    """The place reference of the route's destination: the area's own (901) when it names the destination, else
+    ``resolve_fn(dest)`` (906D's retry, injected). Remembered by ``set_dest_reference``. Never raises."""
+    emit = _emit(log)
+    try:
+        if not dest:
+            return None
+        pt = None
+        if area is not None and getattr(area, "place_ref_precision", "") == "place" \
+                and (getattr(area, "place_ref_lat", 0) or getattr(area, "place_ref_lng", 0)) \
+                and _names(getattr(area, "place_ref_name", "") or "", dest):
+            pt = (float(area.place_ref_lat), float(area.place_ref_lng))
+        if pt is None and resolve_fn is not None:
+            got = resolve_fn(dest)
+            if isinstance(got, dict) and (got.get("lat") or got.get("lng")):
+                pt = (float(got["lat"]), float(got["lng"]))
+            elif got and not isinstance(got, dict):
+                pt = (float(got[0]), float(got[1]))
+        if pt:
+            set_dest_reference(pt, dest)
+            emit(f"  [LOCAL-906M] destination {dest!r} place reference {pt[0]:.4f},{pt[1]:.4f} "
+                 f"(preferred over a geocoded street address)")
+        return pt
+    except Exception as err:  # pragma: no cover
+        emit(f"  [LOCAL-906M] destination reference skipped (non-fatal): {err}")
+        return None
+
+
 def set_final_pins(pins: Dict[str, Pt]) -> None:
     _STATE["pins"] = dict(pins)
 
@@ -226,6 +267,9 @@ def _pick_reference(i: int, p: Dict, rows: Sequence[Dict], route_refs: Optional[
     ref = row.get("reference")
     if ref and _in_box(box, tuple(ref[:2])) and not row.get("rejected_900b"):
         return (float(ref[0]), float(ref[1])), "place reference", False
+    dref = _STATE.get("dest_ref")          # [LOCAL-906M] the destination stop: its place reference, never a street geocode
+    if dref and dest and _names(str(p.get("name", "")), dest) and _in_box(box, dref):
+        return dref, "destination place reference", False
     rr = (route_refs or {}).get(i)
     if rr and rr.get("coord") and _in_box(box, tuple(rr["coord"])):
         return tuple(rr["coord"]), "route place reference", False
@@ -343,6 +387,12 @@ def endpoints_pts(geocode_fn: Optional[Callable], log: Optional[Callable] = None
                 return float(hit[0]), float(hit[1])
         return None
     a, b = one(info["origin"]), one(info["destination"])
+    dref = _STATE.get("dest_ref")
+    if dref and a:                      # [LOCAL-906M] the place reference, not a street address, is the far end
+        if b and km_between(b, dref) > 1.0:
+            emit(f"  {TAG} destination geocode {b[0]:.4f},{b[1]:.4f} is {km_between(b, dref):.0f} km from its place "
+                 f"reference {dref[0]:.4f},{dref[1]:.4f} -> the place reference is used")
+        b = dref
     if a and b and km_between(a, b) < 1.0:
         a = b = None
     if a and b and km_between(a, b) > 400.0:      # [LEAD review] a same-named place elsewhere: not one drive
