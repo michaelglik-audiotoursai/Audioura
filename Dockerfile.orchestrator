@@ -54,6 +54,11 @@ COPY tour_evaluator.py /app/
 COPY tour_rubric_scorer.py /app/
 COPY user_quality_index.py /app/
 COPY user_stops_flag.py /app/
+# [LOCAL-907 / D772] topic-library fillings (additive payload field; read-only, failure => []).
+COPY fillings_payload.py /app/
+COPY topic_picker.py /app/
+COPY topic_library.py /app/
+COPY listening_events.py /app/
 # [LOCAL-867] reviewed-itinerary preview objects -> user-stops strings.
 COPY itinerary_import.py /app/
 # [LOCAL-711 / D673] Written at creation after an original tour succeeds

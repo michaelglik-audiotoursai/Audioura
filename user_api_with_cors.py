@@ -24,6 +24,7 @@ def after_request(response):
 @app.route('/user/<secret_id>', methods=['OPTIONS'])
 @app.route('/users', methods=['OPTIONS'])
 @app.route('/tour/<tour_id>/update', methods=['OPTIONS'])
+@app.route('/listening-events', methods=['OPTIONS'])
 def handle_options(*args, **kwargs):
     response = make_response()
     return add_cors_headers(response)
@@ -287,6 +288,40 @@ def update_tour_via_user(tour_id):
         print(f"Error: {e}")
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
+def _listening_repo():
+    """[LOCAL-907] Repo over a fresh connection (tests replace this with a MemoryRepo)."""
+    import listening_events
+    return listening_events.PgRepo(get_db())
+
+
+@app.route('/listening-events', methods=['POST'])
+def post_listening_event():
+    """[LOCAL-907 / D772] Store one listening event (start|skip|finish|choose) for a topic-library
+    filling and update the listener's theme weight. Additive: old apps never call it."""
+    import listening_events as le
+    try:
+        event = le.validate_event(request.get_json(silent=True))
+    except le.ValidationError as e:
+        return jsonify({'error': str(e)}), 400
+    repo = None
+    try:
+        repo = _listening_repo()
+        result = le.apply_event(repo, event)
+    except le.UnknownSegment as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        print(f"[LOCAL-907] listening event failed: {e}")
+        return jsonify({'error': 'could not store listening event'}), 500
+    finally:
+        conn = getattr(repo, 'conn', None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+    return jsonify({'status': 'success', 'event_id': result['id'], 'theme': result['theme'],
+                    'weight_delta': result['weight_delta']}), 201
 
 if __name__ == '__main__':
     print("Starting Flask app...")

@@ -1,0 +1,59 @@
+{
+  "_comment": "LOCAL-907 / D772 / D769: regions are DATA. Centres and Wikipedia seed article titles only. A seed starting with 'voyage:' is read from Wikivoyage instead of Wikipedia.",
+  "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"],
+  "regions": [
+    {
+      "region_key": "mui_ne_binh_thuan",
+      "display_name": "Mũi Né / Bình Thuận",
+      "centre": {"lat": 10.9333, "lng": 108.2833},
+      "radius_km": 70,
+      "seed_articles": {
+        "en": ["Mũi Né", "Bình Thuận province", "Phan Thiết", "Fish sauce", "Cham people"],
+        "vi": ["Mũi Né", "Bình Thuận", "Phan Thiết"]
+      },
+      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+    },
+    {
+      "region_key": "ho_chi_minh_city",
+      "display_name": "Ho Chi Minh City",
+      "centre": {"lat": 10.7769, "lng": 106.7009},
+      "radius_km": 45,
+      "seed_articles": {
+        "en": ["Ho Chi Minh City", "History of Ho Chi Minh City", "Saigon River", "Cholon", "Vietnamese cuisine"],
+        "vi": ["Thành phố Hồ Chí Minh"]
+      },
+      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+    },
+    {
+      "region_key": "boston_ma",
+      "display_name": "Boston, Massachusetts",
+      "centre": {"lat": 42.3601, "lng": -71.0589},
+      "radius_km": 35,
+      "seed_articles": {
+        "en": ["Boston", "History of Boston", "Economy of Boston", "Freedom Trail", "Massachusetts Bay Transportation Authority", "Big Dig", "New England cuisine"]
+      },
+      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+    },
+    {
+      "region_key": "nice_cote_d_azur",
+      "display_name": "Nice (Côte d'Azur)",
+      "centre": {"lat": 43.7102, "lng": 7.2620},
+      "radius_km": 50,
+      "seed_articles": {
+        "en": ["Nice", "History of Nice", "French Riviera", "Alpes-Maritimes", "Niçoise cuisine", "Carnival of Nice"],
+        "fr": ["Nice", "Côte d'Azur", "Histoire de Nice"]
+      },
+      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+    },
+    {
+      "region_key": "san_diego_ca",
+      "display_name": "San Diego, California",
+      "centre": {"lat": 32.7157, "lng": -117.1611},
+      "radius_km": 55,
+      "seed_articles": {
+        "en": ["San Diego", "History of San Diego", "Economy of San Diego", "San Diego County, California", "Port of San Diego", "San Diego Trolley", "California cuisine"]
+      },
+      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+    }
+  ]
+}

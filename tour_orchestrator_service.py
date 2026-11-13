@@ -3521,6 +3521,16 @@ def _orchestrate_tour_async_impl(job_id, location, tour_type, total_stops, user_
         ACTIVE_JOBS[job_id]["replaced_version_no"] = store_replaced_version_no
         if coordinates:
             ACTIVE_JOBS[job_id]["coordinates"] = coordinates
+        # [LOCAL-907 / D772] ADDITIVE: topic-library "fillings" for the long legs between stops.
+        # Read-only, never raises, [] when the library is not built/migrated; old apps ignore it.
+        try:
+            import fillings_payload as _fp907
+            _f907 = _fp907.fillings_for_tour(tour_content, tour_type=tour_type or "",
+                                             user_id=user_id, language=language)
+            if _f907:
+                ACTIVE_JOBS[job_id]["fillings"] = _f907
+        except Exception as _e907:
+            print(f"[LOCAL-907] fillings skipped: {_e907}")
         
         print(f"==== ORCHESTRATE_TOUR_ASYNC COMPLETED: {datetime.now().isoformat()} ====")
         
@@ -4518,6 +4528,8 @@ def get_job_status(job_id):
             response["netlify_ready"] = job.get("netlify_ready", True)
             if "coordinates" in job:
                 response["coordinates"] = job["coordinates"]
+            if job.get("fillings"):                      # [LOCAL-907] additive
+                response["fillings"] = job["fillings"]
             if "final_tour_id" in job:
                 response["final_tour_id"] = job["final_tour_id"]
             # [LOCAL-718 / D678] int (version archived on a same-creator replace)
