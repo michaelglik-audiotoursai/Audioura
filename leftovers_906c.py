@@ -31,6 +31,11 @@ def _emit(log: Optional[Callable]) -> Callable:
 
 def _ev_map(evidence_by_title: Optional[Dict[str, str]]) -> Dict[str, str]:
     ev = dict(rc._EVIDENCE_904)
+    try:   # [LOCAL-906H] the job's delivery-evidence store (every producer fills it)
+        import delivery_evidence_906h as _de
+        ev.update(_de.get())
+    except Exception:
+        pass
     ev.update({str(k): str(v) for k, v in (evidence_by_title or {}).items()})
     return {rc.fold(k): v for k, v in ev.items()}
 
@@ -704,6 +709,12 @@ def final_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = Non
                log: Optional[Callable] = None) -> str:
     """Scope claims, the opener repair and the filler bodies, on ANY tour (the last thing before the 905 recount)."""
     t = tour_text
+    try:   # [LOCAL-906H] no evidence passed -> the job's delivery-evidence store
+        import delivery_evidence_906h as _de
+        evidence_by_title = _de.resolve(evidence_by_title)
+        _k906h, _n906h = _de.coverage(tour_text, evidence_by_title)
+    except Exception:  # pragma: no cover
+        _k906h, _n906h = 0, len(rc._stop_blocks(tour_text or ""))
     try:   # [LOCAL-906F] blocked claims, promo, cross-stop conflicts, leads, names, hyphens, person pronouns
         import leftovers_906f as _f
         t = _f.run_pass(t, evidence_by_title, log)
@@ -719,4 +730,21 @@ def final_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = Non
         t = _f.fix_orphan_compounds(t, log)
     except Exception as err:  # pragma: no cover
         _emit(log)(f"  [LOCAL-906F] closing repair skipped (non-fatal): {err}")
+    try:   # [LOCAL-906H] a quantifier whose number was cut; one summary line (never a silent no-op)
+        import delivery_evidence_906h as _de
+        t = _de.drop_dangling_quantifier(t, log)
+    except Exception as err:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906H] dangling-quantifier guard skipped (non-fatal): {err}")
+    try:
+        import difflib
+        _a, _b = (tour_text or "").split("\n"), t.split("\n")
+        _chg = sum(max(i2 - i1, j2 - j1) for tag, i1, i2, j1, j2 in
+                   difflib.SequenceMatcher(None, _a, _b, autojunk=False).get_opcodes() if tag != "equal")
+        if _k906h == 0:
+            _emit(log)(f"  [LOCAL-906C] final pass: evidence for 0/{_n906h} stops, {_chg} change(s) -- NO evidence: "
+                      f"scope/blocked/cross-stop checks skipped")
+        else:
+            _emit(log)(f"  [LOCAL-906C] final pass: evidence for {_k906h}/{_n906h} stops, {_chg} change(s)")
+    except Exception:  # pragma: no cover
+        pass
     return t

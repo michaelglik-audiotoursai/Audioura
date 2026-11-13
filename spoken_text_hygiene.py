@@ -807,6 +807,11 @@ def audit_seating_capacity(text: str, evidence_text: str = "",
                 "", new_body)
             # otherwise just remove the sentinel, keeping any comparative/descriptive
             # word that followed it ("rise \x00MAG\x00 high" -> "rise high").
+            # [LOCAL-906H] a quantifier that belonged to the cut number goes with it ("climbing an additional <N> steps
+            # from the station" must not become "climbing an additional from the station"): the WHOLE measure phrase.
+            new_body = re.sub(
+                r"(?i)\b(?:an?\s+(?:additional|further|extra)|another|some|about|around|roughly|approximately|nearly|"
+                r"over|more\s+than|up\s+to|a\s+total\s+of)\s+\x00MAG\x00\s*", " ", new_body)
             new_body = re.sub(r"\s*\x00MAG\x00\s*", " ", new_body)
         new_body = re.sub(r"(?i)\ba\s+venue\s+venue\b", "a venue", new_body)
         new_body = re.sub(r"(?i)\bvenue\s+venue\b", "venue", new_body)

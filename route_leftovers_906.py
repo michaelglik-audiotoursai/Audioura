@@ -33,6 +33,11 @@ def _ev_for(ev_map: Dict[str, str], title: str) -> Optional[str]:
 
 def _merged_evidence(evidence_by_title: Optional[Dict[str, str]]) -> Dict[str, str]:
     ev = dict(rc._EVIDENCE_904)
+    try:   # [LOCAL-906H] the job's delivery-evidence store
+        import delivery_evidence_906h as _de
+        ev.update(_de.get())
+    except Exception:
+        pass
     ev.update({str(k): str(v) for k, v in (evidence_by_title or {}).items()})
     return {rc.fold(k): v for k, v in ev.items()}
 
@@ -127,6 +132,11 @@ def drop_unsupported_claims(tour_text: str, evidence_by_title: Optional[Dict[str
     emit = _emit(log)
     if not tour_text:
         return tour_text
+    try:   # [LOCAL-906H] no evidence passed -> the job's delivery-evidence store
+        import delivery_evidence_906h as _de
+        evidence_by_title = _de.resolve(evidence_by_title)
+    except Exception:
+        pass
     try:   # [LOCAL-906C] a regional superlative / exclusivity claim needs evidence for the SAME or a wider scope, on ANY tour
         import leftovers_906c as _c
         tour_text = _c.drop_unsupported_scope_claims(tour_text, evidence_by_title, log)

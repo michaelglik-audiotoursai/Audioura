@@ -1869,6 +1869,11 @@ def set_evidence_904(ev: Optional[Dict[str, str]]) -> None:
         _EVIDENCE_904.update({str(k): str(v) for k, v in (ev or {}).items()})
     except Exception:
         pass
+    try:   # [LOCAL-906H] the job's delivery-evidence store sees it too
+        import delivery_evidence_906h as _de906h
+        _de906h.add(ev, "904")
+    except Exception:
+        pass
 
 
 def _prose_lines(lines: List[str], last: bool) -> List[int]:
