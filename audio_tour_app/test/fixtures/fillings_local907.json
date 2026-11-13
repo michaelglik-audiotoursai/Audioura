@@ -1,0 +1,77 @@
+{
+ "job_id": "j",
+ "status": "completed",
+ "total_stops": 4,
+ "fillings": [
+  {
+   "leg": 0,
+   "after_stop": 1,
+   "minutes": 40.1,
+   "items": [
+    {
+     "segment_id": 1,
+     "title": "The harbour that built the town",
+     "theme": "history",
+     "minutes": 12.7,
+     "audio_url": "/topic-audio/a1.mp3",
+     "credit_line": "This segment is based on Wikipedia articles, used under the Creative Commons Attribution-ShareAlike licence."
+    },
+    {
+     "segment_id": 3,
+     "title": "Marsh, tide and shore birds",
+     "theme": "nature",
+     "minutes": 9.0,
+     "audio_url": "/topic-audio/a3.mp3",
+     "credit_line": "This segment is based on Wikipedia articles, used under the Creative Commons Attribution-ShareAlike licence."
+    },
+    {
+     "segment_id": 2,
+     "title": "What the first settlers ate",
+     "theme": "food",
+     "minutes": 10.2,
+     "audio_url": "/topic-audio/a2.mp3",
+     "credit_line": "This segment is based on Wikipedia articles, used under the Creative Commons Attribution-ShareAlike licence."
+    },
+    {
+     "segment_id": 4,
+     "title": "The painters of the waterfront",
+     "theme": "arts",
+     "minutes": 11.0,
+     "audio_url": "/topic-audio/a4.mp3",
+     "credit_line": "This segment is based on Wikipedia articles, used under the Creative Commons Attribution-ShareAlike licence."
+    }
+   ]
+  },
+  {
+   "leg": 2,
+   "after_stop": 3,
+   "minutes": 37.2,
+   "items": [
+    {
+     "segment_id": 8,
+     "title": "Lobster, chowder and the working docks",
+     "theme": "food",
+     "minutes": 9.5,
+     "audio_url": "/topic-audio/a8.mp3",
+     "credit_line": "This segment is based on Wikipedia articles, used under the Creative Commons Attribution-ShareAlike licence."
+    },
+    {
+     "segment_id": 5,
+     "title": "How the railway changed everything",
+     "theme": "transport",
+     "minutes": 13.0,
+     "audio_url": "/topic-audio/a5.mp3",
+     "credit_line": "This segment is based on Wikipedia articles, used under the Creative Commons Attribution-ShareAlike licence."
+    },
+    {
+     "segment_id": 6,
+     "title": "The ghost lights of the bay",
+     "theme": "legends",
+     "minutes": 10.0,
+     "audio_url": "/topic-audio/a6.mp3",
+     "credit_line": "This segment is based on Wikipedia articles, used under the Creative Commons Attribution-ShareAlike licence."
+    }
+   ]
+  }
+ ]
+}

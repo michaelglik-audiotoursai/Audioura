@@ -13,6 +13,7 @@ import 'about_screen.dart';
 import 'home_screen.dart';
 import 'plan_screen.dart';
 import '../services/notification_service.dart';
+import '../services/on_the_way_notification.dart';
 import '../services/background_service.dart';
 import '../services/entitlements_service.dart';
 import '../services/deep_link_service.dart';
@@ -438,6 +439,13 @@ class MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
   Future<void> _initializeNotifications() async {
     await NotificationService.initialize((NotificationResponse response) {
+      // [LOCAL-908] The "On the way" notification/action opens the topics menu
+      // in the live player; it must not reset the Listen tab (that would pop
+      // the player and stop the audio).
+      if (OnTheWayNotification.isMenuResponse(response)) {
+        OnTheWayNotification.requestMenu();
+        return;
+      }
       // Navigate to the Listen tab when a notification is tapped.
       if (!mounted) return;
       setState(() {
