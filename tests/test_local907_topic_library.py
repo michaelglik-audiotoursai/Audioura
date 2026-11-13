@@ -433,19 +433,19 @@ POOL = [seg(1, "history", 10), seg(2, "food", 12), seg(3, "nature", 9), seg(4, "
 
 
 def test_leg_minutes_by_mode():
-    t = car_tour(18.0)                                   # 18 km * 1.3 = 23.4 road-km at 35 km/h
-    assert tp.leg_minutes(t, 0) == pytest.approx(40.1, abs=0.5)
+    t = car_tour(18.0)                                   # 18 km * 1.3 = 23.4 road-km at 45 km/h (LOCAL-909: rural 40-50)
+    assert tp.leg_minutes(t, 0) == pytest.approx(31.2, abs=0.5)
     t["area"] = "city"
     assert tp.leg_minutes(t, 0) == pytest.approx(56.2, abs=0.5)           # 25 km/h
     assert tp.leg_minutes(dict(t, mode="bike"), 0) == pytest.approx(100.3, abs=1)    # 14 km/h
     assert tp.leg_minutes(dict(t, mode="walk"), 0) == pytest.approx(311.7, abs=2)    # 4.5 km/h
-    assert tp.leg_minutes(dict(t, mode=None, tour_type="driving tour", area=None), 0) == pytest.approx(40.1, abs=0.5)
+    assert tp.leg_minutes(dict(t, mode=None, tour_type="driving tour", area=None), 0) == pytest.approx(31.2, abs=0.5)
 
 
 def test_route_data_overrides_the_estimate():
     t = car_tour(18.0, legs=[{"minutes": 20}])
     assert tp.leg_minutes(t, 0) == 20
-    t = car_tour(18.0, legs=[{"distance_km": 35}])
+    t = car_tour(18.0, legs=[{"distance_km": 45}])
     assert tp.leg_minutes(t, 0) == pytest.approx(60.0)
 
 
@@ -646,7 +646,7 @@ def test_payload_is_additive_and_old_fields_unchanged():
     new = fp.attach_fillings(dict(old), fillings)
     assert {k: v for k, v in new.items() if k != "fillings"} == snapshot
     f = new["fillings"][0]
-    assert f["leg"] == 0 and f["after_stop"] == 1 and f["minutes"] == pytest.approx(40.1, abs=0.5)
+    assert f["leg"] == 0 and f["after_stop"] == 1 and f["minutes"] == pytest.approx(31.2, abs=0.5)
     it = f["items"][0]
     assert set(it) >= {"segment_id", "title", "theme", "minutes", "audio_url", "credit_line"}
     assert it["audio_url"].endswith(".mp3") and it["credit_line"] == tl.CREDIT_LINE

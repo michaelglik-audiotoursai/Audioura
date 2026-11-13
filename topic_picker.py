@@ -31,7 +31,7 @@ MIN_ITEMS, MAX_ITEMS = 3, 5
 SLACK_MINUTES = 5.0
 CIRCUITY = 1.3                    # road km per straight-line km when no route data exists
 CITY_LEG_KM = 6.0
-SPEEDS_KMH = {"car_rural": 35.0, "car_city": 25.0, "bike": 14.0, "walk": 4.5}
+SPEEDS_KMH = {"car_rural": 45.0, "car_city": 25.0, "bike": 14.0, "walk": 4.5}
 
 W_REGION, W_THEME_FIT, W_LISTENER = 1.0, 1.5, 2.0
 WEIGHT_CLAMP = 5.0
@@ -53,8 +53,11 @@ def _coord(stop: Dict[str, Any]):
         return None
 
 
-def leg_minutes(tour: Dict[str, Any], i: int) -> Optional[float]:
-    """Minutes from stop i to stop i+1, or None when it cannot be known."""
+def leg_minutes_source(tour: Dict[str, Any], i: int):
+    """(minutes, source) from stop i to stop i+1; (None, "no pins") when it cannot be known.
+    [LOCAL-909] source: route minutes | stop minutes | route km | stated km | pin distance. Driving speed:
+    rural 45 km/h (40-50), city 25 km/h; a km figure the tour STATES (the Directions' "roughly N km") is a road
+    distance and is not inflated."""
     stops = tour.get("stops") or []
     legs = tour.get("legs") or []
     route = legs[i] if i < len(legs) and isinstance(legs[i], dict) else {}
@@ -70,17 +73,22 @@ def leg_minutes(tour: Dict[str, Any], i: int) -> Optional[float]:
         return km / speed * 60.0
 
     if route.get("minutes") is not None:
-        return float(route["minutes"])
+        return float(route["minutes"]), "route minutes"
     if stops[i].get("leg_minutes") is not None:
-        return float(stops[i]["leg_minutes"])
+        return float(stops[i]["leg_minutes"]), "stop minutes"
     if route.get("distance_km") is not None:
-        return _from_km(float(route["distance_km"]))
+        return _from_km(float(route["distance_km"])), "route km"
     if stops[i].get("leg_distance_km") is not None:
-        return _from_km(float(stops[i]["leg_distance_km"]))
+        return _from_km(float(stops[i]["leg_distance_km"])), "stated km"
     a, b = _coord(stops[i]), _coord(stops[i + 1])
     if not a or not b:
-        return None
-    return _from_km(tl.haversine_km(a[0], a[1], b[0], b[1]) * CIRCUITY)
+        return None, "no pins"
+    return _from_km(tl.haversine_km(a[0], a[1], b[0], b[1]) * CIRCUITY), "pin distance"
+
+
+def leg_minutes(tour: Dict[str, Any], i: int) -> Optional[float]:
+    """Minutes from stop i to stop i+1, or None when it cannot be known."""
+    return leg_minutes_source(tour, i)[0]
 
 
 def _stop_text(stop: Dict[str, Any]) -> str:

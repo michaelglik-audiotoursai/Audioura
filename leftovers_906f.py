@@ -598,6 +598,64 @@ def drop_promo(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = Non
         return tour_text
 
 
+# ══ 5b. [LOCAL-909] driving tour: public-transport directions and scheduling advice ════════════════════════
+_TRANSIT = [re.compile(p) for p in (
+    r"(?i)\b(?:take|takes|taking|catch|catching|board|ride|riding)\s+(?:the\s+|a\s+|an\s+)?"
+    r"(?:(?:public|local|city|express|shuttle)\s+)?(?:bus|buses|minibus|metro|subway|underground|tram|train|trolley|coach)\b",
+    r"(?i)\b(?:bus|metro|tram|train|subway)\s+(?:line\s+|route\s+|number\s+|no\.?\s*)?\d+\b",
+    r"(?i)\bfrom\s+the\s+(?:mall|bus\s+(?:station|stop|terminal)|train\s+station|metro\s+station|tram\s+stop)\b",
+    r"(?i)\bpublic\s+(?:transport|transportation|transit)\b",
+    r"(?i)\bmaking\s+sure\s+you\s+are\s+heading\s+in\s+the\s+right\s+direction\b",
+)]
+_SCHEDULE = [re.compile(p) for p in (
+    r"(?i)\b(?:morning\s+or\s+(?:in\s+the\s+)?afternoon|afternoon\s+or\s+(?:in\s+the\s+)?morning)\b",
+    r"(?i)\bdepending\s+on\s+your\s+(?:schedule|plans?|itinerary|time|preferences?|mood)\b",
+    r"(?i)\byou\s+(?:can|could|may)\s+(?:choose|decide)\s+to\s+visit\b",
+    r"(?i)\bwhichever\s+(?:suits|fits|works\s+(?:best\s+)?for)\s+(?:you|your\s+schedule)\b",
+)]
+_OPTION_ADVICE = re.compile(
+    r"(?i)^\s*you\s+(?:can|could|may)\s+(?:either\s+)?(?:take|ride|use|choose)\s+(?:a|an|the)\s+(?:[\w\-]+\s+){0,3}?"
+    r"(?:cable\s*car|gondola|shuttle|bus|train|funicular|lift|tram)\s+or\s+(?:walk|hike|climb|trek|take|ride)\b")
+
+
+def is_driving_practical(sentence: str) -> str:
+    """'' when the sentence is fine on a driving tour, else why it goes (transit / schedule / option advice)."""
+    x = sentence or ""
+    if any(rx.search(x) for rx in _TRANSIT):
+        return "public-transport directions"
+    if any(rx.search(x) for rx in _SCHEDULE):
+        return "scheduling advice"
+    if _OPTION_ADVICE.search(x):
+        return "how-to-get-up options"
+    return ""
+
+
+def drop_driving_practical(tour_text: str, log: Optional[Callable] = None, force: bool = False) -> str:
+    """[LOCAL-909] On a DRIVING tour a stop body carries no bus / metro / train directions, no \"from the mall\", no
+    \"morning or afternoon depending on your schedule\" and no \"you can take X or walk\" advice. A walking tour is
+    untouched (``force`` only for tests that do not set the job state)."""
+    emit = _emit(log)
+    if not tour_text:
+        return tour_text
+    try:
+        import route_order_909 as r909
+        if not (force or r909.is_driving()):
+            return tour_text
+
+        def fn(st: Dict, _all: List[Dict]):
+            edits = {}
+            for i, j, x in st["flat"]:
+                why = is_driving_practical(x)
+                if why:
+                    emit(f'  [LOCAL-909] Stop {st["num"]}: {why} dropped on a driving tour: "{x[:80]}"')
+                    edits[(i, j)] = []
+            return edits
+        return _each_stop(tour_text, fn)
+    except Exception as err:  # pragma: no cover
+        emit(f"  [LOCAL-909] driving practical guard skipped (non-fatal): {err}")
+        return tour_text
+
+
 # ══ 6. cosmetics ═════════════════════════════════════════════════════════════════════════════════════════
 _UNITS = (r"long|high|tall|wide|deep|thick|old|meters?|metres?|kilomet\w+|miles?|foot|feet|ft|km|minutes?|hours?|days?|"
           r"years?|stor(?:y|ey)|floors?|tons?|tonnes?|acres?|hectares?|step|steps")
@@ -954,6 +1012,7 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
     t = tour_text
     t = strip_blocked(t, evidence_by_title, log)
     t = drop_promo(t, evidence_by_title, log)
+    t = drop_driving_practical(t, log)
     t = resolve_cross_stop(t, evidence_by_title, log)
     t = drop_cross_stop_fact(t, evidence_by_title, log)
     t = drop_encyclopedia_leads(t, log)
