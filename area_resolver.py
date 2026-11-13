@@ -347,7 +347,9 @@ def _default_free_candidates(query: str):
 
 def first_named_place_reference(location: str, city: str,
                                coarse_center: Tuple[float, float],
-                               geocode_fn=None, candidates_fn=None) -> Optional[Dict]:
+                               geocode_fn=None, candidates_fn=None,
+                               city_qid: str = "", country: str = "",
+                               province_box_fn=None, wd_search_fn=None, language: str = "") -> Optional[Dict]:
     """[LOCAL-901/902] The full location string was not on Wikidata, so the area fell
     back to the city centre. Try the FIRST NAMED PLACE of the location through the
     existing ``_wikidata_name_lookup`` and, on a miss, the free geocoder ("<name>, <city>"),
@@ -407,6 +409,25 @@ def first_named_place_reference(location: str, city: str,
                         "precision": "place", "source": source}
         print(f"  [LOCAL-901] place reference '{name}' \u2192 none (wikidata miss"
               f", geocoder miss{'; ' + ', '.join(tried) if tried else ''})")
+        # [LOCAL-906D item 1] retry by local name / aliases / the province-scoped geocoder; inside the province only
+        try:
+            import pin_fallback_906d as _pf
+            injected = geocode_fn is not None or candidates_fn is not None
+            if province_box_fn is not None or not injected:
+                pb = (province_box_fn or _pf.province_box)(city, country) if city else None
+                box = (pb or {}).get("box") if isinstance(pb, dict) else None
+                langs = [language] if language else []
+                if not langs and city_qid and not injected:
+                    langs = [x for x in (_pf.local_language(city_qid),) if x]
+                got = _pf.place_reference_retry(
+                    name, city, country, box=box, languages=langs,
+                    wd_search_fn=wd_search_fn or (None if not injected else (lambda *_a: [])),
+                    candidates_fn=candidates_fn or (None if not injected else (lambda *_a: [])),
+                    log=print)
+                if got:
+                    return got
+        except Exception as _e906d:
+            print(f"  [LOCAL-906D] place reference retry skipped (non-fatal): {_e906d}")
         return None
     except Exception as e:
         print(f"  [LOCAL-901] place reference '{name}' \u2192 none (non-fatal error: {e})")
@@ -508,10 +529,10 @@ def resolve_area(location_string: str) -> Optional[AreaResolution]:
                   f"({center_lat:.4f}, {center_lng:.4f})")
         elif neighborhood_qid:
             print(f"  [area_resolver] Neighborhood resolved: {neighborhood} → {neighborhood_qid} (no P625, using city center)")
-            _place_ref = first_named_place_reference(neighborhood, city, (city_lat, city_lng))
+            _place_ref = first_named_place_reference(neighborhood, city, (city_lat, city_lng), city_qid=city_qid)
         else:
             print(f"  [area_resolver] Neighborhood '{neighborhood}' not on Wikidata — using city center")
-            _place_ref = first_named_place_reference(neighborhood, city, (city_lat, city_lng))
+            _place_ref = first_named_place_reference(neighborhood, city, (city_lat, city_lng), city_qid=city_qid)
     
     # Detect language from country
     language = _detect_language(city_qid)
