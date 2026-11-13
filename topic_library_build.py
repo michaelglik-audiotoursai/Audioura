@@ -40,12 +40,19 @@ NARRATION_MODEL = os.environ.get("NARRATION_MODEL", "gpt-4.1-mini")
 TARGET_WORDS = 1900            # asked of the writer
 MIN_WORDS_WRITTEN = 1500       # spec window
 MAX_WORDS_WRITTEN = 2200
-MIN_SURVIVOR_WORDS = 1200      # below this after grounding => rejected
+MIN_SURVIVOR_WORDS = 1200      # floor for a source of >= LONG_SOURCE_WORDS words (see survivor_floor)
+MIN_SURVIVOR_FLOOR = 700       # LOCAL-907D: lowest floor, for the shortest sources
+LONG_SOURCE_WORDS = 2500       # LOCAL-907D: at or above this the floor is MIN_SURVIVOR_WORDS
+PART_TARGET_WORDS = 800        # LOCAL-907D: one writing call asks for about this many words
+MAX_PARTS = 3
+MIN_PART_GAIN_WORDS = 150      # a later part that adds less than this => the source is used up
 MIN_SOURCE_WORDS = int(os.environ.get("TOPIC_MIN_SOURCE_WORDS", "500"))
 MAX_OVERLAP = 0.30
 MAX_LINKED_SHARE = 0.25         # LOCAL-907C: gated linked articles may fill at most this share
 MAX_SECTIONS_PER_SEED = 2       # LOCAL-907C: sections taken from any one seed article
-GROUND_BATCH_SENTENCES = 20
+GROUND_BATCH_SENTENCES = 12     # LOCAL-907D: was 20 (the verdict JSON got cut off)
+GROUND_TOKENS_PER_SENTENCE = 60  # LOCAL-907D: judge reply budget per sentence ...
+GROUND_TOKENS_BASE = 200         # ... plus this
 CACHE_DIR = os.environ.get("TOPIC_SOURCE_CACHE", os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "topic_source_cache"))
 USER_AGENT = wc.USER_AGENT
@@ -536,13 +543,43 @@ def plan_topics(region: Dict[str, Any], language: str, max_segments: int, *,
     return chosen
 
 
-def estimate_segment_cost(source_words: int) -> float:
-    """Write call + ceil(sentences/20) grounding calls (conservative: full evidence window)."""
-    ev_tok = int(min(source_words, 7000) * 1.4)
-    write = llm_cost(ev_tok + 450, int(TARGET_WORDS * 1.4))
-    batches = max(1, -(-int(TARGET_WORDS / 17) // GROUND_BATCH_SENTENCES))
+def survivor_floor(source_words: int) -> int:
+    """LOCAL-907D: grounded words a segment must keep to be 'ready'. 1,200 for a source of
+    >= 2,500 words; otherwise max(700, half the source), never above 1,200 (a smaller source
+    must not face a higher bar than a larger one)."""
+    if source_words >= LONG_SOURCE_WORDS:
+        return MIN_SURVIVOR_WORDS
+    return min(MIN_SURVIVOR_WORDS, max(MIN_SURVIVOR_FLOOR, int(0.5 * source_words)))
+
+
+def plan_part_count(source_words: int) -> int:
+    """How many writing calls a segment is planned as (2-3; 1 for a very short source)."""
+    if source_words >= 2000:
+        return MAX_PARTS
+    return 2 if source_words >= 900 else 1
+
+
+def part_target_words(n_parts: int, source_words: int) -> int:
+    return min(PART_TARGET_WORDS, max(400, int(source_words * 0.9 / max(1, n_parts))))
+
+
+def judge_max_tokens(n_sentences: int) -> int:
+    """Reply budget for one judge call over ``n_sentences`` sentences (LOCAL-907D)."""
+    return GROUND_TOKENS_PER_SENTENCE * max(1, int(n_sentences)) + GROUND_TOKENS_BASE
+
+
+def _part_cost_estimate(evidence_words: int, target_words: int) -> float:
+    write = llm_cost(int(evidence_words * 1.4) + 450, int(target_words * 1.4))
+    batches = max(1, -(-int(target_words / 17) // GROUND_BATCH_SENTENCES))
     ground = batches * llm_cost(1500 + GROUND_BATCH_SENTENCES * 35 + 600, 500)
-    return round(write + ground, 4)
+    return write + ground
+
+
+def estimate_segment_cost(source_words: int) -> float:
+    """Every planned writing call + its grounding calls (conservative: all parts are written)."""
+    n = plan_part_count(source_words)
+    per = _part_cost_estimate(min(source_words, 7000) / n + 700, part_target_words(n, source_words))
+    return round(n * per, 4)
 
 
 def theme_counts(topics: List[Dict[str, Any]], themes: Optional[List[str]] = None) -> Dict[str, int]:
@@ -597,6 +634,54 @@ WRITER_SYSTEM = (
     % (TARGET_WORDS, MIN_WORDS_WRITTEN, MAX_WORDS_WRITTEN))
 
 
+def writer_system(part: int, n_parts: int, target: int) -> str:
+    """LOCAL-907D: prompt for part ``part`` of ``n_parts``. The hook belongs to part 1 only;
+    the closing credit is never written by the model (it is appended once, at the end)."""
+    lo, hi = int(target * 0.875), int(target * 1.125)
+    head = ("You write %s of a spoken audio guide, to be heard while travelling between stops. "
+            "Use ONLY the facts in the SOURCE passages the user gives you; add nothing from "
+            "memory. Write about %d words of plain spoken English prose (never fewer than %d, "
+            "never more than %d). "
+            % ("one segment" if n_parts == 1 else f"part {part} of {n_parts} of one segment",
+               target, lo, hi))
+    if part == 1:
+        order = ("In this order:\n1. First line: a single-sentence hook that makes the listener "
+                 "curious.\n2. Then flowing paragraphs separated by blank lines.\n")
+    else:
+        order = ("Do NOT write a hook, a greeting or an opening line. Continue straight on from "
+                 "where the previous part ended (its last paragraph is quoted for context) and do "
+                 "not repeat anything it says. Write flowing paragraphs separated by blank lines. "
+                 "Use the OVERVIEW only for context; build this part from the PART passages.\n")
+    close = ("" if part < n_parts else "End with one natural closing sentence. ") if n_parts > 1 \
+        else "End with one natural closing sentence. "
+    if part < n_parts:
+        close = "Do not wrap up or conclude: more of the segment follows. "
+    tail = ("Spoken register: short sentences, one idea each. NO citations, NO footnote marks, NO "
+            "parentheses, NO brackets, NO tables, NO lists, NO headings, NO markdown. Write years "
+            "as digits (for example 1975), because the voice reads them naturally. Spell out "
+            "symbols and abbreviations a voice would stumble on. Never mention 'the source', "
+            "'the article' or 'Wikipedia'. Do not write a closing credit; it is added separately.")
+    return head + order + close + tail
+
+
+def drop_repeats(text: str, seen: set) -> str:
+    """Remove paragraphs already used in an earlier part, and any credit line the model wrote;
+    ``seen`` is updated with the paragraphs kept."""
+    out = []
+    credit_key = _para_key(tl.CREDIT_LINE)
+    for para in re.split(r"\n\s*\n", (text or "").strip()):
+        key = _para_key(para)
+        if not key or key in seen or credit_key in key:
+            continue
+        seen.add(key)
+        out.append(para.strip())
+    return "\n\n".join(out)
+
+
+def _para_key(p: str) -> str:
+    return re.sub(r"\W+", " ", (p or "").lower()).strip()
+
+
 def default_llm(system: str, user: str, model: str, max_tokens: int) -> Tuple[str, int, int]:
     """ONE chat-completion call (billed by the project meter, which intercepts requests.post).
     Returns (text, in_tokens, out_tokens); raises on failure."""
@@ -636,9 +721,33 @@ def clean_spoken(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip()
 
 
-def gather_evidence(topic: Dict[str, Any], fetch_fn: Callable) -> Tuple[str, List[Dict[str, Any]]]:
-    """(evidence text, sources[]) for a topic: its section(s) / article plus the article lead."""
-    parts, sources, seen = [], [], set()
+def _split_units(text: str, max_words: int = 300) -> List[str]:
+    """Paragraph-sized units; a paragraph over ``max_words`` is cut at sentence boundaries."""
+    from sentence_split import split_sentences
+    units: List[str] = []
+    for para in re.split(r"\n+", text or ""):
+        para = para.strip()
+        if not para:
+            continue
+        if tl.word_count(para) <= max_words:
+            units.append(para)
+            continue
+        cur: List[str] = []
+        for sent in split_sentences(para):
+            cur.append(sent.strip())
+            if tl.word_count(" ".join(cur)) >= max_words:
+                units.append(" ".join(cur))
+                cur = []
+        if cur:
+            units.append(" ".join(cur))
+    return units
+
+
+def gather_parts(topic: Dict[str, Any], fetch_fn: Callable) -> Dict[str, Any]:
+    """Everything the writer / judge need: ``evidence`` (the whole text), ``sources``, ``lead``
+    (the articles' lead passages), ``units`` [(header, text)] of the topic's own sections /
+    articles in source order, and ``body_words`` (their size)."""
+    parts, leads, units, sources, seen = [], [], [], [], set()
     for src in topic["sources"]:
         art = fetch_fn(src["lang"], src["article"] if src.get("site") != "wikivoyage"
                        else "voyage:" + src["article"])
@@ -647,18 +756,58 @@ def gather_evidence(topic: Dict[str, Any], fetch_fn: Callable) -> Tuple[str, Lis
         lead, sections = split_sections(art["text"])
         if src.get("section"):
             body = next((s["text"] for s in sections if s["heading"] == src["section"]), "")
-            parts.append(f"{art['title']} — {src['section']}\n{body}")
+            header = f"{art['title']} — {src['section']}"
+            parts.append(f"{header}\n{body}")
             if lead:
-                parts.append(f"{art['title']} — overview\n{' '.join(lead.split()[:700])}")
+                lt = f"{art['title']} — overview\n{' '.join(lead.split()[:700])}"
+                parts.append(lt)
+                leads.append(lt)
         else:
+            header = art["title"]
             parts.append(f"{art['title']}\n{' '.join(art['text'].split()[:5000])}")
+            body = " ".join(art["text"].split()[:5000])
+        units += [(header, u) for u in _split_units(body)]
         if art["url"] not in seen:
             seen.add(art["url"])
             sources.append({"url": art["url"], "title": art["title"], "lang": art["lang"],
                             "site": art["site"], "revision_id": art["revision_id"],
                             "licence": art.get("licence", tl.LICENCE),
                             "licence_url": tl.LICENCE_URL, "section": src.get("section")})
-    return "\n\n".join(parts), sources
+    return {"evidence": "\n\n".join(parts), "sources": sources, "lead": "\n\n".join(leads),
+            "units": units, "body_words": sum(tl.word_count(u) for _h, u in units)}
+
+
+def gather_evidence(topic: Dict[str, Any], fetch_fn: Callable) -> Tuple[str, List[Dict[str, Any]]]:
+    """(evidence text, sources[]) for a topic: its section(s) / article plus the article lead."""
+    g = gather_parts(topic, fetch_fn)
+    return g["evidence"], g["sources"]
+
+
+def slice_units(units: List[Tuple[str, str]], n_parts: int) -> List[str]:
+    """Cut the source into ``n_parts`` contiguous slices of about equal size, so each writing
+    call works from DIFFERENT passages. A slice repeats the section header of its units."""
+    total = sum(tl.word_count(u) for _h, u in units)
+    if not units:
+        return []
+    n_parts = max(1, min(n_parts, len(units)))
+    target = total / float(n_parts)
+    slices: List[List[Tuple[str, str]]] = [[]]
+    acc = 0.0
+    for h, u in units:
+        if acc >= target * len(slices) - 1e-9 and len(slices) < n_parts:
+            slices.append([])
+        slices[-1].append((h, u))
+        acc += tl.word_count(u)
+    out = []
+    for sl in slices:
+        lines, last = [], None
+        for h, u in sl:
+            if h != last:
+                lines.append(h)
+                last = h
+            lines.append(u)
+        out.append("\n".join(lines))
+    return out
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -669,48 +818,98 @@ def _norm(s: str) -> str:
 
 
 def ground_text(title: str, text: str, evidence: str, classify_fn: Callable,
-                *, batch_sentences: int = GROUND_BATCH_SENTENCES) -> Tuple[str, Dict[str, int]]:
+                *, batch_sentences: int = GROUND_BATCH_SENTENCES) -> Tuple[str, Dict[str, Any]]:
     """Run the strict grounding gate (strict_grounding_gate.apply_grounding_gate) over the text
     in batches of whole paragraphs. Unsupported / contradicted sentences are dropped; paragraph
-    structure is kept. Returns (kept text, {"before","kept","dropped"})."""
+    structure is kept. Returns (kept text, stats).
+
+    LOCAL-907D: every judge call gets its own ``max_tokens`` sized for the batch
+    (judge_max_tokens), so the verdict JSON is never cut off. A batch whose judge reply is
+    missing / truncated / unparseable is retried ONCE with half the batch (a one-sentence batch
+    is retried with twice the tokens) before it counts as a failure (``judge_failures``)."""
     import strict_grounding_gate as sgg
     from sentence_split import split_sentences
     paras = [p for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
-    batches: List[List[str]] = []
-    cur: List[str] = []
-    n = 0
-    for p in paras:
-        cur.append(p)
-        n += len(split_sentences(p))
-        if n >= batch_sentences:
+    batches: List[List[Tuple[int, str]]] = []
+    cur: List[Tuple[int, str]] = []
+    for pi, p in enumerate(paras):
+        sents = [s.strip() for s in split_sentences(p)]
+        cur += [(pi, s) for s in sents]
+        if len(cur) >= batch_sentences:
             batches.append(cur)
-            cur, n = [], 0
+            cur = []
     if cur:
         batches.append(cur)
-    kept_paras: List[str] = []
+    stats: Dict[str, Any] = {"judge_calls": 0, "judge_failures": 0, "judge_retries": 0,
+                             "judge_cost_usd": 0.0}
+
+    def _join(items: List[Tuple[int, str]]) -> str:
+        out, last = [], None
+        for pi, sent in items:
+            if pi == last:
+                out[-1] += " " + sent
+            else:
+                out.append(sent)
+            last = pi
+        return "\n\n".join(out)
+
+    def _run(items: List[Tuple[int, str]], max_tokens: int) -> Tuple[List[bool], bool]:
+        failed = [False]
+
+        def probe(system, user, model, *a, **kw):
+            kw = dict(kw)
+            kw["max_tokens"] = max_tokens
+            parsed, in_tok, out_tok = classify_fn(system, user, model, *a, **kw)
+            stats["judge_calls"] += 1
+            stats["judge_cost_usd"] += llm_cost(in_tok or 0, out_tok or 0)
+            if not isinstance(parsed, dict) or not parsed.get("verdicts"):
+                failed[0] = True
+            return parsed, in_tok, out_tok
+
+        new_prose, _rep = sgg.apply_grounding_gate(title, _join(items), evidence,
+                                                   classify_fn=probe, deny_check=False)
+        survivors = [_norm(x) for x in split_sentences(new_prose)]
+        flags, ptr = [], 0
+        for _pi, sent in items:
+            ns = _norm(sent)
+            if ptr < len(survivors) and survivors[ptr] == ns:
+                flags.append(True)
+                ptr += 1
+            elif ns in survivors[ptr:ptr + 3]:       # tolerate a gate-internal drop of a short fragment
+                ptr = survivors.index(ns, ptr) + 1
+                flags.append(True)
+            else:
+                flags.append(False)
+        return flags, failed[0]
+
+    def _judge(items: List[Tuple[int, str]], retry_allowed: bool) -> List[bool]:
+        flags, failed = _run(items, judge_max_tokens(len(items)))
+        if not failed:
+            return flags
+        if retry_allowed:
+            stats["judge_retries"] += 1
+            if len(items) > 1:
+                h = len(items) // 2
+                return _judge(items[:h], False) + _judge(items[h:], False)
+            flags2, failed2 = _run(items, judge_max_tokens(len(items)) * 2)
+            if not failed2:
+                return flags2
+        stats["judge_failures"] += 1
+        return flags
+
+    keep: Dict[int, List[str]] = {}
     before = kept = 0
     for batch in batches:
-        body = "\n\n".join(batch)
-        new_prose, _rep = sgg.apply_grounding_gate(title, body, evidence, classify_fn=classify_fn,
-                                                   deny_check=False)
-        survivors = [_norm(s) for s in split_sentences(new_prose)]
-        ptr = 0
-        for p in batch:
-            keep = []
-            for s in split_sentences(p):
-                before += 1
-                ns = _norm(s)
-                if ptr < len(survivors) and survivors[ptr] == ns:
-                    keep.append(s.strip())
-                    ptr += 1
-                    kept += 1
-                elif ns in survivors[ptr:ptr + 3]:       # tolerate a gate-internal drop of a short fragment
-                    ptr = survivors.index(ns, ptr) + 1
-                    keep.append(s.strip())
-                    kept += 1
-            if keep:
-                kept_paras.append(" ".join(keep))
-    return "\n\n".join(kept_paras), {"before": before, "kept": kept, "dropped": before - kept}
+        flags = _judge(batch, True)
+        for (pi, sent), ok in zip(batch, flags):
+            before += 1
+            if ok:
+                kept += 1
+                keep.setdefault(pi, []).append(sent)
+    kept_paras = [" ".join(keep[pi]) for pi in sorted(keep)]
+    stats.update(before=before, kept=kept, dropped=before - kept,
+                 judge_cost_usd=round(stats["judge_cost_usd"], 6))
+    return "\n\n".join(kept_paras), stats
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -718,11 +917,15 @@ def ground_text(title: str, text: str, evidence: str, classify_fn: Callable,
 # ═════════════════════════════════════════════════════════════════════════════
 def build_segment(topic: Dict[str, Any], region: Dict[str, Any], language: str, *,
                   fetch_fn: Callable, llm_fn: Callable, classify_fn: Callable,
-                  meter: BuildMeter, model: str = NARRATION_MODEL) -> Dict[str, Any]:
-    """Write + ground one segment. Returns a topic_segments row (status ready / rejected).
-    Raises BudgetStop (nothing paid is lost silently: spend so far stays in the meter)."""
+                  meter: BuildMeter, model: str = NARRATION_MODEL,
+                  log: Callable[[str], None] = lambda m: None) -> Dict[str, Any]:
+    """Write + ground one segment in 1-3 parts (LOCAL-907D). Returns a topic_segments row
+    (status ready / rejected). Raises BudgetStop only when nothing usable exists yet (spend so far
+    stays in the meter); a budget stop between parts finishes the segment with the parts it has
+    and sets ``budget_stopped``."""
     start_spent = meter.spent
-    evidence, sources = gather_evidence(topic, fetch_fn)
+    g = gather_parts(topic, fetch_fn)
+    evidence, sources = g["evidence"], g["sources"]
     row: Dict[str, Any] = {
         "region_key": region["region_key"], "theme": topic["theme"], "title": topic["title"],
         "language": language, "text": "", "word_count": 0, "est_minutes": 0,
@@ -733,37 +936,103 @@ def build_segment(topic: Dict[str, Any], region: Dict[str, Any], language: str, 
     if tl.word_count(evidence) < MIN_SOURCE_WORDS:
         row["reject_reason"] = "insufficient_source"
         return row
-    meter.require(estimate_segment_cost(tl.word_count(evidence)) * 0.4)   # the write call
-    user = (f"TOPIC: {topic['title']}\nTHEME: {topic['theme']}\nREGION: {region['display_name']}\n\n"
-            f"SOURCE passages:\n{evidence}\n\nWrite the segment now.")
-    written, in_tok, out_tok = llm_fn(WRITER_SYSTEM, user, model, int(MAX_WORDS_WRITTEN * 2.2))
-    meter.charge(llm_cost(in_tok, out_tok))
-    text = clean_spoken(written)
-    fails_before, exhausted_before = meter.grounding_failures, meter.exhausted
-    kept_text, stats = ground_text(topic["title"], text, evidence, meter.wrap_classify(classify_fn))
-    if meter.exhausted and not exhausted_before:
-        raise BudgetStop("budget reached while grounding; segment discarded")
-    row["cost_usd"] = round(meter.spent - start_spent, 6)
-    row["ground_stats"] = stats
-    if meter.grounding_failures > fails_before:
-        row["reject_reason"] = "grounding_unavailable"   # an unjudged sentence is never trusted
-        return row
+    src_words = g["body_words"] or tl.word_count(evidence)
+    floor = survivor_floor(src_words)
+    slices = slice_units(g["units"], plan_part_count(src_words)) or [evidence]
+    n_parts = len(slices)
+    target = part_target_words(n_parts, src_words)
+    row["floor"] = floor
+    log(f"  floor {floor} words (source {src_words} words), {n_parts} part(s) of ~{target} words")
+    lead_block = g["lead"]
+    seen: set = set()
+    kept_parts: List[str] = []
+    written: List[int] = []
+    kept_by_part: List[int] = []
+    tot: Dict[str, Any] = {"before": 0, "kept": 0, "dropped": 0, "judge_calls": 0,
+                           "judge_failures": 0, "judge_retries": 0, "judge_cost_usd": 0.0}
+    budget_stopped = False
+    last_part_cost = 0.0
+    for k, piece in enumerate(slices, 1):
+        part_evidence = piece + (("\n\n" + lead_block) if lead_block else "")
+        user = (f"TOPIC: {topic['title']}\nTHEME: {topic['theme']}\nREGION: {region['display_name']}\n"
+                f"PART: {k} of {n_parts}\n\n")
+        if k > 1:
+            prev = (kept_parts[-1].split("\n\n")[-1] if kept_parts else "")
+            user += f"PREVIOUS PART ENDED WITH (do not repeat it):\n{prev}\n\n"
+        user += (f"SOURCE passages (PART):\n{piece}\n\n"
+                 + (f"OVERVIEW (context only):\n{lead_block}\n\n" if lead_block else "")
+                 + "Write this part now.")
+        system = writer_system(k, n_parts, target)
+        try:
+            # reserve the larger of the estimate and what the previous part really cost
+            meter.require(max(_part_cost_estimate(tl.word_count(part_evidence), target),
+                              last_part_cost))
+        except BudgetStop:
+            if k == 1:
+                raise
+            budget_stopped = True
+            break
+        max_tokens = int(target * 1.125 * 2.2)
+        spent_before_part = meter.spent
+        text_raw, in_tok, out_tok = llm_fn(system, user, model, max_tokens)
+        meter.charge(llm_cost(in_tok, out_tok))
+        text = drop_repeats(clean_spoken(text_raw), seen)
+        n_written = tl.word_count(text)
+        written.append(n_written)
+        if not text:
+            break
+        exhausted_before = meter.exhausted
+        kept_text, st = ground_text(topic["title"], text, part_evidence,
+                                    meter.wrap_classify(classify_fn))
+        if meter.exhausted and not exhausted_before:
+            if k == 1 or not kept_parts:
+                raise BudgetStop("budget reached while grounding; segment discarded")
+            written.pop()
+            budget_stopped = True
+            break
+        for key in ("before", "kept", "dropped", "judge_calls", "judge_failures", "judge_retries"):
+            tot[key] += st.get(key, 0)
+        tot["judge_cost_usd"] = round(tot["judge_cost_usd"] + st.get("judge_cost_usd", 0.0), 6)
+        if st.get("judge_failures"):
+            row["cost_usd"] = round(meter.spent - start_spent, 6)
+            row.update(ground_stats={k2: tot[k2] for k2 in ("before", "kept", "dropped")},
+                       parts_words=written, floor=floor, judge_calls=tot["judge_calls"],
+                       judge_cost_usd=tot["judge_cost_usd"], reject_reason="grounding_unavailable")
+            return row                               # an unjudged sentence is never trusted
+        last_part_cost = meter.spent - spent_before_part
+        kept_parts.append(kept_text)
+        kept_by_part.append(tl.word_count(kept_text))
+        if sum(written) >= MIN_WORDS_WRITTEN:
+            break                                    # enough material (never past ~2,200: parts are ~800)
+        if k > 1 and n_written < MIN_PART_GAIN_WORDS:
+            break                                    # the source is used up
+    kept_text = "\n\n".join(p for p in kept_parts if p.strip())
     words = tl.word_count(kept_text)
-    row["survivor_words"] = words
+    row["cost_usd"] = round(meter.spent - start_spent, 6)
+    row["ground_stats"] = {k2: tot[k2] for k2 in ("before", "kept", "dropped")}
+    row.update(parts_words=written, kept_by_part=kept_by_part, floor=floor,
+               judge_calls=tot["judge_calls"], judge_cost_usd=tot["judge_cost_usd"],
+               survivor_words=words)
+    if budget_stopped:
+        row["budget_stopped"] = True
     full = (kept_text + "\n\n" + tl.CREDIT_LINE).strip()
     row.update(text=full, word_count=tl.word_count(full), est_minutes=tl.est_minutes(tl.word_count(full)))
-    if words >= MIN_SURVIVOR_WORDS:
+    if words >= floor:
         row["status"] = "ready"
     else:
-        row["reject_reason"] = f"only {words} grounded words (< {MIN_SURVIVOR_WORDS})"
+        row["reject_reason"] = f"only {words} grounded words (< {floor})"
     return row
+
+
+_ROW_EXTRAS = ("reject_reason", "ground_stats", "survivor_words", "parts_words", "kept_by_part",
+               "floor", "judge_calls", "judge_cost_usd", "budget_stopped")
 
 
 def run_build(region_key: str, language: str = "en", *, max_segments: int = 9,
               budget_usd: Optional[float] = None, dry_run: bool = False,
               store=None, fetch_fn: Optional[Callable] = None, llm_fn: Optional[Callable] = None,
               classify_fn: Optional[Callable] = None, regions_path: Optional[str] = None,
-              meta_fn: Optional[Callable] = None,
+              meta_fn: Optional[Callable] = None, rebuild: bool = False,
               log: Callable[[str], None] = print) -> Dict[str, Any]:
     region = tl.get_region(region_key, regions_path)
     meta_fn = meta_fn
@@ -793,29 +1062,46 @@ def run_build(region_key: str, language: str = "en", *, max_segments: int = 9,
     if classify_fn is None:
         import strict_grounding_gate as sgg
         classify_fn = sgg._default_classify
-    existing = {s["title"] for s in store.list_segments(region_key, language)}
+    existing = {s["title"]: s for s in store.list_segments(region_key, language)}
     last_cost = 0.0
     try:
         for topic in topics:
-            if topic["title"] in existing:
+            old = existing.get(topic["title"])
+            if old is not None and old.get("status") == "ready" and not rebuild:
                 log(f"skip (already built): {topic['title']}")
                 continue
             try:
                 # reserve the larger of the estimate and what the last segment really cost
                 meter.require(max(topic["est_cost_usd"], last_cost))
                 row = build_segment(topic, region, language, fetch_fn=fetch_fn, llm_fn=llm_fn,
-                                    classify_fn=classify_fn, meter=meter)
+                                    classify_fn=classify_fn, meter=meter, log=log)
             except BudgetStop as e:
                 summary["stopped_on_budget"] = True
                 log(f"BUDGET STOP: {e}")
                 break
             last_cost = row["cost_usd"]
-            extra = {k: row.pop(k) for k in ("reject_reason", "ground_stats", "survivor_words") if k in row}
-            sid = store.insert_segment(row)
+            extra = {k: row.pop(k) for k in _ROW_EXTRAS if k in row}
+            note = ""
+            if old is None:
+                sid = store.insert_segment(row)
+            elif old.get("status") == "ready" and row["status"] != "ready":
+                sid = old["id"]                      # a failed rebuild never replaces a good row
+                note = f"  (kept the existing ready row #{sid})"
+            else:
+                sid = old["id"]
+                store.update_segment(sid, row)       # UPDATE by id, never DELETE
+                note = f"  (rebuilt row #{sid})"
             summary["built"].append({"id": sid, "title": row["title"], "status": row["status"],
                                      "words": row["word_count"], "cost_usd": row["cost_usd"], **extra})
             log(f"{row['status']:>8}  {row['title']}  ({row['word_count']} words, ${row['cost_usd']:.4f})"
-                + (f"  [{extra.get('reject_reason')}]" if row["status"] == "rejected" else ""))
+                + (f"  [{extra.get('reject_reason')}]" if row["status"] == "rejected" else "") + note)
+            log(f"          parts written {extra.get('parts_words')}  kept {extra.get('survivor_words')}  "
+                f"floor {extra.get('floor')}  judge calls {extra.get('judge_calls')}  "
+                f"cost ${row['cost_usd']:.4f}")
+            if extra.get("budget_stopped"):
+                summary["stopped_on_budget"] = True
+                log("BUDGET STOP: stopped after the parts above")
+                break
     finally:
         summary["spent_usd"] = round(meter.spent, 6)
         meter.finish(f"topic_library_build {region_key} {language}")
@@ -966,6 +1252,8 @@ def _parse(argv: Optional[List[str]]) -> argparse.Namespace:
                     help="translate READY segments of this language (e.g. en) into --language")
     ap.add_argument("--max-segments", type=int, default=9)
     ap.add_argument("--budget-usd", type=float, default=None)
+    ap.add_argument("--rebuild", action="store_true",
+                    help="rebuild READY rows too (a REJECTED row is always rebuilt; UPDATE by id)")
     ap.add_argument("--dry-run", action="store_true", help="print the plan + estimated cost; spend $0")
     ap.add_argument("--render-audio", action="store_true", help="render English audio via KOKORO_URL")
     ap.add_argument("-v", "--verbose", action="store_true",
@@ -995,8 +1283,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         print("non-English segments are translations: pass --from en", file=sys.stderr)
         return 2
     elif a.budget_usd is not None or not a.render_audio:
-        # build (existing titles are skipped); --render-audio alone, with no budget, only renders
-        run_build(a.region, a.language, max_segments=a.max_segments, budget_usd=a.budget_usd, store=store)
+        # build (ready titles are skipped; rejected ones rebuilt); --render-audio alone, with no budget, only renders
+        run_build(a.region, a.language, max_segments=a.max_segments, budget_usd=a.budget_usd, store=store,
+                  rebuild=a.rebuild)
     if a.render_audio:
         run_render_audio(a.region, store=store, out_dir=a.audio_dir)
     return 0
