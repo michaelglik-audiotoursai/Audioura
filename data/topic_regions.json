@@ -1,59 +1,1016 @@
 {
   "_comment": "LOCAL-907 / D772 / D769: regions are DATA. Centres and Wikipedia seed article titles only. A seed starting with 'voyage:' is read from Wikivoyage instead of Wikipedia.",
-  "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"],
+  "default_themes": [
+    "history",
+    "modern",
+    "people_economy",
+    "religion_customs",
+    "food",
+    "transport",
+    "nature",
+    "legends",
+    "arts"
+  ],
   "regions": [
     {
       "region_key": "mui_ne_binh_thuan",
       "display_name": "Mũi Né / Bình Thuận",
-      "centre": {"lat": 10.9333, "lng": 108.2833},
+      "centre": {
+        "lat": 10.9333,
+        "lng": 108.2833
+      },
       "radius_km": 70,
       "seed_articles": {
-        "en": ["Mũi Né", "Bình Thuận province", "Phan Thiết", "Fish sauce", "Cham people"],
-        "vi": ["Mũi Né", "Bình Thuận", "Phan Thiết"]
+        "en": [
+          "Mũi Né",
+          "Bình Thuận province",
+          "Phan Thiết",
+          "Fish sauce",
+          "Cham people"
+        ],
+        "vi": [
+          "Mũi Né",
+          "Bình Thuận",
+          "Phan Thiết"
+        ]
       },
-      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+      "default_themes": [
+        "history",
+        "modern",
+        "people_economy",
+        "religion_customs",
+        "food",
+        "transport",
+        "nature",
+        "legends",
+        "arts"
+      ],
+      "aliases": [
+        "Mui Ne",
+        "Binh Thuan",
+        "Phan Thiet",
+        "Champa",
+        "Chams",
+        "Po Sahu Inu",
+        "Po Klong Garai",
+        "Ta Cu",
+        "Ke Ga",
+        "Phan Rang",
+        "Hon Rom",
+        "Phu Hai",
+        "Ham Tien",
+        "Tuy Phong",
+        "Phu Quy"
+      ],
+      "generic_seeds": [
+        "Fish sauce",
+        "Vietnamese cuisine"
+      ],
+      "topic_hints": {
+        "en": [
+          {
+            "title": "Champa",
+            "theme": "history"
+          },
+          {
+            "title": "Chams",
+            "theme": "people_economy"
+          },
+          {
+            "title": "Po Klong Garai",
+            "theme": "legends"
+          },
+          {
+            "title": "Po Nagar",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Legendary Champa rulers",
+            "theme": "legends"
+          },
+          {
+            "title": "Cham calendar",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Fish sauce",
+            "theme": "food"
+          },
+          {
+            "title": "Dragon fruit",
+            "theme": "people_economy"
+          },
+          {
+            "title": "Bình Thuận province",
+            "theme": "modern"
+          },
+          {
+            "title": "Mũi Né",
+            "theme": "nature"
+          },
+          {
+            "title": "Phan Thiết (city)",
+            "theme": "modern"
+          },
+          {
+            "title": "Tà Cú Mountain",
+            "theme": "nature"
+          },
+          {
+            "title": "North–South railway (Vietnam)",
+            "theme": "transport"
+          },
+          {
+            "title": "Vietnamese cuisine",
+            "theme": "food"
+          },
+          {
+            "title": "Bánh xèo",
+            "theme": "food"
+          },
+          {
+            "title": "Buddhism in Vietnam",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Caodaism",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Vietnamese folk religion",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Islam in Vietnam",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Whale worship",
+            "theme": "legends"
+          },
+          {
+            "title": "Art of Champa",
+            "theme": "arts"
+          },
+          {
+            "title": "Museum of Cham Sculpture",
+            "theme": "arts"
+          },
+          {
+            "title": "Panduranga (Champa)",
+            "theme": "history"
+          },
+          {
+            "title": "Cham festival",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "National Route 1 (Vietnam)",
+            "theme": "transport"
+          },
+          {
+            "title": "Phan Thiết station",
+            "theme": "transport"
+          },
+          {
+            "title": "Da Lat–Thap Cham railway",
+            "theme": "transport"
+          },
+          {
+            "title": "Núi Chúa National Park",
+            "theme": "nature"
+          },
+          {
+            "title": "Hàm Thuận Bắc district",
+            "theme": "nature"
+          },
+          {
+            "title": "Southern Vietnam lowland dry forests",
+            "theme": "nature"
+          },
+          {
+            "title": "Ninh Thuận province",
+            "theme": "modern"
+          },
+          {
+            "title": "Yang Po Inu Nagar",
+            "theme": "legends"
+          },
+          {
+            "title": "Thiên Y A Na",
+            "theme": "legends"
+          },
+          {
+            "title": "Đạo Mẫu",
+            "theme": "religion_customs"
+          }
+        ]
+      },
+      "generic_tokens": [
+        "vietnam",
+        "vietnamese"
+      ],
+      "exclude_title_terms": [
+        "vietnam",
+        "vietnamese"
+      ]
     },
     {
       "region_key": "ho_chi_minh_city",
       "display_name": "Ho Chi Minh City",
-      "centre": {"lat": 10.7769, "lng": 106.7009},
+      "centre": {
+        "lat": 10.7769,
+        "lng": 106.7009
+      },
       "radius_km": 45,
       "seed_articles": {
-        "en": ["Ho Chi Minh City", "History of Ho Chi Minh City", "Saigon River", "Cholon", "Vietnamese cuisine"],
-        "vi": ["Thành phố Hồ Chí Minh"]
+        "en": [
+          "Ho Chi Minh City",
+          "History of Ho Chi Minh City",
+          "Saigon River",
+          "Cholon",
+          "Vietnamese cuisine"
+        ],
+        "vi": [
+          "Thành phố Hồ Chí Minh"
+        ]
       },
-      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+      "default_themes": [
+        "history",
+        "modern",
+        "people_economy",
+        "religion_customs",
+        "food",
+        "transport",
+        "nature",
+        "legends",
+        "arts"
+      ],
+      "aliases": [
+        "Saigon",
+        "Sai Gon",
+        "Ho Chi Minh City",
+        "Cholon",
+        "Gia Dinh",
+        "Thu Duc",
+        "Cu Chi",
+        "Can Gio",
+        "Ben Thanh",
+        "Tan Son Nhat",
+        "Mekong Delta"
+      ],
+      "generic_seeds": [
+        "Vietnamese cuisine"
+      ],
+      "topic_hints": {
+        "en": [
+          {
+            "title": "Ho Chi Minh City Opera House",
+            "theme": "arts"
+          },
+          {
+            "title": "Notre-Dame Cathedral Basilica of Saigon",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Bến Thành Market",
+            "theme": "food"
+          },
+          {
+            "title": "Independence Palace",
+            "theme": "history"
+          },
+          {
+            "title": "War Remnants Museum",
+            "theme": "history"
+          },
+          {
+            "title": "Củ Chi tunnels",
+            "theme": "history"
+          },
+          {
+            "title": "Bitexco Financial Tower",
+            "theme": "modern"
+          },
+          {
+            "title": "Chợ Lớn",
+            "theme": "people_economy"
+          },
+          {
+            "title": "Saigon Central Post Office",
+            "theme": "arts"
+          },
+          {
+            "title": "Jade Emperor Pagoda",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Thien Hau Temple of Cholon",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Bánh mì",
+            "theme": "food"
+          },
+          {
+            "title": "Pho",
+            "theme": "food"
+          },
+          {
+            "title": "Fall of Saigon",
+            "theme": "history"
+          },
+          {
+            "title": "Saigon River",
+            "theme": "nature"
+          },
+          {
+            "title": "Cần Giờ Mangrove Forest",
+            "theme": "nature"
+          },
+          {
+            "title": "Tan Son Nhat International Airport",
+            "theme": "transport"
+          },
+          {
+            "title": "Ho Chi Minh City Metro",
+            "theme": "transport"
+          },
+          {
+            "title": "Coffee production in Vietnam",
+            "theme": "food"
+          },
+          {
+            "title": "Tết",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Cần Giờ district",
+            "theme": "nature"
+          },
+          {
+            "title": "Thủ Đức (city)",
+            "theme": "modern"
+          },
+          {
+            "title": "Ho Chi Minh City Museum of Fine Arts",
+            "theme": "arts"
+          },
+          {
+            "title": "Caodaism",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Hoa people in Ho Chi Minh City",
+            "theme": "people_economy"
+          },
+          {
+            "title": "Thiên Y A Na",
+            "theme": "legends"
+          },
+          {
+            "title": "Âu Cơ",
+            "theme": "legends"
+          },
+          {
+            "title": "Lạc Long Quân",
+            "theme": "legends"
+          },
+          {
+            "title": "The Tale of Kieu",
+            "theme": "arts"
+          },
+          {
+            "title": "Đạo Mẫu",
+            "theme": "religion_customs"
+          }
+        ]
+      },
+      "generic_tokens": [
+        "vietnam",
+        "vietnamese",
+        "saigon"
+      ],
+      "exclude_title_terms": [
+        "vietnam",
+        "vietnamese",
+        "ho chi minh$"
+      ]
     },
     {
       "region_key": "boston_ma",
       "display_name": "Boston, Massachusetts",
-      "centre": {"lat": 42.3601, "lng": -71.0589},
+      "centre": {
+        "lat": 42.3601,
+        "lng": -71.0589
+      },
       "radius_km": 35,
       "seed_articles": {
-        "en": ["Boston", "History of Boston", "Economy of Boston", "Freedom Trail", "Massachusetts Bay Transportation Authority", "Big Dig", "New England cuisine"]
+        "en": [
+          "Boston",
+          "History of Boston",
+          "Economy of Boston",
+          "Freedom Trail",
+          "Massachusetts Bay Transportation Authority",
+          "Big Dig",
+          "New England cuisine"
+        ]
       },
-      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+      "default_themes": [
+        "history",
+        "modern",
+        "people_economy",
+        "religion_customs",
+        "food",
+        "transport",
+        "nature",
+        "legends",
+        "arts"
+      ],
+      "aliases": [
+        "Boston",
+        "Massachusetts Bay",
+        "Back Bay",
+        "Beacon Hill",
+        "Charlestown",
+        "MBTA",
+        "Boston Harbor",
+        "Charles River",
+        "Cambridge, Massachusetts",
+        "Beantown"
+      ],
+      "generic_seeds": [
+        "New England cuisine"
+      ],
+      "topic_hints": {
+        "en": [
+          {
+            "title": "Boston Tea Party",
+            "theme": "history"
+          },
+          {
+            "title": "Battle of Bunker Hill",
+            "theme": "history"
+          },
+          {
+            "title": "Paul Revere",
+            "theme": "history"
+          },
+          {
+            "title": "Boston Massacre",
+            "theme": "history"
+          },
+          {
+            "title": "Freedom Trail",
+            "theme": "history"
+          },
+          {
+            "title": "Boston Common",
+            "theme": "nature"
+          },
+          {
+            "title": "Faneuil Hall",
+            "theme": "people_economy"
+          },
+          {
+            "title": "Fenway Park",
+            "theme": "arts"
+          },
+          {
+            "title": "Boston Marathon",
+            "theme": "modern"
+          },
+          {
+            "title": "Boston Harbor",
+            "theme": "transport"
+          },
+          {
+            "title": "Charles River",
+            "theme": "nature"
+          },
+          {
+            "title": "Boston Public Library",
+            "theme": "arts"
+          },
+          {
+            "title": "Museum of Fine Arts, Boston",
+            "theme": "arts"
+          },
+          {
+            "title": "Old North Church",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Massachusetts Institute of Technology",
+            "theme": "modern"
+          },
+          {
+            "title": "Boston Public Garden",
+            "theme": "nature"
+          },
+          {
+            "title": "Boston Light",
+            "theme": "legends"
+          },
+          {
+            "title": "Clam chowder",
+            "theme": "food"
+          },
+          {
+            "title": "Boston cream pie",
+            "theme": "food"
+          },
+          {
+            "title": "Boston baked beans",
+            "theme": "food"
+          },
+          {
+            "title": "Boston Symphony Orchestra",
+            "theme": "arts"
+          },
+          {
+            "title": "Emerald Necklace",
+            "theme": "nature"
+          },
+          {
+            "title": "Boston Harbor Islands National and State Park",
+            "theme": "nature"
+          },
+          {
+            "title": "South Station",
+            "theme": "transport"
+          },
+          {
+            "title": "Logan International Airport",
+            "theme": "transport"
+          },
+          {
+            "title": "History of Irish Americans in Boston",
+            "theme": "people_economy"
+          },
+          {
+            "title": "North End, Boston",
+            "theme": "food"
+          },
+          {
+            "title": "Black Heritage Trail",
+            "theme": "history"
+          },
+          {
+            "title": "Boston Latin School",
+            "theme": "modern"
+          },
+          {
+            "title": "Great Molasses Flood",
+            "theme": "legends"
+          },
+          {
+            "title": "Boston Strangler",
+            "theme": "legends"
+          },
+          {
+            "title": "Sons of Liberty",
+            "theme": "history"
+          },
+          {
+            "title": "Salem witch trials",
+            "theme": "legends"
+          },
+          {
+            "title": "Samuel Adams",
+            "theme": "history"
+          }
+        ]
+      },
+      "generic_tokens": [
+        "boston"
+      ],
+      "exclude_title_terms": [
+        "united states",
+        "american",
+        "massachusetts"
+      ]
     },
     {
       "region_key": "nice_cote_d_azur",
       "display_name": "Nice (Côte d'Azur)",
-      "centre": {"lat": 43.7102, "lng": 7.2620},
+      "centre": {
+        "lat": 43.7102,
+        "lng": 7.262
+      },
       "radius_km": 50,
       "seed_articles": {
-        "en": ["Nice", "History of Nice", "French Riviera", "Alpes-Maritimes", "Niçoise cuisine", "Carnival of Nice"],
-        "fr": ["Nice", "Côte d'Azur", "Histoire de Nice"]
+        "en": [
+          "Nice",
+          "History of Nice",
+          "French Riviera",
+          "Alpes-Maritimes",
+          "Niçoise cuisine",
+          "Carnival of Nice"
+        ],
+        "fr": [
+          "Nice",
+          "Côte d'Azur",
+          "Histoire de Nice"
+        ]
       },
-      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+      "default_themes": [
+        "history",
+        "modern",
+        "people_economy",
+        "religion_customs",
+        "food",
+        "transport",
+        "nature",
+        "legends",
+        "arts"
+      ],
+      "aliases": [
+        "Nice",
+        "Côte d'Azur",
+        "Cote d'Azur",
+        "French Riviera",
+        "Alpes-Maritimes",
+        "Niçois",
+        "Nissa",
+        "Promenade des Anglais",
+        "Cimiez",
+        "Villefranche-sur-Mer",
+        "Menton",
+        "Antibes",
+        "Cannes",
+        "Monaco",
+        "Grasse",
+        "Èze",
+        "Saint-Paul-de-Vence",
+        "Vence"
+      ],
+      "generic_seeds": [],
+      "topic_hints": {
+        "en": [
+          {
+            "title": "Promenade des Anglais",
+            "theme": "arts"
+          },
+          {
+            "title": "Nice Cathedral",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Place Masséna",
+            "theme": "modern"
+          },
+          {
+            "title": "Musée Matisse (Nice)",
+            "theme": "arts"
+          },
+          {
+            "title": "Musée Marc Chagall",
+            "theme": "arts"
+          },
+          {
+            "title": "Russian Orthodox Cathedral, Nice",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Castle of Nice",
+            "theme": "history"
+          },
+          {
+            "title": "Nice Côte d'Azur Airport",
+            "theme": "transport"
+          },
+          {
+            "title": "Salade niçoise",
+            "theme": "food"
+          },
+          {
+            "title": "Socca",
+            "theme": "food"
+          },
+          {
+            "title": "Pissaladière",
+            "theme": "food"
+          },
+          {
+            "title": "Niçard dialect",
+            "theme": "people_economy"
+          },
+          {
+            "title": "County of Nice",
+            "theme": "history"
+          },
+          {
+            "title": "Treaty of Turin (1860)",
+            "theme": "history"
+          },
+          {
+            "title": "Siege of Nice",
+            "theme": "history"
+          },
+          {
+            "title": "Nice Carnival",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Cimiez",
+            "theme": "history"
+          },
+          {
+            "title": "Villefranche-sur-Mer",
+            "theme": "nature"
+          },
+          {
+            "title": "Èze",
+            "theme": "legends"
+          },
+          {
+            "title": "Grasse",
+            "theme": "people_economy"
+          },
+          {
+            "title": "Saint-Paul-de-Vence",
+            "theme": "arts"
+          },
+          {
+            "title": "Fête du Citron",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Chemins de fer de Provence",
+            "theme": "transport"
+          },
+          {
+            "title": "Nice tramway",
+            "theme": "transport"
+          },
+          {
+            "title": "Mercantour National Park",
+            "theme": "nature"
+          },
+          {
+            "title": "Antibes",
+            "theme": "history"
+          },
+          {
+            "title": "Hotel Negresco",
+            "theme": "modern"
+          },
+          {
+            "title": "Provence wine",
+            "theme": "food"
+          },
+          {
+            "title": "Opéra de Nice",
+            "theme": "arts"
+          },
+          {
+            "title": "Catherine Ségurane",
+            "theme": "legends"
+          },
+          {
+            "title": "Saint Reparata",
+            "theme": "legends"
+          },
+          {
+            "title": "Terra Amata (archaeological site)",
+            "theme": "history"
+          },
+          {
+            "title": "Fenocchio",
+            "theme": "food"
+          },
+          {
+            "title": "Gustav-Adolf Mossa",
+            "theme": "arts"
+          }
+        ]
+      },
+      "generic_tokens": [
+        "nice",
+        "niçoise"
+      ],
+      "exclude_title_terms": [
+        "france",
+        "french",
+        "monaco"
+      ]
     },
     {
       "region_key": "san_diego_ca",
       "display_name": "San Diego, California",
-      "centre": {"lat": 32.7157, "lng": -117.1611},
+      "centre": {
+        "lat": 32.7157,
+        "lng": -117.1611
+      },
       "radius_km": 55,
       "seed_articles": {
-        "en": ["San Diego", "History of San Diego", "Economy of San Diego", "San Diego County, California", "Port of San Diego", "San Diego Trolley", "California cuisine"]
+        "en": [
+          "San Diego",
+          "History of San Diego",
+          "Economy of San Diego",
+          "San Diego County, California",
+          "Port of San Diego",
+          "San Diego Trolley",
+          "California cuisine"
+        ]
       },
-      "default_themes": ["history", "modern", "people_economy", "religion_customs", "food", "transport", "nature", "legends", "arts"]
+      "default_themes": [
+        "history",
+        "modern",
+        "people_economy",
+        "religion_customs",
+        "food",
+        "transport",
+        "nature",
+        "legends",
+        "arts"
+      ],
+      "aliases": [
+        "San Diego",
+        "Balboa Park",
+        "La Jolla",
+        "Coronado",
+        "Point Loma",
+        "Old Town San Diego",
+        "Gaslamp Quarter",
+        "Tijuana",
+        "Mission San Diego de Alcalá",
+        "Kumeyaay",
+        "San Diego Bay"
+      ],
+      "generic_seeds": [
+        "California cuisine"
+      ],
+      "topic_hints": {
+        "en": [
+          {
+            "title": "Balboa Park (San Diego)",
+            "theme": "arts"
+          },
+          {
+            "title": "San Diego Zoo",
+            "theme": "nature"
+          },
+          {
+            "title": "Mission San Diego de Alcalá",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Old Town San Diego State Historic Park",
+            "theme": "history"
+          },
+          {
+            "title": "Gaslamp Quarter, San Diego",
+            "theme": "modern"
+          },
+          {
+            "title": "Hotel del Coronado",
+            "theme": "legends"
+          },
+          {
+            "title": "USS Midway Museum",
+            "theme": "history"
+          },
+          {
+            "title": "Cabrillo National Monument",
+            "theme": "history"
+          },
+          {
+            "title": "Kumeyaay",
+            "theme": "people_economy"
+          },
+          {
+            "title": "La Jolla",
+            "theme": "nature"
+          },
+          {
+            "title": "Torrey Pines State Natural Reserve",
+            "theme": "nature"
+          },
+          {
+            "title": "San Diego–Coronado Bridge",
+            "theme": "transport"
+          },
+          {
+            "title": "San Diego Trolley",
+            "theme": "transport"
+          },
+          {
+            "title": "Fish taco",
+            "theme": "food"
+          },
+          {
+            "title": "Naval Base San Diego",
+            "theme": "people_economy"
+          },
+          {
+            "title": "Panama–California Exposition",
+            "theme": "history"
+          },
+          {
+            "title": "Coronado, California",
+            "theme": "modern"
+          },
+          {
+            "title": "San Diego Bay",
+            "theme": "nature"
+          },
+          {
+            "title": "Point Loma, San Diego",
+            "theme": "nature"
+          },
+          {
+            "title": "Mission Bay (San Diego)",
+            "theme": "nature"
+          },
+          {
+            "title": "San Diego Comic-Con",
+            "theme": "arts"
+          },
+          {
+            "title": "Chicano Park",
+            "theme": "arts"
+          },
+          {
+            "title": "Sunset Cliffs, San Diego",
+            "theme": "nature"
+          },
+          {
+            "title": "San Diego International Airport",
+            "theme": "transport"
+          },
+          {
+            "title": "Beer in San Diego County, California",
+            "theme": "food"
+          },
+          {
+            "title": "Scripps Institution of Oceanography",
+            "theme": "people_economy"
+          },
+          {
+            "title": "SeaWorld San Diego",
+            "theme": "modern"
+          },
+          {
+            "title": "Juan Rodríguez Cabrillo",
+            "theme": "history"
+          },
+          {
+            "title": "Whaley House (San Diego, California)",
+            "theme": "legends"
+          },
+          {
+            "title": "Kate Morgan",
+            "theme": "legends"
+          },
+          {
+            "title": "Kumeyaay traditional narratives",
+            "theme": "legends"
+          },
+          {
+            "title": "Thomas Whaley",
+            "theme": "history"
+          },
+          {
+            "title": "Mission San Luis Rey de Francia",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Roman Catholic Diocese of San Diego",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "San Diego California Temple",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Self-Realization Fellowship Encinitas Hermitage and Meditation Gardens",
+            "theme": "religion_customs"
+          },
+          {
+            "title": "Mission burrito",
+            "theme": "food"
+          },
+          {
+            "title": "Hispanics and Latinos in San Diego",
+            "theme": "people_economy"
+          },
+          {
+            "title": "San Diego–Tijuana",
+            "theme": "people_economy"
+          }
+        ]
+      },
+      "generic_tokens": [
+        "diego",
+        "california"
+      ],
+      "exclude_title_terms": [
+        "united states",
+        "american",
+        "california"
+      ]
     }
   ]
 }
