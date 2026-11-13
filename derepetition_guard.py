@@ -940,6 +940,22 @@ def _carries_magnitude_number(sentence: str) -> bool:
     return bool(_MAGNITUDE_NUMBER_RE.search(sentence or ""))
 
 
+def _title_words_906e(title: str):
+    import unicodedata
+    t = unicodedata.normalize('NFKD', title or '')
+    t = ''.join(c for c in t if not unicodedata.combining(c)).lower()
+    return [w for w in re.findall(r'[a-z0-9]+', t) if len(w) >= 4]
+
+
+def _names_stop_906e(sentence: str, title: str) -> bool:
+    """[LOCAL-906E] The sentence names (at least half of) the stop title's distinctive words."""
+    want = _title_words_906e(title)
+    if not want:
+        return False
+    have = set(_title_words_906e(sentence))
+    return sum(1 for w in want if w in have) * 2 >= len(want)
+
+
 def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
     """Delete later re-tellings of a fact already told at an earlier stop.
 
@@ -959,6 +975,7 @@ def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
     out, actions = tour_text, []
     # One sentence can carry several repeated signatures; remove it once.
     handled = set()
+    _kept_906e = set()          # [LOCAL-906E] sentences kept at their owner stop (their first telling was removed)
     for r in repeats:
         # [LOCAL-880C] Within a stop, the later telling is normally the repeat to
         # drop — but when that later telling carries a SOURCED magnitude number
@@ -972,6 +989,21 @@ def strip_repeated_facts(tour_text: str, min_remaining_words: int = 60):
             if _repeat_has_num and not _first_has_num:
                 r = dict(r, sentence=r['first_sentence'],
                          first_sentence=r['sentence'])
+        # [LOCAL-906E] A fact belongs to the stop whose subject it names. The statue's size was told at the
+        # mountain stop (first) and at the statue stop; D533 removed the statue stop's, then the grounding gate
+        # dropped the mountain stop's as off-topic: told nowhere. When the FIRST telling names the repeat stop's
+        # title and not its own stop's, keep it at the repeat stop and remove the first telling instead.
+        if r['sentence'] in _kept_906e:
+            continue                                  # its first telling was removed instead (swap, above)
+        if not r.get('within_stop') and r.get('first_sentence') and r['first_stop'] != r['repeat_stop']:
+            _bl = dict(_stop_blocks(out))
+            _t_first = (_bl.get(r['first_stop'], '').split('\n', 1)[0]).strip()
+            _t_rep = (_bl.get(r['repeat_stop'], '').split('\n', 1)[0]).strip()
+            if (_names_stop_906e(r['first_sentence'], _t_rep) and not _names_stop_906e(r['first_sentence'], _t_first)
+                    and r['first_sentence'] in _bl.get(r['first_stop'], '')):
+                _kept_906e.add(r['sentence'])
+                r = dict(r, sentence=r['first_sentence'], first_sentence=r['sentence'],
+                         first_stop=r['repeat_stop'], repeat_stop=r['first_stop'], owner_swapped_906e=True)
         sent = r['sentence']
         if sent in handled:
             continue

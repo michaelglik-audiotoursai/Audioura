@@ -644,6 +644,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          scope_precision: str = "",
                          coarse_center: Optional[Tuple[float, float]] = None,
                          province_box: Optional[Sequence[float]] = None,
+                         scope_bbox_is_fallback: bool = False,
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -708,9 +709,15 @@ def snap_poi_coordinates(poi_list: List[Dict],
         scope bbox, else within 100 km of the coarse centre."""
         if ref is None:
             return None
-        if scope_bbox and len(scope_bbox) >= 4:
-            return bool(scope_bbox[0] <= ref[0] <= scope_bbox[1] and scope_bbox[2] <= ref[1] <= scope_bbox[3])
         _c = coarse_center or scope_center
+        if scope_bbox and len(scope_bbox) >= 4:
+            if scope_bbox[0] <= ref[0] <= scope_bbox[1] and scope_bbox[2] <= ref[1] <= scope_bbox[3]:
+                return True
+            # [LOCAL-906E] a FALLBACK box (the province box, padded) never refuses what the earlier rules accept:
+            # a reference within the coarse-centre radius is in scope whatever the box says.
+            if scope_bbox_is_fallback and _c and _haversine_m(ref, _c) / 1000.0 <= _MODEL_PIN_SCOPE_KM:
+                return True
+            return False
         if _c:
             return _haversine_m(ref, _c) / 1000.0 <= _MODEL_PIN_SCOPE_KM
         return None
