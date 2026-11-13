@@ -1916,11 +1916,69 @@ def same_fact(a: str, b: str, title: str = "") -> bool:
     and >= 0.35 of the smaller set)."""
     if _near(a, b):
         return True
+    if same_event(a, b, title):
+        return True
     ta, tb = _fact_tokens(a, title), _fact_tokens(b, title)
     if not ta or not tb:
         return False
     shared = len(ta & tb)
     return shared >= 5 and shared / min(len(ta), len(tb)) >= 0.35
+
+
+_HONORIFIC_906D = {"master", "monk", "king", "queen", "emperor", "empress", "lord", "lady", "saint", "venerable",
+                   "abbot", "prince", "princess", "sir", "dr", "general", "president", "sage"}
+_WORD_906D = re.compile(r"[^\W\d_][^\W_]*")
+_NOT_NAME_906D = {"in", "the", "a", "an", "at", "on", "of", "and", "nearby", "here", "there", "it", "he", "she",
+                  "they", "this", "that", "his", "her", "its", "during", "after", "before", "by", "from", "to",
+                  "with", "for", "as", "when", "while", "today", "later", "then", "also", "but", "zen"}
+
+
+def _person_names_906d(sentence: str, skip: set) -> set:
+    """Person names a sentence carries, as tuples of folded tokens: a run of two or more capitalised tokens, or an
+    honorific (Master / Monk / King ...) with the capitalised name after it (honorific dropped). A run ends at any
+    punctuation or lower-case word; the stop's own title tokens never count as a name."""
+    names, run, last_end = set(), [], 0
+    text = sentence or ""
+
+    def flush():
+        if run:
+            toks = [fold(w) for w in run]
+            hon = toks[0] in _HONORIFIC_906D
+            core = tuple(t for t in (toks[1:] if hon else toks) if t and t not in skip)
+            if core and (hon or len(core) >= 2):
+                names.add(core)
+        run.clear()
+
+    for m in _WORD_906D.finditer(text):
+        w = m.group(0)
+        if re.search(r"[^\w\s'\u2019-]", text[last_end:m.start()]):
+            flush()
+        last_end = m.end()
+        if w[:1].isupper() and fold(w) not in _NOT_NAME_906D:
+            run.append(w)
+        else:
+            flush()
+    flush()
+    return names
+
+
+def same_event(a: str, b: str, title: str = "") -> bool:
+    """[LOCAL-906D] Two sentences are ONE event, whatever their word overlap, when they carry the same 4-digit
+    year AND the same person (a capitalised multi-token name, or Master / Monk / King <Name>) AND the stop's own
+    place/title token. (Tour 552: "In 1872, Master X ... chose <Mountain> for seclusion" and "In 1872, Master X
+    quietly made his way up <Mountain>" share only the year and the name.) Two different events in one year need a
+    different person or no common place token and are not caught."""
+    ya, yb = set(_YEAR4_906B.findall(a or "")), set(_YEAR4_906B.findall(b or ""))
+    if not (ya & yb):
+        return False
+    skip = set(_content_tokens(title))
+    na, nb = _person_names_906d(a, skip), _person_names_906d(b, skip)
+    if not any(x == y or set(x) <= set(y) or set(y) <= set(x) for x in na for y in nb):
+        return False
+    tt = skip or set()
+    if not tt:
+        return False
+    return bool(tt & _content_tokens(a)) and bool(tt & _content_tokens(b))
 
 
 _YEAR4_906B = re.compile(r"\b(?:1[0-9]{3}|20[0-9]{2})\b")

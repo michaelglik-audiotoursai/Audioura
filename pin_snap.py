@@ -320,6 +320,8 @@ def snap_pin(title: str,
              tour_language: str = "en",
              landmark_fn: Optional[Callable] = None,
              venue_fallback_coordinate: Optional[Tuple[float, float]] = None,
+             province_box: Optional[Sequence[float]] = None,
+             stop_type: str = "",
              ) -> Dict:
     """Decide the snap for ONE stop.
 
@@ -472,7 +474,22 @@ def snap_pin(title: str,
     # references (Wikidata P625 / the landmark table) are the place's own identity
     # and skip this check. When no name is available we cannot verify by name and
     # defer to the stops-centroid bound below.
-    if require_name_match and not authority and ref_name:
+    # [LOCAL-906D item 3] A FACILITY named after a natural-feature / area stop ("<Mountain> Cable Car Station"
+    # for the stop "<Mountain>") is the same place: accepted as an APPROXIMATE pin, only inside the province box.
+    # Every other same-name/same-class case (City Hall) keeps the refusal below.
+    _approx_906d = False
+    if require_name_match and not authority and ref_name and province_box \
+            and not _name_matches_reference(title, ref_name):
+        try:
+            import pin_fallback_906d as _pf906d
+            if _pf906d.in_box(ref_pt, province_box) and _pf906d.facility_of_same_place(title, ref_name, stop_type):
+                _approx_906d = True
+                out["approx_facility_906d"] = True
+                print(f"  [LOCAL-906D] approximate reference '{ref_name}' accepted for '{title}' "
+                      f"(facility of the same place)")
+        except Exception:
+            _approx_906d = False
+    if require_name_match and not authority and ref_name and not _approx_906d:
         if not _name_matches_reference(title, ref_name):
             # [LOCAL-813 Cause C] A refused generic reference (e.g. Belvedere →
             # "Lower Belvedere") leaves an artwork stop with no identity. Prefer
@@ -495,7 +512,7 @@ def snap_pin(title: str,
     # 4.8 km south of that cluster is a wrong building — refuse and keep the pin.
     # Authority references are trusted (the place's own P625). Disabled when no
     # stops_centroid is supplied (unit tests that exercise only scope_center).
-    if (not authority and stops_centroid and max_centroid_km):
+    if (not authority and not _approx_906d and stops_centroid and max_centroid_km):
         _cd = _haversine_m(ref_pt, stops_centroid) / 1000.0
         if _cd > max_centroid_km:
             vf_out = _apply_venue_fallback(
@@ -591,6 +608,23 @@ def _snap_outside_scope(shipped, ref, scope_precision: str = "", route_box=None)
     return f"moves the pin {km:.0f} km > {radius:.0f} km" if km > radius else ""
 
 
+def _stop_type_906d(poi) -> str:
+    try:
+        import pin_fallback_906d as _pf
+        return _pf.stop_type_text(poi)
+    except Exception:
+        return ""
+
+
+def _far_from_province_906d(coord, province_box) -> bool:
+    """[LOCAL-906D] an unverified model pin OUTSIDE the province box: its move is judged by the scope, not capped."""
+    try:
+        import pin_fallback_906d as _pf
+        return bool(province_box) and coord is not None and not _pf.in_box(coord, province_box)
+    except Exception:
+        return False
+
+
 def snap_poi_coordinates(poi_list: List[Dict],
                          scope: str = "",
                          scope_center: Optional[Tuple[float, float]] = None,
@@ -609,6 +643,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                          route_refs: Optional[Dict[int, Dict]] = None,
                          scope_precision: str = "",
                          coarse_center: Optional[Tuple[float, float]] = None,
+                         province_box: Optional[Sequence[float]] = None,
                          ) -> Tuple[List[Dict], List[Dict]]:
     """Snap every stop in ``poi_list`` to its reference when the shipped pin is
     more than ``threshold_m`` away AND the reference is trustworthy. Mutates each
@@ -732,7 +767,9 @@ def snap_poi_coordinates(poi_list: List[Dict],
                        scope_bbox=scope_bbox,
                        tour_language=tour_language,
                        landmark_fn=landmark_fn,
-                       venue_fallback_coordinate=venue_fallback_coordinate)
+                       venue_fallback_coordinate=venue_fallback_coordinate,
+                       province_box=province_box,
+                       stop_type=_stop_type_906d(poi))
         # [LOCAL-897] A stop whose title names a route place (or that follows the arrival at the
         # destination) and found no authority of its own uses that place's geocode as its reference.
         _rr = (route_refs or {}).get(i)
@@ -759,7 +796,7 @@ def snap_poi_coordinates(poi_list: List[Dict],
                 row.update({"snapped": False, "new_coordinate": None,
                             "reason": f"reference {_nc902[0]:.4f},{_nc902[1]:.4f} outside the scope — refused "
                                       f"(wrong same-name place)"})
-            elif _in902 and _short_tour_902:
+            elif _in902 and (_short_tour_902 or _far_from_province_906d(coord, province_box)):
                 # [LOCAL-902/LEAD] only on short tours (<= 2 pinned stops): on a larger tour the 900B
                 # scope radius (CITY 25 km, DISTRICT 15 km) still bounds a model pin's move.
                 # [LEAD-905] no cap on the MOVE itself: the reference is already judged in scope, and an
@@ -794,6 +831,9 @@ def snap_poi_coordinates(poi_list: List[Dict],
                 poi["longitude"] = lng
             poi["_pin_snapped"] = True
             poi["_pin_snap_source"] = row["source"]
+            if row.get("approx_facility_906d"):
+                poi["coordinates_approximate"] = True
+                poi["_pin_approx_facility_906d"] = True
             if row.get("accepted_902"):
                 emit(f"[LOCAL-902] snap accepted {title} {_haversine_m(coord, (lat, lng)) / 1000.0:.0f} km: "
                      f"model pins unverified, reference in scope")

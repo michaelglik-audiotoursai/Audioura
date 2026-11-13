@@ -30763,6 +30763,36 @@ REWRITE RULES (all mandatory):
                     _coarse_center_902 = (_ar902.place_ref_lat, _ar902.place_ref_lng)
         except Exception:
             _coarse_center_902 = None
+        # [LOCAL-906D items 2-3] PROVINCE BOX. When the city-level bbox was rejected ("not a city") the snap had
+        # no bbox at all: use the scope province's bounding box instead, and name the unverified model pins that
+        # lie outside it.
+        _prov_box_906d, _prov_name_906d, _prov_ctr_906d = None, "", None
+        try:
+            if _pin_bbox_803 is None and not _route_box_896:
+                import pin_fallback_906d as _pf906d
+                _ar906d = locals().get('_area')
+                _prov_name_906d = (getattr(_ar906d, 'city_name', '') or '').strip()
+                _country_906d = ''
+                try:
+                    from city_scope import is_country_name as _icn906d
+                    _tail906d = [x.strip() for x in (location or '').split(',') if x.strip()]
+                    if _tail906d and _icn906d(_tail906d[-1]):
+                        _country_906d = _tail906d[-1]
+                    if not _prov_name_906d and len(_tail906d) >= 2:
+                        _prov_name_906d = _tail906d[-2] if _country_906d else _tail906d[-1]
+                except Exception:
+                    pass
+                _pb906d = _pf906d.province_box(_prov_name_906d, _country_906d) if _prov_name_906d else None
+                if _pb906d:
+                    _prov_box_906d, _prov_ctr_906d = _pb906d['box'], _pb906d['center']
+                    _pin_bbox_803 = list(_prov_box_906d)
+                    # (the centre stays None: a province centre would make 791C's 15 km scope-sanity refuse the
+                    # real site of a mountain 26 km from it; the box is the scope test)
+                    print(f"  [LOCAL-906D] province box for {_prov_name_906d!r}: {_prov_box_906d} "
+                          f"({_pb906d['source']}) used as the snap bbox (no city-level bbox)")
+                    _pf906d.flag_far_pins(poi_list, _prov_box_906d, _prov_name_906d, log=print)
+        except Exception as _e906d:
+            print(f"  [LOCAL-906D] province box skipped (non-fatal): {_e906d}")
         print(f"  [LOCAL-791C] pin snap: scope={_pin_scope_791c!r} "
               f"center={_pin_center_791c} bbox={_pin_bbox_803} "
               f"venue_fallback={_pin_venue_fallback_813} "
@@ -30775,10 +30805,24 @@ REWRITE RULES (all mandatory):
             route_refs=_route_refs_897,
             scope_precision=((intent.get('scope_precision') or '') if isinstance(intent, dict) else ''),
             coarse_center=_coarse_center_902,
+            province_box=_prov_box_906d,
             is_user_stop_fn=lambda _p: bool(
                 _p.get('user_explicit') or _p.get('_anchor')
                 or _is_user_stop_title(_p.get('name'))),
             log=print)
+        try:   # [LOCAL-906D item 4] never leave an unverified pin outside the scope province
+            if _prov_box_906d:
+                import pin_fallback_906d as _pf906d2
+                _moved906d = _pf906d2.last_resort_pins(poi_list, _snap_rows_791c, _prov_box_906d, _prov_ctr_906d,
+                                                       _prov_name_906d, log=print)
+                if _moved906d:
+                    import single_place_903 as _sp906d
+                    _fp906d = _sp906d.tour_pin(poi_list, first_poi_coordinates)
+                    if _fp906d != first_poi_coordinates:
+                        print(f"  [LOCAL-906D] tour pin {first_poi_coordinates} -> {_fp906d} (follows stop 1)")
+                        first_poi_coordinates = _fp906d
+        except Exception as _e906d2:
+            print(f"  [LOCAL-906D] last-resort pin skipped (non-fatal): {_e906d2}")
         try:   # [LOCAL-903] a snapped, verified place supersedes the place reference; a single place is one place
             import single_place_903 as _sp903
             _ar903 = locals().get('_area')
@@ -30811,6 +30855,17 @@ REWRITE RULES (all mandatory):
             _va902(poi_list, _snap_rows_791c, scope=_pin_scope_791c, log=print)
         except Exception as _va902e:
             print(f"  [LOCAL-902] address check skipped (non-fatal): {_va902e}")
+        try:   # [LOCAL-906D item 5] the address follows the pin: no district the province box cannot confirm
+            if _prov_box_906d:
+                import pin_fallback_906d as _pf906d3
+                try:
+                    from geocode_stops import reverse_address as _rev906d
+                except Exception:
+                    _rev906d = None
+                for _p906d in poi_list:
+                    _pf906d3.address_follows_pin(_p906d, _prov_name_906d, _country_906d, reverse_fn=_rev906d, log=print)
+        except Exception as _e906d3:
+            print(f"  [LOCAL-906D] address follow skipped (non-fatal): {_e906d3}")
         _n_snapped_791c = sum(1 for r in _snap_rows_791c if r.get("snapped"))
         _n_noref_791c = sum(1 for r in _snap_rows_791c if r.get("reference") is None)
         # [LOCAL-858] Stops whose centroid pin was cleared (never shipped as a real
