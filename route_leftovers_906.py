@@ -594,6 +594,7 @@ def content_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = N
     t = drop_unsupported_claims(tour_text, evidence_by_title, log)
     t = drop_contradicting_orientation(t, log)
     t = drop_repeated_sentences(t, log)
+    t = rc.drop_within_stop_duplicates(t, log)          # [LOCAL-906B] the same fact twice in one stop
     t = tone_first_stop(t, None, log)
     t = drop_template_closing(t, log)
     return t

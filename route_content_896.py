@@ -1477,9 +1477,55 @@ _EMPTY_CLAUSE = re.compile(r"(?i),\s*,|\b(?:to|of|at|by|with|than)\s*,\s*(?:meas
                            r"stretching|reaching|which|and)\b|\b(?:covers?|spans?)\s+of\s+the\b")
 
 
+# [LOCAL-906B] A sentence has a verb. A small list of generic verb forms; the -ed / -s heuristics below catch the rest.
+_VERBS_906B = frozenset("""s re ve ll d m is are was were be been being am has have had do does did can could will would shall should may might
+    must stands stand stood lies lie lay lain sits sit sat measures measure measured rises rise rose risen runs run ran
+    sits holds hold held houses house housed contains contain contained features feature featured offers offer offered
+    overlooks overlook overlooked draws draw drew attracts attract attracted became become becomes begins begin began
+    begun built build builds takes take took makes make made gives give gave gets get got goes go went comes come came
+    sees see saw shows show showed brings bring brought keeps keep kept leads lead led marks mark reaches reach reached
+    covers cover spans span stretches stretch sits belongs belong remains remain remained serves serve stays stay
+    tells tell told lets let hosts host lived live lives known called named reads read finds find found grows grow grew
+    welcomes welcome visit visits explore climb walk look listen notice imagine remember follow enter stop head continue
+    turn go see take find try sought wrote written won lost fell fallen fought sent spent taught thought wore worn struck
+    swept slept met paid put set shot sang sung sank flew flown hid hidden hung lit rode rang rebuilt left meant dug
+    bore bought caught chose chosen drove driven ate eaten forgot gave given knew known laid paid ran shone spoke spoken
+    stole threw thrown understood woke woven wove sold shed shut cut hit hurt split spread cost burst bent bound bled
+    blew broke broken dealt dived fed felt fled forbade forgave froze ground heard lent lay led shook sat slid spun
+    sprang stuck stung strode strove swore swam swung tore trod wept wound withdrew""".split())
+_ENGLISH_FN_906B = frozenset("the of and in a an to is are was were with for on at by from that this it its as".split())
+_NOT_VERB_PREV_906B = frozenset("the a an of in on at by to for with from and or but its their his her our your this that "
+                                "these those some many other all most more few several both each every no one two three "
+                                "four five six seven eight nine ten largest greatest oldest tallest biggest highest".split())
+
+
+def _looks_english_906b(words: List[str]) -> bool:
+    return sum(1 for w in words if w in _ENGLISH_FN_906B) >= 2
+
+
+def is_verbless(sentence: str) -> bool:
+    """[LOCAL-906B] True when an English-looking sentence of >= 5 words holds no verb: no form from the generic list,
+    no -ed word (past tense / participle), and no -s word that follows a noun-like word (3rd person). A sentence that
+    does not look English is never judged here (the list is English)."""
+    x = (sentence or "").strip()
+    words = _words(x)
+    if len(words) < 5 or not _looks_english_906b(words) or _CLOSING_LINE.match(x):
+        return False
+    for i, w in enumerate(words):
+        if w in _VERBS_906B:
+            return False
+        if len(w) > 4 and w.endswith("ed") and not w.endswith("eed"):
+            return False
+        if i > 0 and len(w) > 3 and w.endswith("s") and not w.endswith(("ss", "us", "is")) \
+                and words[i - 1] not in _NOT_VERB_PREV_906B and not words[i - 1].endswith(("ing", "est")) \
+                and not words[i - 1].isdigit():
+            return False
+    return True
+
+
 def is_fragment(sentence: str) -> bool:
     """A sentence that is not whole: it ends on a preposition / article / dangling verb, opens with a comma or a
-    bare participle, or holds an empty clause between commas."""
+    bare participle, holds an empty clause between commas, or ([LOCAL-906B]) has no verb at all."""
     x = (sentence or "").strip()
     if not x:
         return False
@@ -1491,7 +1537,7 @@ def is_fragment(sentence: str) -> bool:
     last = _words(core.split()[-1]) if core.split() else []
     if last and last[-1] in _DANGLE_END:
         return True
-    return bool(_EMPTY_CLAUSE.search(x))
+    return bool(_EMPTY_CLAUSE.search(x)) or is_verbless(x)
 
 
 def drop_fragments(tour_text: str, log: Optional[Callable] = None, force: bool = False) -> str:
@@ -1542,13 +1588,20 @@ def drop_carry_filler(tour_text: str, log: Optional[Callable] = None) -> str:
     if not tour_text or "carry with you" not in tour_text.lower():
         return tour_text
     out = []
+    stop_no = "?"
     for ln in tour_text.split("\n"):
+        mh = re.match(r"^Stop\s+(\d+)\s*:", ln)
+        if mh:
+            stop_no = mh.group(1)
         if "carry with you" in ln.lower():
             sents = split_sentences(ln)
             keep = [x for x in sents if not _CARRY_FILLER.match(x)]
             if len(keep) != len(sents):
                 if log:
-                    log("  [LOCAL-900B] closing filler '... is one you might carry with you.' dropped")
+                    for x in sents:                                         # [LOCAL-906B] every removal is logged
+                        if x not in keep:
+                            log(f'  [LOCAL-900B] Stop {stop_no}: dropped "{x[:80]}" (closing filler "... is one you '
+                                f'might carry with you.")')
                 ln = " ".join(keep)
                 if not ln.strip():
                     continue
@@ -1778,6 +1831,93 @@ def _near(a: str, b: str, thr: float = 0.6) -> bool:
     return len(ta & tb) / min(len(ta), len(tb)) >= thr
 
 
+# ── [LOCAL-906B] the same fact twice in one stop ────────────────────────────────────────────────────────
+_DATE_WORDS_906B = {"century", "early", "late", "mid", "around", "circa", "decade", "decades", "year", "years"}
+_ORDINAL_906B = re.compile(r"^\d+(?:st|nd|rd|th|s)?$")
+
+
+def _fact_tokens(sentence: str, title: str = "") -> set:
+    """Content tokens with the date expression ("1872", "the late 19th century") and the stop's own title words
+    set aside: what is left is WHAT the sentence says, not when."""
+    skip = _content_tokens(title)
+    return {t for t in _content_tokens(sentence)
+            if t not in _DATE_WORDS_906B and not _ORDINAL_906B.match(t) and t not in skip}
+
+
+def same_fact(a: str, b: str, title: str = "") -> bool:
+    """Two sentences of one stop that give the same fact: a paraphrase (>= 0.6 of the smaller content set shared,
+    ``_near``) or the same statement with a different date ("In 1872, a sage ... retreated into the forest" /
+    "In the late 19th century, a great sage ... secluded himself": >= 5 shared non-date, non-title content words
+    and >= 0.35 of the smaller set)."""
+    if _near(a, b):
+        return True
+    ta, tb = _fact_tokens(a, title), _fact_tokens(b, title)
+    if not ta or not tb:
+        return False
+    shared = len(ta & tb)
+    return shared >= 5 and shared / min(len(ta), len(tb)) >= 0.35
+
+
+_YEAR4_906B = re.compile(r"\b(?:1[0-9]{3}|20[0-9]{2})\b")
+
+
+def specificity(sentence: str) -> int:
+    """How specific a sentence is: exact years weigh most, then other numbers, then proper names (capitalised
+    words that do not open the sentence)."""
+    x = sentence or ""
+    words = re.findall(r"[^\W_]+", x)
+    caps = sum(1 for i, w in enumerate(words) if i > 0 and w[:1].isupper())
+    nums = len(re.findall(r"\b\d[\d,.]*\b", x))
+    return 3 * len(_YEAR4_906B.findall(x)) + nums + caps
+
+
+def drop_within_stop_duplicates(tour_text: str, log: Optional[Callable] = None) -> str:
+    """[LOCAL-906B] Within ONE stop, two sentences giving the same fact (``same_fact``, a different date included)
+    are one too many: the more specific one stays (later one on a tie), the other is dropped and logged. A stop is
+    never emptied (one of the pair always stays)."""
+    if not tour_text:
+        return tour_text
+    try:
+        blocks = _stop_blocks(tour_text)
+        pieces, pos = [], 0
+        for k, (s, e, num, title) in enumerate(blocks):
+            pieces.append(tour_text[pos:s])
+            pos = e
+            block = tour_text[s:e]
+            lines = block.split("\n")
+            last = k == len(blocks) - 1
+            idx = _prose_lines(lines, last)
+            sents = [(i, x) for i in idx for x in split_sentences(lines[i]) if not _CLOSING_LINE.match(x)]
+            drop: set = set()                                   # positions in ``sents``
+            for a in range(len(sents)):
+                for b in range(a + 1, len(sents)):
+                    xa, xb = sents[a][1], sents[b][1]
+                    if a in drop or b in drop or not same_fact(xa, xb, title):
+                        continue
+                    la, lb = (a, b) if specificity(xa) < specificity(xb) else (b, a)
+                    drop.add(la)
+                    if log:
+                        log(f'  [LOCAL-906B] Stop {num}: dropped "{sents[la][1][:80]}" (same fact as '
+                            f'"{sents[lb][1][:40]}..." in this stop; the more specific sentence stays)')
+            if drop:
+                per_line: Dict[int, List[str]] = {i: [] for i in idx}
+                for pos_i, (i, x) in enumerate(sents):
+                    if pos_i not in drop:
+                        per_line[i].append(x)
+                for i in idx:
+                    closing = [x for x in split_sentences(lines[i]) if _CLOSING_LINE.match(x)]
+                    new = " ".join(per_line[i] + closing)
+                    lines[i] = new if new.strip() else None
+                block = re.sub(r"\n{3,}", "\n\n", "\n".join(x for x in lines if x is not None))
+            pieces.append(block)
+        pieces.append(tour_text[pos:])
+        return "".join(pieces)
+    except Exception as err:  # pragma: no cover
+        if log:
+            log(f"  [LOCAL-906B] within-stop duplicate guard skipped (non-fatal): {err}")
+        return tour_text
+
+
 def _evidence_candidates(ev: str, title: str) -> List[str]:
     """Plain fact sentences of the stop's OWN evidence, richest first: the 885/888 refill path
     (``aboutness.refill_facts``), then the 894B snippet path, then the 873C evidence sentences."""
@@ -1856,8 +1996,8 @@ def refill_thin_stops(before: str, after: str, evidence_by_title: Optional[Dict[
                     return False
                 if is_mood_filler(x, set()) or _has_travel(x) or is_offsite_suggestion(x, set()):
                     return False
-                if any(_near(x, d) for d in lost) or any(_near(x, h) for h in (_have or have)):
-                    return False
+                if any(_near(x, d) for d in lost) or any(same_fact(x, h, title) for h in (_have or have)):
+                    return False   # [LOCAL-906B] same fact, a different date, counts
                 return fold(x) not in used
 
             stage, added = "", []
