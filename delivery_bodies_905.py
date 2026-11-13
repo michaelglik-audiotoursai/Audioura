@@ -43,11 +43,21 @@ def _blocked_906f(title: str, sentence: str) -> bool:
         return False
 
 
-def _own_evidence_sentence(title: str, ev_map: Dict[str, str], rc) -> Optional[str]:
+def _bar_906k(s: str, title: str, blob: str, tour: Optional[str], log) -> bool:
+    """[LOCAL-906K] True = the sentence fails the refill quality bar (logged)."""
+    try:
+        import refill_quality_906k as _k
+        return _k.reject_logged(s, title, tour, log, "?", _k.source_of(s, blob, title), "", bool(blob))
+    except Exception:  # pragma: no cover
+        return False
+
+
+def _own_evidence_sentence(title: str, ev_map: Dict[str, str], rc, tour: Optional[str] = None, log=None) -> Optional[str]:
     blob = ev_map.get(rc.fold(title)) or ""
     for s in rc.split_sentences(blob):
         if (6 <= len(s.split()) <= 40 and s[-1:] in ".!?" and not rc.is_fragment(s)
-                and not rc.is_mood_filler(s, set()) and not _blocked_906f(title, s)):
+                and not rc.is_mood_filler(s, set()) and not _blocked_906f(title, s)
+                and not _bar_906k(s, title, blob, tour, log)):
             return s
     return None
 
@@ -87,7 +97,7 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
             if _has_content(lines, last, rc):
                 out.append(block)
                 continue
-            body = _own_evidence_sentence(title, ev_map, rc)
+            body = _own_evidence_sentence(title, ev_map, rc, text, emit)
             how = "own evidence"
             if not body:
                 try:
@@ -95,6 +105,8 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                     neigh = pn.neighbour_sentence(pn.short_place_name(title),
                                                   rc._neighbour_evidence(blocks, k, ev_map, text), rc.split_sentences)
                 except Exception:
+                    neigh = None
+                if neigh and _bar_906k(neigh, title, "", text, emit):
                     neigh = None
                 body, how = neigh, "neighbour sentence"
             if body and _blocked_906f(title, body):

@@ -19,6 +19,7 @@ import unicodedata
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 import leftovers_906c as c
+import refill_quality_906k as _k906
 import route_content_896 as rc
 
 TAG = "[LOCAL-906F]"
@@ -591,6 +592,9 @@ def drop_promo(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = Non
                 if is_promo(x) and not (venue and _verified_fact(x, ev)):
                     emit(f'  {TAG} Stop {st["num"]}: promo copy dropped: "{x[:80]}"')
                     edits[(i, j)] = []
+                elif _k906.is_venue_promo(x, st["title"]):             # [LOCAL-906K] a venue plug / "with or without a guide"
+                    emit(f'  [LOCAL-906K] Stop {st["num"]}: venue promo dropped: "{x[:80]}"')
+                    edits[(i, j)] = []
             return edits
         return _each_stop(tour_text, fn)
     except Exception as err:  # pragma: no cover
@@ -911,7 +915,10 @@ def refill_thin_stops(tour_text: str, evidence_by_title: Optional[Dict[str, str]
             blob = rc._ev_for(ev_map, title) or ""
             if not blob.strip():
                 return {}
-            pool = kfc.own_prose_sentences(blob, title) or rc.split_sentences(blob)
+            pool = kfc.own_prose_sentences(blob, title)
+            _src = "article"
+            if not pool:
+                pool, _src = rc.split_sentences(blob), "snippet"        # [LOCAL-906K] a search snippet must clear a higher bar
             have = [x for _i, _j, x in flat]
             others = [y for o in all_ if o["title"] != title for _a, _b, y in o["flat"]]
             added: List[str] = []
@@ -923,6 +930,8 @@ def refill_thin_stops(tour_text: str, evidence_by_title: Optional[Dict[str, str]
                     continue
                 if _PRON.search(cand) or _FIRST_PERSON.search(cand) or is_promo(cand) or _LEAD.match(cand):
                     continue
+                if _k906.reject_logged(cand, title, tour_text, emit, st["num"], _src, st.get("type", ""), True):
+                    continue                       # [LOCAL-906K] the refill quality bar (reason logged)
                 if kfc.is_denied(title, cand, blob) or kfc.deterministic_unsupported(cand, blob, title):
                     continue
                 if c.record_claim(cand) and c.record_support(cand, blob, title, c._entries_for(title)) == "bad":
@@ -965,4 +974,5 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
     t = fix_proper_article(t, log)
     t = fix_orphan_compounds(t, log)
     t = repair_person_pronoun(t, evidence_by_title, log)
+    t = _k906.run_pass(t, evidence_by_title, log)          # [LOCAL-906K] mode words, conflicting measures
     return t
