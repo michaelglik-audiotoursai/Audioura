@@ -878,6 +878,12 @@ def regenerate_body_with_story(
     if isinstance(sents, str):
         sents = _sentences(sents)
     sents = [str(x).strip() for x in sents if str(x).strip()]
+    try:   # [LOCAL-906F] a claim a contradiction gate blocked earlier does not come back through the regeneration
+        import key_fact_coverage as _kfc906f
+        sents, _den = _kfc906f.strip_denied(title, sents, "\n".join(facts or []) if isinstance(facts, list) else "",
+                                            log, "880 regen")
+    except Exception:
+        pass
     if len(sents) < min_sentences:
         return None, rep
     joined = " ".join(sents)

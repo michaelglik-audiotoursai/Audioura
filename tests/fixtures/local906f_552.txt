@@ -1,0 +1,32 @@
+<Region> Pilgrimage - Walking Tour
+Tour-Category: walking
+
+Stop 1: <Pagoda>
+
+Coordinates: 10.1000, 106.1000
+
+Type/Specialty: Pagoda
+
+After his death in 1887, his followers established the lower <Pagoda>. A bronze bell hangs near the gate. The courtyard is shaded by old trees. Incense drifts from the main hall.
+
+Directions: Walk uphill to the statue.
+
+Stop 2: <Statue>
+
+Coordinates: 10.1100, 106.1100
+
+Type/Specialty: Statue
+
+This reclining Gautama Buddha statue is the largest reclining Buddha in all of <Region>. The statue lies on its right side facing the valley. It measures 49 meters in length. Pilgrims leave flowers at its feet.
+
+Directions: Continue to the mountain.
+
+Stop 3: <Mountain>
+
+Coordinates: 10.1200, 106.1200
+
+Type/Specialty: Mountain
+
+<Mountain> Mount is a mountain located off National Route 1. It rises above the coast near <Town>. The summit trail starts behind the lower gate. Mist often covers the upper slope.
+
+That's 3 stops in all.

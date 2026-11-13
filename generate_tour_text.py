@@ -28877,6 +28877,18 @@ REWRITE RULES (all mandatory):
                                 c for c in _claim_result['claims']
                                 if c['verdict'] == _CB_CONTRADICTED
                             ]
+                            # [LOCAL-906F] a blocked claim STAYS blocked: every sentence of the contradicted claims goes
+                            # on the job-scoped deny-set that the key-fact / signature / refill paths and the
+                            # delivery pass check before inserting
+                            try:
+                                import key_fact_coverage as _kfc906f
+                                from sentence_split import split_sentences as _ss906f
+                                for _cc in _contradicted_claims:
+                                    _bs = (_cc.get('sentence') or '').strip() or _group_text
+                                    for _b in ([_bs] if _cc.get('sentence') else _ss906f(_bs)):
+                                        _kfc906f.deny_record(_stop_name, _b, '229-contradicted')
+                            except Exception as _dn906f:
+                                print(f"  [LOCAL-906F] deny-set record skipped (non-fatal): {_dn906f}")
                             for _cc in _contradicted_claims:
                                 _log_entry = {
                                     'stop': _stop_name,

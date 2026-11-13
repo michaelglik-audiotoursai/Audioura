@@ -132,6 +132,11 @@ def drop_unsupported_claims(tour_text: str, evidence_by_title: Optional[Dict[str
         tour_text = _c.drop_unsupported_scope_claims(tour_text, evidence_by_title, log)
     except Exception as _e906c:  # pragma: no cover
         emit(f"  [LOCAL-906C] scope-claim guard skipped (non-fatal): {_e906c}")
+    try:   # [LOCAL-906F] blocked claims, promo, cross-stop conflicts, leads, names, hyphens, person pronouns
+        import leftovers_906f as _f906f
+        tour_text = _f906f.run_pass(tour_text, evidence_by_title, log)
+    except Exception as _e906f:  # pragma: no cover
+        emit(f"  [LOCAL-906F] pass skipped (non-fatal): {_e906f}")
     if not in_scope(tour_text):
         return tour_text
     try:
