@@ -236,3 +236,14 @@ def test_logged_leg_51_km_is_about_an_hour_not_two():
     assert tp.leg_minutes_source(est, 0)[1] == "pin distance"
     assert tp.SPEEDS_KMH["car_rural"] in (40.0, 45.0, 50.0)
     assert tp.leg_minutes_source({"mode": "car", "stops": [{"title": "A"}, {"title": "B"}]}, 0) == (None, "no pins")
+
+
+def test_lead_not_routes():
+    """[LEAD review] title-like requests with 'to' are not A-to-B routes."""
+    import route_order_909 as r
+    for q in ["Introduction to Boston history", "Back to the Future filming locations, Los Angeles",
+              "Welcome to Saigon street food", "Ode to Joy concert halls, Vienna"]:
+        assert r.parse_route_request(q) is None, q
+    assert r.parse_route_request("Mui Ne to Ta Cu Mountain, Binh Thuan, Vietnam")["destination"] == "Ta Cu Mountain"
+    assert r.parse_route_request("From Nice to Monte Carlo")["origin"] == "Nice"
+    assert r.parse_route_request("Port of Spain to San Fernando, Trinidad")["origin"] == "Port of Spain"

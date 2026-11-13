@@ -74,6 +74,19 @@ _NOT_A_PLACE = re.compile(r"(?i)\b(?:tour|walk(?:ing)?|driving|drive|cycling|bik
 _A_TO_B = re.compile(r"^\s*(?:from\s+)?(?P<o>[^,]{2,60}?)\s+to\s+(?P<d>[^,]{2,60}?)\s*(?:,\s*(?P<r>.+?))?\s*$", re.I)
 
 
+_LINKS = frozenset("of the de la le les du des del della da do dos das di van von sur upon on en am an im and & y e i at".split())
+_OPENERS = frozenset("introduction intro welcome back return road journey gateway answer key letter ode tribute ticket "
+                     "passport path way hello goodbye farewell homage guide ode".split())
+
+
+def _proper_name(x: str) -> bool:
+    """[LEAD review] A place name: every word capitalised (or a digit), except small linking words, and it starts capitalised."""
+    ws = [w for w in re.split(r"[\s\-–—/]+", x.strip()) if w]
+    if not ws or not (ws[0][:1].isupper() or ws[0][:1].isdigit()):
+        return False
+    return all(w[:1].isupper() or w[:1].isdigit() or w.lower() in _LINKS or w.startswith("(") for w in ws)
+
+
 def parse_route_request(location: str) -> Optional[Dict]:
     """``{"origin", "destination", "region"}`` for "<A> to <B>[, region ...]" or "from <A> to <B>"; None otherwise.
     Grammar only: no place list."""
@@ -83,6 +96,8 @@ def parse_route_request(location: str) -> Optional[Dict]:
     o, d = m.group("o").strip(" .;"), m.group("d").strip(" .;")
     if not o or not d or rc.fold(o) == rc.fold(d) or _NOT_A_PLACE.search(o) or _NOT_A_PLACE.search(d):
         return None
+    if not (_proper_name(o) and _proper_name(d)) or rc.fold(o).split()[0] in _OPENERS:
+        return None          # [LEAD review] "Welcome to Saigon street food", "Back to the Future …" are not routes
     return {"origin": o, "destination": d, "region": (m.group("r") or "").strip()}
 
 
@@ -329,6 +344,9 @@ def endpoints_pts(geocode_fn: Optional[Callable], log: Optional[Callable] = None
         return None
     a, b = one(info["origin"]), one(info["destination"])
     if a and b and km_between(a, b) < 1.0:
+        a = b = None
+    if a and b and km_between(a, b) > 400.0:      # [LEAD review] a same-named place elsewhere: not one drive
+        emit(f"  {TAG} route endpoints {km_between(a, b):.0f} km apart -> not treated as a route")
         a = b = None
     _STATE["endpoints"] = (a, b)
     emit(f"  {TAG} route endpoints: origin={a} destination={b}")
