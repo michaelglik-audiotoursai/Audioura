@@ -43,6 +43,8 @@ MAX_WORDS_WRITTEN = 2200
 MIN_SURVIVOR_WORDS = 1200      # below this after grounding => rejected
 MIN_SOURCE_WORDS = int(os.environ.get("TOPIC_MIN_SOURCE_WORDS", "500"))
 MAX_OVERLAP = 0.30
+MAX_LINKED_SHARE = 0.25         # LOCAL-907C: gated linked articles may fill at most this share
+MAX_SECTIONS_PER_SEED = 2       # LOCAL-907C: sections taken from any one seed article
 GROUND_BATCH_SENTENCES = 20
 CACHE_DIR = os.environ.get("TOPIC_SOURCE_CACHE", os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "topic_source_cache"))
@@ -307,7 +309,8 @@ def _hint_entries(region: Dict[str, Any], language: str) -> List[Dict[str, Optio
 
 def plan_topics(region: Dict[str, Any], language: str, max_segments: int, *,
                 fetch_fn: Callable[[str, str], Optional[Dict[str, Any]]],
-                meta_fn: Optional[Callable] = None) -> List[Dict[str, Any]]:
+                meta_fn: Optional[Callable] = None,
+                stats: Optional[Dict[str, int]] = None) -> List[Dict[str, Any]]:
     """Choose up to ``max_segments`` topics across the region's themes. No two topics overlap
     by more than MAX_OVERLAP (title / section tokens). Fetches are free; no paid call.
 
@@ -316,6 +319,11 @@ def plan_topics(region: Dict[str, Any], language: str, max_segments: int, *,
     used and linked articles are gated, classified from their own lead + categories, and
     dropped when off-region. Without it (legacy / offline callers) linked articles are
     taken by link-title keyword as before."""
+    stats = stats if stats is not None else {}
+
+    def _drop(reason: str) -> None:
+        stats[reason] = stats.get(reason, 0) + 1
+
     seeds = region.get("seed_articles", {}).get(language) or []
     themes = region.get("default_themes") or tl.THEMES
     rtoks = region_tokens(region, language)
@@ -351,6 +359,12 @@ def plan_topics(region: Dict[str, Any], language: str, max_segments: int, *,
         for s in sections:
             if s["words"] < MIN_SOURCE_WORDS:
                 continue
+            denied = tr.section_denied(art["title"], s["heading"])
+            if denied:
+                logger.info("[LOCAL-907C] topic '%s' dropped: not guide-worthy (%s)",
+                            _topic_title(art["title"], s["heading"]), denied)
+                _drop("dull seed section")
+                continue
             theme = tl.classify_theme(s["heading"]) or tl.classify_theme(art["title"])
             if theme not in cands:
                 continue
@@ -382,7 +396,11 @@ def plan_topics(region: Dict[str, Any], language: str, max_segments: int, *,
                 continue
             # a curated hint carries its editorial theme; otherwise the article's own lead
             # and categories decide (None -> dropped, never a guess)
-            theme = h["theme"] or tr.classify_article(title, m.get("lead", ""), m.get("categories", []))
+            classified, margin = tr.classify_scored(title, m.get("lead", ""), m.get("categories", []))
+            theme = tr.reconcile_hint_theme(h["theme"], classified, margin)
+            if theme != h["theme"]:
+                logger.info("[LOCAL-907C] hint '%s' theme %s -> %s (from its lead/categories)",
+                            title, h["theme"], theme)
             if theme not in cands:
                 logger.info("[LOCAL-907B] hint '%s' dropped: no clear theme", title)
                 continue
@@ -414,10 +432,17 @@ def plan_topics(region: Dict[str, Any], language: str, max_segments: int, *,
                 n_dropped += 1
                 logger.info("[LOCAL-907B] topic '%s' dropped: %s (%s)",
                             title, "off-region" if reason == "off-region" else reason, scores)
+                _drop("off-region / excluded")
+                continue
+            unworthy = tr.not_guide_worthy(m)
+            if unworthy:
+                logger.info("[LOCAL-907C] topic '%s' dropped: not guide-worthy (%s)", title, unworthy)
+                _drop(unworthy.split(" (")[0])
                 continue
             theme = tr.classify_article(title, m.get("lead", ""), m.get("categories", []))
             if theme not in cands:
                 logger.info("[LOCAL-907B] topic '%s' dropped: no clear theme (uncategorised)", title)
+                _drop("no clear theme")
                 continue
             seen_titles.add(tr.fold(title))
             cands[theme].append({
@@ -447,36 +472,64 @@ def plan_topics(region: Dict[str, Any], language: str, max_segments: int, *,
         return all(overlap(c["tokens"], x["tokens"]) <= MAX_OVERLAP for x in chosen) and \
             c["title"] not in {x["title"] for x in chosen}
 
-    progressed = True
-    while len(chosen) < max_segments and progressed:
-        progressed = False
-        for theme in themes:
-            if len(chosen) >= max_segments:
-                break
-            pool = cands.get(theme, [])
-            while pool:
-                c = pool.pop(0)
-                if not _ok(c):
-                    continue
-                if c["lazy"]:                             # fetch to learn the size, then vet it
-                    a = _safe_fetch(fetch_fn, language, c["sources"][0]["article"])
-                    if not a:
+    linked_cap = int(max_segments * MAX_LINKED_SHARE)       # gated linked articles: <= 25%
+    per_seed: Dict[str, int] = {}
+
+    def _n_linked() -> int:
+        return sum(1 for x in chosen if x.get("tier") == 1)
+
+    def _select(min_tier: int) -> None:
+        progressed = True
+        while len(chosen) < max_segments and progressed:
+            progressed = False
+            for theme in themes:
+                if len(chosen) >= max_segments:
+                    break
+                pool = cands.get(theme, [])
+                while pool:
+                    if pool[0]["tier"] < min_tier:
+                        break
+                    c = pool.pop(0)
+                    if not _ok(c):
                         continue
-                    if c.get("reason") == "mentions-pending":
-                        ok, reason, scores = tr.check_relevance(c["meta"], region, full_text=a["text"])
-                        if not ok:
-                            logger.info("[LOCAL-907B] topic '%s' dropped: off-region (%s)",
-                                        c["title"], scores)
+                    if c["tier"] == 1 and _n_linked() >= linked_cap:
+                        return                          # linked articles never fill more than the cap
+                    if c.get("reason") == "seed" and c["sources"][0].get("section") is not None and \
+                            per_seed.get(c["sources"][0]["article"], 0) >= MAX_SECTIONS_PER_SEED:
+                        continue
+                    if c["lazy"]:                             # fetch to learn the size, then vet it
+                        a = _safe_fetch(fetch_fn, language, c["sources"][0]["article"])
+                        if not a:
                             continue
-                        c["reason"] = reason
-                    c["source_words"] = tl.word_count(a["text"])
-                    c["url"] = c.get("url") or a.get("url")
-                    if c["source_words"] < (MIN_LINKED_WORDS if c.get("tier") == 1 else MIN_SOURCE_WORDS):
-                        continue
-                    c["lazy"] = False
-                chosen.append(c)
-                progressed = True
-                break
+                        if c.get("reason") == "mentions-pending":
+                            ok, reason, scores = tr.check_relevance(c["meta"], region, full_text=a["text"])
+                            if not ok:
+                                logger.info("[LOCAL-907B] topic '%s' dropped: off-region (%s)",
+                                            c["title"], scores)
+                                _drop("off-region / excluded")
+                                continue
+                            c["reason"] = reason
+                        c["source_words"] = tl.word_count(a["text"])
+                        if c.get("tier") == 1:
+                            small = tr.small_place_by_size(c.get("meta") or {}, c["source_words"])
+                            if small:
+                                logger.info("[LOCAL-907C] topic '%s' dropped: not guide-worthy (%s)",
+                                            c["title"], small)
+                                _drop("minor place")
+                                continue
+                        c["url"] = c.get("url") or a.get("url")
+                        if c["source_words"] < (MIN_LINKED_WORDS if c.get("tier") == 1 else MIN_SOURCE_WORDS):
+                            continue
+                        c["lazy"] = False
+                    chosen.append(c)
+                    if c.get("reason") == "seed" and c["sources"][0].get("section") is not None:
+                        k = c["sources"][0]["article"]
+                        per_seed[k] = per_seed.get(k, 0) + 1
+                    progressed = True
+                    break
+
+    _select(2)                      # seeds + hints first, balanced across the themes
+    _select(1)                      # then gated linked articles, at most 25% of the plan
     for i, c in enumerate(chosen, 1):
         c["key"] = f"{region['region_key']}:{language}:{i}"
         c["est_cost_usd"] = estimate_segment_cost(c["source_words"])
@@ -499,7 +552,8 @@ def theme_counts(topics: List[Dict[str, Any]], themes: Optional[List[str]] = Non
     return out
 
 
-def format_plan(region: Dict[str, Any], language: str, topics: List[Dict[str, Any]]) -> str:
+def format_plan(region: Dict[str, Any], language: str, topics: List[Dict[str, Any]], *,
+                requested: Optional[int] = None, dropped: Optional[Dict[str, int]] = None) -> str:
     themes = region.get("default_themes") or tl.THEMES
     counts = theme_counts(topics, themes)
     lines = [f"Plan for {region['region_key']} ({language}): {len(topics)} topics, "
@@ -515,6 +569,11 @@ def format_plan(region: Dict[str, Any], language: str, topics: List[Dict[str, An
     covered = sum(1 for v in counts.values() if v >= 2)
     lines.append(f"Themes with >= 2 topics: {covered}/{len(counts)}"
                  + (f"  |  thin: {', '.join(thin)}" if thin else ""))
+    if requested and len(topics) < requested:
+        lines.append(f"[LOCAL-907C] thin: {len(topics)} of {requested} requested topics -- a shorter "
+                     f"plan is preferred to filler")
+    if dropped:
+        lines.append("Dropped by reason: " + ", ".join(f"{k}={v}" for k, v in sorted(dropped.items())))
     total = sum(t["est_cost_usd"] for t in topics)
     lines.append(f"Estimated paid cost: ${total:.4f}  |  spent by this plan: $0.0000 (dry run)")
     return "\n".join(lines)
@@ -712,12 +771,16 @@ def run_build(region_key: str, language: str = "en", *, max_segments: int = 9,
         fetch_fn = lambda lang, title: fetch_article(lang, title)       # noqa: E731
         if meta_fn is None:
             meta_fn = tr.WikiMeta()                      # real runs use the relevance gate
-    topics = plan_topics(region, language, max_segments, fetch_fn=fetch_fn, meta_fn=meta_fn)
+    drop_stats: Dict[str, int] = {}
+    topics = plan_topics(region, language, max_segments, fetch_fn=fetch_fn, meta_fn=meta_fn,
+                         stats=drop_stats)
     summary: Dict[str, Any] = {"region": region_key, "language": language, "topics": topics,
                                "estimated_cost_usd": round(sum(t["est_cost_usd"] for t in topics), 4),
-                               "spent_usd": 0.0, "built": [], "stopped_on_budget": False}
+                               "spent_usd": 0.0, "built": [], "stopped_on_budget": False,
+                               "dropped_by_reason": drop_stats, "requested": max_segments}
     if dry_run:
-        summary["plan_text"] = format_plan(region, language, topics)
+        summary["plan_text"] = format_plan(region, language, topics, requested=max_segments,
+                                           dropped=drop_stats)
         log(summary["plan_text"])
         return summary
     if store is None:
