@@ -256,8 +256,7 @@
         "Cu Chi",
         "Can Gio",
         "Ben Thanh",
-        "Tan Son Nhat",
-        "Mekong Delta"
+        "Tan Son Nhat"
       ],
       "generic_seeds": [
         "Vietnamese cuisine"
@@ -363,10 +362,6 @@
           {
             "title": "Hoa people in Ho Chi Minh City",
             "theme": "people_economy"
-          },
-          {
-            "title": "Thiên Y A Na",
-            "theme": "legends"
           },
           {
             "title": "Âu Cơ",

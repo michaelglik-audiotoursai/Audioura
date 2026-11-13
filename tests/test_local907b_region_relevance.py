@@ -183,7 +183,7 @@ def test_plan_order_is_seed_sections_then_hints_then_links():
              "Linked": meta("Linked", coords=(10.0, 100.0), lead="A war and a battle in history.",
                             cats=["Military history"])}
     fetch = lambda lang, t: article(t, words=1200, links=["Linked"])
-    topics = tb.plan_topics(region, "en", 3, fetch_fn=fetch, meta_fn=make_meta_fn(table))
+    topics = tb.plan_topics(region, "en", 12, fetch_fn=fetch, meta_fn=make_meta_fn(table))   # 907C: linked cap 25%
     history = [t for t in topics if t["theme"] == "history"]
     assert [t["reason"] for t in history][:3] == ["seed", "hint", "coord"]
 
