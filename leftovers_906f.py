@@ -71,7 +71,7 @@ _PERSON_PH = re.compile(r"<(?:Person|Monk|Founder|Master|Abbot|Sculptor|Architec
                         r"Saint|Teacher|Man|Woman|Creator|Carver)[^>]{0,30}>")
 _ROLES = (r"monk|master|founder|abbot|sculptor|architect|emperor|king|queen|prince|princess|saint|builder|artist|"
           r"bishop|priest|abbess|nun|general|sage|teacher|poet|painter|patriarch|reverend|venerable|lord|sir|"
-          r"dr|mr|mrs|ms|carver|craftsman|mason|engineer|designer|monarch|ruler|governor|missionary")
+          r"dr|mr|mrs|ms|carver|craftsman|mason|engineer|designer|monarch|ruler|governor|missionary|mayor|president|premier|chancellor|senator|captain|colonel|admiral")
 _ROLE_RX = re.compile(r"(?i:\b(?:" + _ROLES + r")\s+)(?P<n>" + _NAME + r")")
 _CUE_AFTER = re.compile(r"(?P<n>" + _NAME + r")\s+(?:died|was\s+born|founded|established|built|began|started|carved|sculpted|"
                         r"designed|commissioned|taught|lived|ruled|spent|completed|constructed|created)\b")
@@ -152,6 +152,7 @@ def _persony_names(text: str, title: str) -> bool:
 
 
 # ══ 2. a person pronoun with no referent ═════════════════════════════════════════════════════════════════
+_SHIP = re.compile(r"(?i)\b(?:ship|vessel|boat|steamer|schooner|yacht|ferry|frigate|nation|country)\b")
 _PRON = re.compile(r"(?i)\b(his|hers|her|he|she|him|himself|herself)\b")
 _NOT_POSS_NEXT = frozenset("to in at on for with and by from as than or but the a an that which who is was".split())
 
@@ -195,6 +196,9 @@ def repair_person_pronoun(tour_text: str, evidence_by_title: Optional[Dict[str, 
                     before += " " + x
                     continue
                 seen = before + " " + x[:m.start()]
+                if m.group(1).lower() in ("her", "hers", "she", "herself") and _SHIP.search(before + " " + x + " " + title):
+                    before += " " + x                      # a ship / vessel / nation is a referent for her / she
+                    continue
                 if _persony_names(seen, title) or _ROLE_NOUN.search(seen) or _distinct(_cand_names(title), title):
                     before += " " + x
                     continue
@@ -312,18 +316,42 @@ def _claim_of(sentence: str, title: str) -> Optional[Dict]:
     return {"years": years, "builders": names, "role": _role(sentence), "obj": obj, "thing": thing}
 
 
+_GENERIC_TITLE = frozenset(
+    "room hall museum gallery church park square street road avenue plaza garden gardens center centre house site "
+    "old new great grand upper lower north south east west central main city town village national royal saint "
+    "st way trail path market station tour stop visit view point".split())
+_SCOPE_PH = frozenset("country region town city province district state area place village island".split())
+
+
 def _title_toks(title: str) -> set:
     return {t.rstrip("s") for t in rc._content_tokens(c._plain(title))}
 
 
-def _titles_linked(ta: str, tb: str, xa: str, xb: str) -> bool:
-    """Two stops are about one object when their titles share a distinctive word, or one claim names the other's title."""
-    a, b = _title_toks(ta), _title_toks(tb)
-    if a & b:
-        return True
+def _distinctive(title: str) -> set:
+    """A title's identifying words: not a generic head (_OBJECT_NOUNS), not a generic place / venue word."""
+    return {t for t in _title_toks(title) if t not in _OBJECT_NOUNS and t not in _GENERIC_TITLE and len(t) >= 3}
+
+
+def _placeholders(title: str) -> set:
+    """``<Statue>`` stands for one specific name; the same placeholder in two titles is the same named thing."""
+    return {m.strip().lower().rstrip("s") for m in re.findall(r"<([^>]{1,40})>", title or "")
+            if m.strip().lower() not in _SCOPE_PH and not _PERSON_PH.fullmatch("<" + m + ">")}
+
+
+def _link_token(ta: str, tb: str, xa: str, xb: str) -> Optional[str]:
+    """The token that makes two stops one object, or None. Generic heads and shared place words never link on their own."""
+    da, db = _distinctive(ta), _distinctive(tb)
+    shared = (da & db) | (_placeholders(ta) & _placeholders(tb))
+    if shared:
+        return sorted(shared)[0]
     sa = {t.rstrip("s") for t in rc._content_tokens(c._plain(xa))}
     sb = {t.rstrip("s") for t in rc._content_tokens(c._plain(xb))}
-    return bool(a & sb - _OBJECT_NOUNS) or bool(b & sa - _OBJECT_NOUNS)
+    hit = (da - db) & sb or (db - da) & sa            # one stop's sentence names the OTHER stop's distinctive title word
+    return sorted(hit)[0] if hit else None
+
+
+def _titles_linked(ta: str, tb: str, xa: str, xb: str) -> bool:
+    return _link_token(ta, tb, xa, xb) is not None
 
 
 def _supported_year(y: str, ev: str) -> bool:
@@ -385,19 +413,19 @@ def resolve_cross_stop(tour_text: str, evidence_by_title: Optional[Dict[str, str
                     if claims[a][0] == claims[b][0]:
                         continue
                     ca, cb = claims[a][4], claims[b][4]
-                    same_thing = bool(ca["thing"] & cb["thing"]) and _titles_linked(
-                        infos[claims[a][0]]["title"], infos[claims[b][0]]["title"], claims[a][3], claims[b][3])
-                    if not same_thing and len(ca["obj"] & cb["obj"]) < 2:
-                        continue
+                    link = _link_token(infos[claims[a][0]]["title"], infos[claims[b][0]]["title"],
+                                       claims[a][3], claims[b][3])
+                    if not link or not (ca["thing"] & cb["thing"] or len(ca["obj"] & cb["obj"]) >= 2):
+                        continue                              # different objects: generic heads / place words never link
                     yc, bc = _year_conflict(ca, cb), _builder_conflict(ca, cb)
                     if yc or bc:
-                        hit = (a, b, yc, bc)
+                        hit = (a, b, yc, bc, link)
                         break
                 if hit:
                     break
             if not hit:
                 break
-            a, b, yc, bc = hit
+            a, b, yc, bc, link = hit
             (ka, ia, ja, xa, ca), (kb, ib, jb, xb, cb) = claims[a], claims[b]
             sa, sb = infos[ka], infos[kb]
             ev = " ".join(filter(None, (rc._ev_for(ev_map, sa["title"]), rc._ev_for(ev_map, sb["title"]))))
@@ -412,7 +440,7 @@ def resolve_cross_stop(tour_text: str, evidence_by_title: Optional[Dict[str, str
                        f"evidence supports Stop {sa['num'] if oa else sb['num']}" if (oa or ob) else
                        "evidence supports neither -> both dropped")
             emit(f"  {TAG} cross-stop conflict on '{shared}': Stop {sa['num']} \"{xa[:60]}\" vs Stop {sb['num']} "
-                 f"\"{xb[:60]}\" ({what}): {verdict}")
+                 f"\"{xb[:60]}\" ({what}; linked by '{link}'): {verdict}")
             ea: Dict[Tuple[int, int], List[str]] = {}
             eb: Dict[Tuple[int, int], List[str]] = {}
             if oa and ob:
@@ -566,11 +594,15 @@ _HEAD_GROUPS = (
     ({"pagoda", "temple", "chua", "chùa", "wat", "pura"}, r"Pagoda|Temple"),
     ({"island", "dao", "đảo", "koh", "isla", "insel"}, r"Island"),
 )
+_GENERIC_HEADS = frozenset(w for aliases, _h in _HEAD_GROUPS for w in aliases) | {
+    "mountain", "mount", "temple", "pagoda", "island", "lake", "river", "beach", "bay", "bridge", "tower", "castle",
+    "palace", "park", "garden", "museum", "church", "cathedral", "shrine", "mosque", "cave", "waterfall", "hill",
+    "square", "street", "road", "market", "statue", "buddha", "fort", "gate", "monastery", "village", "city", "town"}
 _DUP_WORD = re.compile(r"\b([A-ZÀ-Ỹ][\wÀ-ỹ]{2,})(\s+)\1\b")
 
 
 def _clean_names(x: str) -> str:
-    y = _DUP_WORD.sub(lambda m: m.group(1), x)
+    y = _DUP_WORD.sub(lambda m: m.group(1) if rc.fold(m.group(1)) in _GENERIC_HEADS else m.group(0), x)
     for aliases, heads in _HEAD_GROUPS:
         alt = "|".join(sorted((re.escape(a) for a in aliases), key=len, reverse=True))
         # a placeholder named for the head ("<Mountain> Mount") already says it
