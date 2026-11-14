@@ -166,6 +166,11 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
             final = _o906p.final_pass(_o906p.run_pass(final, evidence_by_title, emit), evidence_by_title, emit)
         except Exception as _e906p:  # pragma: no cover
             emit(f"  [LOCAL-906P] last guard skipped (non-fatal): {_e906p}")
+        try:   # [LOCAL-906R] the very last word: a broken measure splice is cut and a stop it leaves thin is refilled
+            import splice_copy_906r as _r906r
+            final = _r906r.last_word(final, evidence_by_title, emit)
+        except Exception as _e906r:  # pragma: no cover
+            emit(f"  [LOCAL-906R] last word skipped (non-fatal): {_e906r}")
         return fix_counts(final, emit, renumber=bool(removed))
     except Exception as err:  # pragma: no cover
         emit(f"  [LOCAL-905] body guard skipped (non-fatal): {err}")

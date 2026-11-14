@@ -610,6 +610,17 @@ def select_signature_stories(
                 log(f"  [LOCAL-881] signature story for {title}: DROPPED "
                     f"(relative-time phrase contradicts the dates): {story[:60]}")
             continue
+        try:    # [LOCAL-906R] a builder is spelled as the stop's own article spells him, before the story is delivered
+            import splice_copy_906r as _r906r
+            _st, _ch = _r906r.align_names(story, own_ev)
+            if _ch:
+                story = _st
+                src = _r906r.align_names(src, own_ev)[0]
+                if log:
+                    for _o, _n in _ch:
+                        log(f"  [LOCAL-906R] signature story for {title}: builder spelling '{_o}' -> '{_n}' (the article's)")
+        except Exception:  # pragma: no cover
+            pass
         entry = {"story": story, "why_memorable": why, "source_sentence": src}
         # [LOCAL-881 §6] keep the story's exact date so survival/regen preserve it.
         _d = source_full_date(src) or source_full_date(story)

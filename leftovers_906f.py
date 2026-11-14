@@ -1100,4 +1100,9 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
         t = _c906q.run_pass(t, evidence_by_title, log)
     except Exception as _e906q:  # pragma: no cover
         _emit(log)(f"  [LOCAL-906Q] pass skipped (non-fatal): {_e906q}")
+    try:   # [LOCAL-906R] a measure splice, new day-trip / operator wording, the passive restaurant plug, the disclosure on a stop with facts
+        import splice_copy_906r as _r906r
+        t = _r906r.run_pass(t, evidence_by_title, log)
+    except Exception as _e906r:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906R] pass skipped (non-fatal): {_e906r}")
     return t
