@@ -506,6 +506,47 @@ def strip_breadcrumbs(tour_text: str, log: Optional[Callable] = None) -> str:
     return "\n".join(out)
 
 
+# [LEAD wave 58] the cloud 551 Stop 3 ended "… sold at about 0.90 US dollars per kilogram." (no guard saw it): the LAST sweep over
+# narration drops any price / currency sentence, a lone subordinate clause ("If you take this cable car.") and visiting advice.
+_CURRENCY = re.compile(r"(?i)(?:[$€£¥₫]\s?\d|\d[\d.,]*\s?(?:[$€£¥₫]|US\s?dollars?|dollars?|usd|vnd|euros?|eur|pounds?\s+sterling|yen|baht|rupees?|cents?)\b|"
+                       r"\bper\s+(?:kilogram|kilo|kg|pound|lb|person|adult|child|ticket|night|hour)\b[^.!?]*\b\d|\b\d[\d.,]*\s*(?:k|K)?\s*(?:VND|USD)\b)")
+_LONE_SUB = re.compile(r"(?i)^(?:if|when|whenever|once|as|although|though|because|since|while|unless|after|before|until)\s+[^,;]{1,60}[.!?]$")
+_ADVICE = re.compile(r"(?i)\b(?:it\s+is\s+|it's\s+)?(?:recommended|advisable|best|a\s+good\s+idea|wise)\s+to\s+(?:visit|come|go|arrive|get\s+here|bring|wear|book)\b|"
+                     r"\b(?:try\s+to|be\s+sure\s+to|make\s+sure\s+to|don't\s+forget\s+to)\s+(?:visit|come|arrive|bring|wear|book)\b")
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\u00C0-\u1EF9\"'“])")
+
+
+def sweep_reason(x: str) -> Optional[str]:
+    s = (x or "").strip()
+    if _CURRENCY.search(s):
+        return "price / currency"
+    if _LONE_SUB.match(s) and len(s.split()) <= 10:
+        return "a subordinate clause alone"
+    if _ADVICE.search(s):
+        return "visiting advice"
+    return None
+
+
+def final_sweep(tour_text: str, log: Optional[Callable] = None) -> str:
+    """The last guard on narration lines (header and Directions lines untouched). A paragraph is never emptied."""
+    emit = _emit(log)
+    out = []
+    for line in (tour_text or "").split("\n"):
+        if not line.strip() or _META_LINE.match(line) or line.startswith(("Directions:", "Orientation:")) or line.startswith("That's "):
+            out.append(line)
+            continue
+        sents = _SENT_SPLIT.split(line.strip())
+        keep = []
+        for x in sents:
+            why = sweep_reason(x)
+            if why:
+                emit(f'  {TAG} final sweep: {why} dropped: "{x[:90]}"')
+            else:
+                keep.append(x)
+        out.append(" ".join(keep) if keep and len(keep) != len(sents) else line)
+    return "\n".join(out)
+
+
 def last_word(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None, log: Optional[Callable] = None) -> str:
     """After the 906U pass: the 906V guards; a stop they (or a sensory-only body) left without a factual sentence is refilled or takes
     the D760 disclosure body (906S ``factless_stops``), then the guards run once more."""

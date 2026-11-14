@@ -302,3 +302,20 @@ def test_lead_wave58_travel_clause_cut_never_leaves_a_fragment():
     assert r._cut_left_np("This cable car system, designed in Austria.")
     assert not r._cut_left_np("The cable car system was designed in Austria.")
     assert not r._cut_left_np("The pagoda, built in 1872, is the older of the two.")
+
+
+def test_lead_wave58_final_sweep_price_lone_clause_advice():
+    """[LEAD wave 58] the cloud miss: a price in words; plus a lone 'If ...' clause and visiting advice. Real facts stay."""
+    import drive_quality_906v as v
+    t = ("Stop 3: Fruit country\n\nType/Specialty: Agricultural tourism\n\n"
+         "Farmers grow the fruit here. You can find the fruit here sold at about 0.90 US dollars per kilogram.\n\n"
+         "Stop 5: The ascent\n\nThe system was designed in Austria. If you take this cable car. "
+         "It is recommended to visit early in the morning. In 1802 Dong Nai became a province. The statue weighs 200 pounds.\n\n"
+         "Directions: Walk on.")
+    out = v.final_sweep(t)
+    assert "US dollars" not in out and "If you take this cable car." not in out and "recommended to visit" not in out
+    for keep in ("Farmers grow the fruit here.", "The system was designed in Austria.", "In 1802 Dong Nai became a province.",
+                 "The statue weighs 200 pounds.", "Type/Specialty: Agricultural tourism", "Directions: Walk on."):
+        assert keep in out
+    lone = "Stop 1: X\n\nYou can buy it for $2 a bag."
+    assert v.final_sweep(lone) == lone            # a paragraph is never emptied
