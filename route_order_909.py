@@ -543,6 +543,7 @@ def endpoints_pts(geocode_fn: Optional[Callable], log: Optional[Callable] = None
                 return float(hit[0]), float(hit[1])
         return None
     a, b = one(info["origin"]), one(info["destination"])
+    _found906v = bool(a and b)           # [LOCAL-906V] a lookup that failed (429) is not cached: the next call tries again
     dref = _STATE.get("dest_ref")
     if dref and a:                      # [LOCAL-906M] the place reference, not a street address, is the far end
         if b and km_between(b, dref) > 1.0:
@@ -554,7 +555,8 @@ def endpoints_pts(geocode_fn: Optional[Callable], log: Optional[Callable] = None
     if a and b and km_between(a, b) > 400.0:      # [LEAD review] a same-named place elsewhere: not one drive
         emit(f"  {TAG} route endpoints {km_between(a, b):.0f} km apart -> not treated as a route")
         a = b = None
-    _STATE["endpoints"] = (a, b)
+    if _found906v:
+        _STATE["endpoints"] = (a, b)
     emit(f"  {TAG} route endpoints: origin={a} destination={b}")
     return a, b
 
@@ -588,6 +590,14 @@ def order_poi_list(poi_list: List[Dict], geocode_fn: Optional[Callable] = None, 
                 except Exception:
                     pass
             pins.append(pt)
+        try:   # [LOCAL-906V] a stop behind the origin whose detour is over 50 % of its leg is rejected / replaced from the pool
+            import drive_quality_906v as _v906v
+            _n906v = [str(p.get("name", "")) for p in poi_list]
+            poi_list = _v906v.replace_backtracks(poi_list, a, b, pool, info["destination"], protect, log=log)
+            if [str(p.get("name", "")) for p in poi_list] != _n906v:
+                pins = [None if poi_list[k].get("_pin_water_909") else _poi_pin(poi_list[k]) for k in range(len(poi_list))]
+        except Exception as _e906v:  # pragma: no cover
+            emit(f"  [LOCAL-906V] backtrack guard skipped (non-fatal): {_e906v}")
         di = dest_index([str(p.get("name", "")) for p in poi_list], info["destination"])
         subs = dest_substops(poi_list, info["destination"])
         if subs:

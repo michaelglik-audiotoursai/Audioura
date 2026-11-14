@@ -556,7 +556,13 @@ def unify_measures(tour_text: str, evidence_by_title: Optional[Dict[str, str]] =
 
 # ══ 7. a stop with no supported sentence ═════════════════════════════════════════════════════════════════
 def _factual(x: str) -> bool:
-    return not (_is_filler(x) or c._is_disclosure(x) or rc.is_mood_filler(x, set()))
+    if _is_filler(x) or c._is_disclosure(x) or rc.is_mood_filler(x, set()):
+        return False
+    try:   # [LOCAL-906V] a sensory sentence (sounds, scents, light) states nothing: it is not the stop's factual sentence
+        import drive_quality_906v as _v906v
+        return not _v906v.sensory_only(x)
+    except Exception:  # pragma: no cover
+        return True
 
 
 def _factless_stops(text: str) -> List[int]:

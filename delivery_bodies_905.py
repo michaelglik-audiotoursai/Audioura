@@ -181,6 +181,11 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
             final = _u906u.last_word(final, evidence_by_title, emit)
         except Exception as _e906u:  # pragma: no cover
             emit(f"  [LOCAL-906U] last word skipped (non-fatal): {_e906u}")
+        try:   # [LOCAL-906V] sensory-only stops, day-tour / neighbour / template copy, thread template in a body, Directions leg, one telling
+            import drive_quality_906v as _v906v
+            final = _v906v.last_word(final, evidence_by_title, emit)
+        except Exception as _e906v:  # pragma: no cover
+            emit(f"  [LOCAL-906V] last word skipped (non-fatal): {_e906v}")
         return fix_counts(final, emit, renumber=bool(removed))
     except Exception as err:  # pragma: no cover
         emit(f"  [LOCAL-905] body guard skipped (non-fatal): {err}")
