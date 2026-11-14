@@ -384,6 +384,117 @@ def restore_pins(poi_list: List[Dict], rows: Sequence[Dict], a: Optional[Pt], b:
     return fixed
 
 
+# ── [LOCAL-906P] a pin over water / far from its place reference; a stop that is a long detour ─────────────
+MAX_REF_KM = 10.0             # a stop pin farther than this from its place reference is re-resolved
+MAX_DETOUR = 0.60             # (A->P->B minus A->B) / A->B above this: the stop is a detour, not a stop on the way
+
+
+def _ref_point(got) -> Optional[Pt]:
+    if isinstance(got, dict) and (got.get("lat") or got.get("lng")):
+        return float(got["lat"]), float(got["lng"])
+    if got and not isinstance(got, dict):
+        try:
+            return float(got[0]), float(got[1])
+        except Exception:
+            return None
+    return None
+
+
+def rereference_pins(poi_list: List[Dict], resolve_fn: Optional[Callable], land_fn: Optional[Callable], dest: str = "",
+                     protect: Optional[Callable[[Dict], bool]] = None, max_km: float = MAX_REF_KM,
+                     log: Optional[Callable] = None) -> List[int]:
+    """A stop pin over water (``land_fn(lat, lng)`` is False) or more than ``max_km`` from the stop's PLACE reference is
+    re-resolved by the 906D place-reference chain (``resolve_fn(name)`` -> {lat, lng} | (lat, lng) | None), the same chain the
+    destination uses; the reference replaces the pin. A water pin with no reference is flagged for the 909 restore. The
+    destination stop and a ``protect``-ed (user) stop keep their own handling. Returns the 0-based indices changed."""
+    emit = _emit(log)
+    out: List[int] = []
+    for i, p in enumerate(poi_list or []):
+        try:
+            name = str(p.get("name", ""))
+            if (dest and _names(name, dest)) or (protect and protect(p)):
+                continue
+            cur = _poi_pin(p)
+            if cur is None:
+                continue
+            water = False
+            if land_fn is not None:
+                try:
+                    water = land_fn(cur[0], cur[1]) is False
+                except Exception:
+                    water = False
+            ref = _ref_point(resolve_fn(name)) if resolve_fn is not None else None
+            far = bool(ref) and km_between(cur, ref) > max_km
+            if not (water or far):
+                continue
+            why = "over water" if water else f"{km_between(cur, ref):.0f} km from its place reference"
+            if ref:
+                _set_pin(p, ref, False)
+                p.pop("_pin_water_909", None)
+                p["_pin_rereferenced_906p"] = True
+                out.append(i)
+                emit(f"  [LOCAL-906P] Stop {i + 1} '{name[:40]}': pin {cur[0]:.4f},{cur[1]:.4f} is {why} -> re-resolved by the "
+                     f"place-reference chain {ref[0]:.4f},{ref[1]:.4f}")
+            elif water:
+                p["_pin_water_909"] = True
+                emit(f"  [LOCAL-906P] Stop {i + 1} '{name[:40]}': pin {cur[0]:.4f},{cur[1]:.4f} is over water and the "
+                     f"place-reference chain found nothing -> unverified (restored by the route pass)")
+        except Exception as err:  # pragma: no cover
+            emit(f"  [LOCAL-906P] pin re-reference for stop {i + 1} skipped (non-fatal): {err}")
+    return out
+
+
+def detour_ratio(pt: Pt, a: Pt, b: Pt) -> float:
+    """(A->P + P->B - A->B) / A->B: how much longer the drive A->B gets with a stop at P (0 = on the way)."""
+    ab = km_between(a, b)
+    return 0.0 if ab <= 0 else (km_between(a, pt) + km_between(pt, b) - ab) / ab
+
+
+def replace_detours(poi_list: List[Dict], a: Optional[Pt], b: Optional[Pt], pool: Optional[Sequence[Dict]], dest: str = "",
+                    protect: Optional[Callable[[Dict], bool]] = None, max_detour: float = MAX_DETOUR,
+                    log: Optional[Callable] = None) -> List[Dict]:
+    """An "A to B" request: a stop whose detour exceeds ``max_detour`` of A->B is replaced by the pool candidate (not already in
+    the tour, with a pin) with the smallest detour, when that one is below the limit. No better candidate: the stop stays."""
+    emit = _emit(log)
+    try:
+        if not (a and b) or not poi_list:
+            return poi_list
+        have = {rc.fold(str(p.get("name", ""))) for p in poi_list}
+        cands = []
+        for q in pool or []:
+            if not isinstance(q, dict) or rc.fold(str(q.get("name", ""))) in have:
+                continue
+            pt = _poi_pin(q)
+            if pt is not None and not q.get("_pin_water_909"):
+                cands.append((detour_ratio(pt, a, b), str(q.get("name", "")), q))
+        cands.sort(key=lambda z: (z[0], z[1]))
+        out: List[Dict] = []
+        for p in poi_list:
+            pt = _poi_pin(p)
+            name = str(p.get("name", ""))
+            if pt is None or (dest and _names(name, dest)) or (protect and protect(p)):
+                out.append(p)
+                continue
+            r = detour_ratio(pt, a, b)
+            if r <= max_detour:
+                out.append(p)
+                continue
+            rep = next(((cr, cn, cq) for cr, cn, cq in cands if cr < max_detour), None)
+            if rep is None:
+                emit(f"  [LOCAL-906P] stop {name!r} is a {r * 100:.0f}% detour (limit {max_detour * 100:.0f}%) and the pool has "
+                     f"no better candidate -> kept")
+                out.append(p)
+                continue
+            cands.remove(rep)
+            emit(f"  [LOCAL-906P] stop {name!r} is a {r * 100:.0f}% detour of the {km_between(a, b):.0f} km drive (limit "
+                 f"{max_detour * 100:.0f}%) -> replaced by {rep[1]!r} ({rep[0] * 100:.0f}%)")
+            out.append(rep[2])
+        return out
+    except Exception as err:  # pragma: no cover
+        emit(f"  [LOCAL-906P] detour guard skipped (non-fatal): {err}")
+        return poi_list
+
+
 def reorder_on_pins(poi_list: List[Dict], a: Pt, b: Pt, destination: str, log: Optional[Callable] = None,
                     only_if_backtrack: bool = False) -> List[Dict]:
     """A new list in A->B order (the destination stop last). With ``only_if_backtrack`` the order is changed
@@ -449,7 +560,8 @@ def endpoints_pts(geocode_fn: Optional[Callable], log: Optional[Callable] = None
 
 
 def order_poi_list(poi_list: List[Dict], geocode_fn: Optional[Callable] = None, land_fn: Optional[Callable] = None,
-                   log: Optional[Callable] = None) -> List[Dict]:
+                   log: Optional[Callable] = None, pool: Optional[Sequence[Dict]] = None,
+                   protect: Optional[Callable[[Dict], bool]] = None) -> List[Dict]:
     """The pre-writing order: the stops by their projection on the origin->destination line, the destination stop
     last. A pin in open water (``land_fn``) or no pin leaves the stop in place (the post-snap pass fixes it with its
     final pin). Never raises; unchanged when the request is not "A to B" or an end cannot be placed."""
@@ -462,6 +574,8 @@ def order_poi_list(poi_list: List[Dict], geocode_fn: Optional[Callable] = None, 
         if not (a and b):
             emit(f"  {TAG} route order skipped: origin/destination not placed")
             return poi_list
+        # [LOCAL-906P] BEFORE writing: a stop that is a > 60% detour of the A->B drive is replaced from the pool when a better one exists
+        poi_list = replace_detours(poi_list, a, b, pool, info["destination"], protect, log=log)
         pins = []
         for i, p in enumerate(poi_list):
             pt = _poi_pin(p)
@@ -495,8 +609,11 @@ def order_poi_list(poi_list: List[Dict], geocode_fn: Optional[Callable] = None, 
 
 def finalize_route_pins(poi_list: List[Dict], rows: Sequence[Dict], info: Optional[Dict], origin_pt: Optional[Pt],
                         dest_pt: Optional[Pt], box=None, route_refs: Optional[Dict] = None,
-                        land_fn: Optional[Callable] = None, log: Optional[Callable] = None) -> List[Dict]:
-    """After the snap and 906D's last resort: (1) the water check, (2) every stop gets a pin, (3) the stops are
+                        land_fn: Optional[Callable] = None, log: Optional[Callable] = None,
+                        resolve_fn: Optional[Callable] = None,
+                        protect: Optional[Callable[[Dict], bool]] = None) -> List[Dict]:
+    """After the snap and 906D's last resort: (0) [LOCAL-906P] a pin over water / far from its place reference is re-resolved and
+    (1) the water check, (2) every stop gets a pin, (3) the stops are
     re-ordered on the FINAL pins when they double back. Returns the (possibly re-ordered) list; never raises."""
     emit = _emit(log)
     try:
@@ -510,6 +627,7 @@ def finalize_route_pins(poi_list: List[Dict], rows: Sequence[Dict], info: Option
         for p in poi_list:                       # a stale water flag: the snap has since placed it on a reference
             if p.get("_pin_water_909") and not _unverified(p):
                 p.pop("_pin_water_909", None)
+        rereference_pins(poi_list, resolve_fn, land_fn, dest, protect, log=log)       # [LOCAL-906P]
         water_pins(poi_list, land_fn, log)
         a = origin_pt
         d_i = dest_index([str(p.get("name", "")) for p in poi_list], dest)

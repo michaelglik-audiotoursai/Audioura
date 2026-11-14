@@ -161,6 +161,11 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                 final = _c906f2.run_pass(_thin, evidence_by_title, emit)
         except Exception as _e906i:  # pragma: no cover
             emit(f"  [LOCAL-906I] thin-stop refill skipped (non-fatal): {_e906i}")
+        try:   # [LOCAL-906P] the last word: a refilled sentence is hedged / cleaned like any other
+            import owner_junk_906p as _o906p
+            final = _o906p.final_pass(_o906p.run_pass(final, evidence_by_title, emit), evidence_by_title, emit)
+        except Exception as _e906p:  # pragma: no cover
+            emit(f"  [LOCAL-906P] last guard skipped (non-fatal): {_e906p}")
         return fix_counts(final, emit, renumber=bool(removed))
     except Exception as err:  # pragma: no cover
         emit(f"  [LOCAL-905] body guard skipped (non-fatal): {err}")

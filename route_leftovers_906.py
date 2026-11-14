@@ -576,7 +576,11 @@ _FILLER_CLOSING = re.compile(
     # [LOCAL-906M] \"Together, these stops highlight ...\" / \"All in all, these stops ...\" / \"These stops (together) showcase ...\"
     r"(?:together|all\s+in\s+all|taken\s+together|in\s+all|overall),?\s+(?:these|the)\s+stops\b|"
     r"these\s+stops(?:,?\s+together,?)?\s+(?:highlight|showcase|capture|reveal|illustrate|reflect|celebrate|"
-    r"represent|offer|tell|show|paint|weave|bring|combine|form|add\s+up)\b)")
+    r"represent|offer|tell|show|paint|weave|bring|combine|form|add\s+up)\b|"
+    # [LOCAL-906P] \"Exploring these remarkable landmarks, like ..., highlights the unique charm ...\"
+    r"(?:exploring|visiting|discovering|experiencing|seeing)\s+(?:all\s+)?(?:of\s+)?(?:these|those)\b[^.!?]{0,180}?\b"
+    r"(?:highlights?|showcases?|reveals?|captures?|reflects?|celebrates?|illustrates?|demonstrates?|underscores?|embod(?:y|ies)|"
+    r"represents?|offers?|tells?|shows?)\b)")
 
 
 def drop_template_closing(tour_text: str, log: Optional[Callable] = None) -> str:

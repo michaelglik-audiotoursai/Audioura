@@ -22322,7 +22322,8 @@ Exempt: navigation directions ("Turn left", "Continue past").
                 from geocode_stops import geocode as _geo909, reverse_is_land as _land909
             except Exception:
                 _geo909 = _land909 = None
-            poi_list = _r909b.order_poi_list(poi_list, _geo909, _land909, log=print)
+            poi_list = _r909b.order_poi_list(poi_list, _geo909, _land909, log=print,
+                                             pool=locals().get('_detour_pool_906p'))   # [LOCAL-906P] none handed in: logged, kept
     except Exception as _e909b:
         print(f"  [LOCAL-909] route order skipped (non-fatal): {_e909b}")
 
@@ -31012,7 +31013,12 @@ REWRITE RULES (all mandatory):
                 _n909 = [str(_p.get('name', '')) for _p in poi_list]
                 poi_list = _r909c.finalize_route_pins(
                     poi_list, _snap_rows_791c, _r909c.route(), _a909, _b909, box=_prov_box_906d or _route_box_896,
-                    route_refs=_route_refs_897, land_fn=_land909c, log=print)
+                    route_refs=_route_refs_897, land_fn=_land909c, log=print,
+                    resolve_fn=locals().get('_res906m'),       # [LOCAL-906P] a stop pin over water / > 10 km from its place reference
+                    protect=lambda _p: bool(_p.get('user_explicit') or _p.get('_anchor') or _is_user_stop_title(_p.get('name'))))
+                _rr906p = any(_p.get('_pin_rereferenced_906p') for _p in poi_list)
+                if _rr906p and '_sp903' in locals() and [str(_p.get('name', '')) for _p in poi_list] == _n909:
+                    first_poi_coordinates = _sp903.tour_pin(poi_list, first_poi_coordinates)     # [LOCAL-906P] the tour pin follows the stop pin
                 if [str(_p.get('name', '')) for _p in poi_list] != _n909:
                     # the snap rows are indexed like the OLD list: re-index them with the stops
                     _pos909 = {n: k for k, n in enumerate(_n909)}

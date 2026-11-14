@@ -896,25 +896,38 @@ def _title_words(title: str) -> List[str]:
     return [w for w in rc._words(re.sub(r"[<>]", " ", title or "")) if w not in _UNITLESS and len(w) >= 3]
 
 
+_CONTAINER_WORDS = frozenset("mountain mount mountains hill hills peak park island islands beach lake river valley bay district "
+                             "province city town village area region coast plateau range reserve forest garden gardens".split())
+
+
+def _is_container_title(title: str) -> bool:
+    """[LOCAL-906P] A title naming the PLACE that holds other things (a mountain, a park, an island ...)."""
+    return any(w in _CONTAINER_WORDS for w in _title_words(title))
+
+
 def _owner(sentence: str, titles: Sequence[str]) -> Optional[int]:
     """The stop whose title object the number in ``sentence`` is about: the title with a word closest before the first
-    number (ties: the longer title)."""
+    number (ties: the longer title). [LOCAL-906P] A fact about the object a stop is NAMED for belongs to that stop even when
+    the sentence also names the enclosing place ("the statue here on <Mountain>"): of the titles the sentence names, the
+    more specific one (an object, not a container place) wins over the containing place."""
     m = _NUM_UNIT.search(sentence)
     if not m:
         return None
     before = rc._words(sentence[:m.start()])
-    best, best_key = None, None
+    whole = rc._words(sentence)
+    cands = []
     for k, t in enumerate(titles):
         tw = _title_words(t)
-        if not tw or not all(w in rc._words(sentence) for w in tw):
+        if not tw or not all(w in whole for w in tw):
             continue
         pos = max((i for i, w in enumerate(before) if w in tw), default=-1)
-        if pos < 0:
-            continue
-        key = (pos, len(tw))
-        if best_key is None or key > best_key:
-            best, best_key = k, key
-    return best
+        cands.append((k, pos, len(tw)))
+    if len(cands) > 1 and any(not _is_container_title(titles[k]) for k, _p, _n in cands):
+        cands = [cd for cd in cands if not _is_container_title(titles[cd[0]])]      # [LOCAL-906P] the object, not its place
+        if len(cands) == 1:
+            return cands[0][0]
+    cands = [cd for cd in cands if cd[1] >= 0]
+    return max(cands, key=lambda cd: (cd[1], cd[2]))[0] if cands else None
 
 
 def drop_cross_stop_fact(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
@@ -1077,4 +1090,9 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
         t = _n906n.restore_proper_case(t, log)
     except Exception as _e906n:  # pragma: no cover
         _emit(log)(f"  [LOCAL-906N] case guard skipped (non-fatal): {_e906n}")
+    try:   # [LOCAL-906P] captions / list stubs, a glued sentence, cable-car numbers, a raw measure splice, the closing's superlatives
+        import owner_junk_906p as _o906p
+        t = _o906p.run_pass(t, evidence_by_title, log)
+    except Exception as _e906p:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906P] pass skipped (non-fatal): {_e906p}")
     return t
