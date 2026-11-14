@@ -791,6 +791,16 @@ def _names_unpinned(sentence: str) -> bool:
     return bool(o) and not place_point(_STATE["origin"]) and fold(o) in f
 
 
+_CUT_NP = re.compile(r"^[A-Z][^,.!?]{0,60},\s+(?:[a-z]+ed|[a-z]+ing|built|made|known|set|found)\b[^.!?]*[.!?]?$")
+_CUT_FINITE = re.compile(r"(?i)\b(?:is|are|was|were|has|have|had|will|can|may|does|did)\b")
+
+
+def _cut_left_np(y: str) -> bool:
+    """[LEAD wave 58] What a clause cut left: a noun phrase + a participle phrase and no main verb."""
+    s = (y or "").strip()
+    return bool(_CUT_NP.match(s)) and not _CUT_FINITE.search(s)
+
+
 def strip_body_travel(tour_text: str, log: Optional[Callable] = None) -> str:
     """No \"N minutes/km away\" or compass direction in a stop BODY unless both ends are pinned (the
     stop, and the route place the sentence names). Directions lines are handled by
@@ -813,6 +823,8 @@ def strip_body_travel(tour_text: str, log: Optional[Callable] = None) -> str:
                 _time = bool(_MINUTES.search(x))
                 if _has_travel(x) and (_time or not (_pinned and _other and not _names_unpinned(x))):
                     y = repair_travel_sentence(x)
+                    if y is not None and (is_fragment(y) or _cut_left_np(y)):   # [LEAD wave 58] "This cable car system, designed in Austria."
+                        y = None
                     if log:
                         log(f"  [LOCAL-897] Stop {_n} '{_t[:40]}': body distance/time/compass without both ends "
                             f"pinned -> {'clause dropped' if y else 'sentence dropped'}: \"{x[:90]}\"")

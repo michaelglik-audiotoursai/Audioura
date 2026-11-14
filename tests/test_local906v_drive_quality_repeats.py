@@ -294,3 +294,11 @@ def test_lead_wave57_breadcrumb_label_dropped():
     assert v.strip_breadcrumbs(prose) == prose
     alone = "Stop 1: X\n\nCountryland/Some Province/Some Pagoda\n\nA fact here."
     assert "Countryland/" not in v.strip_breadcrumbs(alone)
+
+
+def test_lead_wave58_travel_clause_cut_never_leaves_a_fragment():
+    """[LEAD wave 58] 897's clause cut left 'This cable car system, designed in Austria.' (no main verb); 906E then glued the title on."""
+    import route_content_896 as r
+    assert r._cut_left_np("This cable car system, designed in Austria.")
+    assert not r._cut_left_np("The cable car system was designed in Austria.")
+    assert not r._cut_left_np("The pagoda, built in 1872, is the older of the two.")
