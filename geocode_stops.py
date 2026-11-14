@@ -53,6 +53,8 @@ import logging
 import urllib.parse
 import urllib.request
 
+import nominatim_throttle_906u as _t906u
+
 # --- configuration -----------------------------------------------------------
 
 GEOCODE_ENABLED = os.getenv("GEOCODE_STOPS", "1") not in ("0", "false", "False")
@@ -242,20 +244,16 @@ def geocode_detailed(query):
 
 def _geocode_once_detailed(query):
     """One detailed Nominatim lookup → dict (see ``geocode_detailed``) or None."""
-    global _last_request_at
     if not query or not query.strip():
         return None
-    elapsed = time.time() - _last_request_at
-    if elapsed < _MIN_INTERVAL_S:
-        time.sleep(_MIN_INTERVAL_S - elapsed)
     url = NOMINATIM_URL + "?" + urllib.parse.urlencode({
         "q": query, "format": "jsonv2", "limit": 1, "addressdetails": 0,
     })
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    try:
+
+    def _do():
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
             payload = json.load(resp)
-        _last_request_at = time.time()
         if not payload:
             return None
         row = payload[0]
@@ -267,30 +265,24 @@ def _geocode_once_detailed(query):
             "addresstype": str(row.get("addresstype") or ""),
             "display_name": str(row.get("display_name") or ""),
         }
-    except Exception as e:
-        _last_request_at = time.time()
-        logging.warning("[GEOCODE] detailed lookup failed for %r: %s", query, e)
-        return None
+    # [LOCAL-906U] one process-wide throttle (1 req/s), 429 back-off, per-job cache (empty answers too)
+    return _t906u.call(("detail", url), _do, query=query)
 
 
 def geocode_candidates(query, limit=5):
     """[LOCAL-903] Up to ``limit`` Nominatim hits for ``query`` as a list of dicts ({lat, lng, type, class,
     addresstype, display_name}), best first. [] on any failure. Same host, rate limit and User-Agent as
     ``geocode``; one request."""
-    global _last_request_at
     if not query or not query.strip():
         return []
-    elapsed = time.time() - _last_request_at
-    if elapsed < _MIN_INTERVAL_S:
-        time.sleep(_MIN_INTERVAL_S - elapsed)
     url = NOMINATIM_URL + "?" + urllib.parse.urlencode({
         "q": query, "format": "jsonv2", "limit": int(limit), "addressdetails": 0,
     })
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    try:
+
+    def _do():
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
             payload = json.load(resp)
-        _last_request_at = time.time()
         out = []
         for row in payload or []:
             out.append({
@@ -301,10 +293,8 @@ def geocode_candidates(query, limit=5):
                 "display_name": str(row.get("display_name") or ""),
             })
         return out
-    except Exception as e:
-        _last_request_at = time.time()
-        logging.warning("[GEOCODE] candidates lookup failed for %r: %s", query, e)
-        return []
+    res = _t906u.call(("cands", url), _do, query=query, empty=[])
+    return list(res or [])
 
 
 def is_city_like(detail):
@@ -342,30 +332,21 @@ def _geocode_once(query):
     Returns None on any failure — no network, rate limited, no match, malformed
     response. Callers must treat None as "no opinion", never as an error.
     """
-    global _last_request_at
     if not query or not query.strip():
         return None
-
-    # Respect Nominatim's 1 req/sec policy.
-    elapsed = time.time() - _last_request_at
-    if elapsed < _MIN_INTERVAL_S:
-        time.sleep(_MIN_INTERVAL_S - elapsed)
-
     url = NOMINATIM_URL + "?" + urllib.parse.urlencode({
         "q": query, "format": "json", "limit": 1,
     })
-    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    try:
+
+    def _do():
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
             payload = json.load(resp)
-        _last_request_at = time.time()
         if not payload:
             return None
         return float(payload[0]["lat"]), float(payload[0]["lon"])
-    except Exception as e:
-        _last_request_at = time.time()
-        logging.warning("[GEOCODE] lookup failed for %r: %s", query, e)
-        return None
+    # [LOCAL-906U] shared throttle / 429 back-off / per-job cache
+    return _t906u.call(("search", url), _do, query=query)
 
 
 def _parse_stop(stop_text):
@@ -1474,44 +1455,40 @@ def repair_inherited_coordinates(poi_list, tour_location,
 def reverse_address(lat, lng):
     """[LOCAL-902] Free reverse geocode (the same Nominatim host as ``geocode``): the display name of the
     place at (lat, lng), e.g. "<commune>, <district>, <province>, <country>"; '' on any failure."""
-    global _last_request_at
     try:
-        elapsed = time.time() - _last_request_at
-        if elapsed < _MIN_INTERVAL_S:
-            time.sleep(_MIN_INTERVAL_S - elapsed)
         url = NOMINATIM_URL.replace("/search", "/reverse") + "?" + urllib.parse.urlencode({
             "lat": f"{float(lat):.6f}", "lon": f"{float(lng):.6f}", "format": "jsonv2", "zoom": 14})
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
-            payload = json.load(resp)
-        _last_request_at = time.time()
-        return str((payload or {}).get("display_name") or "")
     except Exception as e:
         logging.warning("[GEOCODE] reverse lookup failed for %r,%r: %s", lat, lng, e)
         return ""
+
+    def _do():
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+            payload = json.load(resp)
+        return str((payload or {}).get("display_name") or "")
+    return _t906u.call(("reverse", url), _do, query=f"{lat},{lng}", empty="") or ""
 
 
 def reverse_is_land(lat, lng):
     """[LOCAL-909] Free reverse geocode (the same Nominatim host): True when the point has a land address / admin
     area, False when the geocoder answers "Unable to geocode" (open water), None when the lookup itself failed
     (network / timeout: unknown, never read as water)."""
-    global _last_request_at
     try:
-        elapsed = time.time() - _last_request_at
-        if elapsed < _MIN_INTERVAL_S:
-            time.sleep(_MIN_INTERVAL_S - elapsed)
         url = NOMINATIM_URL.replace("/search", "/reverse") + "?" + urllib.parse.urlencode({
             "lat": f"{float(lat):.6f}", "lon": f"{float(lng):.6f}", "format": "jsonv2", "zoom": 10})
+    except Exception as e:
+        logging.warning("[GEOCODE] land check failed for %r,%r: %s", lat, lng, e)
+        return None
+
+    def _do():
         req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
             payload = json.load(resp)
-        _last_request_at = time.time()
         if not isinstance(payload, dict):
             return None
         if payload.get("error"):
             return False
         addr = payload.get("address") or {}
         return bool(addr.get("country") or addr.get("state") or addr.get("county") or payload.get("display_name"))
-    except Exception as e:
-        logging.warning("[GEOCODE] land check failed for %r,%r: %s", lat, lng, e)
-        return None
+    return _t906u.call(("land", url), _do, query=f"{lat},{lng}", empty=None)

@@ -162,15 +162,21 @@ def box_problem(box: Box, coarse_center=None) -> str:
 
 
 def _default_search_rows(query: str) -> List[Dict]:
-    """Nominatim, several rows, administrative areas preferred (featuretype=state). Never raises."""
-    try:
+    """Nominatim, several rows, administrative areas preferred (featuretype=state). Never raises.
+    [LOCAL-906U] through the shared throttle / 429 back-off / cache."""
+    def _do():
         import requests
         resp = requests.get("https://nominatim.openstreetmap.org/search",
                             params={"q": query, "format": "jsonv2", "limit": "5", "featuretype": "state",
                                     "extratags": "1", "accept-language": "en"},
                             headers={"User-Agent": "Audioura/2.2 (tour-generation; contact: support@audioura.com)"},
                             timeout=8)
+        if resp.status_code == 429:
+            resp.raise_for_status()
         return resp.json() if resp.status_code == 200 else []
+    try:
+        import nominatim_throttle_906u as t
+        return t.call(("prov", query), _do, query=query, empty=[]) or []
     except Exception:
         return []
 
@@ -547,6 +553,15 @@ def _in_province_reference(rows: List[Dict], poi_list: List[Dict], box: Box, ski
     return best[1], best[2]
 
 
+def _own_lookups_failed(poi: Dict) -> bool:
+    """[LOCAL-906U] True when a geocoder request for this stop's name ended in an error (429, timeout)."""
+    try:
+        import nominatim_throttle_906u as t
+        return t.lookup_failed_for(str(poi.get("name") or ""))
+    except Exception:
+        return False
+
+
 def last_resort_pins(poi_list: List[Dict], rows: List[Dict], box: Optional[Box], center,
                      province: str, log: Optional[Callable] = None, pad_km: float = 0.0) -> List[int]:
     """After the snap: a stop whose unverified pin is still outside the province box moves to the best in-province
@@ -576,6 +591,16 @@ def last_resort_pins(poi_list: List[Dict], rows: List[Dict], box: Optional[Box],
                 _log(log, f"  [LOCAL-906D] stop={i + 1} pin {c[0]:.4f},{c[1]:.4f} outside {province}: moved to its "
                           f"own approximate facility reference {own[0]:.4f},{own[1]:.4f}")
                 moved.append(i)
+                continue
+            if _own_lookups_failed(p):
+                # [LOCAL-906U] every lookup for THIS stop errored (rate limit / timeout): it must not stand on another
+                # stop's coordinates (proof of 906T: Stop 2 was moved onto Stop 1's reference, 30 km from its site).
+                p["_no_coordinate"] = True
+                p["coordinates_approximate"] = True
+                p["_pin_lookup_failed_906u"] = True
+                _log(log, f"  [LOCAL-906U] stop={i + 1} pin {c[0]:.4f},{c[1]:.4f} outside {province}: its own geocoder "
+                          f"lookups failed (not 'no result'), so it keeps no pin of its own and does not inherit "
+                          f"another stop's coordinates (unpinned, approximate)")
                 continue
             found = _in_province_reference(rows, poi_list, box, i)
             if found:

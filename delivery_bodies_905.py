@@ -176,6 +176,11 @@ def ensure_bodies(text: str, evidence_by_title: Optional[Dict[str, str]] = None,
             final = _s906s.last_word(final, evidence_by_title, emit)
         except Exception as _e906s:  # pragma: no cover
             emit(f"  [LOCAL-906S] last word skipped (non-fatal): {_e906s}")
+        try:   # [LOCAL-906U] A-to-B orientation, headline / hours copy, one disclosure, dangling start, two distances, colour, refill bar
+            import final_906u as _u906u
+            final = _u906u.last_word(final, evidence_by_title, emit)
+        except Exception as _e906u:  # pragma: no cover
+            emit(f"  [LOCAL-906U] last word skipped (non-fatal): {_e906u}")
         return fix_counts(final, emit, renumber=bool(removed))
     except Exception as err:  # pragma: no cover
         emit(f"  [LOCAL-905] body guard skipped (non-fatal): {err}")

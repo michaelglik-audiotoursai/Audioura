@@ -11792,6 +11792,11 @@ def generate_tour_text(location, tour_type, output_file=None, total_stops=None, 
     # path below overwrites it. The service's fail-closed coordinate assertion
     # reads this to name the delivering path.
     _J._LAST_DELIVERY_PATH = 'fresh'
+    try:   # [LOCAL-906U] a new job starts with an empty geocoder answer cache and failure ledger
+        import nominatim_throttle_906u as _t906u_job
+        _t906u_job.reset_job()
+    except Exception:
+        pass
     # [LOCAL-894] The impl receives the ORIGINAL request (it derives the place itself,
     # inside its own job scope -- the cost scope below opens a new context, so state
     # set here would not reach it). The wrapper's own steps use the short place.
