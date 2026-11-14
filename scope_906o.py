@@ -175,6 +175,10 @@ _PRACTICAL = [re.compile(p) for p in (
     r"(?i)\bas\s+part\s+of\s+(?:a|an|the)\s+(?:[\w\-]+\s+){0,2}?(?:half-day|full-day|day|guided|organi[sz]ed)\s+"
     r"(?:tours?|trips?|excursions?|packages?)\b",
     r"(?i)\b(?:half-day|full-day)\s+(?:tours?|excursions?|packages?)\b",
+    # [LOCAL-906P] "Tours from <City> often include <Stop> as part of day trips to <Town>."
+    r"(?i)\b(?:day\s+)?tours?\s+(?:from|of|to|in|around)\b[^.!?]{0,80}?\b(?:often|usually|typically|commonly|frequently|regularly|"
+    r"generally|sometimes)\s+(?:include|includes|visit|stop|feature|combine|cover|pass|take)\b",
+    r"(?i)\bas\s+part\s+of\s+(?:[\w\-]+\s+){0,2}?(?:day|half-day|full-day)\s+(?:trips?|tours?|excursions?)\b",
 )]
 
 

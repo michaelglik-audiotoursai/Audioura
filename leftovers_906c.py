@@ -1078,6 +1078,11 @@ def final_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = Non
         t = _de.drop_dangling_quantifier(t, log)
     except Exception as err:  # pragma: no cover
         _emit(log)(f"  [LOCAL-906H] dangling-quantifier guard skipped (non-fatal): {err}")
+    try:   # [LOCAL-906P] the hedge is the LAST word: whatever the passes above added or moved is hedged here
+        import owner_junk_906p as _o906p
+        t = _o906p.final_pass(t, evidence_by_title, log)
+    except Exception as err:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906P] final hedge guard skipped (non-fatal): {err}")
     try:
         import difflib
         _a, _b = (tour_text or "").split("\n"), t.split("\n")

@@ -126,6 +126,13 @@ def refill_reject(cand: str, title: str, tour_text: Optional[str] = None, source
         return "video / booking / selling word"
     if _GLUED.search(x):
         return "glued tokens"
+    try:   # [LOCAL-906P] an image caption / a list stub is never a refill
+        import owner_junk_906p as _o
+        _why = _o.junk_reason(x)
+        if _why:
+            return _why
+    except Exception:  # pragma: no cover
+        pass
     if _WORLD.search(x) or c.record_claim(x):
         return "world / record / exclusivity claim"
     m = c._SUP_RX.search(x)
@@ -278,12 +285,30 @@ def _tonum(s: str) -> float:
     return float(s.replace(",", ""))
 
 
-def measures(text: str) -> List[Dict]:
+# [LOCAL-906P] An ELEVATION ("563 meters above sea level", "At the summit, 563 meters", "rises 563 meters") is the height of
+# the PLACE above the sea, never the height / length of a structure on it.
+_ELEV_AFTER = re.compile(r"(?i)^[\s,)]{0,3}(?:(?:above|over)\s+(?:the\s+)?(?:mean\s+)?(?:sea|ocean|level)|a\.?s\.?l\b|amsl|"
+                         r"in\s+(?:elevation|altitude)\b|of\s+(?:elevation|altitude)\b)")
+_ELEV_BEFORE = re.compile(r"(?i)(?:\b(?:elevation|altitude|summit|peak|top|crest|apex|highest\s+point)(?:['’]s)?\s*(?:of|is|at|reaches|stands\s+at|:|,|-|–)?\s*"
+                          r"(?:the\s+|a\s+|an\s+)?(?:about\s+|around\s+|some\s+|nearly\s+|approximately\s+)?"
+                          r"|\b(?:rises?|rising|climbs?|reaches|reach|soars?)\s+(?:up\s+)?(?:to\s+)?(?:about\s+|around\s+|some\s+|nearly\s+)?)$")
+
+
+def is_elevation(text: str, start: int, end: int) -> bool:
+    """[LOCAL-906P] The number at ``text[start:end]`` is an elevation (above sea level / altitude / summit height / "rises N")."""
+    t = text or ""
+    return bool(_ELEV_AFTER.search(t[end:end + 40]) or _ELEV_BEFORE.search(t[max(0, start - 60):start]))
+
+
+def measures(text: str, keep_elevation: bool = False) -> List[Dict]:
+    """Length / height / width / depth measures of ``text``. [LOCAL-906P] An elevation is not one (``keep_elevation`` keeps it)."""
     out: List[Dict] = []
     for rx in (_MEAS_A, _MEAS_B):
         for m in rx.finditer(text or ""):
             u = m.group("u").lower()
             if u not in _UNIT_M:
+                continue
+            if not keep_elevation and is_elevation(text, m.start(), m.end()):
                 continue
             out.append({"dim": _DIM[m.group("d").lower()], "m": _tonum(m.group("n")) * _UNIT_M[u], "span": (m.start(), m.end()),
                         "raw": m.group(0), "num": m.group("n"), "unit": m.group("u")})
@@ -339,6 +364,78 @@ def other_stops_article_values(st_title: str, sentence: str, dim: str, all_: Lis
     return out
 
 
+# [LOCAL-906P] A value is a measure of an object ONLY when the evidence sentence ties it to the same object noun.
+_OBJ_NOUNS = frozenset("statue buddha tower bridge building pagoda temple church cathedral monument lighthouse mountain hill "
+                       "peak mount castle wall gate palace dome spire column obelisk sculpture cave lake river waterfall fall dam "
+                       "stadium arch tunnel hall cable gondola funicular island beach".split())
+_BAD_SPLICE = re.compile(r"(?i)(?P<lead>,?\s*)\b(?:which|that)\s+(?:is|are|was|were)\s+(?:the\s+)?(?:height|length|width|depth)\s+of\s+"
+                         r"(?:about\s+|around\s+|some\s+|nearly\s+)?(?:" + _NUM + r")\s*-?\s*(?:kilometres?|kilometers?|metres?|meters?|km|feet|foot|ft|m)\b"
+                         r"(?P<tail>\s+and\s+)?")
+
+
+def _stem(w: str) -> str:
+    return w[:-1] if len(w) > 3 and w.endswith("s") and not w.endswith("ss") else w
+
+
+def object_nouns(x: str) -> set:
+    return {_stem(w) for w in re.findall(r"[a-z]+", (x or "").lower()) if _stem(w) in _OBJ_NOUNS or w in _OBJ_NOUNS}
+
+
+def tied_to_object(body_sentence: str, ev_sentence: str, title: str = "") -> bool:
+    """[LOCAL-906P] The evidence sentence's value is about the object the body sentence measures: they share an object noun
+    (statue / tower / bridge ...); an evidence sentence with no object noun of its own is tied through the stop's title. A body
+    sentence that names no object noun cannot be tied to anything else, so nothing blocks it."""
+    b = object_nouns(body_sentence)
+    if not b:
+        return True
+    e = object_nouns(ev_sentence)
+    if not e:
+        e = object_nouns(title)
+    return bool(b & e)
+
+
+def sentence_measures(text: str) -> List[Dict]:
+    """``measures`` of every sentence of ``text`` (elevations excluded), each carrying its sentence under ``sent``."""
+    out: List[Dict] = []
+    for sent in rc.split_sentences(text or ""):
+        for mm in measures(sent):
+            mm = dict(mm)
+            mm["sent"] = sent
+            out.append(mm)
+    return out
+
+
+_HYPHEN_UNIT = {"meters": "meter", "metres": "metre", "kilometers": "kilometer", "kilometres": "kilometre", "feet": "foot"}
+
+
+def rewrite_measure(mm: Dict, v: Dict) -> str:
+    """[LOCAL-906P] ``mm["raw"]`` with ONLY its number and unit replaced by ``v``'s: the body keeps its own wording
+    ("7 meters high", "49-meter-long"); a raw evidence phrase ("height of 563 meters") is never spliced into a sentence."""
+    raw = mm["raw"]
+    unit = v["unit"]
+    if "-" in raw:
+        unit = _HYPHEN_UNIT.get(unit.lower(), unit)
+    elif unit.lower() in _HYPHEN_UNIT.values() and v["num"] != "1":
+        unit = {b: a for a, b in _HYPHEN_UNIT.items()}.get(unit.lower(), unit)
+    out = raw.replace(mm["num"], v["num"], 1)
+    return re.sub(r"(?i)(?<=[\d\s\-])" + re.escape(mm["unit"]) + r"(?=[\s\-]|$)", lambda _m: unit, out, count=1)
+
+
+def fix_bad_splice(x: str) -> Tuple[str, bool]:
+    """"..., which is height of 563 meters and one of the largest ..." (a measure noun spliced in as raw text): the clause is cut
+    and the sentence stays grammatical ("..., which is one of the largest ...")."""
+    m = _BAD_SPLICE.search(x)
+    if not m:
+        return x, False
+    if m.group("tail"):
+        verb = re.search(r"(?i)\b(?:which|that)\s+(?:is|are|was|were)\b", m.group(0)).group(0)
+        new = x[:m.start()] + (m.group("lead") or "") + verb + " " + x[m.end():]
+    else:
+        new = x[:m.start()] + x[m.end():]
+    new = re.sub(r"\s+([,.])", r"\1", new).strip()
+    return new, True
+
+
 def resolve_measure_conflicts(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
                               log: Optional[Callable] = None) -> str:
     """A body measure ("11 meters high") whose stop evidence holds ANOTHER value for the same dimension ("7 meters high"):
@@ -359,18 +456,19 @@ def resolve_measure_conflicts(tour_text: str, evidence_by_title: Optional[Dict[s
             if not ev.strip():
                 return {}
             art, web = _article_text(ev, title, c._entries_for(title))
-            a_by, w_by = {}, {}
-            for mm in measures(art):
-                a_by.setdefault(mm["dim"], []).append(mm)
-            for mm in measures(web + " " + art):
-                w_by.setdefault(mm["dim"], []).append(mm)
+            a_all = sentence_measures(art)                       # [LOCAL-906P] elevations are not measures
+            w_all = sentence_measures(web + " " + art)
             edits = {}
             for i, j, x in st["flat"]:
                 new, changed = x, False
-                for mm in reversed(measures(x)):
+                fixed, did = fix_bad_splice(new)
+                if did:
+                    emit(f'  [LOCAL-906P] Stop {st["num"]}: measure noun spliced as raw text ("height of N ...") -> clause cut: "{x[:80]}"')
+                    new, changed = fixed, True
+                for mm in reversed(measures(new)):
                     dim = mm["dim"]
-                    av = a_by.get(dim, [])
-                    wv = w_by.get(dim, [])
+                    av = [v for v in a_all if v["dim"] == dim and tied_to_object(new, v["sent"], title)]
+                    wv = [v for v in w_all if v["dim"] == dim and tied_to_object(new, v["sent"], title)]
                     if any(_same(mm["m"], v["m"]) for v in av):
                         continue
                     def _distinct(vs):
@@ -389,7 +487,7 @@ def resolve_measure_conflicts(tour_text: str, evidence_by_title: Optional[Dict[s
                         v = av[0]
                         s, e = mm["span"]
                         emit(f'  {TAG} Stop {st["num"]}: conflicting {dim} ({mm["raw"]} vs {v["raw"]}): the article value is used')
-                        new = new[:s] + v["raw"] + new[e:]
+                        new = new[:s] + rewrite_measure(mm, v) + new[e:]
                         changed = True
                         continue
                     if not av and len(_distinct(wv)) < 2:
