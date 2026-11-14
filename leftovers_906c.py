@@ -962,7 +962,7 @@ def repair_pronoun_opener(tour_text: str, log: Optional[Callable] = None) -> str
 _THING_HEADS = frozenset(
     "pagoda temple statue church cathedral tower shrine mosque monastery palace castle bridge monument mausoleum fountain "
     "gate fort lighthouse building hall tomb museum market station garden park cave waterfall lake".split())
-_THING_OPEN = re.compile(r"^The\s+(?P<head>" + "|".join(sorted(_THING_HEADS)) + r")(?P<poss>['\u2019]s)?\b(?P<rest>.*)$", re.S | re.I)
+_THING_OPEN = re.compile(r"^(?P<det>The|This|That|These|Those)\s+(?P<head>" + "|".join(sorted(_THING_HEADS)) + r")s?(?P<poss>['\u2019]s)?\b(?P<rest>.*)$", re.S | re.I)   # [LOCAL-906R] "This statue" too
 _NAME_TOK = r"(?:<[^>]{1,40}>|[A-ZÀ-Ỹ][\w'’\-]*)"
 
 
@@ -1030,10 +1030,10 @@ def repair_thing_referent(tour_text: str, evidence_by_title: Optional[Dict[str, 
                 if len(cands) == 1:
                     name = cands[0]
                     fixed = "The " + name + (m.group("poss") or "") + m.group("rest")
-                    emit(f'  {_J} Stop {info["num"]}: "The {head}" had no antecedent; named from the evidence ({name}): "{x[:80]}"')
+                    emit(f'  {_J} Stop {info["num"]}: "{m.group("det")} {head}" had no antecedent; named from the evidence ({name}): "{x[:80]}"')
                     new.append(fixed)
                 else:
-                    emit(f'  {_J} Stop {info["num"]}: "The {head}" had no antecedent and the evidence names '
+                    emit(f'  {_J} Stop {info["num"]}: "{m.group("det")} {head}" had no antecedent and the evidence names '
                          f'{"none" if not cands else "several"} -> sentence dropped: "{x[:80]}"')
                 changed = True
             if changed and new:
