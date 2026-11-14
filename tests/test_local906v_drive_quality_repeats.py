@@ -278,3 +278,19 @@ def test_same_value_distance_fixture_through_last_word_order():
     body = "Omega Mountain is about 28 kilometers west of Gamma City. You can reach the top by cable car."
     t = tour([("Beta Dunes", "The dunes cover about 40 square kilometres.", ""), ("Omega Mountain", body, "")])
     assert v.run_pass(u.run_pass(t, {}, None), None) == u.run_pass(t, {}, None)
+
+
+def test_lead_wave57_breadcrumb_label_dropped():
+    """[LEAD wave 57] '<Country>/<Province>/<Place> 1.' at the end of a body is a gallery label; slashes in prose stay."""
+    import drive_quality_906v as v
+    body = ("Stop 6: Some Pagoda\n\nType/Specialty: Buddhist temple\n\n"
+            "The pagoda was restored over time. It is a pilgrimage site. Countryland/Some Province/Some Pagoda 1.\n\n"
+            "Directions: Walk on.")
+    out = v.strip_breadcrumbs(body)
+    assert "Countryland/Some Province" not in out
+    assert "It is a pilgrimage site." in out
+    assert "Type/Specialty: Buddhist temple" in out
+    prose = "Stop 1: X\n\nThe road climbs at 40 km/h limits and the river and/or canal meet here."
+    assert v.strip_breadcrumbs(prose) == prose
+    alone = "Stop 1: X\n\nCountryland/Some Province/Some Pagoda\n\nA fact here."
+    assert "Countryland/" not in v.strip_breadcrumbs(alone)

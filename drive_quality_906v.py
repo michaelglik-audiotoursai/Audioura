@@ -393,12 +393,33 @@ def run_pass(tour_text: str, log: Optional[Callable] = None) -> str:
     return directions_pass(t, log)
 
 
+# [LEAD wave 57] a gallery / breadcrumb label ("<Country>/<Province>/<Place> 1.") leaked into a stop body on the cloud: a run of
+# three or more Capitalised segments joined by "/" (optionally a trailing image number) is never narration.
+_SEG = r"[A-Z\u00C0-\u1EF9][\w'\u2019\-]*(?:[ \t]+[\w'\u2019\-]+){0,6}"
+_BREADCRUMB = re.compile(r"(?:(?<=[.!?:;])[ \t]+|^[ \t]*|(?<=[ \t]))" + _SEG + r"(?:[ \t]*/[ \t]*" + _SEG + r"){2,}(?:[ \t]+\d{1,3})?[ \t]*[.!?]?(?=[ \t]|$)",
+                         re.M)
+_META_LINE = re.compile(r"^(?:Stop\s+\d+:|Address:|Coordinates:|Type/Specialty:|Specific Examples:|Tour-Category:)")
+
+
+def strip_breadcrumbs(tour_text: str, log: Optional[Callable] = None) -> str:
+    """Drop gallery / breadcrumb labels from narration lines (header lines untouched); logged."""
+    emit = _emit(log)
+    out = []
+    for line in (tour_text or "").split("\n"):
+        if _META_LINE.match(line) or "/" not in line:
+            out.append(line)
+            continue
+        new = _BREADCRUMB.sub(lambda m: (emit(f'  {TAG} breadcrumb / gallery label dropped: "{m.group(0).strip()[:90]}"') or ""), line)
+        out.append(re.sub(r"[ \t]{2,}", " ", new).rstrip() if new != line else line)
+    return "\n".join(out)
+
+
 def last_word(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None, log: Optional[Callable] = None) -> str:
     """After the 906U pass: the 906V guards; a stop they (or a sensory-only body) left without a factual sentence is refilled or takes
     the D760 disclosure body (906S ``factless_stops``), then the guards run once more."""
     emit = _emit(log)
     try:
-        t = run_pass(tour_text, log)
+        t = run_pass(strip_breadcrumbs(tour_text, log), log)
         import language_dest_906s as s906
         t2 = s906.factless_stops(t, evidence_by_title, log)
         if t2 != t:
