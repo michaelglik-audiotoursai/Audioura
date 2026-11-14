@@ -119,6 +119,12 @@ def junk_reason(x: str) -> Optional[str]:
     s = (x or "").strip()
     if any(rx.search(s) for rx in _CAPTION):
         return "photo caption"
+    try:   # [LOCAL-906S] "A person cleans a beach." / "<Place>, <Place>, A person cleans ..." (a verb the list above does not name)
+        import language_dest_906s as _s906s
+        if _s906s.caption_variant(s):
+            return "photo caption"
+    except Exception:  # pragma: no cover
+        pass
     if any(rx.search(s) for rx in _LIST_STUB):
         return "list stub"
     return None

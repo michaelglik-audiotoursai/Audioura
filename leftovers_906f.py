@@ -1004,6 +1004,7 @@ def refill_thin_stops(tour_text: str, evidence_by_title: Optional[Dict[str, str]
             title = st["title"]
             blob = rc._ev_for(ev_map, title) or ""
             if not blob.strip():
+                emit(f"  {TAG} Stop {st['num']} '{title[:40]}': thin, but the delivery evidence holds nothing for this title -> no refill")
                 return {}
             pool = kfc.own_prose_sentences(blob, title)
             _src = "article"
@@ -1015,31 +1016,41 @@ def refill_thin_stops(tour_text: str, evidence_by_title: Optional[Dict[str, str]
                 return {}                          # [LEAD 906L] D760 disclosure: adding "built in 1955" would contradict it
             others = [y for o in all_ if o["title"] != title for _a, _b, y in o["flat"]]
             added: List[str] = []
+            _why: Dict[str, int] = {}      # [LOCAL-906S] why the silent rejections happened (a destination stop with no refill was a mystery)
             for cand in pool:
                 if len(have) + len(added) >= THIN_TARGET:
                     break
                 n = len(cand.split())
                 if not (6 <= n <= 40) or cand[-1:] not in ".!?" or rc.is_fragment(cand) or rc.is_mood_filler(cand, set()):
+                    _why["length / fragment / mood"] = _why.get("length / fragment / mood", 0) + 1
                     continue
                 if _PRON.search(cand) or _FIRST_PERSON.search(cand) or is_promo(cand) or _LEAD.match(cand):
+                    _why["pronoun / you / promo / lead"] = _why.get("pronoun / you / promo / lead", 0) + 1
                     continue
                 if _k906.reject_logged(cand, title, tour_text, emit, st["num"], _src, st.get("type", ""), True):
                     continue                       # [LOCAL-906K] the refill quality bar (reason logged)
                 if kfc.is_denied(title, cand, blob) or kfc.deterministic_unsupported(cand, blob, title):
+                    _why["denied / unsupported"] = _why.get("denied / unsupported", 0) + 1
                     continue
                 if c.record_claim(cand) and c.record_support(cand, blob, title, c._entries_for(title)) == "bad":
+                    _why["record not carried"] = _why.get("record not carried", 0) + 1
                     continue                       # [LOCAL-906J] a record the sources do not carry is not a refill either
                 if c.check_claim(cand, blob, title)[0] == "bad":
+                    _why["claim check"] = _why.get("claim check", 0) + 1
                     continue
                 cur = have + added
                 if any(rc.same_fact(cand, y, title) for y in cur + others):
+                    _why["same fact already in the tour"] = _why.get("same fact already in the tour", 0) + 1
                     continue
                 fc = _facts(cand)
                 me = next((k for k, o in enumerate(all_) if o["num"] == st["num"]), None)
                 if fc and any(fc <= _facts(y) for y in others) and _owner(cand, titles) != me:
+                    _why["fact owned by another stop"] = _why.get("fact owned by another stop", 0) + 1
                     continue
                 added.append(cand)
             if not added:
+                emit(f"  {TAG} Stop {st['num']} '{title[:40]}': thin, no refill candidate passed ({len(pool)} from the {_src}; "
+                     f"{', '.join(f'{k} x{v}' for k, v in _why.items()) or 'none reached the bars'})")
                 return {}
             i, j, last = flat[-1]
             emit(f"  {TAG} Stop {st['num']} '{title[:40]}': [LOCAL-906I] thin after removals ({len(flat)} body sentence(s)) "

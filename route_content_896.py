@@ -1602,7 +1602,13 @@ def is_fragment(sentence: str) -> bool:
     last = _words(core.split()[-1]) if core.split() else []
     if last and last[-1] in _DANGLE_END:
         return True
-    return bool(_EMPTY_CLAUSE.search(x)) or is_verbless(x)
+    if _EMPTY_CLAUSE.search(x) or is_verbless(x):
+        return True
+    try:   # [LOCAL-906S] "As you explore, known for ..." / "<Name>, located about 40 minutes away in <District>." (a participle is not a verb)
+        import language_dest_906s as _s906s
+        return bool(_s906s.fragment_reason(x))
+    except Exception:  # pragma: no cover
+        return False
 
 
 def drop_fragments(tour_text: str, log: Optional[Callable] = None, force: bool = False) -> str:
