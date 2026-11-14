@@ -135,7 +135,7 @@ def promo_reason(x: str) -> Optional[str]:
 # ══ 6. records and comparatives against ALL the evidence ═════════════════════════════════════════════════
 _TEMPORAL = re.compile(r"(?i)\b(?:was|were|had\s+been|formerly|previously|once)\s+(?:the\s+)?(?:\w+\s+)?(?:largest|biggest|longest|tallest|highest|oldest|greatest)\b"
                        r"[^.!?]{0,80}?\b(?:up\s+to|until|till|before|prior\s+to|through)\s+(?:the\s+(?:year\s+)?)?\d{4}")
-_CMP_CUE = re.compile(r"(?i)\b(?:(?:larger|bigger|taller|longer|older|higher|greater|wider|deeper)\s+than|surpass(?:es|ing|ed)?|exceed(?:s|ing|ed)?|"
+_CMP_CUE = re.compile(r"(?i)\b(?:(?:larger|bigger|taller|longer|older|higher|greater|wider|deeper|smaller|shorter|lower|younger|narrower|shallower)\s+than|surpass(?:es|ing|ed)?|exceed(?:s|ing|ed)?|"
                       r"outdo(?:es|ing)?|outsiz(?:es|ing|ed)|dwarf(?:s|ing|ed)?|eclips(?:es|ing|ed)|beat(?:s|ing)?|overtak(?:es|ing)|rival(?:s|ing|led)?)\b")
 _CAPS = re.compile(r"\b[A-ZÀ-Ỹ][^\W\d_]{2,}(?:\s+[A-ZÀ-Ỹ][^\W\d_]{2,})*")
 
@@ -191,12 +191,22 @@ def narrower_scope(x: str, st_title: str, ev_own: str, ev_other: Dict[str, str])
     return best["scope"] if best else None
 
 
-def comparative_unsupported(x: str, ev_own: str, ev_all: Sequence[str]) -> Optional[str]:
-    """The named place a comparative sentence measures against, when no evidence sentence states that comparison."""
+def comparative_unsupported(x: str, ev_own: str, ev_all: Sequence[str], title: str = "") -> Optional[str]:
+    """The named place a comparative sentence measures against, when no evidence sentence states that comparison.
+    [LOCAL-906X] \"There are big <Object> statues in <Country> too, <A>, <B>, but both are smaller than this one.\" names the other
+    objects BEFORE the cue: they count too (the stop's own title words and the sentence opener do not)."""
     m = _CMP_CUE.search(x or "")
     if not m:
         return None
     names = [n for n in _CAPS.findall(x[m.end():])]
+    if not names and re.match(r"(?i)\s*(?:this|that|it|its|those|these|the)\b", x[m.end():]):
+        tt = set(rc.fold(w) for w in re.findall(r"[^\W\d_]+", title or ""))
+        for cm in _CAPS.finditer(x[:m.start()]):
+            if cm.start() == 0:
+                continue
+            ws = [rc.fold(w) for w in cm.group(0).split()]
+            if ws and not set(ws) <= tt:
+                names.append(cm.group(0))
     if not names:
         return None
     pools = [ev_own] + list(ev_all)
@@ -211,7 +221,7 @@ def comparative_unsupported(x: str, ev_own: str, ev_all: Sequence[str]) -> Optio
 
 def _record_judgement(x: str, st: Dict, ctx: Dict) -> Optional[Tuple[str, str, str]]:
     ev_own = ctx["ev"].get(st["num"], "")
-    cmp_name = comparative_unsupported(x, ev_own, [v for v in ctx["ev_all"].values() if v != ev_own])
+    cmp_name = comparative_unsupported(x, ev_own, [v for v in ctx["ev_all"].values() if v != ev_own], st["title"])
     if cmp_name:
         return "drop", "", f"comparison with '{cmp_name}' that no evidence states"
     other = {k: v for k, v in ctx["ev_all"].items() if v != ev_own}      # the evidence of EVERY entry of the job, tour stop or not

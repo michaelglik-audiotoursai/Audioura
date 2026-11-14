@@ -226,6 +226,10 @@ def _persony_names(text: str, title: str) -> bool:
                 continue
             if re.search(r"(?i)\bthe\s+$", s[:m.start()]):
                 continue
+            # [LOCAL-906X] "the Lower Pagoda, Long Doan.": a name after "<place noun>," is the place's own name, not a person
+            ap = re.search(r"([^\W\d_]+)\s*,\s*$", s[:m.start()])
+            if ap and ap.group(1).lower() in _PLACE_END:
+                continue
             return True
     return False
 
@@ -1123,4 +1127,9 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
         t = _r906r.run_pass(t, evidence_by_title, log)
     except Exception as _e906r:  # pragma: no cover
         _emit(log)(f"  [LOCAL-906R] pass skipped (non-fatal): {_e906r}")
+    try:   # [LOCAL-906X] a length stated as a rise, a year no article states for a built object
+        import rise_dates_906x as _x906x
+        t = _x906x.run_pass(t, evidence_by_title, log)
+    except Exception as _e906x:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906X] pass skipped (non-fatal): {_e906x}")
     return t
