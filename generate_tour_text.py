@@ -3758,6 +3758,21 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
     if not poi_list or not scope_name:
         return poi_list
 
+    # [LOCAL-906Q] An A-to-B tour is judged against its ROUTE CORRIDOR (origin, destination, region, padded box), never
+    # the destination alone; a rejection made against a route is never recorded, and scope memory never rejects there.
+    _corr906q = None
+    try:
+        import route_scope_906q as _r906q
+        _corr906q = _r906q.corridor()
+        if _corr906q:
+            print(f"   [LOCAL-906Q] route corridor scope: {_corr906q['origin']!r} -> {_corr906q['destination']!r} "
+                  f"region={_corr906q['region']!r} box={'yes' if _corr906q['box'] else 'none'} "
+                  f"(was '{scope_name}')")
+            scope_name = _r906q.label(_corr906q)
+    except Exception as _e906q:  # pragma: no cover
+        print(f"   [LOCAL-906Q] corridor scope skipped (non-fatal): {_e906q}")
+        _corr906q = None
+
     # [D557] Memory before judgement. A stop already ruled outside THIS scope is
     # dropped deterministically — no token spend, and no chance of the model
     # answering differently than it did last run, which is how Villa Leopolda
@@ -3802,7 +3817,12 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
         if _VENUE_PARTS_RUN or poi.get('_venue_part'):
             return poi, True, "high", "[D578] part of the venue by construction"
 
-        remembered, why = known_out_of_scope(name, scope_name)
+        if _corr906q:
+            if _r906q.stop_in_corridor(poi, _corr906q):
+                return poi, True, "high", "[LOCAL-906Q] inside the route corridor"
+            remembered, why = False, ''        # a destination-keyed entry never judges a route tour
+        else:
+            remembered, why = known_out_of_scope(name, scope_name)
         if remembered:
             return poi, False, "high", f"[scope-memory] {why}"
 
@@ -3940,7 +3960,9 @@ def _validate_stops_within_scope(poi_list, scope_name, headers, max_check=12,
                 # [LOCAL-481] A [not-a-place] rejection is NOT scope-specific — the
                 # name is bad for every scope — so it must not be written into the
                 # (name, scope) out-of-scope corpus.
-                if not reason.startswith('[scope-memory]') and not reason.startswith('[not-a-place]'):
+                if _corr906q:
+                    print(f"   [LOCAL-906Q] route-corridor rejection of '{poi.get('name', '')}' is not recorded in scope memory")
+                elif not reason.startswith('[scope-memory]') and not reason.startswith('[not-a-place]'):
                     record_out_of_scope(poi.get('name', ''), scope_name, reason=reason)
 
     kept = first_stop + survivors + tail
@@ -13667,6 +13689,13 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
     _geo_scope = (intent.get('geographic_scope') or '').strip() if intent else ''
     _scope_precision = (intent.get('scope_precision') or '').strip().upper() if intent else ''
     _scope_constraint = ''
+    try:    # [LOCAL-906Q] an A-to-B request is bounded by its corridor, not by the destination alone
+        import route_scope_906q as _r906q3a
+        _c906q3a = _r906q3a.corridor(compute_box=False)
+        if _c906q3a and _geo_scope:
+            _geo_scope = _r906q3a.label(_c906q3a)
+    except Exception:  # pragma: no cover
+        pass
     if _geo_scope and _scope_precision in ('CORRIDOR', 'DISTRICT'):
         _scope_constraint = (
             f"\nGEOGRAPHIC SCOPE — ALL stops MUST be located within: {_geo_scope}.\n"
@@ -15770,6 +15799,23 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             if _selection_reasons:
                 print(f"  [LOCAL-329] Captured {len(_selection_reasons)} substantive selection reason(s)")
 
+            # [LOCAL-906Q] Fewer than the requested count survived: refill from the hollow candidates in their original
+            # order (deduped) up to N. The existence gate and grounding downstream still decide.
+            try:
+                _n906q = int(_requested_stop_count_original or total_stops or 0)
+            except Exception:
+                _n906q = 0
+            if _hollow_fallback_lead910 and 0 < len(poi_list) < _n906q:
+                from story_miner import _normalize as _q906_norm
+                _k906q = 0
+                for _hn, _ha in _hollow_fallback_lead910:
+                    if len(poi_list) >= _n906q:
+                        break
+                    if not any(_q906_norm(_hn) == _q906_norm(p.get('name', '')) for p in poi_list):
+                        poi_list.append(_new_poi(_hn, _ha))
+                        _k906q += 1
+                if _k906q:
+                    print(f"  [LOCAL-906Q] hollow refill: {_k906q}")
             # [LEAD-910] A hollow reason only DEPRIORITIZES a candidate (LOCAL-329's intent). When every
             # candidate was rejected for that reason alone, an empty tour is worse: keep them, and let the
             # existence gate and grounding downstream decide. Observed 2026-11-13: an A-to-B drive whose 6

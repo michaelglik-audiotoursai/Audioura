@@ -724,6 +724,68 @@ def origin_directions(tour_text: str, origin: str, origin_pt: Optional[Pt], log:
     return tour_text[:s] + new_blk + tour_text[e:]
 
 
+def first_leg_from_origin(tour_text: str, origin: str, destination: str, origin_pt: Optional[Pt] = None,
+                          log: Optional[Callable] = None) -> str:
+    """[LOCAL-906Q] On an A-to-B tour the first leg starts at the ORIGIN. A sentence of Stop 1's Orientation / Directions that
+    drives \"From <destination>, head ...\" is dropped (the destination is the LAST stop, not the start), a dangling
+    \"for,\" direction sentence goes, and the Orientation names the origin as the start. Never raises."""
+    emit = _emit(log)
+    try:
+        blocks = rc._stop_blocks(tour_text or "")
+        if not blocks or not origin or not destination:
+            return tour_text
+        s0, e0, _num, title = blocks[0]
+        blk = tour_text[s0:e0]
+        lines = blk.split("\n")
+        o_idx = None
+        for k, ln in enumerate(lines):
+            m = re.match(r"(?i)^(\s*(?:Orientation|Directions)\s*:\s*)(.*)$", ln)
+            if not m:
+                continue
+            kind = m.group(1).strip().rstrip(":").strip().lower()
+            sents = rc.split_sentences(m.group(2))
+            kept = []
+            for x in sents:
+                fm = re.match(r"(?i)^From\s+([^,.]{2,80}?)\s*(?:,|\s+head\b|\s+drive\b|\s+take\b)", x)
+                from_dest = bool(fm) and rc._names(fm.group(1), destination) and not rc._names(fm.group(1), origin)
+                if from_dest or re.search(r"(?i)\bfor\s*(?:[,;.]|$)|\bfor\s+then\b", x):
+                    emit(f'  [LOCAL-906Q] first leg: sentence that starts at the destination / dangles on "for," dropped '
+                         f'(Stop 1 {kind}): "{x[:90]}"')
+                    continue
+                kept.append(x)
+            if len(kept) != len(sents):
+                if not kept and kind == "directions":      # the whole leg started at the destination: state the real one
+                    cm0 = re.search(r"(?mi)^Coordinates:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)", blk)
+                    kept = [f"From {origin}, head to {title}."]
+                    if origin_pt and cm0:
+                        pt0 = (float(cm0.group(1)), float(cm0.group(2)))
+                        km0 = km_between(origin_pt, pt0) * ROAD_CIRCUITY
+                        if km0 >= 1.0:
+                            kept = [f"From {origin}, head {compass(origin_pt, pt0)} to {title} -- it is roughly "
+                                    f"{km0:.0f} km away."]
+                lines[k] = m.group(1) + " ".join(kept)
+            if kind == "orientation":
+                o_idx = k
+        if o_idx is not None:
+            om = re.match(r"(?i)^(\s*Orientation\s*:\s*)(.*)$", lines[o_idx])
+            if not rc._names(om.group(2), origin) and not re.search(r"(?i)\bfrom\s+" + re.escape(origin), om.group(2)):
+                cm = re.search(r"(?mi)^Coordinates:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)", blk)
+                lead = f"The route starts at {origin}; from there, head to {title}."
+                if origin_pt and cm:
+                    pt = (float(cm.group(1)), float(cm.group(2)))
+                    km = km_between(origin_pt, pt) * ROAD_CIRCUITY
+                    if km >= 1.0:
+                        lead = (f"The route starts at {origin}; from there, head {compass(origin_pt, pt)} to {title} "
+                                f"-- roughly {km:.0f} km away.")
+                lines[o_idx] = (om.group(1) + om.group(2)).rstrip() + " " + lead
+                emit(f"  [LOCAL-906Q] first Orientation now names the origin {origin!r} as the start")
+        new_blk = "\n".join(lines)
+        return tour_text[:s0] + new_blk + tour_text[e0:] if new_blk != blk else tour_text
+    except Exception as err:  # pragma: no cover
+        emit(f"  [LOCAL-906Q] first-leg fix skipped (non-fatal): {err}")
+        return tour_text
+
+
 def finalize_text(tour_text: str, log: Optional[Callable] = None) -> str:
     """Delivery pass for an "A to B" tour (a no-op for any other): every stop block carries a Coordinates line and the
     first Directions start from the origin. Never raises."""
@@ -734,6 +796,7 @@ def finalize_text(tour_text: str, log: Optional[Callable] = None) -> str:
             return tour_text
         out = ensure_text_coordinates(tour_text, None, log)
         a, _b = _STATE.get("endpoints") or (None, None)
+        out = first_leg_from_origin(out, info["origin"], info["destination"], a, log)   # [LOCAL-906Q]
         return origin_directions(out, info["origin"], a, log)
     except Exception as err:  # pragma: no cover
         emit(f"  {TAG} delivery pass skipped (non-fatal): {err}")
