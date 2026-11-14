@@ -373,3 +373,24 @@ def test_a_sentence_with_a_number_the_fact_does_not_state_is_still_rejected():
         min_sentences=1, max_sentences=3, log=logs.append)
     assert sents is None
     assert any("not traceable" in m for m in logs) and any("[LOCAL-906U]" in m and "not narrated" in m for m in logs)
+
+
+def test_lead_job_backoff_budget_caps_total_429_sleep(monkeypatch):
+    """[LEAD 906U] persistent 429s must not stall a job: total back-off per job is capped."""
+    import nominatim_throttle_906u as t
+    t.reset_job()
+    monkeypatch.setattr(t, "DEFAULT_BACKOFF_S", 2.0)
+    slept = []
+
+    class E429(Exception):
+        code = 429
+        headers = {"Retry-After": "30"}
+
+    def boom():
+        raise E429("Too many requests")
+
+    for i in range(10):
+        t.call(("q", i), boom, query=f"place {i}", sleep=slept.append, min_interval=0.0, log=lambda m: None)
+    assert sum(slept) <= t.JOB_BACKOFF_BUDGET_S + 1e-9
+    t.reset_job()
+    assert t._backoff_spent[0] == 0.0

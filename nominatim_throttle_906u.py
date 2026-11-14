@@ -28,11 +28,13 @@ MAX_RETRIES = 2                 # retries after the first 429 (so at most 3 requ
 RETRY_AFTER_CAP_S = 30.0        # a server asking for longer is not waited for
 DEFAULT_BACKOFF_S = 2.0         # when a 429 carries no Retry-After: 2 s, then 4 s
 FAIL_TTL_S = 60.0               # an errored lookup is not repeated for this long (the 429 window)
+JOB_BACKOFF_BUDGET_S = 60.0     # [LEAD 906U] total 429 back-off sleep per job: past it, a 429 fails at once (no hour-long stall)
 
 _lock = threading.Lock()
 _last_request = 0.0
 _cache: Dict[Any, Any] = {}                 # key -> ("ok", value) | ("fail", expires_at)
 _failed_queries: List[str] = []
+_backoff_spent = [0.0]
 _MISS = object()
 
 
@@ -48,6 +50,7 @@ def reset_job() -> None:
     with _lock:
         _cache.clear()
         del _failed_queries[:]
+        _backoff_spent[0] = 0.0
 
 
 def wait_turn(sleep: Callable[[float], None] = None, clock: Callable[[], float] = None,
@@ -109,8 +112,9 @@ def call(key: Any, do_request: Callable[[], Any], query: str = "", sleep: Callab
         try:
             val = do_request()
         except Exception as e:                                  # noqa: BLE001 - every failure is a failed lookup
-            if is_429(e) and attempt < MAX_RETRIES:
-                pause = retry_after_s(e, attempt)
+            if is_429(e) and attempt < MAX_RETRIES and _backoff_spent[0] < JOB_BACKOFF_BUDGET_S:
+                pause = min(retry_after_s(e, attempt), JOB_BACKOFF_BUDGET_S - _backoff_spent[0])
+                _backoff_spent[0] += pause
                 emit(f"[LOCAL-906U] geocoder 429 for {query!r}: retry {attempt + 1}/{MAX_RETRIES} after {pause:.0f}s")
                 sleep(pause)
                 continue
