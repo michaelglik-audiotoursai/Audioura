@@ -2105,6 +2105,13 @@ def _salvage_after_count(cut_text: str, other_titles: Optional[List[str]] = None
                 paras.append(para)
         for x in _sentences906b("\n\n".join(paras)):
             low = re.sub(r'\s+', ' ', x).lower()
+            try:   # [LOCAL-906V] the tour-level thread template is never a stop sentence, whatever follows the offer
+                import drive_quality_906v as _v906v
+                if _v906v.thread_template(x):
+                    gone.append(x)
+                    continue
+            except Exception:  # pragma: no cover
+                pass
             if stop_like(x) and (after_offer or not any(t in low for t in others)):
                 keep.append(x)
             else:

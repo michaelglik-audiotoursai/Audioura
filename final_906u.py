@@ -359,7 +359,19 @@ def sentence_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = 
                 for v, key in distances(x):
                     if not key:
                         continue
-                    if key in seen and abs(seen[key][0] - v) > 0.5:
+                    if key in seen and abs(seen[key][0] - v) <= 0.5:
+                        # [LOCAL-906V] the same value twice is one fact told twice: the location lead ("<X> is N km <dir> of <City>, in
+                        # <Province>, ...") goes, else the later sentence
+                        pv, pi, pj, px = seen[key]
+                        lead_new = bool(re.search(r"(?i)\bis\s+\d[\d.,]*\s*(?:km|kilomet\w+|miles?)\b[^.!?]*,\s+in\s+", x))
+                        lead_old = bool(re.search(r"(?i)\bis\s+\d[\d.,]*\s*(?:km|kilomet\w+|miles?)\b[^.!?]*,\s+in\s+", px))
+                        loser = (pi, pj, px) if (lead_old and not lead_new) else (i, j, x)
+                        if (loser[0], loser[1]) not in drop_dist:
+                            drop_dist.add((loser[0], loser[1]))
+                            emit(f'  {TAG} Stop {st["num"]}: the same distance from "{key}" ({v:g} km) told twice -> dropped: "{loser[2][:80]}"')
+                        if loser[:2] == (pi, pj):
+                            seen[key] = (v, i, j, x)
+                    elif key in seen and abs(seen[key][0] - v) > 0.5:
                         pv, pi, pj, px = seen[key]
                         import refill_quality_906k as k
                         keep_new = k.source_of(x, ev, st["title"]) == "article" and k.source_of(px, ev, st["title"]) != "article"

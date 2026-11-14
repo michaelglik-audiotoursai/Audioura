@@ -1039,6 +1039,13 @@ def refill_thin_stops(tour_text: str, evidence_by_title: Optional[Dict[str, str]
                     _why["claim check"] = _why.get("claim check", 0) + 1
                     continue
                 cur = have + added
+                try:   # [LOCAL-906V] a distance the stop already states is not appended again
+                    import drive_quality_906v as _v906v
+                    if _v906v.distance_duplicate(cand, cur):
+                        _why["distance already stated"] = _why.get("distance already stated", 0) + 1
+                        continue
+                except Exception:  # pragma: no cover
+                    pass
                 if any(rc.same_fact(cand, y, title) for y in cur + others):
                     _why["same fact already in the tour"] = _why.get("same fact already in the tour", 0) + 1
                     continue
