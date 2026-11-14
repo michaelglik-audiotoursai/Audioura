@@ -1095,4 +1095,9 @@ def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None,
         t = _o906p.run_pass(t, evidence_by_title, log)
     except Exception as _e906p:  # pragma: no cover
         _emit(log)(f"  [LOCAL-906P] pass skipped (non-fatal): {_e906p}")
+    try:   # [LOCAL-906Q] restaurant plug, day-trip / operator copy, resort promo, filler, two communes, a dangling "for,"
+        import route_copy_906q as _c906q
+        t = _c906q.run_pass(t, evidence_by_title, log)
+    except Exception as _e906q:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906Q] pass skipped (non-fatal): {_e906q}")
     return t
