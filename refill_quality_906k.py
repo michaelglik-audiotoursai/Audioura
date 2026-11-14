@@ -133,6 +133,15 @@ def refill_reject(cand: str, title: str, tour_text: Optional[str] = None, source
             return _why
     except Exception:  # pragma: no cover
         pass
+    try:   # [LOCAL-906S] a sentence in another language is never a refill (a local-language encyclopedia lead)
+        import language_dest_906s as _s906s
+        _lang = _s906s.foreign_language(x)
+        if _lang and (tour_text is None or _s906s.tour_is_english(tour_text)):
+            return f"sentence in another language ({_lang})"
+        if _s906s.caption_variant(x) or _s906s.variant_reason(x) or _s906s.fragment_reason(x) or _s906s.is_connects_filler(x):
+            return "caption / operator / fragment / filler copy"
+    except Exception:  # pragma: no cover
+        pass
     if _WORLD.search(x) or c.record_claim(x):
         return "world / record / exclusivity claim"
     m = c._SUP_RX.search(x)
