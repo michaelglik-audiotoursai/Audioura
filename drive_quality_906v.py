@@ -522,7 +522,11 @@ _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\u00C0-\u1EF9\"'“])")
 
 
 # [LOCAL-906X] neighbour / operator leftovers the earlier passes missed (drive proof of 906W)
-_NEIGHBOUR_LEFTOVER = re.compile(r"(?i)\bvisitors\s+often\s+combine\b|\blocal\s+attractions\s+and\s+activities\s+like\b|\bjeep\s+tours?\b")
+_NEIGHBOUR_LEFTOVER = re.compile(r"(?i)\bvisitors\s+often\s+combine\b|\blocal\s+attractions\s+and\s+activities\s+like\b|\bjeep\s+tours?\b|"
+                                 # [LEAD wave 59 cloud] "Tour <Name> to experience the cable car and see …" (an imperative listing)
+                                 r"^tour\s+[A-Z\u00C0-\u1EF9][^.!?]{0,60}\bto\s+(?:experience|see|explore|visit|enjoy|discover)\b|"
+                                 # [LEAD wave 59 cloud] 552's new closing "Set side by side, they trace how this place changed …"
+                                 r"^(?:set|placed|taken|seen)\s+side\s+by\s+side\b|\bthey\s+trace\s+how\s+this\s+place\b")
 
 
 def sweep_reason(x: str) -> Optional[str]:
@@ -556,6 +560,7 @@ def final_sweep(tour_text: str, log: Optional[Callable] = None) -> str:
     """The last guard on narration lines (header and Directions lines untouched). A paragraph is never emptied."""
     emit = _emit(log)
     out = []
+    _seen = [0, 0]
     for line in (tour_text or "").split("\n"):
         if not line.strip() or _META_LINE.match(line) or line.startswith(("Directions:", "Orientation:")) or line.startswith("That's "):
             out.append(line)
@@ -563,12 +568,16 @@ def final_sweep(tour_text: str, log: Optional[Callable] = None) -> str:
         sents = _SENT_SPLIT.split(line.strip())
         keep = []
         for x in sents:
+            _seen[0] += 1
             why = sweep_reason(x)
             if why:
                 emit(f'  {TAG} final sweep: {why} dropped: "{x[:90]}"')
             else:
                 keep.append(x)
-        out.append(" ".join(keep) if keep and len(keep) != len(sents) else line)
+        _new = " ".join(keep) if keep and len(keep) != len(sents) else line
+        _seen[1] += (len(sents) - len(keep)) if _new != line else 0
+        out.append(_new)
+    emit(f"  {TAG} final sweep ran: {_seen[0]} narration sentence(s) checked, {_seen[1]} dropped")   # [LEAD wave 59] reachability heartbeat
     return "\n".join(out)
 
 

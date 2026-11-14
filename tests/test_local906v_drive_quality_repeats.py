@@ -334,3 +334,14 @@ def test_lead_wave59_last_word_ends_with_final_sweep_and_reguards_refills():
         assert v.sweep_reason(x), x
     for x in ("The statue was begun in 1958 and completed in 1962.", "Exploring the towers, archaeologists found 12 inscriptions in 1990."):
         assert v.sweep_reason(x) is None, x
+
+
+def test_lead_wave59_cloud_tour_listing_side_by_side_and_heartbeat():
+    """[LEAD wave 59 cloud] 'Tour <X> to experience …' and 'Set side by side, they trace …' are dropped; the sweep logs a heartbeat."""
+    import drive_quality_906v as v
+    assert v.sweep_reason("Tour Some Mountain to experience the cable car and see the Reclining Buddha.")
+    assert v.sweep_reason("Set side by side, they trace how this place changed across the twentieth century.")
+    assert v.sweep_reason("Tourists come here in 1990 to see the statue.") is None
+    logs = []
+    v.final_sweep("Stop 1: X\n\nA fact here. Another fact here.", logs.append)
+    assert any("final sweep ran: 2 narration sentence(s) checked, 0 dropped" in m for m in logs)
