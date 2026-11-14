@@ -625,6 +625,14 @@ def _far_from_province_906d(coord, province_box) -> bool:
         return False
 
 
+def floats_911(b):
+    """[LEAD-911] A bounding box as floats (Nominatim returns strings); None when it cannot be read."""
+    try:
+        return [float(x) for x in b] if b and len(b) >= 4 else b
+    except (TypeError, ValueError):
+        return None
+
+
 def snap_poi_coordinates(poi_list: List[Dict],
                          scope: str = "",
                          scope_center: Optional[Tuple[float, float]] = None,
@@ -670,6 +678,10 @@ def snap_poi_coordinates(poi_list: List[Dict],
     ``[LOCAL-858] no coordinate <title>``. A centroid is 'coordinates unknown', not
     a place, so it must never ship as a real pin (HCMC tour 527). The stop itself
     is kept — only the fake pin is dropped."""
+    # [LEAD-911] Nominatim gives boundingbox values as strings; comparing them with float coordinates raised
+    # "'<=' not supported between 'str' and 'float'" and skipped the snap for EVERY stop of the tour.
+    scope_bbox = floats_911(scope_bbox)
+    route_box = floats_911(route_box)
     emit = log or (lambda _m: None)
     rows: List[Dict] = []
 
