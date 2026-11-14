@@ -226,3 +226,10 @@ def test_run_pass_is_idempotent_and_never_raises():
     once = sp.run_pass(t, EVID)
     assert sp.run_pass(once, EVID) == once
     assert sp.run_pass("", None) == ""
+
+
+def test_lead_superlative_in_size_is_not_a_splice():
+    import splice_copy_906r as _s
+    assert _s.splice_span("It is the largest in size among the island pagodas.") is None
+    assert _s.splice_span("An increase in size followed.") is None
+    assert _s.splice_span("Stretching an impressive in length.") is not None

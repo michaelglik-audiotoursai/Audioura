@@ -87,7 +87,7 @@ _HAS_NUMBER = re.compile(r"\d|(?i:\b" + _NUMWORD + r"\b)")
 _ADJ = (r"(?:impressive|remarkable|staggering|towering|enormous|massive|whopping|stunning|total|overall|full|incredible|"
         r"great|considerable|significant|huge|giant|vast|long|tall|high)")
 _SPLICE = [re.compile(p) for p in (
-    r"(?i)\b(?:an?|the|its|their|this|that)\s+(?:[a-z\-]+\s+)?in\s+(?:length|height|width|depth|size|diameter)\b",
+    r"(?i)\b(?:an?|the|its|their|this|that)\s+(?:" + _ADJ + r"\s+)?in\s+(?:length|height|width|depth|size|diameter)\b",   # LEAD: only an adjective, never "the largest in size"
     r"(?i)\b(?:total|overall|full)\s+(?:length|height|width|depth)\s+of\s*(?=[,.;!?]|$)",
     r"(?i)\bmeasur(?:ing|es|ed)\s+(?:about\s+|around\s+|nearly\s+|some\s+)?(?:meters|metres|kilometers|kilometres|feet|miles|km)\b",
     r"(?i)\b(?:an?|the)\s+" + _ADJ + r"\s+(?:long|high|tall|wide|deep)\s*(?=[.,;!?]|$)",
