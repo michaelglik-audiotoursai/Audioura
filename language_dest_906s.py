@@ -213,6 +213,8 @@ _VARIANTS = [re.compile(p) for p in (
     r"(?i)\bpersonali[sz]ed\s+experience\b",
     r"(?i)^this\s+tour\s+(?:showcases?|highlights?|celebrates?|captures?|explores?|brings|offers|reveals|reflects|weaves|blends|combines|"
     r"tells|takes|invites|journeys|traces|illustrates|demonstrates)\b",
+    r"(?i)^(?:exploring|visiting|seeing|discovering)\s+(?:these|all\s+(?:of\s+)?these)\s+(?:sites|stops|places|spots|landmarks|locations)\b[^.!?]{0,20}\b(?:allows?|lets?|helps?|gives?)\s+you\b",
+    r"(?i)\bcreating\s+(?:lasting|unforgettable|lifelong|lifetime)\s+memories\b",
     r"(?i)^(?:each|every)\s+(?:stop|place|site)\s+(?:invites?|offers?|reveals?|reflects?|tells?|shows?|captures?|adds?|brings?|"
     r"holds?|deepens?|reminds?)\b",
 )]
@@ -621,7 +623,13 @@ def factless_stops(tour_text: str, evidence_by_title: Optional[Dict[str, str]] =
 def run_pass(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None, log: Optional[Callable] = None) -> str:
     t = drop_pass(tour_text, evidence_by_title, log)
     t = drop_closing(t, log)
-    return unify_measures(t, evidence_by_title, log)
+    t = unify_measures(t, evidence_by_title, log)
+    try:   # [LOCAL-906T] promo / record / neighbour / bearing guards, then the stub-tail guard
+        import stub_promo_906t as _t906t
+        t = _t906t.run_pass(t, evidence_by_title, log)
+    except Exception as err:  # pragma: no cover
+        _emit(log)(f"  [LOCAL-906T] pass skipped (non-fatal): {err}")
+    return t
 
 
 def last_word(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None, log: Optional[Callable] = None) -> str:

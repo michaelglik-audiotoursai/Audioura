@@ -485,6 +485,8 @@ def _join_kept_clauses(parts: List[str], seps: List[str], is_bad: Callable[[str]
         x = x.rstrip(" ,;")
         if n and x:
             x = x[0].upper() + x[1:]
+        if x and len(re.findall(r"[^\W\d_]+", x)) < 3 and x[-1] not in ".!?":
+            continue     # [LOCAL-906T] a kept clause of one or two words ("This site") is what is left of a cut sentence: never a stub
         if n < len(sents) - 1 and x and x[-1] not in ".!?":
             x += "."
         out.append(x)
