@@ -142,6 +142,15 @@ _CLOSE_GERUND = re.compile(r"(?i)^(?:exploring|experiencing|visiting|discovering
                            r"[^.!?]{0,220}?\b(?:allows?|invites?|lets?|helps?|gives?|offers?|encourages?|deepens?|enriches?|leaves?)\b")
 
 
+# [LOCAL-906W] a travel time in a stop body ("If you start from <Origin>, the trip to <X> takes about 40 to 44 minutes by car.") is the 897
+# rule's: it was injected after ``strip_body_travel`` ran, so it is judged again here on a route tour.
+_TRAVEL_CUE = re.compile(r"(?i)\b(?:trip|drive|ride|journey|travel(?:l?ing)?|commute|takes?|by\s+(?:car|bus|taxi|train|motorbike|motorcycle|bike|boat|foot))\b")
+
+
+def body_travel_time(x: str, route: bool) -> bool:
+    return bool(route and rc._MINUTES.search(x or "") and _TRAVEL_CUE.search(x or ""))
+
+
 def _no_fact(x: str) -> bool:
     if re.search(r"\d", x or ""):
         return False
@@ -202,9 +211,36 @@ def _names(x: str, title: str) -> Set[str]:
     return {rc.fold(w) for w in words[1:] if w[:1].isupper() and rc.fold(w) not in skip and len(w) > 2}
 
 
+def _norm_toks(x: str, drop: Set[str]) -> Set[str]:
+    """[LOCAL-906W] content tokens without the stop's own title words, \"un-\" / \"non-\" folded into the bare word."""
+    out = set()
+    for t in rc._content_tokens(x):
+        if t in drop:
+            continue
+        m = re.match(r"^(?:un|non)([a-z]{4,})$", t)
+        out.add(m.group(1) if m else t)
+    return out
+
+
+def _shingle(xa: str, xb: str, n: int = 5) -> bool:
+    """[LOCAL-906W] a run of ``n`` consecutive words (case-folded) that both sentences hold."""
+    wa, wb = re.findall(r"\w+", rc.fold(xa)), re.findall(r"\w+", rc.fold(xb))
+    if len(wa) < n or len(wb) < n:
+        return False
+    grams = {tuple(wa[i:i + n]) for i in range(len(wa) - n + 1)}
+    return any(tuple(wb[i:i + n]) in grams for i in range(len(wb) - n + 1))
+
+
 def same_telling(xa: str, xb: str, title: str = "") -> bool:
     ta, tb = rc._content_tokens(xa), rc._content_tokens(xb)
     if min(len(ta), len(tb)) >= 5 and len(ta & tb) / min(len(ta), len(tb)) >= 0.6:
+        return True
+    # [LOCAL-906W] the stop's own name words (and \"un-damaged\" / \"damaged\") are not what the two sentences share: compare without them
+    drop = set(rc._content_tokens(title)) | {rc.fold(w) for w in re.findall(r"[^\W\d_]+", title or "")}
+    na, nb = _norm_toks(xa, drop), _norm_toks(xb, drop)
+    if min(len(na), len(nb)) >= 5 and len(na & nb) / min(len(na), len(nb)) >= 0.6:
+        return True
+    if _shingle(xa, xb) and min(len(ta), len(tb)) >= 5:
         return True
     ca, cb = _classes(xa), _classes(xb)
     shared = ca & cb
@@ -219,7 +255,54 @@ def same_telling(xa: str, xb: str, title: str = "") -> bool:
         return False
 
 
-def retold_pass(tour_text: str, log: Optional[Callable] = None) -> str:
+def _unhedged_record(x: str, title: str) -> bool:
+    """[LOCAL-906W] a size superlative with no \"one of\" / \"among\" hedge, or a record claim, for a scope that is not the stop's own."""
+    try:
+        cl = c.scoped_claim(x)
+        if cl and not cl["hedged"] and cl["cls"] in c._SIZE_CLASSES and not c._local_scope(cl, title):
+            return True
+        return bool(c.record_claim(x))
+    except Exception:
+        return False
+
+
+def _plain_specificity(x: str, title: str = "") -> int:
+    """[LOCAL-906W] ``rc.specificity`` without the capitalised scope word of a superlative (\"... in Asia\"): a superlative is not a specific."""
+    try:
+        cl = c.scoped_claim(x, include_hedged=True)
+        if cl and cl.get("scope"):
+            x = re.sub(r"(?<![\w-])" + re.escape(cl["scope"]) + r"(?![\w-])", " ", x, count=1)
+    except Exception:
+        pass
+    for w in {w for w in re.findall(r"[^\W\d_]{3,}", title or "")}:   # the stop's own name is not a specific either
+        x = re.sub(r"(?<![\w-])" + re.escape(w) + r"(?![\w-])", " ", x)
+    return rc.specificity(x)
+
+
+def keep_key(x: str, title: str, k: int = 0) -> Tuple:
+    """[LOCAL-906W] which of several tellings stays: never an unhedged record over another sentence, then the most specific (a superlative's
+    scope word does not count), then the first."""
+    return (0 if _unhedged_record(x, title) else 1, _plain_specificity(x, title), -k)
+
+
+_THING_HEADS_906W = tuple(sorted(c._THING_HEADS))
+
+
+def _introduces(dropped: str, kept: str, title: str, before: Sequence[str]) -> bool:
+    """[LOCAL-906W] ``dropped`` is the only earlier sentence that names the generic thing (\"statue\") ``kept`` opens on (\"This statue ...\")."""
+    m = c._THING_OPEN.match((kept or "").strip())
+    if not m or c._SELF_ANCHOR.match(m.group("rest") or ""):
+        return False
+    head = m.group("head").lower()
+    rx = re.compile(r"\b" + head + r"s?\b")
+    if rx.search(rc.fold(re.sub(r"[<>]", " ", title or ""))):
+        return False
+    if any(rx.search(rc.fold(y)) for y in before):
+        return False
+    return bool(rx.search(rc.fold(dropped)))
+
+
+def retold_pass(tour_text: str, log: Optional[Callable] = None, evidence_by_title: Optional[Dict[str, str]] = None) -> str:
     emit = _emit(log)
     if not tour_text:
         return tour_text
@@ -245,15 +328,21 @@ def retold_pass(tour_text: str, log: Optional[Callable] = None) -> str:
             for members in groups.values():
                 if len(members) < 2:
                     continue
-                keep = max(members, key=lambda k: (rc.specificity(items[k][2]), -k))
+                keep = max(members, key=lambda k: keep_key(items[k][2], st["title"], k))
                 for k in members:
                     if k != keep:
                         i, j, x = items[k]
+                        if _introduces(x, items[keep][2], st["title"], [y for (_a, _b, y) in items if y is not x and (_a, _b) < (i, j)]):
+                            emit(f'  {TAG} Stop {st["num"]}: "{x[:80]}" kept: it introduces the thing "{items[keep][2][:40]}" opens on')
+                            continue
                         edits[(i, j)] = []
                         emit(f'  {TAG} Stop {st["num"]}: the same event told again -> dropped "{x[:80]}" '
                              f'(kept "{items[keep][2][:60]}")')
             return edits
-        return sp._edit(tour_text, fn)
+        out = sp._edit(tour_text, fn)
+        if out != tour_text:   # [LOCAL-906W] a sentence the removal left without its antecedent ("This statue ...") is named or dropped
+            out = c.repair_thing_referent(out, evidence_by_title, log)
+        return out
     except Exception as err:  # pragma: no cover
         emit(f"  {TAG} retold-event guard skipped (non-fatal): {err}")
         return tour_text
@@ -335,11 +424,14 @@ def sentence_pass(tour_text: str, log: Optional[Callable] = None) -> str:
     try:
         def fn(st: Dict, tg):
             edits: Dict = {}
+            route = rc.active() or bool(re.match(r"(?is)^[^\n]{0,160}\bfrom\s+.{2,80}?\s+to\s+", tour_text))
             for i in sorted(tg):
                 for j, x in enumerate(tg[i][1]):
                     if c._is_disclosure(x):
                         continue
                     why = copy_reason(x)
+                    if not why and not tg[i][0] and body_travel_time(x, route):
+                        why = "travel time in a stop body (897 rule)"
                     if not why and not st["last"] and not tg[i][0] and thread_template(x):
                         why = "tour-level thread template in a stop body"
                     if why:
@@ -387,9 +479,9 @@ def closing_pass(tour_text: str, log: Optional[Callable] = None) -> str:
         return tour_text
 
 
-def run_pass(tour_text: str, log: Optional[Callable] = None) -> str:
+def run_pass(tour_text: str, log: Optional[Callable] = None, evidence_by_title: Optional[Dict[str, str]] = None) -> str:
     t = closing_pass(sentence_pass(tour_text, log), log)
-    t = retold_pass(t, log)
+    t = retold_pass(t, log, evidence_by_title)
     return directions_pass(t, log)
 
 
@@ -419,11 +511,11 @@ def last_word(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None
     the D760 disclosure body (906S ``factless_stops``), then the guards run once more."""
     emit = _emit(log)
     try:
-        t = run_pass(strip_breadcrumbs(tour_text, log), log)
+        t = run_pass(strip_breadcrumbs(tour_text, log), log, evidence_by_title)
         import language_dest_906s as s906
         t2 = s906.factless_stops(t, evidence_by_title, log)
         if t2 != t:
-            t2 = run_pass(t2, log)
+            t2 = run_pass(t2, log, evidence_by_title)
         return t2
     except Exception as err:  # pragma: no cover
         emit(f"  {TAG} last word skipped (non-fatal): {err}")
