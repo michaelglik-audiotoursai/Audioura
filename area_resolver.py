@@ -860,7 +860,7 @@ def _nominatim_bbox(query: str) -> Optional[List[float]]:
     q = (query or "").strip()
     if not q:
         return None
-    try:
+    def _do():
         resp = requests.get(
             "https://nominatim.openstreetmap.org/search",
             params={"q": q, "format": "jsonv2", "limit": "1",
@@ -868,9 +868,14 @@ def _nominatim_bbox(query: str) -> Optional[List[float]]:
             headers={"User-Agent": _USER_AGENT},
             timeout=8,
         )
+        if resp.status_code == 429:
+            resp.raise_for_status()      # [LOCAL-906U] the shared gate backs off and retries
         if resp.status_code != 200:
-            return None
-        results = resp.json() or []
+            return []
+        return resp.json() or []
+    try:
+        import nominatim_throttle_906u as _t906u
+        results = _t906u.call(("bbox", q), _do, query=q, empty=[]) or []
     except Exception:
         return None
     if not results or not isinstance(results[0], dict):

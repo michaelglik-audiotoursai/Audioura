@@ -121,6 +121,11 @@ def _nominatim_request(params: dict, context: str = "") -> "requests.Response":
                 sleep_time = _NOMINATIM_MIN_INTERVAL - elapsed
                 time.sleep(sleep_time)
             _nominatim_last_request_time = time.time()
+        try:   # [LOCAL-906U] and the process-wide gate every other geocoder caller shares
+            import nominatim_throttle_906u as _t906u
+            _t906u.wait_turn()
+        except Exception:
+            pass
 
         try:
             resp = _http.get(
@@ -141,7 +146,13 @@ def _nominatim_request(params: dict, context: str = "") -> "requests.Response":
             logger.warning(f"[EXISTENCE-GATE] Nominatim 429 for {context!r} "
                            f"(attempt {attempt + 1}/{_NOMINATIM_MAX_RETRIES})")
             if attempt < _NOMINATIM_MAX_RETRIES - 1:
-                time.sleep(_NOMINATIM_RETRY_BACKOFF * (2 ** attempt))
+                try:   # [LOCAL-906U] honour Retry-After (capped)
+                    import nominatim_throttle_906u as _t906u2
+                    time.sleep(max(_NOMINATIM_RETRY_BACKOFF * (2 ** attempt),
+                                   _t906u2.retry_after_s(type("E", (), {"headers": resp.headers})(), attempt)
+                                   if resp.headers.get("Retry-After") else 0.0))
+                except Exception:
+                    time.sleep(_NOMINATIM_RETRY_BACKOFF * (2 ** attempt))
                 continue
             raise RuntimeError(
                 f"Nominatim rate limited (429) for {context!r} after "

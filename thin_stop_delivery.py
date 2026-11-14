@@ -128,7 +128,25 @@ def _safe_fact_ok(fact_filter: Callable, title: str, sentence: str,
         return True
 
 
-def _traceable(sentence: str, fact_token_sets: List[set]) -> bool:
+def _numbers(text: str) -> set:
+    return set(re.findall(r"\d+(?:[.,]\d+)?", text or ""))
+
+
+def _share_enough(stoks: set, ftoks: set, sentence: str = "", fact: str = "") -> bool:
+    """[LOCAL-906U] >= 3 shared content tokens; for a SHORT fact (<= 4 content tokens, so 3 is out of reach) the
+    sentence must share at least 2 of them, state a number, and every number it states must be the fact's own
+    (proof of 906T: the only sourced fact of a stop, "...climbs at an angle of 37 degrees", was rejected as
+    'not traceable' and the stop delivered only the disclosure)."""
+    shared = len(stoks & ftoks)
+    if shared >= 3:
+        return True
+    if fact and len(ftoks) <= 4 and shared >= 2:
+        ns, nf = _numbers(sentence), _numbers(fact)
+        return bool(ns) and ns <= nf
+    return False
+
+
+def _traceable(sentence: str, fact_token_sets: List[set], fact_texts: Optional[List[str]] = None) -> bool:
     """True when a body sentence shares enough content with SOME fact to be
     considered drawn from it (>= 3 content tokens in common). With no facts
     supplied, any specific sentence counts (back-compat / standalone use)."""
@@ -137,8 +155,9 @@ def _traceable(sentence: str, fact_token_sets: List[set]) -> bool:
     stoks = _content_tokens(sentence)
     if not stoks:
         return False
-    for ftoks in fact_token_sets:
-        if len(stoks & ftoks) >= 3:
+    for k, ftoks in enumerate(fact_token_sets):
+        ft = fact_texts[k] if fact_texts and k < len(fact_texts) else ""
+        if _share_enough(stoks, ftoks, sentence, ft):
             return True
     return False
 
@@ -158,14 +177,16 @@ def count_delivered_specifics(body: str, facts=None) -> int:
     fact_texts = _fact_texts(facts)
     if not fact_texts:
         return count_specifics(sents)
-    fact_token_sets = [_content_tokens(t) for t in fact_texts]
-    fact_token_sets = [s for s in fact_token_sets if s]
+    _pr = [(_content_tokens(t), t) for t in fact_texts]
+    _pr = [(a, b) for a, b in _pr if a]
+    fact_token_sets = [a for a, _b in _pr]
+    fact_texts = [b for _a, b in _pr]
     n = 0
     seen = set()
     for sent in sents:
         if not _is_specific(sent):
             continue
-        if fact_token_sets and not _traceable(sent, fact_token_sets):
+        if fact_token_sets and not _traceable(sent, fact_token_sets, fact_texts):
             continue
         key = fold(sent)[:80]
         if key in seen:
@@ -475,13 +496,14 @@ def _default_narrate(system: str, user: str, model: str,
         return None, 0, 0
 
 
-def _traceable_to_facts(sentence: str, fact_token_sets: List[set]) -> bool:
+def _traceable_to_facts(sentence: str, fact_token_sets: List[set], fact_texts: Optional[List[str]] = None) -> bool:
     if not fact_token_sets:
         return False
     stoks = _content_tokens(sentence)
     if not stoks:
         return False
-    return any(len(stoks & ft) >= 3 for ft in fact_token_sets)
+    return any(_share_enough(stoks, ft, sentence, (fact_texts[k] if fact_texts and k < len(fact_texts) else ""))
+               for k, ft in enumerate(fact_token_sets))
 
 
 def narrate_stop_body(
@@ -551,8 +573,10 @@ def narrate_stop_body(
 
     # evidence for the LOCAL-872 claim gate = the facts themselves.
     evidence = list(facts_texts)
-    fact_token_sets = [_content_tokens(t) for t in facts_texts]
-    fact_token_sets = [s for s in fact_token_sets if s]
+    _pairs = [(_content_tokens(t), t) for t in facts_texts]
+    _pairs = [(a, b) for a, b in _pairs if a]
+    fact_token_sets = [a for a, _b in _pairs]
+    _fact_texts_aligned = [b for _a, b in _pairs]
 
     kept: List[str] = []
     seen = set()
@@ -563,9 +587,9 @@ def narrate_stop_body(
         if key in seen:
             continue
         # 873B fact-sheet verify: the sentence must be traceable to a fact.
-        if not _traceable_to_facts(s, fact_token_sets):
+        if not _traceable_to_facts(s, fact_token_sets, _fact_texts_aligned):
             report["rejected"] += 1
-            log(f"  [LOCAL-873C] rejected (not traceable): {s[:90]}")
+            log(f"  [LOCAL-873C] rejected (not traceable to any of the {len(fact_token_sets)} sourced fact(s)): {s[:90]}")
             continue
         # LOCAL-872 claim gate: no unsourced named claim / date.
         if claim_gate_fn is not None:
@@ -586,6 +610,9 @@ def narrate_stop_body(
     if len(kept) < min_sentences:
         log(f"  [LOCAL-873C] narration kept only {len(kept)} traceable "
             f"sentence(s) (< {min_sentences}) for {title!r}; falling back")
+        if not kept and facts_texts:   # [LOCAL-906U] a sourced fact that is not delivered is dropped for a logged reason
+            log(f"  [LOCAL-906U] {title!r}: {len(facts_texts)} escalated sourced fact(s) not narrated: no candidate "
+                f"sentence was traceable to them (first fact: \"{facts_texts[0][:80]}\")")
         return None, report
     return kept[:max_sentences], report
 

@@ -74,6 +74,27 @@ def about_stop(cand: str, title: str, type_text: str = "") -> bool:
     return bool(toks & words)
 
 
+_LANDFORMS = {"beach": "beach", "beaches": "beach", "island": "island", "islands": "island", "lake": "lake", "lakes": "lake",
+              "bay": "bay", "bays": "bay", "desert": "desert", "dune": "dune", "dunes": "dune", "lagoon": "lagoon",
+              "waterfall": "waterfall", "waterfalls": "waterfall", "canyon": "canyon", "seaside": "seaside"}
+
+
+def foreign_landform(cand: str, title: str, type_text: str = "") -> Optional[str]:
+    """[LOCAL-906U] The landform a sentence names when the stop is not one (its title and type name none of them) and the sentence does
+    not name the stop either. \"Wander the beautiful beaches in this relaxing area.\" on a mountain pagoda: 'beach'."""
+    own = {_LANDFORMS.get(w, w) for w in rc._words(re.sub(r"[<>]", " ", (title or "") + " " + (type_text or "")))}
+    words = rc._words(cand or "")
+    named = {_LANDFORMS[w] for w in words if w in _LANDFORMS}
+    named -= own
+    if not named:
+        return None
+    toks = _title_tokens(title, "")
+    stem = {w[:-1] if len(w) > 4 and w.endswith("s") else w for w in words}
+    if toks & stem:
+        return None                                  # the sentence is about the stop and mentions its setting
+    return sorted(named)[0]
+
+
 def other_landmark(cand: str, title: str, tour_text: Optional[str]) -> Optional[str]:
     """A named landmark (a name carrying a place noun) that is neither this stop's title nor anywhere in the tour."""
     known = _tour_words(tour_text) | _fold_set(title)
@@ -155,8 +176,13 @@ def refill_reject(cand: str, title: str, tour_text: Optional[str] = None, source
             return "promo copy"
     except Exception:  # pragma: no cover
         pass
-    if not own_evidence and not about_stop(x, title, type_text):   # a sentence of the stop's OWN evidence is keyed to it already
+    # [LOCAL-906U] a sentence of the stop's own evidence is keyed to it already, EXCEPT one that names a landform the stop is not
+    # (beaches on a mountain pagoda): that is off-topic on every path.
+    if not own_evidence and not about_stop(x, title, type_text):
         return "not about this stop"
+    lf = foreign_landform(x, title, type_text)
+    if lf:
+        return f"not about this stop (names a landform the stop is not: {lf})"
     other = other_landmark(x, title, tour_text)
     if other:
         return f"names another place ({other[:30]})"

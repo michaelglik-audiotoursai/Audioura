@@ -249,3 +249,16 @@ def _local889_reset_deny_set():
     except Exception:
         pass
     yield
+
+
+# ─── LOCAL-906U: the process-wide Nominatim gate (throttle + per-job cache) must not leak between tests ────
+@pytest.fixture(autouse=True)
+def _local906u_reset_geocoder_gate(monkeypatch):
+    try:
+        import nominatim_throttle_906u as t
+        t.reset_job()
+        monkeypatch.setattr(t, "MIN_INTERVAL_S", 0.0)       # tests never sleep; test_local906u passes its own clock
+        monkeypatch.setattr(t, "DEFAULT_BACKOFF_S", 0.0)
+    except Exception:
+        pass
+    yield
