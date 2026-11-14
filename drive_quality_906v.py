@@ -521,8 +521,14 @@ _CLOSE_ANY = re.compile(r"(?i)^(?:by\s+)?(?:understanding|exploring|experiencing
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\u00C0-\u1EF9\"'“])")
 
 
+# [LOCAL-906X] neighbour / operator leftovers the earlier passes missed (drive proof of 906W)
+_NEIGHBOUR_LEFTOVER = re.compile(r"(?i)\bvisitors\s+often\s+combine\b|\blocal\s+attractions\s+and\s+activities\s+like\b|\bjeep\s+tours?\b")
+
+
 def sweep_reason(x: str) -> Optional[str]:
     s = (x or "").strip()
+    if _NEIGHBOUR_LEFTOVER.search(s):
+        return "neighbour / operator leftover"
     if _CURRENCY.search(s):
         return "price / currency"
     if _LONE_SUB.match(s) and len(s.split()) <= 10:
@@ -582,6 +588,11 @@ def last_word(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None
                 t2 = run_pass(s906.run_pass(t2, evidence_by_title, log), log, evidence_by_title)
             except Exception as _e_re:  # pragma: no cover
                 emit(f"  {TAG} re-guard after refill skipped (non-fatal): {_e_re}")
+        try:   # [LOCAL-906X] the refill may bring a rise-as-length / unsupported-year sentence back: judged once more before the sweep
+            import rise_dates_906x as _x906
+            t2 = _x906.run_pass(t2, evidence_by_title, log)
+        except Exception as _e_x:  # pragma: no cover
+            emit(f"  {TAG} rise / year guard skipped (non-fatal): {_e_x}")
         return final_sweep(strip_breadcrumbs(t2, log), log)   # [LEAD wave 58/59] the LAST text transform of the delivery guards
     except Exception as err:  # pragma: no cover
         emit(f"  {TAG} last word skipped (non-fatal): {err}")
