@@ -161,6 +161,10 @@ def refill_reject(cand: str, title: str, tour_text: Optional[str] = None, source
             return f"sentence in another language ({_lang})"
         if _s906s.caption_variant(x) or _s906s.variant_reason(x) or _s906s.fragment_reason(x) or _s906s.is_connects_filler(x):
             return "caption / operator / fragment / filler copy"
+        import stub_promo_906t as _t906t      # [LEAD wave 59] a refill never brings back what 906T dropped
+        _pr = _t906t.promo_reason(x)
+        if _pr:
+            return f"promo ({_pr})"
     except Exception:  # pragma: no cover
         pass
     if _WORLD.search(x) or c.record_claim(x):

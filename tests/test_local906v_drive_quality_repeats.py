@@ -319,3 +319,18 @@ def test_lead_wave58_final_sweep_price_lone_clause_advice():
         assert keep in out
     lone = "Stop 1: X\n\nYou can buy it for $2 a bag."
     assert v.final_sweep(lone) == lone            # a paragraph is never emptied
+
+
+def test_lead_wave59_last_word_ends_with_final_sweep_and_reguards_refills():
+    """[LEAD wave 59] last_word must end with the final sweep (it silently did not after the 906W merge), and the sweep covers
+    the promo / closing / hours / tour-part families a refill can bring back."""
+    import inspect
+    import drive_quality_906v as v
+    assert "return final_sweep(" in inspect.getsource(v.last_word)
+    for x in ("Visit historic Old Towers, fruit orchards, and Some Mountain summit by cable car with a dedicated English-speaking cultural guide.",
+              "Understanding these connections allows you to appreciate the enduring legacy of the local heritage.",
+              "The village is busiest between 5:30 and 7:00 AM, when the boats come in.",
+              "You can explore the village on your own by bike or motorbike, or as part of a tour that includes nearby attractions."):
+        assert v.sweep_reason(x), x
+    for x in ("The statue was begun in 1958 and completed in 1962.", "Exploring the towers, archaeologists found 12 inscriptions in 1990."):
+        assert v.sweep_reason(x) is None, x

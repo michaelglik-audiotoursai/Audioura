@@ -109,7 +109,7 @@ _PROMO = [(re.compile(p), why) for p, why in (
     (r"(?i)\b(?:prices?|fares?|fees?|costs?)\b[^.!?]{0,40}\b(?:around|about|approximately|from|start(?:s|ing)?\s+at|of|is|are|range[sd]?|run|runs)\b[^.!?]{0,30}"
      r"(?:\$|€|£|USD|VND|dong|euros?|dollars?|\d)", "price copy"),
     (r"(?i)\bprices?\s+(?:around|are|is|start|range|vary|from|of)\b", "price copy"),
-    (r"(?i)(?:[$€£]\s?\d|\b\d[\d.,]*\s?(?:usd|vnd|dollars?|euros?|dong)\b)", "a price"),
+    (r"(?i)(?:[$€£]\s?\d|\b\d[\d.,]*\s?(?:usd|vnd|dollars?|euros?|dong(?!(?-i:\s+[A-Z])))\b)", "a price"),
     (r"(?i)\bfor\s+(?:entry|admission)\b|\b(?:entry|admission|entrance)\s+(?:fees?|prices?|costs?|charges?)\b|\badmission\b|\bentry\s+is\s+(?:free|\$)", "entry-fee copy"),
     (r"(?i)^visit\b[^.!?]*,[^.!?]*\band\b", "an imperative tour listing"),
     (r"(?i)^visit\s+(?:historic|famous|the|ancient|beautiful)\b[^.!?]{0,120}\b(?:by|with|via)\b", "an imperative tour listing"),

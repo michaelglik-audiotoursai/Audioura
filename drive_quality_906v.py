@@ -513,6 +513,11 @@ _CURRENCY = re.compile(r"(?i)(?:[$€£¥₫]\s?\d|\d[\d.,]*\s?(?:[$€£¥₫]|
 _LONE_SUB = re.compile(r"(?i)^(?:if|when|whenever|once|as|although|though|because|since|while|unless|after|before|until)\s+[^,;]{1,60}[.!?]$")
 _ADVICE = re.compile(r"(?i)\b(?:it\s+is\s+|it's\s+)?(?:recommended|advisable|best|a\s+good\s+idea|wise)\s+to\s+(?:visit|come|go|arrive|get\s+here|bring|wear|book)\b|"
                      r"\b(?:try\s+to|be\s+sure\s+to|make\s+sure\s+to|don't\s+forget\s+to)\s+(?:visit|come|arrive|bring|wear|book)\b")
+_CLOCK = re.compile(r"(?i)\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b|\b\d{1,2}:\d{2}\s*(?:-|–|to|and)\s*\d{1,2}:\d{2}\b")
+_TOUR_PART = re.compile(r"(?i)\b(?:as|on)\s+(?:part\s+of\s+)?an?\s+(?:guided\s+|organi[sz]ed\s+|day\s+|private\s+)?tours?\s+(?:that|which)\s+(?:includes?|covers?|combines?)\b|"
+                        r"\bon\s+your\s+own\s+by\s+(?:bike|motorbike|car|taxi|scooter)\b")
+_CLOSE_ANY = re.compile(r"(?i)^(?:by\s+)?(?:understanding|exploring|experiencing|visiting|discovering|seeing|appreciating|learning\s+about)\s+"
+                        r"(?:these|this|the)\b[^.!?]{0,80}\b(?:allows?|lets?|invites?|helps?|gives?|offers?|enables?|you\s+(?:gain|get|discover|learn))\b")
 _SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\u00C0-\u1EF9\"'“])")
 
 
@@ -524,6 +529,20 @@ def sweep_reason(x: str) -> Optional[str]:
         return "a subordinate clause alone"
     if _ADVICE.search(s):
         return "visiting advice"
+    if _CLOCK.search(s):
+        return "opening hours / clock times"
+    if _TOUR_PART.search(s):
+        return "operator copy (part of a tour)"
+    if _CLOSE_ANY.match(s) and not re.search(r"\d", s):
+        return "closing template ('Understanding / Exploring … allows you')"
+    try:   # [LEAD wave 59] the promo / operator / closing families, whatever path put the sentence back
+        import stub_promo_906t as _t
+        import language_dest_906s as _s
+        why = _t.promo_reason(s) or _s.variant_reason(s) or copy_reason(s)
+        if why:
+            return why
+    except Exception:  # pragma: no cover
+        pass
     return None
 
 
@@ -557,7 +576,13 @@ def last_word(tour_text: str, evidence_by_title: Optional[Dict[str, str]] = None
         t2 = s906.factless_stops(t, evidence_by_title, log)
         if t2 != t:
             t2 = run_pass(t2, log, evidence_by_title)
-        return t2
+            # [LEAD wave 59] the refill above took "Visit historic <A>, <B> … with a dedicated English-speaking guide" back from the
+            # evidence AFTER 906T had dropped it (drive proof, 3 cycles): the 906S/906T guards run once more on the refilled text
+            try:
+                t2 = run_pass(s906.run_pass(t2, evidence_by_title, log), log, evidence_by_title)
+            except Exception as _e_re:  # pragma: no cover
+                emit(f"  {TAG} re-guard after refill skipped (non-fatal): {_e_re}")
+        return final_sweep(strip_breadcrumbs(t2, log), log)   # [LEAD wave 58/59] the LAST text transform of the delivery guards
     except Exception as err:  # pragma: no cover
         emit(f"  {TAG} last word skipped (non-fatal): {err}")
         return tour_text
