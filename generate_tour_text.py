@@ -30277,7 +30277,10 @@ REWRITE RULES (all mandatory):
             # recurs with different years.
             try:
                 from derepetition_guard import cap_person_across_stops as _cap_person
-                for _cp in _cap_person(poi_list):
+                # [LOCAL-906T] the tour's own place words (location, request, title) are never people
+                _pc_text = [str(_v) for _v in (locals().get('location'), locals().get('original_request'),
+                                               locals().get('tour_title'), locals().get('request_text')) if _v]
+                for _cp in _cap_person(poi_list, place_text=_pc_text):
                     print(f"      [PERSON-CAP] stop {_cp['stop']}: '{_cp['person']}' "
                           f"already carries two stops — cut: {_cp['removed'][:80]}")
             except Exception as _cp_err:
@@ -30967,6 +30970,23 @@ REWRITE RULES (all mandatory):
                         first_poi_coordinates = _fp906d
         except Exception as _e906d2:
             print(f"  [LOCAL-906D] last-resort pin skipped (non-fatal): {_e906d2}")
+        try:   # [LOCAL-906T] a stop pin rounded to 1-2 decimals (the city / tour fallback) is replaced from a named-place geocode
+            import stub_promo_906t as _t906t
+            import geocode_stops as _gs906t
+            _pn906t = (_prov_name_906d or '') if '_prov_name_906d' in locals() else ''
+            try:   # the pipeline's own city centre, for the compass-bearing guard
+                _cn906t = (getattr(locals().get('_ar906d'), 'city_name', '') or '').split(',')[0].strip()
+                _cc906t = locals().get('_pin_center_791c')
+                if _cn906t and _cc906t:
+                    _t906t.set_city_centers({_cn906t: (float(_cc906t[0]), float(_cc906t[1]))})
+            except Exception:
+                pass
+            _t906t.fix_coarse_pins(
+                poi_list, lambda _q: _gs906t.geocode_candidates(_q, 5), province=_pn906t,
+                country=str(locals().get('country') or ''),
+                box=(_prov_box_906d if '_prov_box_906d' in locals() and _prov_box_906d else None), log=print)
+        except Exception as _e906t:
+            print(f"  [LOCAL-906T] coarse-pin fix skipped (non-fatal): {_e906t}")
         try:   # [LOCAL-903] a snapped, verified place supersedes the place reference; a single place is one place
             import single_place_903 as _sp903
             _ar903 = locals().get('_area')

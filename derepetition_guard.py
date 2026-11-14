@@ -1239,10 +1239,59 @@ _RECAP_SENTENCE = re.compile(
     r"|\byour\s+tour\s+(?:of|is)\b|\bto\s+recap\b", re.I)
 
 
-def _person_names(sentence):
+# [LOCAL-906T] Place / landmark words are never people. PERSON-CAP cut sentences for 'pagoda', 'mountain', 'tien' and 'thiet' on a
+# mountain tour: the first two are landmark nouns, the others are halves of place names ("Ham Tien", "Phan Thiet"). A token is not a
+# person when it is a landmark / common noun, part of any stop title, the tour title or request, or the object of a place preposition.
+_LANDMARK_NOUNS = {
+    'pagoda', 'pagodas', 'mountain', 'mountains', 'mount', 'hill', 'hills', 'peak', 'summit', 'valley', 'temple', 'temples', 'monastery',
+    'beach', 'lake', 'river', 'island', 'islands', 'cave', 'caves', 'falls', 'waterfall', 'lighthouse', 'towers', 'fortress', 'fort',
+    'citadel', 'palace', 'market', 'village', 'harbor', 'harbour', 'port', 'bay', 'cape', 'forest', 'dunes', 'dune', 'desert', 'coast',
+    'province', 'district', 'ward', 'region', 'sea', 'ocean', 'buddha', 'statue', 'resort', 'hotel', 'cable', 'car', 'mosque', 'synagogue',
+    'castle', 'monument', 'memorial', 'cemetery', 'plaza', 'island', 'canyon', 'glacier', 'volcano', 'reef', 'harbour', 'quay', 'pier',
+}
+_PLACE_PREP = re.compile(r"(?:\b(?:in|near|at|outside|around|toward|towards|into)\s+)$")
+
+
+def _fold_token(t):
+    import unicodedata
+    return ''.join(ch for ch in unicodedata.normalize('NFD', t.lower().replace('\u0111', 'd'))
+                   if unicodedata.category(ch) != 'Mn')
+
+
+def place_tokens_from(*texts):
+    """Folded word tokens of the stop titles / tour title / request handed in (each item a str or an iterable of str)."""
+    out = set()
+    for t in texts:
+        items = [t] if isinstance(t, str) else list(t or [])
+        for it in items:
+            for w in re.findall(r"[^\W\d_]+", str(it or ''), re.UNICODE):
+                f = _fold_token(w)
+                if len(f) > 2:
+                    out.add(f)
+    return out
+
+
+def _person_names(sentence, place_tokens=None):
     """Just the names in a sentence that could plausibly be PEOPLE."""
-    names, _years = _entity_year_key(sentence)
-    return {n for n in names if n not in _NOT_PERSON and len(n) > 2}
+    place_tokens = place_tokens or set()
+    names = set()
+    for m in _PROPER.finditer(sentence or ''):
+        words = m.group(1).split()
+        titled = any(w.lower() in _TITLES - {'the'} for w in words)
+        parts = [w for w in words if w.lower() not in _TITLES]
+        if not parts:
+            continue
+        # the object of a place preposition ("in Ham Tien") is a place unless a person's title opens it
+        if not titled and _PLACE_PREP.search((sentence or '')[:m.start()].lower().rstrip() + ' '):
+            continue
+        last = parts[-1].lower()
+        if last in _NOT_PERSON or last in _LANDMARK_NOUNS or len(last) <= 2:
+            continue
+        if _fold_token(last) in place_tokens:
+            continue
+        # a phrase ending in a landmark noun ("Linh Son Truong Tho Pagoda") is a place whole
+        names.add(last)
+    return names
 
 
 def _same_episode(key_a, key_b):
@@ -1354,7 +1403,7 @@ def _same_event(key_a, key_b):
     return True
 
 
-def cap_person_across_stops(poi_list, max_stops: int = 2):
+def cap_person_across_stops(poi_list, max_stops: int = 2, place_text=''):
     """No one person may carry the story at more than `max_stops` stops.
 
     The kiro critic on a 6-stop church tour, 2026-09-23: *"the Cuenin / Cardinal Law
@@ -1372,11 +1421,13 @@ def cap_person_across_stops(poi_list, max_stops: int = 2):
     only that person are dropped.
     """
     from collections import defaultdict
+    # [LOCAL-906T] every stop title, the tour title / request: their words are place words, never people.
+    _pt = place_tokens_from([(p.get('name') or '') for p in (poi_list or []) if isinstance(p, dict)], place_text)
     where = defaultdict(list)          # surname -> [(stop_idx, sentence), ...]
     for i, poi in enumerate(poi_list or []):
         desc = (poi.get('description') or '') if isinstance(poi, dict) else ''
         for sent in _split_into_sentences(desc):
-            for n in _person_names(sent):
+            for n in _person_names(sent, _pt):
                 where[n].append((i, sent))
 
     removed = []
@@ -1390,7 +1441,7 @@ def cap_person_across_stops(poi_list, max_stops: int = 2):
                 continue
             # Only drop it if this person is the ONLY name carrying the sentence —
             # never cut a sentence that is doing other work too.
-            if _person_names(sent) != {surname}:
+            if _person_names(sent, _pt) != {surname}:
                 continue
             # [2026-09-23] Never cut a RECAP sentence. Filtering common nouns out of
             # the person set made "That's 4 stops -- Stained Glass Windows, where
@@ -1400,8 +1451,10 @@ def cap_person_across_stops(poi_list, max_stops: int = 2):
             if _RECAP_SENTENCE.search(sent):
                 continue
             poi = poi_list[i]
-            kept = [x for x in _split_into_sentences(poi.get('description') or '')
-                    if x != sent]
+            # [LOCAL-906T] split WITHOUT the 20-character floor of _split_into_sentences: the rebuild silently dropped every short
+            # sentence of the body, and a sentence cut by that floor leaves a stub at the end of the stop.
+            kept = [x.strip() for x in _ss_split((poi.get('description') or '').strip())
+                    if x.strip() and x.strip() != sent]
             # NEVER empty a stop. The first version of this cut the Altar down to
             # nothing, and LOCAL-292's empty-stop gate would then have deleted the
             # stop entirely -- trading a repetition for a missing stop, which is the
