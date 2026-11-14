@@ -15681,6 +15681,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             # [LOCAL-329] Track selection reasons for substance filtering and corpus persistence
             _selection_reasons = {}  # name_lower → reason text
             _hollow_reason_rejects = []  # names rejected for ranking-only reasons
+            _hollow_fallback_lead910 = []  # [LEAD-910] (name, address) of those, kept as a last resort
 
             for c in candidates:
                 if not isinstance(c, dict):
@@ -15743,6 +15744,7 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
                         # Hollow reason — the venue may still be real, but the LLM
                         # couldn't cite a specific fact. Deprioritize.
                         _hollow_reason_rejects.append(name)
+                        _hollow_fallback_lead910.append((name, c.get("address") or ""))
                         print(f"   ! [LOCAL-329] Hollow reason for '{name}': '{reason[:80]}'")
                         continue  # skip this candidate
 
@@ -15768,6 +15770,17 @@ def _generate_tour_text_impl(location, tour_type, output_file=None, total_stops=
             if _selection_reasons:
                 print(f"  [LOCAL-329] Captured {len(_selection_reasons)} substantive selection reason(s)")
 
+            # [LEAD-910] A hollow reason only DEPRIORITIZES a candidate (LOCAL-329's intent). When every
+            # candidate was rejected for that reason alone, an empty tour is worse: keep them, and let the
+            # existence gate and grounding downstream decide. Observed 2026-11-13: an A-to-B drive whose 6
+            # candidates all had one-line reasons clean-failed with "no stops could be generated".
+            if len(poi_list) == 0 and _hollow_fallback_lead910:
+                from story_miner import _normalize as _l910_norm
+                for _hn, _ha in _hollow_fallback_lead910:
+                    if not any(_l910_norm(_hn) == _l910_norm(p.get('name', '')) for p in poi_list):
+                        poi_list.append(_new_poi(_hn, _ha))
+                print(f"  [LEAD-910] all {len(_hollow_fallback_lead910)} Phase 3A candidate(s) had hollow reasons; "
+                      f"kept {len(poi_list)} rather than fail (existence gate decides)")
             if len(poi_list) == 0:
                 print(f"X PHASE 3A: no usable POIs after parsing")
                 # [LOCAL-582] RUNG 3. An exhibition/historic museum that resolved on
