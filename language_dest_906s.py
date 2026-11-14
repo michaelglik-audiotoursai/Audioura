@@ -215,6 +215,7 @@ _VARIANTS = [re.compile(p) for p in (
     r"tells|takes|invites|journeys|traces|illustrates|demonstrates)\b",
     r"(?i)^(?:exploring|visiting|seeing|discovering)\s+(?:these|all\s+(?:of\s+)?these)\s+(?:sites|stops|places|spots|landmarks|locations)\b[^.!?]{0,20}\b(?:allows?|lets?|helps?|gives?)\s+you\b",
     r"(?i)\bcreating\s+(?:lasting|unforgettable|lifelong|lifetime)\s+memories\b",
+    r"(?i)^by\s+(?:exploring|visiting|seeing|discovering)\s+(?:these|all\s+(?:of\s+)?these|all\s+the)\b[^.!?]{0,80}?,?\s*you\s+(?:will\s+|can\s+)?(?:gain|get|discover|learn)\b",   # [LOCAL-906W]
     r"(?i)^(?:each|every)\s+(?:stop|place|site)\s+(?:invites?|offers?|reveals?|reflects?|tells?|shows?|captures?|adds?|brings?|"
     r"holds?|deepens?|reminds?)\b",
 )]

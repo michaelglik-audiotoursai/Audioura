@@ -119,6 +119,7 @@ _PROMO = [(re.compile(p), why) for p, why in (
     (r"(?i)^(?:exploring|visiting|seeing|discovering|experiencing)\s+(?:these|all\s+(?:of\s+)?these|the|all\s+the)\s+(?:sites|stops|places|spots|landmarks|locations|attractions)\b"
      r"[^.!?]{0,20}\b(?:allows?|lets?|helps?|gives?|offers?|enables?)\s+you\b", "template closing"),
     (r"(?i)\bcreating\s+(?:lasting|unforgettable|lifelong|lifetime|wonderful|precious)\s+memories\b", "template closing"),
+    (r"(?i)^by\s+(?:exploring|visiting|seeing|discovering)\s+(?:these|all\s+(?:of\s+)?these|all\s+the)\b[^.!?]{0,80}?,?\s*you\s+(?:will\s+|can\s+)?(?:gain|get|discover|learn)\b", "template closing"),   # [LOCAL-906W]
     (r"(?i)\b(?:connect|connecting)\s+with\s+the\s+(?:region|area|country|city|town|island)[’']?s\s+(?:heritage|culture|history)\b", "template closing"),
 )]
 
@@ -167,6 +168,29 @@ def contested_record(x: str, st_title: str, ev_own: str, ev_other: Dict[str, str
     return None
 
 
+def narrower_scope(x: str, st_title: str, ev_own: str, ev_other: Dict[str, str]) -> Optional[str]:
+    """[LOCAL-906W] The scope an evidence sentence of the job states for the SAME superlative (same size class, same object) when it is
+    narrower than the one ``x`` claims (\"the longest ... in Asia\" against \"the longest ... in Southeast Asia\"). Two sources that disagree on
+    a record's scope do not back the wider claim, hedged or not. None when no evidence does, or the claim is the stop's own venue."""
+    cl = c.scoped_claim(x)
+    if not cl or cl["hedged"] or cl["cls"] not in c._SIZE_CLASSES or c._local_scope(cl, st_title) or cl["rank"] is None:
+        return None
+    obj = _object_tokens(cl, st_title) | set(rc._content_tokens(st_title))
+    best: Optional[Dict] = None
+    for text, own in [(ev_own, True)] + [(v, False) for v in ev_other.values()]:
+        for es in _evidence_sentences(text):
+            if not (own or obj & set(rc._content_tokens(es))):
+                continue
+            for e in c.scoped_claims(es, include_hedged=True):
+                if not c.cls_eq(e["cls"], cl["cls"]) or e["rank"] is None or e["rank"] >= cl["rank"] or not e["scope"]:
+                    continue
+                if not (set(e["toks"]) & set(cl["toks"]) or (obj & (set(e["toks"]) | set(rc._content_tokens(es))))):
+                    continue
+                if best is None or e["rank"] > best["rank"]:
+                    best = e
+    return best["scope"] if best else None
+
+
 def comparative_unsupported(x: str, ev_own: str, ev_all: Sequence[str]) -> Optional[str]:
     """The named place a comparative sentence measures against, when no evidence sentence states that comparison."""
     m = _CMP_CUE.search(x or "")
@@ -192,11 +216,18 @@ def _record_judgement(x: str, st: Dict, ctx: Dict) -> Optional[Tuple[str, str, s
         return "drop", "", f"comparison with '{cmp_name}' that no evidence states"
     other = {k: v for k, v in ctx["ev_all"].items() if v != ev_own}      # the evidence of EVERY entry of the job, tour stop or not
     why = contested_record(x, st["title"], ev_own, other)
-    if why:
+    nsc = narrower_scope(x, st["title"], ev_own, other)        # [LOCAL-906W] the job's evidence states it for a narrower scope
+    if why or nsc:
         new = c._hedge_text(x)
+        if new and nsc and not why:       # a hedge in the evidence keeps the claim's own scope (906T); only a narrower, unhedged statement narrows it
+            cl0 = c.scoped_claim(x)
+            sc0 = (cl0 or {}).get("scope") or ""
+            if sc0 and rc.fold(sc0) != rc.fold(nsc):
+                new = re.sub(r"(?<![\w-])" + re.escape(sc0) + r"(?![\w-])", nsc, new, count=1)
         if new and new != x:
-            return "replace", new, f"record contested by the evidence ({why}) -> hedged"
-        return "drop", "", f"record contested by the evidence ({why})"
+            return "replace", new, (f"record contested by the evidence ({why or 'narrower scope: ' + str(nsc)}) -> hedged"
+                                    + (f" for {nsc}" if nsc else ""))
+        return "drop", "", f"record contested by the evidence ({why or 'narrower scope: ' + str(nsc)})"
     cl = c.scoped_claim(x)
     if cl and not cl["hedged"] and cl["cls"] in c._SIZE_CLASSES and not c._local_scope(cl, st["title"]) \
             and not ctx["any_ev"] and cl["rank"] is not None and cl["rank"] >= 3:

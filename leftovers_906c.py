@@ -876,6 +876,10 @@ _PRON_VERB = rc._VERB_OPEN | {"represents", "represent", "captures", "capture", 
                               "looks", "look", "gives", "give", "makes", "make", "belongs", "belong"}
 
 
+_NP_BREAK_906W = frozenset("also still now once only often then just in on at of from with by for to and but or which that who whose where when while "
+                           "as near above below beside within without into onto over under after before during".split())
+
+
 def _title_toks(title: str) -> Set[str]:
     return {w for w in rc.fold(title).split() if len(w) >= 4}
 
@@ -940,7 +944,17 @@ def repair_pronoun_opener(tour_text: str, log: Optional[Callable] = None) -> str
             elif first in _PRON_VERB:                            # "This is ..."
                 fixed = f"{the} {rest}"
             elif first and first in _title_toks(title):          # "This statue ..." -> the title names it
-                fixed = f"{the} {rest.split(' ', 1)[1] if ' ' in rest else ''}".strip()
+                _w0 = rest.split(" ", 1)[0]
+                _tail = rest.split(" ", 1)[1] if " " in rest else ""
+                _n1 = _tail.split(" ", 1)[0].lower().strip(",.;:") if _tail else ""
+                if (pron in ("This", "These") and _tail and not _w0.endswith((",", ";", ":")) and _n1
+                        and _n1 not in _PRON_VERB and _n1 not in rc._VERBS_906B and _n1 not in _NP_BREAK_906W
+                        and not re.search(r"(?:ed|ing)$", _n1)):
+                    # [LOCAL-906W] "This cable car system, designed ..." already names the object in a longer noun phrase:
+                    # the title is not glued in front of it ("The cable car ascent car system")
+                    fixed = f"The {rest}"
+                else:
+                    fixed = f"{the} {_tail}".strip()
             else:
                 pieces.append(block)
                 continue

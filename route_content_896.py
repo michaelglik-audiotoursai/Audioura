@@ -801,6 +801,14 @@ def _cut_left_np(y: str) -> bool:
     return bool(_CUT_NP.match(s)) and not _CUT_FINITE.search(s)
 
 
+_CUT_SUB = re.compile(r"(?i)^(?:if|when|whenever|once|as|although|though|because|since|while|unless|after|before|until)\b[^,]*$")
+
+
+def _cut_left_sub(y: str) -> bool:
+    """[LOCAL-906W] What a clause cut left: a subordinate clause with no main clause ("If you start from <Origin>.")."""
+    return bool(_CUT_SUB.match((y or "").strip().rstrip(".!?")))
+
+
 def strip_body_travel(tour_text: str, log: Optional[Callable] = None) -> str:
     """No \"N minutes/km away\" or compass direction in a stop BODY unless both ends are pinned (the
     stop, and the route place the sentence names). Directions lines are handled by
@@ -823,7 +831,7 @@ def strip_body_travel(tour_text: str, log: Optional[Callable] = None) -> str:
                 _time = bool(_MINUTES.search(x))
                 if _has_travel(x) and (_time or not (_pinned and _other and not _names_unpinned(x))):
                     y = repair_travel_sentence(x)
-                    if y is not None and (is_fragment(y) or _cut_left_np(y)):   # [LEAD wave 58] "This cable car system, designed in Austria."
+                    if y is not None and (is_fragment(y) or _cut_left_np(y) or _cut_left_sub(y)):   # [LEAD wave 58] "This cable car system, designed in Austria."
                         y = None
                     if log:
                         log(f"  [LOCAL-897] Stop {_n} '{_t[:40]}': body distance/time/compass without both ends "
